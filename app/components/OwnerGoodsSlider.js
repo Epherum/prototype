@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import styles from "./GoodsSlider.module.css";
 import Link from "next/link";
-import { FaChevronDown, FaChevronUp } from "react-icons/fa";
+import styles from "./GoodsSlider.module.css";
+import { FaChevronDown, FaChevronUp, FaLevelDownAlt } from "react-icons/fa";
 
 const goods = [
   {
@@ -54,16 +54,13 @@ const goods = [
   },
 ];
 
-export default function GoodsSlider({ partnerId, isVisible }) {
+export default function OwnerGoodsSlider({ onGoodChange, isVisible }) {
   const [currentGoodIndex, setCurrentGoodIndex] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [isDragButtonPressed, setIsDragButtonPressed] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-
-  const partnerGoods = goods.filter((good) => good.partnerId === partnerId);
 
   const handleTouchStart = (e) => {
     setTouchStart(e.touches[0].clientX);
@@ -85,25 +82,25 @@ export default function GoodsSlider({ partnerId, isVisible }) {
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
-    if (isLeftSwipe && currentGoodIndex < partnerGoods.length - 1) {
-      setCurrentGoodIndex((prev) => prev + 1);
+    if (isLeftSwipe && currentGoodIndex < goods.length - 1) {
+      setCurrentGoodIndex((prev) => {
+        const newIndex = prev + 1;
+        onGoodChange(goods[newIndex].partnerId);
+        return newIndex;
+      });
     }
     if (isRightSwipe && currentGoodIndex > 0) {
-      setCurrentGoodIndex((prev) => prev - 1);
+      setCurrentGoodIndex((prev) => {
+        const newIndex = prev - 1;
+        onGoodChange(goods[newIndex].partnerId);
+        return newIndex;
+      });
     }
 
     setTouchStart(null);
     setTouchEnd(null);
     setIsDragging(false);
     setDragOffset(0);
-  };
-
-  const handleDragStart = () => {
-    setIsDragButtonPressed(true);
-  };
-
-  const handleDragEnd = () => {
-    setIsDragButtonPressed(false);
   };
 
   const toggleExpand = () => {
@@ -123,7 +120,7 @@ export default function GoodsSlider({ partnerId, isVisible }) {
           transform: isDragging ? `translateX(${-dragOffset}px)` : "none",
         }}
       >
-        {partnerGoods.map((good, index) => (
+        {goods.map((good, index) => (
           <div
             key={good.id}
             className={`${styles.goodSlide} ${
@@ -153,9 +150,11 @@ export default function GoodsSlider({ partnerId, isVisible }) {
                 </>
               )}
             </button>
-            <Link href="/owners" className={styles.toggleButton}>
-              Level Up
-            </Link>
+            <div className={styles.navigationButtons}>
+              <Link href="/" className={styles.levelButton}>
+                <FaLevelDownAlt /> Level Down
+              </Link>
+            </div>
             <div
               className={`${styles.description} ${
                 isDescriptionExpanded ? styles.expanded : ""
@@ -170,13 +169,16 @@ export default function GoodsSlider({ partnerId, isVisible }) {
         ))}
       </div>
       <div className={styles.dots}>
-        {partnerGoods.map((_, index) => (
+        {goods.map((_, index) => (
           <span
             key={index}
             className={`${styles.dot} ${
               index === currentGoodIndex ? styles.activeDot : ""
             }`}
-            onClick={() => setCurrentGoodIndex(index)}
+            onClick={() => {
+              setCurrentGoodIndex(index);
+              onGoodChange(goods[index].partnerId);
+            }}
           />
         ))}
       </div>

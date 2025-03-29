@@ -100,6 +100,21 @@
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+.levelButton {
+  background: transparent;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 .toggleButton:hover {
   background: #000000;
   color: white;

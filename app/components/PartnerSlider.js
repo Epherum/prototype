@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import styles from "./PartnerSlider.module.css";
 
 const partners = [
@@ -25,17 +26,19 @@ const partners = [
     id: 3,
     name: "CloudTech Partners",
     description: "Cloud infrastructure and digital transformation specialists.",
-    image: "https://source.unsplash.com/featured/800x400/?startup,modern",
+    image:
+      "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&q=80",
   },
 ];
 
 export default function PartnerSlider({ onPartnerChange }) {
+  const router = useRouter();
   const [currentPartner, setCurrentPartner] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState(0);
-  const [expandedDescription, setExpandedDescription] = useState(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const handleTouchStart = (e) => {
     setTouchStart(e.touches[0].clientX);
@@ -72,10 +75,12 @@ export default function PartnerSlider({ onPartnerChange }) {
     setDragOffset(0);
   };
 
-  const toggleDescription = (partnerId) => {
-    setExpandedDescription(
-      expandedDescription === partnerId ? null : partnerId
-    );
+  const toggleDescription = () => {
+    setIsExpanded((prev) => !prev);
+  };
+
+  const handleLevelDown = () => {
+    router.push("/owners");
   };
 
   return (
@@ -107,18 +112,21 @@ export default function PartnerSlider({ onPartnerChange }) {
               className={styles.partnerImage}
             />
             <h2>{partner.name}</h2>
-            <button
-              className={styles.toggleButton}
-              onClick={() => toggleDescription(partner.id)}
-              aria-expanded={expandedDescription === partner.id}
-            >
-              {expandedDescription === partner.id
-                ? "Hide Details"
-                : "Show Details"}
-            </button>
+            <div className={styles.buttonContainer}>
+              <button
+                className={styles.toggleButton}
+                onClick={toggleDescription}
+                aria-expanded={isExpanded}
+              >
+                {isExpanded ? "Hide Details" : "Show Details"}
+              </button>
+              <button className={styles.toggleButton} onClick={handleLevelDown}>
+                Level Down
+              </button>
+            </div>
             <div
               className={`${styles.description} ${
-                expandedDescription === partner.id ? styles.expanded : ""
+                isExpanded ? styles.expanded : ""
               }`}
             >
               <p>{partner.description}</p>

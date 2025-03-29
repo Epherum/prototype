@@ -145,3 +145,36 @@
   background-color: #357abd;
   transform: scale(0.98);
 }
+
+.navigationButtons {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.levelButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: #000000;
+  border: 1px solid #000000;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  margin: 12px auto;
+  width: fit-content;
+}
+
+.levelButton:hover {
+  background: #000000;
+  color: white;
+}
+
+.levelButton:hover {
+  background-color: #1d4ed8;
+}
