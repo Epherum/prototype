@@ -1,18 +1,31 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Warm Palette */
+  --bg-main: #fdf8f2; /* Warm off-white/very light beige */
+  --bg-card: #ffffff; /* Clean white for cards */
+  --text-primary: #3a3a3a; /* Dark grey for primary text */
+  --text-secondary: #7a7a7a; /* Lighter grey for secondary text */
+  --accent-warm: #e89f71; /* Muted warm orange/terracotta accent */
+  --accent-warm-light: #f3d4c2; /* Lighter version for backgrounds/hovers */
+  --border-subtle: #eee; /* Subtle border/divider */
+  --shadow-color: rgba(100, 100, 100, 0.1); /* Softer shadow */
+
+  /* Rounding */
+  --border-radius-lg: 16px; /* Generous rounding for cards */
+  --border-radius-md: 12px; /* Medium rounding for sliders/inputs */
+  --border-radius-sm: 8px; /* Small rounding for buttons/details */
+  --border-radius-pill: 50px; /* For fully rounded pill buttons */
+
+  /* Spacing */
+  --spacing-unit: 8px;
 }
 
-html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
-}
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  /* Apply base font and background to body */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -21,15 +34,4 @@ body {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
 }

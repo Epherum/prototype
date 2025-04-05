@@ -1,0 +1,152 @@
+{
+  "journals": [
+    { "id": "journal-1", "name": "Buy" },
+    { "id": "journal-2", "name": "Sell" },
+    { "id": "journal-3", "name": "Manufacturing" },
+    { "id": "journal-4", "name": "Finance" },
+    { "id": "journal-5", "name": "Logistics" },
+    { "id": "journal-6", "name": "Inventory" }
+  ],
+  "partners": [
+    {
+      "id": "partner-a",
+      "name": "Partner A",
+      "journals": ["journal-1", "journal-3"],
+      "goods": ["good-x", "good-y", "good-1"]
+    },
+    {
+      "id": "partner-b",
+      "name": "Partner B",
+      "journals": ["journal-1", "journal-2", "journal-4"],
+      "goods": ["good-z", "good-2", "good-3"]
+    },
+    {
+      "id": "partner-c",
+      "name": "Partner C",
+      "journals": ["journal-2", "journal-6"],
+      "goods": ["good-x", "good-z", "good-4"]
+    },
+    {
+      "id": "partner-d",
+      "name": "Partner D",
+      "journals": ["journal-3", "journal-5"],
+      "goods": ["good-5", "good-6"]
+    },
+    {
+      "id": "partner-e",
+      "name": "Partner E",
+      "journals": ["journal-4", "journal-6"],
+      "goods": ["good-7", "good-8", "good-9"]
+    },
+    {
+      "id": "partner-f",
+      "name": "Partner F",
+      "journals": ["journal-1", "journal-5"],
+      "goods": ["good-10", "good-11"]
+    },
+    {
+      "id": "partner-g",
+      "name": "Partner G",
+      "journals": ["journal-5", "journal-6"],
+      "goods": ["good-12", "good-13"]
+    }
+  ],
+  "goods": [
+    {
+      "id": "good-x",
+      "name": "Iron Ore",
+      "journal": "journal-1",
+      "ownedBy": ["partner-a", "partner-c"]
+    },
+    {
+      "id": "good-y",
+      "name": "Steel Plate",
+      "journal": "journal-3",
+      "ownedBy": ["partner-a"]
+    },
+    {
+      "id": "good-z",
+      "name": "Gold Coin",
+      "journal": "journal-2",
+      "ownedBy": ["partner-b", "partner-c"]
+    },
+    {
+      "id": "good-1",
+      "name": "Aluminum Sheet",
+      "journal": "journal-1",
+      "ownedBy": ["partner-a"]
+    },
+    {
+      "id": "good-2",
+      "name": "Plastic Crate",
+      "journal": "journal-2",
+      "ownedBy": ["partner-b"]
+    },
+    {
+      "id": "good-3",
+      "name": "Battery Pack",
+      "journal": "journal-4",
+      "ownedBy": ["partner-b"]
+    },
+    {
+      "id": "good-4",
+      "name": "Rubber Wheel",
+      "journal": "journal-6",
+      "ownedBy": ["partner-c"]
+    },
+    {
+      "id": "good-5",
+      "name": "Wooden Pallet",
+      "journal": "journal-3",
+      "ownedBy": ["partner-d"]
+    },
+    {
+      "id": "good-6",
+      "name": "Screw Set",
+      "journal": "journal-5",
+      "ownedBy": ["partner-d"]
+    },
+    {
+      "id": "good-7",
+      "name": "Glass Bottle",
+      "journal": "journal-4",
+      "ownedBy": ["partner-e"]
+    },
+    {
+      "id": "good-8",
+      "name": "Ink Cartridge",
+      "journal": "journal-6",
+      "ownedBy": ["partner-e"]
+    },
+    {
+      "id": "good-9",
+      "name": "LED Bulb",
+      "journal": "journal-6",
+      "ownedBy": ["partner-e"]
+    },
+    {
+      "id": "good-10",
+      "name": "Motor Oil",
+      "journal": "journal-1",
+      "ownedBy": ["partner-f"]
+    },
+    {
+      "id": "good-11",
+      "name": "Cable Wire",
+      "journal": "journal-5",
+      "ownedBy": ["partner-f"]
+    },
+    {
+      "id": "good-12",
+      "name": "Circuit Board",
+      "journal": "journal-5",
+      "ownedBy": ["partner-g"]
+    },
+    {
+      "id": "good-13",
+      "name": "Printer Head",
+      "journal": "journal-6",
+      "ownedBy": ["partner-g"]
+    }
+  ]
+}
