@@ -26,6 +26,40 @@ import {
 // Helper
 const getFirstId = (arr) => (arr && arr.length > 0 ? arr[0].id : null);
 
+// Constants
+const SLIDER_TYPES = { JOURNAL: "journal", PARTNER: "partner", GOODS: "goods" };
+const SLIDER_CONFIG = {
+  [SLIDER_TYPES.JOURNAL]: { Component: DynamicSlider, title: "Journal" },
+  [SLIDER_TYPES.PARTNER]: { Component: DynamicSlider, title: "Partner" },
+  [SLIDER_TYPES.GOODS]: { Component: DynamicSlider, title: "Goods" },
+};
+const INITIAL_ORDER = [
+  SLIDER_TYPES.JOURNAL,
+  SLIDER_TYPES.PARTNER,
+  SLIDER_TYPES.GOODS,
+];
+
+// --- Place near other constants like SLIDER_TYPES ---
+const ALLOWED_ORDERS = [
+  // Order 1
+  [SLIDER_TYPES.JOURNAL, SLIDER_TYPES.PARTNER, SLIDER_TYPES.GOODS],
+  // Order 2
+  [SLIDER_TYPES.JOURNAL, SLIDER_TYPES.GOODS, SLIDER_TYPES.PARTNER],
+  // Order 3 (NOTE: Your description had partner->journal->goods, ensure this matches your intent)
+  [SLIDER_TYPES.PARTNER, SLIDER_TYPES.JOURNAL, SLIDER_TYPES.GOODS],
+  // Order 4 (NOTE: Your description had good->journal->partner, ensure this matches your intent)
+  [SLIDER_TYPES.GOODS, SLIDER_TYPES.JOURNAL, SLIDER_TYPES.PARTNER],
+];
+
+// Helper function to check if an order array is valid
+// Uses JSON stringify for easy array comparison
+const isOrderAllowed = (orderToCheck) => {
+  const orderString = JSON.stringify(orderToCheck);
+  return ALLOWED_ORDERS.some(
+    (allowed) => JSON.stringify(allowed) === orderString
+  );
+};
+
 const JOURNAL_ICONS = {
   "journal-1": IoCartOutline,
   "journal-2": IoPricetagOutline,
@@ -296,19 +330,6 @@ function DynamicSlider({
     </>
   );
 }
-
-// Constants
-const SLIDER_TYPES = { JOURNAL: "journal", PARTNER: "partner", GOODS: "goods" };
-const SLIDER_CONFIG = {
-  [SLIDER_TYPES.JOURNAL]: { Component: DynamicSlider, title: "Journal" },
-  [SLIDER_TYPES.PARTNER]: { Component: DynamicSlider, title: "Partner" },
-  [SLIDER_TYPES.GOODS]: { Component: DynamicSlider, title: "Goods" },
-};
-const INITIAL_ORDER = [
-  SLIDER_TYPES.JOURNAL,
-  SLIDER_TYPES.PARTNER,
-  SLIDER_TYPES.GOODS,
-];
 
 // --- Main Page Component ---
 export default function Home() {
@@ -683,6 +704,7 @@ export default function Home() {
     [accordionTypeState]
   ); // Dependency updated
 
+  // --- REFINED moveSlider ---
   const moveSlider = (sliderId, direction) => {
     // Capture selections *before* changing order
     const currentSelections = {
@@ -690,6 +712,9 @@ export default function Home() {
       partner: selectedPartnerId,
       goods: selectedGoodsId,
     };
+    // Capture the ID of the item that IS CURRENTLY locked, if any
+    const previouslyLockedItemId = lockedItem?.id || null;
+    const previouslyLockedType = lockedItem?.type || null;
 
     setSliderOrder((currentOrder) => {
       const currentIndex = currentOrder.indexOf(sliderId);
@@ -706,42 +731,130 @@ export default function Home() {
       ];
       console.log("Order changed:", newOrder);
 
-      // Determine if the new order should trigger a lock
       const firstSliderType = newOrder[0];
       let newLockedItem = null;
 
+      // Prepare variables to hold the *final* selections to be set
+      let finalJournalSelection = null;
+      let finalPartnerSelection = null;
+      let finalGoodsSelection = null;
+
+      // Determine lock state based on the NEW order's first item
       if (firstSliderType === SLIDER_TYPES.PARTNER) {
-        newLockedItem = {
-          type: SLIDER_TYPES.PARTNER,
-          id: currentSelections.partner,
-        };
-        console.log("Locking Partner:", newLockedItem.id);
-        // Keep partner selection, reset others (useEffect will refine based on lock)
-        setSelectedJournalId(null); // Trigger reset check in useEffect
-        setSelectedGoodsId(null);
-        setSelectedPartnerId(newLockedItem.id); // Ensure locked ID is selected
+        // --- Locking Partner ---
+        const partnerIdToLock = currentSelections.partner;
+        const lockedPartnerObj = initialData.partners.find(
+          (p) => p.id === partnerIdToLock
+        );
+
+        if (lockedPartnerObj) {
+          newLockedItem = { type: SLIDER_TYPES.PARTNER, id: partnerIdToLock };
+          console.log("Locking Partner:", partnerIdToLock);
+
+          // Pre-filter data based on the newly locked partner
+          const initialFilteredJournals = initialData.journals.filter((j) =>
+            lockedPartnerObj.journals.includes(j.id)
+          );
+          const initialFilteredGoods = initialData.goods.filter((g) =>
+            lockedPartnerObj.goods.includes(g.id)
+          );
+
+          // Set selections: Keep locked partner, reset others to first available
+          finalPartnerSelection = partnerIdToLock;
+          finalJournalSelection = getFirstId(initialFilteredJournals);
+          finalGoodsSelection = getFirstId(initialFilteredGoods);
+        } else {
+          // Handle case where selected partner doesn't exist? Fallback to unlock.
+          console.warn(
+            `Attempted to lock non-existent partner: ${partnerIdToLock}. No lock applied.`
+          );
+          newLockedItem = null;
+          // Reset all to first available (as if unlocked)
+          finalJournalSelection = getFirstId(initialData.journals);
+          finalPartnerSelection = getFirstId(initialData.partners);
+          finalGoodsSelection = getFirstId(initialData.goods);
+        }
       } else if (firstSliderType === SLIDER_TYPES.GOODS) {
-        newLockedItem = {
-          type: SLIDER_TYPES.GOODS,
-          id: currentSelections.goods,
-        };
-        console.log("Locking Goods:", newLockedItem.id);
-        // Keep goods selection, reset others
-        setSelectedJournalId(null);
-        setSelectedPartnerId(null);
-        setSelectedGoodsId(newLockedItem.id); // Ensure locked ID is selected
+        // --- Locking Goods ---
+        const goodIdToLock = currentSelections.goods;
+        const lockedGoodObj = initialData.goods.find(
+          (g) => g.id === goodIdToLock
+        );
+
+        if (lockedGoodObj) {
+          newLockedItem = { type: SLIDER_TYPES.GOODS, id: goodIdToLock };
+          console.log("Locking Goods:", goodIdToLock);
+
+          // Pre-filter based on the newly locked good
+          const initialFilteredJournals = initialData.journals.filter(
+            (j) => j.id === lockedGoodObj.journal
+          );
+          const initialFilteredPartners = initialData.partners.filter(
+            (p) =>
+              Array.isArray(lockedGoodObj.ownedBy) &&
+              lockedGoodObj.ownedBy.includes(p.id)
+          );
+
+          // Set selections: Keep locked good, reset others to first available
+          finalGoodsSelection = goodIdToLock;
+          finalJournalSelection = getFirstId(initialFilteredJournals);
+          finalPartnerSelection = getFirstId(initialFilteredPartners);
+        } else {
+          console.warn(
+            `Attempted to lock non-existent good: ${goodIdToLock}. No lock applied.`
+          );
+          newLockedItem = null;
+          // Reset all to first available
+          finalJournalSelection = getFirstId(initialData.journals);
+          finalPartnerSelection = getFirstId(initialData.partners);
+          finalGoodsSelection = getFirstId(initialData.goods);
+        }
       } else {
-        // No lock (e.g., Journal is first), reset all selections
-        console.log("Unlocking / No Lock. Resetting selections.");
-        setSelectedJournalId(getFirstId(initialData.journals));
-        setSelectedPartnerId(getFirstId(initialData.partners));
-        setSelectedGoodsId(getFirstId(initialData.goods));
+        // --- NOT Locking (Journal first OR Unlocking) ---
+        newLockedItem = null; // Ensure lock is removed
+
+        // Check if we *just* moved away from a locked state
+        if (previouslyLockedType === SLIDER_TYPES.PARTNER) {
+          // Just unlocked Partner
+          console.log(
+            `Just unlocked partner ${previouslyLockedItemId}, keeping selection.`
+          );
+          finalPartnerSelection = previouslyLockedItemId; // Keep the partner that was locked
+          // Reset others to first of full initial lists
+          finalJournalSelection = getFirstId(initialData.journals);
+          finalGoodsSelection = getFirstId(initialData.goods);
+        } else if (previouslyLockedType === SLIDER_TYPES.GOODS) {
+          // Just unlocked Goods
+          console.log(
+            `Just unlocked good ${previouslyLockedItemId}, keeping selection.`
+          );
+          finalGoodsSelection = previouslyLockedItemId; // Keep the good that was locked
+          // Reset others to first of full initial lists
+          finalJournalSelection = getFirstId(initialData.journals);
+          finalPartnerSelection = getFirstId(initialData.partners);
+        } else {
+          // No lock involved before or after - reset all to defaults
+          console.log("No lock change, resetting selections.");
+          finalJournalSelection = getFirstId(initialData.journals);
+          finalPartnerSelection = getFirstId(initialData.partners);
+          finalGoodsSelection = getFirstId(initialData.goods);
+        }
       }
 
-      // Set the lock state AFTER order state is updated
-      // Use a timeout to ensure state updates related to order happen first? Maybe not needed.
+      // --- Set the final calculated selections ---
+      console.log("Setting selections after move:", {
+        j: finalJournalSelection,
+        p: finalPartnerSelection,
+        g: finalGoodsSelection,
+      });
+      setSelectedJournalId(finalJournalSelection);
+      setSelectedPartnerId(finalPartnerSelection);
+      setSelectedGoodsId(finalGoodsSelection);
+
+      // Set the lock state
       setLockedItem(newLockedItem);
 
+      // Return the new order
       return newOrder;
     });
   };
@@ -826,9 +939,29 @@ export default function Home() {
               );
               // --- END HOOK CALLS ---
 
-              // Calculate if first/last for button visibility
-              const isFirst = index === 0;
-              const isLast = index === sliderOrder.length - 1;
+              // --- CALCULATE MOVE VALIDITY ---
+              let canMoveUp = false;
+              if (index > 0) {
+                // Simulate moving up
+                const potentialOrderUp = [...sliderOrder];
+                [potentialOrderUp[index], potentialOrderUp[index - 1]] = [
+                  potentialOrderUp[index - 1],
+                  potentialOrderUp[index],
+                ];
+                canMoveUp = isOrderAllowed(potentialOrderUp);
+              }
+
+              let canMoveDown = false;
+              if (index < sliderOrder.length - 1) {
+                // Simulate moving down
+                const potentialOrderDown = [...sliderOrder];
+                [potentialOrderDown[index], potentialOrderDown[index + 1]] = [
+                  potentialOrderDown[index + 1],
+                  potentialOrderDown[index],
+                ];
+                canMoveDown = isOrderAllowed(potentialOrderDown);
+              }
+              // --- END MOVE VALIDITY CALCULATION ---
 
               // Now, conditionally return null if not visible
               if (!visibility[sliderId]) {
@@ -852,29 +985,28 @@ export default function Home() {
                   style={{ order: index }}
                   className={styles.sliderWrapper}
                 >
-                  {/* Controls */}
+                  {/* --- CONTROLS SECTION - Conditional Rendering --- */}
                   <div className={styles.controls}>
-                    {/* Conditionally render "Up" button */}
-                    {!isFirst && (
+                    {/* Render "Up" button ONLY if canMoveUp is true */}
+                    {canMoveUp && (
                       <button
                         onClick={() => moveSlider(sliderId, "up")}
-                        // disabled={isFirst} // <-- REMOVE disabled prop
                         className={styles.moveButton}
                       >
                         ▲ Up
                       </button>
                     )}
-                    {/* Conditionally render "Down" button */}
-                    {!isLast && (
+                    {/* Render "Down" button ONLY if canMoveDown is true */}
+                    {canMoveDown && (
                       <button
                         onClick={() => moveSlider(sliderId, "down")}
-                        // disabled={isLast} // <-- REMOVE disabled prop
                         className={styles.moveButton}
                       >
                         ▼ Down
                       </button>
                     )}
                   </div>
+                  {/* --- END CONTROLS MODIFICATION --- */}
                   {/* Component */}
                   <Component
                     sliderId={sliderId}
