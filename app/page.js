@@ -26,6 +26,15 @@ import {
 // Helper
 const getFirstId = (arr) => (arr && arr.length > 0 ? arr[0].id : null);
 
+const JOURNAL_ICONS = {
+  "journal-1": IoCartOutline,
+  "journal-2": IoPricetagOutline,
+  "journal-3": IoBuildOutline,
+  "journal-4": IoWalletOutline,
+  "journal-5": IoNavigateOutline,
+  "journal-6": IoClipboardOutline,
+};
+
 // --- DynamicSlider Component (Major Updates) ---
 function DynamicSlider({
   sliderId,
@@ -68,17 +77,20 @@ function DynamicSlider({
     }
   };
 
-  const JOURNAL_ICONS = {
-    "journal-1": IoCartOutline,
-    "journal-2": IoPricetagOutline,
-    "journal-3": IoBuildOutline,
-    "journal-4": IoWalletOutline,
-    "journal-5": IoNavigateOutline,
-    "journal-6": IoClipboardOutline,
-  };
+  // --- ADJUSTED currentItem LOGIC ---
+  // Find the currently active item based on the prop
+  let currentItem = data.find((item) => item.id === activeItemId);
 
-  // Find the currently active item to display details
-  const currentItem = data.find((item) => item.id === activeItemId);
+  // *** FALLBACK LOGIC ***
+  // If the activeItemId prop doesn't match any item in the *current* data array
+  // (e.g., due to filtering or initial load mismatch), AND data exists,
+  // default to using the FIRST item in the current data array for displaying details.
+  if (!currentItem && data.length > 0) {
+    currentItem = data[0];
+    // Optional: Log a warning if this happens often, might indicate other issues
+    // console.warn(`DynamicSlider (${sliderId}): activeItemId '${activeItemId}' not found. Defaulting details to first item '${data[0]?.id}'.`);
+  }
+  // *** END FALLBACK LOGIC ***
 
   const lockedItemName =
     isItemLocked && currentItem ? `: ${currentItem.name}` : "";
