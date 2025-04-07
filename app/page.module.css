@@ -349,3 +349,154 @@
 .swiperInstance.lockedSwiper .swiper-pagination {
   display: none;
 }
+/* Keep ALL previous styles */
+/* ... (variables, body, pageContainer, title, toggles, orderInfo, slidersArea, sliderWrapper, controls, moveButton, Swiper styles, etc.) ... */
+
+/* Renamed for clarity */
+.sliderTitle {
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  font-size: 1.1em; /* Maybe slightly smaller */
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Slide content styling */
+.slide {
+  /* background: linear-gradient(135deg, var(--bg-main), var(--accent-warm-light)); */ /* Removing gradient for cleaner look with image */
+  background-color: var(--bg-main); /* Use main background */
+  display: flex;
+  flex-direction: column; /* Stack image and text */
+  justify-content: flex-start; /* Align content to top */
+  align-items: center;
+  height: auto; /* Let content determine height */
+  min-height: 250px; /* Ensure minimum height */
+  font-size: 1.1em;
+  font-weight: 500;
+  color: var(--text-primary);
+  border-radius: var(--border-radius-md);
+  text-align: center;
+  padding: 0; /* Remove padding, handled by inner elements */
+  box-sizing: border-box;
+  cursor: grab;
+  overflow: hidden; /* Clip image rounding */
+}
+
+/* Image wrapper within the slide */
+.slideImageWrapper {
+  width: 100%;
+  height: 200px; /* Match image height */
+  overflow: hidden;
+  margin-bottom: var(--spacing-unit);
+  position: relative;
+}
+
+.slideImage {
+  display: block; /* Remove extra space below image */
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Crop image nicely */
+}
+
+/* Text content below image */
+.slideTextContent {
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5); /* Add padding here */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5); /* Small gap between name/subtext */
+}
+
+.slideName {
+  font-weight: 600;
+  font-size: 1.1em; /* Slightly larger name */
+}
+
+.slideSubText {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+/* NEW: Accordion Styles */
+.accordionContainer {
+  margin-top: calc(var(--spacing-unit) * 2); /* Space above accordion button */
+  padding-top: calc(var(--spacing-unit) * 1.5); /* Space */
+  border-top: 1px solid var(--border-subtle); /* Separator line */
+}
+
+.detailsButton {
+  display: flex; /* Align text and icon */
+  justify-content: space-between; /* Push icon to right */
+  align-items: center;
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  padding: calc(var(--spacing-unit) * 0.5) 0; /* Vertical padding only */
+  font-size: 0.95em;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.accordionIcon {
+  display: inline-block;
+  margin-left: var(--spacing-unit);
+  font-size: 0.8em;
+  transition: transform 0.3s ease;
+  color: var(--text-secondary);
+}
+
+.accordionIconOpen {
+  transform: rotate(180deg);
+}
+
+.detailsContentWrapper {
+  overflow: hidden; /* Crucial for height animation */
+}
+
+.detailsContent {
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 0.5); /* Padding inside details */
+  background-color: rgba(0, 0, 0, 0.02); /* Very subtle background tint */
+  border-radius: var(--border-radius-sm);
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+.detailsContent p {
+  margin: 0 0 calc(var(--spacing-unit) * 0.75) 0; /* Spacing between detail paragraphs */
+  line-height: 1.5;
+}
+.detailsContent p:last-child {
+  margin-bottom: 0;
+}
+
+.detailsContent strong {
+  color: var(--text-primary); /* Make labels slightly darker */
+  margin-right: 4px;
+}
+
+/* --- Ensure Swiper takes appropriate height --- */
+/* Adjust height based on typical content */
+.swiperInstance {
+  width: 100%;
+  /* height: 280px; */ /* Adjust height based on image + text */
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  padding-left: 45px;
+  padding-right: 45px;
+  position: relative; /* Needed for positioning buttons inside */
+  margin-bottom: var(--spacing-unit); /* Space before accordion */
+}
+
+/* --- No Data (Adjust height) --- */
+.noData {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 250px; /* Match approximate slide height */
+  /* ... rest of noData styles ... */
+}

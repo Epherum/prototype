@@ -2,18 +2,21 @@
 const nextConfig = {
   images: {
     remotePatterns: [
+      // Keep Unsplash if you might use it elsewhere, or remove
       {
         protocol: "https",
         hostname: "images.unsplash.com",
-        pathname: "/**",
+        port: "",
+        pathname: "**",
       },
+      // Add placeholder.com
       {
         protocol: "https",
-        hostname: "source.unsplash.com",
-        pathname: "/**",
+        hostname: "via.placeholder.com", // Add this hostname
+        port: "",
+        pathname: "**", // Allow any path
       },
     ],
   },
 };
-
 export default nextConfig;
