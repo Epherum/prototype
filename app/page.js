@@ -13,6 +13,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 
+// Add these alongside your other imports
 import {
   IoCartOutline, // For Buy/Procurement
   IoPricetagOutline, // For Sell
@@ -29,162 +30,168 @@ const getFirstId = (arr) => (arr && arr.length > 0 ? arr[0].id : null);
 function DynamicSlider({
   sliderId,
   title,
-  data = [], // Default to empty array for safety
+  data = [],
   onSlideChange,
   locked,
   activeItemId,
   orderIndex,
   isItemLocked,
-  // Accordion props
+  // NEW Props for Accordion
   isAccordionOpen,
-  onToggleAccordion, // Expects the handler from the parent, e.g., () => toggleAccordion(sliderId)
+  onToggleAccordion,
 }) {
   const swiperRef = useRef(null);
 
-  // Effect to programmatically move swiper when activeItemId or data changes
   useEffect(() => {
     if (swiperRef.current && data.length > 0) {
       const activeIndex = data.findIndex((item) => item.id === activeItemId);
-      const targetIndex = activeIndex !== -1 ? activeIndex : 0; // Go to 0 if not found
-      const currentRealIndex =
-        swiperRef.current.realIndex !== undefined
-          ? swiperRef.current.realIndex
-          : swiperRef.current.activeIndex;
-
-      // Use slideToLoop if loop=true, otherwise slideTo
-      // Check if the swiper isn't already animating and the index needs changing
-      if (!swiperRef.current.animating && currentRealIndex !== targetIndex) {
-        if (swiperRef.current.params.loop) {
-          swiperRef.current.slideToLoop(targetIndex, 0); // 0ms transition for programmatic changes
-        } else {
-          swiperRef.current.slideTo(targetIndex, 0);
-        }
+      const targetIndex = activeIndex !== -1 ? activeIndex : 0;
+      if (swiperRef.current.realIndex !== targetIndex) {
+        // Use realIndex for loops
+        // Use slideToLoop if loop=true, otherwise slideTo
+        swiperRef.current.slideToLoop
+          ? swiperRef.current.slideToLoop(targetIndex, 0)
+          : swiperRef.current.slideTo(targetIndex, 0);
       }
-      // Ensure swiper updates its internal state if data/params changed
       swiperRef.current.update();
     } else if (swiperRef.current) {
-      swiperRef.current.update(); // Update even if empty
+      swiperRef.current.update();
     }
   }, [activeItemId, data]); // Rerun when active ID or data itself changes
 
-  // Handler for when user manually swipes
   const handleSwiperChange = (swiper) => {
     // Use realIndex when loop is enabled
     const currentRealIndex =
       swiper.realIndex !== undefined ? swiper.realIndex : swiper.activeIndex;
     if (!locked && data.length > currentRealIndex) {
-      // Callback to parent component to update the selected ID state
       onSlideChange(data[currentRealIndex].id);
     }
   };
 
-  // Find the currently active item based on state to display details/image
+  const JOURNAL_ICONS = {
+    "journal-1": IoCartOutline,
+    "journal-2": IoPricetagOutline,
+    "journal-3": IoBuildOutline,
+    "journal-4": IoWalletOutline,
+    "journal-5": IoNavigateOutline,
+    "journal-6": IoClipboardOutline,
+  };
+
+  // Find the currently active item to display details
   const currentItem = data.find((item) => item.id === activeItemId);
 
-  // Prepare locked item display name
   const lockedItemName =
     isItemLocked && currentItem ? `: ${currentItem.name}` : "";
 
   return (
     <>
-      {/* Slider Title Section */}
       <h2 className={styles.sliderTitle}>
-        <span>
-          {" "}
-          {/* Span helps with flex alignment if needed */}
-          {title} ({orderIndex + 1}){" "}
-          {isItemLocked ? `[LOCKED${lockedItemName}]` : ""}
-        </span>
+        {" "}
+        {/* Renamed class for clarity */}
+        {title}
+        {isItemLocked ? `[LOCKED${lockedItemName}]` : ""}
       </h2>
-
-      {/* Swiper Section */}
       {data.length > 0 ? (
         <Swiper
           onSwiper={(swiper) => {
             swiperRef.current = swiper;
           }}
           modules={[Navigation, Pagination]}
-          loop={data.length > 1} // Enable loop only if more than 1 slide
-          spaceBetween={20} // Spacing between slides (if using slidesPerView > 1)
-          slidesPerView={1} // Show one slide at a time
-          navigation={!locked && data.length > 1} // Show nav buttons if not locked and more than 1 slide
-          pagination={!locked && data.length > 1 ? { clickable: true } : false} // Show pagination if not locked and more than 1 slide
-          allowTouchMove={!locked} // Disable swiping if locked
-          onSlideChange={handleSwiperChange} // Update state on user swipe
+          loop={false} // Enable loop only if more than 1 slide
+          spaceBetween={20} // Slightly less space
+          slidesPerView={1}
+          navigation={!locked && data.length > 1} // Hide nav if locked or only 1 slide
+          pagination={!locked && data.length > 1 ? { clickable: true } : false} // Hide pagination too
+          allowTouchMove={!locked}
+          onSlideChange={handleSwiperChange}
           className={`${styles.swiperInstance} ${
             locked ? styles.lockedSwiper : ""
           }`}
-          // Robust key to force re-initialization when data source or lock status changes significantly
-          key={data.map((d) => d.id).join("-") + `-${locked}-${sliderId}`}
+          // Key change forces re-init if data fundamentally changes (e.g., filtering to 1 item)
+          key={data.map((d) => d.id).join("-") + `-${locked}`}
           initialSlide={Math.max(
             0,
             data.findIndex((item) => item.id === activeItemId)
-          )} // Set starting slide
-          observer={true} // Detect changes to Swiper parent
-          observeParents={true} // Detect changes to Swiper parent
+          )}
+          observer={true}
+          observeParents={true}
         >
           {data.map((item) => {
-            // Determine which icon to use for Journal items
+            // <<< --- START ICON LOGIC --- >>>
+            // 1. Define a variable to hold the potential icon component
             let IconComponent = null;
+
+            // 2. Check if this is the Journal slider AND if an icon exists for this specific item's ID
             if (sliderId === SLIDER_TYPES.JOURNAL && JOURNAL_ICONS[item.id]) {
+              // 3. Assign the mapped icon component
               IconComponent = JOURNAL_ICONS[item.id];
             }
+            // <<< --- END ICON LOGIC --- >>>
 
+            // The return statement for each slide
             return (
               <SwiperSlide key={item.id} className={styles.slide}>
-                {/* Conditional Image for Partners and Goods */}
+                {/* Image Section (Conditional) - Keep commented out based on previous request */}
+                {/*
                 {(sliderId === SLIDER_TYPES.PARTNER ||
                   sliderId === SLIDER_TYPES.GOODS) &&
                   item.imageUrl && (
                     <div className={styles.slideImageWrapper}>
-                      <Image
-                        src={item.imageUrl} // Assumes local path like /images/placeholders/...
-                        alt={item.name}
-                        width={400} // IMPORTANT: Set to your placeholder's actual width
-                        height={200} // IMPORTANT: Set to your placeholder's actual height
-                        className={styles.slideImage}
-                        priority={item.id === activeItemId} // Load active slide image sooner
-                      />
+                      <Image ... />
                     </div>
-                  )}
-                {/* Text Content Area */}
-                <div className={styles.slideTextContent}>
-                  {/* Render Journal Icon */}
+                )}
+                 */}
+                {/* Text Content */}
+                <div
+                  className={`${styles.slideTextContent} ${
+                    // Base class
+                    IconComponent ? styles.slideTextContentWithIcon : "" // Conditional class
+                  }`}
+                >
+                  {/* <<< --- START ICON RENDERING --- >>> */}
+                  {/* 4. Conditionally render the IconComponent if it was found */}
                   {IconComponent && (
                     <IconComponent
                       className={styles.slideIcon}
                       aria-hidden="true"
                     />
                   )}
-                  {/* Render Item Name */}
-                  <span className={styles.slideName}>{item.name}</span>
+                  {/* <<< --- END ICON RENDERING --- >>> */}
 
-                  {/* Render Sub-text Conditionally */}
-                  {sliderId === SLIDER_TYPES.GOODS &&
-                    item.quantity !== undefined && (
-                      <span className={styles.slideSubText}>
-                        {item.quantity} {item.unit}
-                      </span>
-                    )}
+                  <span className={styles.slideName}>{item.name}</span>
+                  {/* Conditionally show simple details like quantity for goods */}
+                  {sliderId === SLIDER_TYPES.GOODS && item.quantity && (
+                    <span className={styles.slideSubText}>
+                      {item.quantity} {item.unit}
+                    </span>
+                  )}
                   {sliderId === SLIDER_TYPES.PARTNER && item.location && (
                     <span className={styles.slideSubText}>{item.location}</span>
                   )}
+                  {/* Remove the description preview for Journal if icon is present (Optional) */}
+                  {/*
+                  {sliderId === SLIDER_TYPES.JOURNAL &&
+                    item.description &&
+                    !IconComponent && ( // Only show if no icon
+                      <span className={styles.slideSubText}>
+                        {item.description.substring(0, 50)}
+                        {item.description.length > 50 ? "..." : ""}
+                      </span>
+                  )}
+                  */}
                 </div>
               </SwiperSlide>
             );
           })}
         </Swiper>
       ) : (
-        // Display when no data matches filters
         <div className={styles.noData}>No items match criteria.</div>
       )}
-
-      {/* Accordion Section - Shows details for the currently active item */}
-      {currentItem && (
+      {/* Accordion Section */}
+      {currentItem && ( // Only show accordion if there's an active item
         <div className={styles.accordionContainer}>
-          {/* Button to toggle accordion visibility */}
           <button
-            onClick={onToggleAccordion} // Calls parent handler: () => toggleAccordion(sliderId)
+            onClick={onToggleAccordion}
             className={styles.detailsButton}
             aria-expanded={isAccordionOpen}
           >
@@ -194,26 +201,25 @@ function DynamicSlider({
                 isAccordionOpen ? styles.accordionIconOpen : ""
               }`}
             >
-              ▼ {/* Arrow indicator */}
+              ▼ {/* Simple arrow, rotates via CSS */}
             </span>
           </button>
-          {/* AnimatePresence handles the mounting/unmounting */}
+          {/* AnimatePresence manages the details visibility */}
           <AnimatePresence initial={false}>
-            {isAccordionOpen && ( // Conditionally render details content
+            {isAccordionOpen && (
               <motion.div
-                key={`details-${sliderId}`} // Use sliderId for stable key during open/close
+                key={`details-${currentItem.id}`} // Key needed for AnimatePresence
                 initial="collapsed"
                 animate="open"
                 exit="collapsed"
                 variants={{
-                  // Simplified variants: Only animate opacity
-                  open: { opacity: 1 },
-                  collapsed: { opacity: 0 },
+                  open: { opacity: 1, height: "auto", marginTop: "8px" },
+                  collapsed: { opacity: 0, height: 0, marginTop: "0px" },
                 }}
-                transition={{ duration: 0.2, ease: "linear" }} // Simple fade transition
-                className={styles.detailsContentWrapper} // Wrapper needed for overflow: hidden
+                transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }} // Smoother ease
+                className={styles.detailsContentWrapper} // Wrapper for overflow hidden
               >
-                {/* Actual details content */}
+                {/* Display Details based on slider type */}
                 <div className={styles.detailsContent}>
                   {/* Common Detail: Description */}
                   {currentItem.description && (
@@ -267,7 +273,8 @@ function DynamicSlider({
                       )}
                     </>
                   )}
-                  {/* Journal details are primarily in its description */}
+                  {/* Journal specific details already in description, maybe add related partners/goods? */}
+                  {/* (Could fetch this if needed, but keeping simple for now) */}
                 </div>
               </motion.div>
             )}
@@ -291,15 +298,6 @@ const INITIAL_ORDER = [
   SLIDER_TYPES.GOODS,
 ];
 
-const JOURNAL_ICONS = {
-  "journal-1": IoCartOutline,
-  "journal-2": IoPricetagOutline,
-  "journal-3": IoBuildOutline,
-  "journal-4": IoWalletOutline,
-  "journal-5": IoNavigateOutline,
-  "journal-6": IoClipboardOutline,
-};
-
 // --- Main Page Component ---
 export default function Home() {
   // === State ===
@@ -321,6 +319,9 @@ export default function Home() {
   );
   const [displayedGoods, setDisplayedGoods] = useState(initialData.goods);
 
+  // NEW: State for locked item
+  const [lockedItem, setLockedItem] = useState(null);
+
   // NEW: State for accordion open/closed status, keyed by item ID
 
   // --- CHANGE: State for accordion open/closed status, keyed by SLIDER TYPE ---
@@ -336,8 +337,6 @@ export default function Home() {
     [SLIDER_TYPES.PARTNER]: true, // Start visible
     [SLIDER_TYPES.GOODS]: false, // Start hidden
   });
-
-  const [lockedItem, setLockedItem] = useState(null);
 
   // === Derived State ===
   const getLockedSliderType = () => lockedItem?.type || null;
@@ -864,7 +863,6 @@ export default function Home() {
                       </button>
                     )}
                   </div>
-                  {/* --- END CONTROLS MODIFICATION --- */}
                   {/* Component */}
                   <Component
                     sliderId={sliderId}

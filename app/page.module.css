@@ -500,3 +500,76 @@
   height: 250px; /* Match approximate slide height */
   /* ... rest of noData styles ... */
 }
+/* --- Styles for page.module.css --- */
+
+/* Keep ALL existing styles */
+/* ... */
+
+/* Text content below image (or main content area if no image) */
+.slideTextContent {
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  display: flex; /* ADD: Use flexbox */
+  flex-direction: row; /* ADD: Align icon and text horizontally */
+  align-items: center; /* ADD: Center items vertically */
+  justify-content: center; /* ADD: Center items horizontally */
+  gap: calc(var(--spacing-unit) * 0.75); /* ADD: Space between icon and text */
+  text-align: left; /* Align text to the left relative to the icon */
+  width: 100%; /* Take full width */
+  box-sizing: border-box;
+}
+
+/* Style for the icon itself */
+.slideIcon {
+  flex-shrink: 0; /* Prevent icon shrinking */
+  font-size: 1.4em; /* Make icon slightly larger */
+  color: var(--accent-warm); /* Color the icon */
+  /* Add margin if needed, but gap should handle spacing */
+}
+
+.slideName {
+  font-weight: 600;
+  font-size: 1.1em;
+  /* No changes needed usually */
+}
+
+.slideSubText {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  /* Move this below the name if desired */
+  /* For Journal, this might be removed if description preview is removed */
+  width: 100%; /* Allow subtext to potentially wrap below */
+  text-align: center; /* Re-center subtext if needed */
+  margin-top: 4px;
+}
+
+/* Adjust slide layout if needed to accommodate icon better */
+.slide {
+  background-color: var(--bg-main);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  height: auto;
+  min-height: 250px; /* Adjust as needed */
+  border-radius: var(--border-radius-md);
+  padding: 0;
+  box-sizing: border-box;
+  cursor: grab;
+  overflow: hidden;
+}
+.slideTextContent {
+  padding: var(--spacing-unit) 0; /* Adjust padding */
+  display: flex; /* Use flex for COLUMN layout by default */
+  flex-direction: column; /* Stack name and subtext */
+  align-items: center; /* Center items horizontally */
+  gap: calc(var(--spacing-unit) * 0.5); /* Gap between name/subtext */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Style applied ONLY when an icon is present */
+.slideTextContentWithIcon {
+  flex-direction: row; /* Override to row layout */
+  justify-content: center; /* Center icon and text block */
+  text-align: left; /* Align text left relative to icon */
+}
