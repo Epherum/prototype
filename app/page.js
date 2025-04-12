@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion"; // Ensure AnimatePresence is imported
 import Image from "next/image"; // <-- Import Next.js Image
 import styles from "./page.module.css";
-import initialData from "./data.json";
+import initialData1 from "./data.json";
+import initialData2 from "./data2.json"; // Import the new file
 
 // Swiper Imports
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -49,6 +50,8 @@ const ALLOWED_ORDERS = [
   [SLIDER_TYPES.PARTNER, SLIDER_TYPES.JOURNAL, SLIDER_TYPES.GOODS],
   // Order 4 (NOTE: Your description had good->journal->partner, ensure this matches your intent)
   [SLIDER_TYPES.GOODS, SLIDER_TYPES.JOURNAL, SLIDER_TYPES.PARTNER],
+  [SLIDER_TYPES.GOODS, SLIDER_TYPES.PARTNER, SLIDER_TYPES.JOURNAL], // 5 (NEW: Locked Good -> Partner -> Journal)
+  [SLIDER_TYPES.PARTNER, SLIDER_TYPES.GOODS, SLIDER_TYPES.JOURNAL],
 ];
 
 // Helper function to check if an order array is valid
@@ -121,8 +124,6 @@ function DynamicSlider({
   // default to using the FIRST item in the current data array for displaying details.
   if (!currentItem && data.length > 0) {
     currentItem = data[0];
-    // Optional: Log a warning if this happens often, might indicate other issues
-    // console.warn(`DynamicSlider (${sliderId}): activeItemId '${activeItemId}' not found. Defaulting details to first item '${data[0]?.id}'.`);
   }
   // *** END FALLBACK LOGIC ***
 
@@ -166,7 +167,6 @@ function DynamicSlider({
             // <<< --- START ICON LOGIC --- >>>
             // 1. Define a variable to hold the potential icon component
             let IconComponent = null;
-
             // 2. Check if this is the Journal slider AND if an icon exists for this specific item's ID
             if (sliderId === SLIDER_TYPES.JOURNAL && JOURNAL_ICONS[item.id]) {
               // 3. Assign the mapped icon component
@@ -214,17 +214,6 @@ function DynamicSlider({
                   {sliderId === SLIDER_TYPES.PARTNER && item.location && (
                     <span className={styles.slideSubText}>{item.location}</span>
                   )}
-                  {/* Remove the description preview for Journal if icon is present (Optional) */}
-                  {/*
-                  {sliderId === SLIDER_TYPES.JOURNAL &&
-                    item.description &&
-                    !IconComponent && ( // Only show if no icon
-                      <span className={styles.slideSubText}>
-                        {item.description.substring(0, 50)}
-                        {item.description.length > 50 ? "..." : ""}
-                      </span>
-                  )}
-                  */}
                 </div>
               </SwiperSlide>
             );
@@ -335,27 +324,67 @@ function DynamicSlider({
 export default function Home() {
   // === State ===
   const [sliderOrder, setSliderOrder] = useState(INITIAL_ORDER);
-  const [selectedJournalId, setSelectedJournalId] = useState(
-    getFirstId(initialData.journals)
-  );
-  const [selectedPartnerId, setSelectedPartnerId] = useState(
-    getFirstId(initialData.partners)
-  );
-  const [selectedGoodsId, setSelectedGoodsId] = useState(
-    getFirstId(initialData.goods)
-  );
-  const [displayedJournals, setDisplayedJournals] = useState(
-    initialData.journals
-  );
-  const [displayedPartners, setDisplayedPartners] = useState(
-    initialData.partners
-  );
-  const [displayedGoods, setDisplayedGoods] = useState(initialData.goods);
-
   // NEW: State for locked item
   const [lockedItem, setLockedItem] = useState(null);
 
-  // NEW: State for accordion open/closed status, keyed by item ID
+  const [activeDataSource, setActiveDataSource] = useState("data1"); // 'data1' or 'data2'
+  const [activeDataSet, setActiveDataSet] = useState(initialData1); // Holds the actual data object
+
+  const [selectedJournalId, setSelectedJournalId] = useState(() =>
+    getFirstId(activeDataSet.journals)
+  );
+  const [selectedPartnerId, setSelectedPartnerId] = useState(() =>
+    getFirstId(activeDataSet.partners)
+  );
+  const [selectedGoodsId, setSelectedGoodsId] = useState(() =>
+    getFirstId(activeDataSet.goods)
+  );
+  const [displayedJournals, setDisplayedJournals] = useState(
+    () => activeDataSet.journals
+  );
+  const [displayedPartners, setDisplayedPartners] = useState(
+    () => activeDataSet.partners
+  );
+  const [displayedGoods, setDisplayedGoods] = useState(
+    () => activeDataSet.goods
+  );
+
+  const handleDataSourceChange = (event) => {
+    const newSourceKey = event.target.value; // 'data1' or 'data2'
+    if (newSourceKey === activeDataSource) return; // No change
+
+    console.log(`Switching data source to: ${newSourceKey}`);
+    const newDataSet = newSourceKey === "data1" ? initialData1 : initialData2;
+
+    setActiveDataSource(newSourceKey);
+    setActiveDataSet(newDataSet);
+
+    // --- RESET ALL DEPENDENT STATE ---
+    console.log("Resetting state due to data source change.");
+    const newFirstJournal = getFirstId(newDataSet.journals);
+    const newFirstPartner = getFirstId(newDataSet.partners);
+    const newFirstGoods = getFirstId(newDataSet.goods);
+
+    setSliderOrder(INITIAL_ORDER); // Reset order
+    setLockedItem(null); // Remove lock
+    setSelectedJournalId(newFirstJournal);
+    setSelectedPartnerId(newFirstPartner);
+    setSelectedGoodsId(newFirstGoods);
+    setDisplayedJournals(newDataSet.journals); // Directly set displayed data
+    setDisplayedPartners(newDataSet.partners);
+    setDisplayedGoods(newDataSet.goods);
+    // Optionally reset visibility/accordion or keep them
+    // setVisibility({
+    //   [SLIDER_TYPES.JOURNAL]: true,
+    //   [SLIDER_TYPES.PARTNER]: true,
+    //   [SLIDER_TYPES.GOODS]: false,
+    // });
+    // setAccordionTypeState({
+    //   [SLIDER_TYPES.JOURNAL]: false,
+    //   [SLIDER_TYPES.PARTNER]: false,
+    //   [SLIDER_TYPES.GOODS]: false,
+    // });
+  };
 
   // --- CHANGE: State for accordion open/closed status, keyed by SLIDER TYPE ---
   const [accordionTypeState, setAccordionTypeState] = useState({
@@ -388,10 +417,10 @@ export default function Home() {
       goods: selectedGoodsId,
     });
 
-    // Start with full data or data pre-filtered by locked item
-    let filteredJournals = [...initialData.journals];
-    let filteredPartners = [...initialData.partners];
-    let filteredGoods = [...initialData.goods];
+    // *** Use activeDataSet ***
+    let filteredJournals = [...activeDataSet.journals];
+    let filteredPartners = [...activeDataSet.partners];
+    let filteredGoods = [...activeDataSet.goods];
     let activeSelections = {
       journal: selectedJournalId,
       partner: selectedPartnerId,
@@ -400,41 +429,32 @@ export default function Home() {
 
     // --- Step 1: Apply Lock Filter (if any) ---
     if (lockedItem) {
-      activeSelections[lockedItem.type] = lockedItem.id; // Ensure selection matches lock
-
+      activeSelections[lockedItem.type] = lockedItem.id;
       if (lockedItem.type === SLIDER_TYPES.PARTNER) {
-        const lockedPartnerObj = initialData.partners.find(
+        const lockedPartnerObj = activeDataSet.partners.find(
           (p) => p.id === lockedItem.id
         );
         if (lockedPartnerObj) {
           console.log(`Applying Lock: PARTNER ${lockedItem.id}`);
-          filteredPartners = [lockedPartnerObj]; // Only the locked partner
-          filteredJournals = initialData.journals.filter((j) =>
+          filteredPartners = [lockedPartnerObj];
+          filteredJournals = activeDataSet.journals.filter((j) =>
             lockedPartnerObj.journals.includes(j.id)
           );
-          filteredGoods = initialData.goods.filter((g) =>
+          filteredGoods = activeDataSet.goods.filter((g) =>
             lockedPartnerObj.goods.includes(g.id)
           );
-          // Reset selections for downstream sliders if they aren't compatible
+          // Reset selections based on NEW filtered data
           if (
             selectedJournalId &&
             !filteredJournals.some((j) => j.id === selectedJournalId)
           ) {
             activeSelections.journal = getFirstId(filteredJournals);
-            console.log(
-              "  Resetting Journal selection due to lock:",
-              activeSelections.journal
-            );
           }
           if (
             selectedGoodsId &&
             !filteredGoods.some((g) => g.id === selectedGoodsId)
           ) {
             activeSelections.goods = getFirstId(filteredGoods);
-            console.log(
-              "  Resetting Goods selection due to lock:",
-              activeSelections.goods
-            );
           }
         } else {
           console.error("Locked partner not found!"); // Should not happen
@@ -443,41 +463,32 @@ export default function Home() {
           filteredGoods = [];
         }
       } else if (lockedItem.type === SLIDER_TYPES.GOODS) {
-        const lockedGoodObj = initialData.goods.find(
+        const lockedGoodObj = activeDataSet.goods.find(
           (g) => g.id === lockedItem.id
         );
         if (lockedGoodObj) {
           console.log(`Applying Lock: GOODS ${lockedItem.id}`);
-          filteredGoods = [lockedGoodObj]; // Only the locked good
-          // Assuming a good belongs to only one journal based on data model
-          filteredJournals = initialData.journals.filter(
+          filteredGoods = [lockedGoodObj];
+          filteredJournals = activeDataSet.journals.filter(
             (j) => j.id === lockedGoodObj.journal
           );
-          filteredPartners = initialData.partners.filter(
+          filteredPartners = activeDataSet.partners.filter(
             (p) =>
               Array.isArray(lockedGoodObj.ownedBy) &&
               lockedGoodObj.ownedBy.includes(p.id)
           );
-          // Reset selections for downstream sliders
+          // Reset selections based on NEW filtered data
           if (
             selectedJournalId &&
             !filteredJournals.some((j) => j.id === selectedJournalId)
           ) {
             activeSelections.journal = getFirstId(filteredJournals);
-            console.log(
-              "  Resetting Journal selection due to lock:",
-              activeSelections.journal
-            );
           }
           if (
             selectedPartnerId &&
             !filteredPartners.some((p) => p.id === selectedPartnerId)
           ) {
             activeSelections.partner = getFirstId(filteredPartners);
-            console.log(
-              "  Resetting Partner selection due to lock:",
-              activeSelections.partner
-            );
           }
         } else {
           console.error("Locked good not found!");
@@ -502,8 +513,16 @@ export default function Home() {
     for (let i = 0; i < sliderOrder.length - 1; i++) {
       const sourceSlider = sliderOrder[i];
       const targetSlider = sliderOrder[i + 1];
+      if (isSliderLocked(sourceSlider) || isSliderLocked(targetSlider))
+        continue;
 
-      // Skip filtering *from* a locked slider OR filtering *into* a locked slider
+      console.log(
+        `Filtering Step ${i + 1}: ${sourceSlider} -> ${targetSlider}`
+      );
+
+      // Apply filters based on current selections (which might have been updated by lock)
+      // Use the `filteredJournals`, `filteredPartners`, `filteredGoods` lists
+
       if (isSliderLocked(sourceSlider) || isSliderLocked(targetSlider)) {
         console.log(
           `Skipping filter step ${
@@ -517,19 +536,18 @@ export default function Home() {
         `Filtering Step ${i + 1}: ${sourceSlider} -> ${targetSlider}`
       );
 
-      // Apply filters based on current selections (which might have been updated by lock)
-      // Use the `filteredJournals`, `filteredPartners`, `filteredGoods` lists
-
+      // --- Filtering Logic with NEW CASES ---
       if (
         sourceSlider === SLIDER_TYPES.JOURNAL &&
         targetSlider === SLIDER_TYPES.PARTNER
       ) {
+        // Standard J -> P
         if (currentJournal) {
           filteredPartners = filteredPartners.filter((p) =>
             p.journals.includes(currentJournal.id)
           );
           console.log(
-            `  Filtered Partners by Journal ${currentJournal.id}:`,
+            `  (Std) Filtered Partners by Journal ${currentJournal.id}:`,
             filteredPartners.map((p) => p.id)
           );
         } else {
@@ -539,11 +557,11 @@ export default function Home() {
         sourceSlider === SLIDER_TYPES.PARTNER &&
         targetSlider === SLIDER_TYPES.GOODS
       ) {
+        // Standard P -> G (potentially filtered by J earlier)
         if (currentPartner) {
           filteredGoods = filteredGoods.filter((g) =>
             currentPartner.goods.includes(g.id)
           );
-          // Additional check: Ensure good's journal matches selected journal if it came before partner
           const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
           if (currentJournal && journalIndex !== -1 && journalIndex < i) {
             filteredGoods = filteredGoods.filter(
@@ -551,7 +569,7 @@ export default function Home() {
             );
           }
           console.log(
-            `  Filtered Goods by Partner ${currentPartner.id}:`,
+            `  (Std) Filtered Goods by Partner ${currentPartner.id}:`,
             filteredGoods.map((g) => g.id)
           );
         } else {
@@ -561,12 +579,13 @@ export default function Home() {
         sourceSlider === SLIDER_TYPES.JOURNAL &&
         targetSlider === SLIDER_TYPES.GOODS
       ) {
+        // Standard J -> G
         if (currentJournal) {
           filteredGoods = filteredGoods.filter(
             (g) => g.journal === currentJournal.id
           );
           console.log(
-            `  Filtered Goods by Journal ${currentJournal.id}:`,
+            `  (Std) Filtered Goods by Journal ${currentJournal.id}:`,
             filteredGoods.map((g) => g.id)
           );
         } else {
@@ -576,11 +595,11 @@ export default function Home() {
         sourceSlider === SLIDER_TYPES.GOODS &&
         targetSlider === SLIDER_TYPES.PARTNER
       ) {
+        // Standard G -> P (potentially filtered by J earlier)
         if (currentGoods && Array.isArray(currentGoods.ownedBy)) {
           filteredPartners = filteredPartners.filter((p) =>
             currentGoods.ownedBy.includes(p.id)
           );
-          // Additional check: Filter partners by journal if it came before goods
           const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
           if (currentJournal && journalIndex !== -1 && journalIndex < i) {
             filteredPartners = filteredPartners.filter((p) =>
@@ -588,13 +607,109 @@ export default function Home() {
             );
           }
           console.log(
-            `  Filtered Partners by Goods ${currentGoods.id}:`,
+            `  (Std) Filtered Partners by Goods ${currentGoods.id}:`,
             filteredPartners.map((p) => p.id)
           );
         } else {
           filteredPartners = [];
         }
+
+        // --- NEW Case 5: Order = G -> P -> J ---
+        // Filter J based on selected P (which is already filtered by locked G)
+      } else if (
+        sourceSlider === SLIDER_TYPES.PARTNER &&
+        targetSlider === SLIDER_TYPES.JOURNAL &&
+        sliderOrder[0] === SLIDER_TYPES.GOODS
+      ) {
+        console.log("  Applying Filter for Order G -> P -> J");
+        // The 'filteredJournals' list *already* contains only the locked Good's journal due to Step 1.
+        // We don't need to filter it further based on the partner in this specific setup,
+        // because if the partner owns the good, they are implicitly related to that journal.
+        // If data model changed (partner could own good but not be in journal), this check would be needed:
+        // if (currentPartner && currentJournal) { // currentJournal is the single one from the locked good
+        //     if (!currentPartner.journals.includes(currentJournal.id)) {
+        //         console.log("    Partner not in the locked Good's journal - clearing journals (unlikely scenario)");
+        //         filteredJournals = [];
+        //     }
+        // }
+        // Essentially, for this order, the journal list is fixed by the locked good.
+        console.log(
+          `    Journal list fixed by locked good:`,
+          filteredJournals.map((j) => j.id)
+        );
+
+        // --- NEW Case 6: Order = P -> G -> J ---
+        // Filter J based on selected G (which is already filtered by locked P)
+      } else if (
+        sourceSlider === SLIDER_TYPES.GOODS &&
+        targetSlider === SLIDER_TYPES.JOURNAL &&
+        sliderOrder[0] === SLIDER_TYPES.PARTNER
+      ) {
+        console.log("  Applying Filter for Order P -> G -> J");
+        // 'filteredJournals' contains all journals for the locked Partner (from Step 1).
+        // Now, filter this list down to only the journal associated with the currently selected Good.
+        if (currentGoods) {
+          filteredJournals = filteredJournals.filter(
+            (j) => j.id === currentGoods.journal
+          );
+          console.log(
+            `    Filtered Journals by selected Good (${currentGoods.id})'s journal (${currentGoods.journal}):`,
+            filteredJournals.map((j) => j.id)
+          );
+        } else {
+          console.log("    No Good selected, cannot filter Journals further.");
+          // Keep journals filtered by partner, or clear if no good means no specific journal? Clearing seems safer.
+          filteredJournals = [];
+        }
+
+        // --- Existing specific order filters (e.g., Mode 3/4 if different) ---
+        // Review if Mode 3 (G->J->P) or Mode 4 (P->J->G) logic needs adjustments or is covered.
+        // Example: Keep Mode 3's P filter if needed.
+      } else if (
+        sourceSlider === SLIDER_TYPES.JOURNAL &&
+        targetSlider === SLIDER_TYPES.PARTNER &&
+        sliderOrder[0] === SLIDER_TYPES.GOODS
+      ) {
+        console.log("  Applying Filter for Order G -> J -> P");
+        // Filter Partners based on selected Journal (which is fixed to the Good's journal)
+        if (
+          currentJournal &&
+          currentGoods &&
+          Array.isArray(currentGoods.ownedBy)
+        ) {
+          // Partners list initially filtered by owning the Good. Further filter by selected (Good's) Journal.
+          filteredPartners = filteredPartners.filter((p) =>
+            p.journals.includes(currentJournal.id)
+          );
+          console.log(
+            `    Filtered Partners by selected Journal ${currentJournal.id}:`,
+            filteredPartners.map((p) => p.id)
+          );
+        } else {
+          filteredPartners = [];
+        }
+        // Example: Keep Mode 4's G filter if needed.
+      } else if (
+        sourceSlider === SLIDER_TYPES.JOURNAL &&
+        targetSlider === SLIDER_TYPES.GOODS &&
+        sliderOrder[0] === SLIDER_TYPES.PARTNER
+      ) {
+        console.log("  Applying Filter for Order P -> J -> G");
+        // Filter Goods based on selected Journal (which is filtered from Partner's journals)
+        if (currentJournal && currentPartner) {
+          // Goods list initially filtered by owned by Partner. Further filter by selected Journal.
+          filteredGoods = filteredGoods.filter(
+            (g) => g.journal === currentJournal.id
+          );
+          console.log(
+            `    Filtered Goods by selected Journal ${currentJournal.id}:`,
+            filteredGoods.map((g) => g.id)
+          );
+        } else {
+          filteredGoods = [];
+        }
       }
+      // --- End Filtering Logic ---
       // Other specific mode logic might be simplified now due to the lock pre-filter
 
       // Update 'current' selections for the next iteration based on the *newly filtered* lists
@@ -654,6 +769,7 @@ export default function Home() {
     selectedPartnerId,
     selectedGoodsId,
     lockedItem,
+    activeDataSet,
   ]);
 
   // === Event Handlers ===
@@ -743,118 +859,78 @@ export default function Home() {
       if (firstSliderType === SLIDER_TYPES.PARTNER) {
         // --- Locking Partner ---
         const partnerIdToLock = currentSelections.partner;
-        const lockedPartnerObj = initialData.partners.find(
+        const lockedPartnerObj = activeDataSet.partners.find(
           (p) => p.id === partnerIdToLock
         );
-
         if (lockedPartnerObj) {
           newLockedItem = { type: SLIDER_TYPES.PARTNER, id: partnerIdToLock };
-          console.log("Locking Partner:", partnerIdToLock);
-
-          // Pre-filter data based on the newly locked partner
-          const initialFilteredJournals = initialData.journals.filter((j) =>
+          // *** Use activeDataSet ***
+          const initialFilteredJournals = activeDataSet.journals.filter((j) =>
             lockedPartnerObj.journals.includes(j.id)
           );
-          const initialFilteredGoods = initialData.goods.filter((g) =>
+          const initialFilteredGoods = activeDataSet.goods.filter((g) =>
             lockedPartnerObj.goods.includes(g.id)
           );
-
-          // Set selections: Keep locked partner, reset others to first available
           finalPartnerSelection = partnerIdToLock;
           finalJournalSelection = getFirstId(initialFilteredJournals);
           finalGoodsSelection = getFirstId(initialFilteredGoods);
         } else {
-          // Handle case where selected partner doesn't exist? Fallback to unlock.
-          console.warn(
-            `Attempted to lock non-existent partner: ${partnerIdToLock}. No lock applied.`
-          );
-          newLockedItem = null;
-          // Reset all to first available (as if unlocked)
-          finalJournalSelection = getFirstId(initialData.journals);
-          finalPartnerSelection = getFirstId(initialData.partners);
-          finalGoodsSelection = getFirstId(initialData.goods);
+          // *** Use activeDataSet ***
+          finalJournalSelection = getFirstId(activeDataSet.journals);
+          finalPartnerSelection = getFirstId(activeDataSet.partners);
+          finalGoodsSelection = getFirstId(activeDataSet.goods);
         }
       } else if (firstSliderType === SLIDER_TYPES.GOODS) {
-        // --- Locking Goods ---
         const goodIdToLock = currentSelections.goods;
-        const lockedGoodObj = initialData.goods.find(
+        // *** Use activeDataSet ***
+        const lockedGoodObj = activeDataSet.goods.find(
           (g) => g.id === goodIdToLock
         );
-
         if (lockedGoodObj) {
           newLockedItem = { type: SLIDER_TYPES.GOODS, id: goodIdToLock };
-          console.log("Locking Goods:", goodIdToLock);
-
-          // Pre-filter based on the newly locked good
-          const initialFilteredJournals = initialData.journals.filter(
+          // *** Use activeDataSet ***
+          const initialFilteredJournals = activeDataSet.journals.filter(
             (j) => j.id === lockedGoodObj.journal
           );
-          const initialFilteredPartners = initialData.partners.filter(
+          const initialFilteredPartners = activeDataSet.partners.filter(
             (p) =>
               Array.isArray(lockedGoodObj.ownedBy) &&
               lockedGoodObj.ownedBy.includes(p.id)
           );
-
-          // Set selections: Keep locked good, reset others to first available
           finalGoodsSelection = goodIdToLock;
           finalJournalSelection = getFirstId(initialFilteredJournals);
           finalPartnerSelection = getFirstId(initialFilteredPartners);
         } else {
-          console.warn(
-            `Attempted to lock non-existent good: ${goodIdToLock}. No lock applied.`
-          );
-          newLockedItem = null;
-          // Reset all to first available
-          finalJournalSelection = getFirstId(initialData.journals);
-          finalPartnerSelection = getFirstId(initialData.partners);
-          finalGoodsSelection = getFirstId(initialData.goods);
+          // *** Use activeDataSet ***
+          finalJournalSelection = getFirstId(activeDataSet.journals);
+          finalPartnerSelection = getFirstId(activeDataSet.partners);
+          finalGoodsSelection = getFirstId(activeDataSet.goods);
         }
       } else {
-        // --- NOT Locking (Journal first OR Unlocking) ---
-        newLockedItem = null; // Ensure lock is removed
-
-        // Check if we *just* moved away from a locked state
+        // Not Locking
+        newLockedItem = null;
         if (previouslyLockedType === SLIDER_TYPES.PARTNER) {
-          // Just unlocked Partner
-          console.log(
-            `Just unlocked partner ${previouslyLockedItemId}, keeping selection.`
-          );
-          finalPartnerSelection = previouslyLockedItemId; // Keep the partner that was locked
-          // Reset others to first of full initial lists
-          finalJournalSelection = getFirstId(initialData.journals);
-          finalGoodsSelection = getFirstId(initialData.goods);
+          finalPartnerSelection = previouslyLockedItemId;
+          // *** Use activeDataSet ***
+          finalJournalSelection = getFirstId(activeDataSet.journals);
+          finalGoodsSelection = getFirstId(activeDataSet.goods);
         } else if (previouslyLockedType === SLIDER_TYPES.GOODS) {
-          // Just unlocked Goods
-          console.log(
-            `Just unlocked good ${previouslyLockedItemId}, keeping selection.`
-          );
-          finalGoodsSelection = previouslyLockedItemId; // Keep the good that was locked
-          // Reset others to first of full initial lists
-          finalJournalSelection = getFirstId(initialData.journals);
-          finalPartnerSelection = getFirstId(initialData.partners);
+          finalGoodsSelection = previouslyLockedItemId;
+          // *** Use activeDataSet ***
+          finalJournalSelection = getFirstId(activeDataSet.journals);
+          finalPartnerSelection = getFirstId(activeDataSet.partners);
         } else {
-          // No lock involved before or after - reset all to defaults
-          console.log("No lock change, resetting selections.");
-          finalJournalSelection = getFirstId(initialData.journals);
-          finalPartnerSelection = getFirstId(initialData.partners);
-          finalGoodsSelection = getFirstId(initialData.goods);
+          // *** Use activeDataSet ***
+          finalJournalSelection = getFirstId(activeDataSet.journals);
+          finalPartnerSelection = getFirstId(activeDataSet.partners);
+          finalGoodsSelection = getFirstId(activeDataSet.goods);
         }
       }
 
-      // --- Set the final calculated selections ---
-      console.log("Setting selections after move:", {
-        j: finalJournalSelection,
-        p: finalPartnerSelection,
-        g: finalGoodsSelection,
-      });
       setSelectedJournalId(finalJournalSelection);
       setSelectedPartnerId(finalPartnerSelection);
       setSelectedGoodsId(finalGoodsSelection);
-
-      // Set the lock state
       setLockedItem(newLockedItem);
-
-      // Return the new order
       return newOrder;
     });
   };
@@ -887,6 +963,31 @@ export default function Home() {
   return (
     <div className={styles.pageContainer}>
       <h1 className={styles.title}>Welcome</h1>
+
+      {/* --- NEW: Data Source Radio Buttons --- */}
+      <div className={styles.dataSourceSelector}>
+        <label>
+          <input
+            type="radio"
+            name="dataSource"
+            value="data1"
+            checked={activeDataSource === "data1"}
+            onChange={handleDataSourceChange}
+          />
+          All Entries
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="dataSource"
+            value="data2"
+            checked={activeDataSource === "data2"}
+            onChange={handleDataSourceChange}
+          />
+          Filtered Entries
+        </label>
+      </div>
+      {/* --- END: Data Source Radio Buttons --- */}
 
       {/* Visibility Toggle Buttons (Keep as is) */}
       <div className={styles.visibilityToggles}>

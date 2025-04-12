@@ -574,4 +574,29 @@
   text-align: left; /* Align text left relative to icon */
 }
 
-/* --- Styles for page.module.css --- */
+/* --- NEW: Data Source Selector Styles --- */
+.dataSourceSelector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 2); /* 16px gap */
+  margin-bottom: calc(var(--spacing-unit) * 3); /* 24px margin below */
+  padding: calc(var(--spacing-unit) * 1);
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: var(--border-radius-md);
+}
+
+.dataSourceSelector label {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5); /* 4px gap between radio and text */
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dataSourceSelector input[type="radio"] {
+  cursor: pointer;
+  /* Optional: Add custom styling to radio buttons if desired */
+  accent-color: var(--accent-warm); /* Modern way to color radios */
+}
