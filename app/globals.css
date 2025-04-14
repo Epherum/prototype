@@ -6,6 +6,7 @@
   --text-secondary: #7a7a7a; /* Lighter grey for secondary text */
   --accent-warm: #e89f71; /* Muted warm orange/terracotta accent */
   --accent-warm-light: #f3d4c2; /* Lighter version for backgrounds/hovers */
+  --accent-slider: #fff0e8; /* Soft warm orange for sliders */
   --border-subtle: #eee; /* Subtle border/divider */
   --shadow-color: rgba(100, 100, 100, 0.1); /* Softer shadow */
 

@@ -1,27 +1,86 @@
-/* --- Base & Variables --- */
-
+/* --- Global & Page Structure --- */
 .pageContainer {
-  max-width: 600px; /* Constrain width even on larger mobile/tablet */
-  margin: 0 auto; /* Center */
-  padding: calc(var(--spacing-unit) * 3) calc(var(--spacing-unit) * 2); /* 24px top/bottom, 16px left/right */
-  min-height: 100vh; /* Ensure it takes full height */
+  max-width: 600px;
+  margin: 0 auto;
+  padding: calc(var(--spacing-unit) * 3) calc(var(--spacing-unit) * 2);
+  min-height: 100vh;
   box-sizing: border-box;
 }
 
 .title {
   text-align: center;
   color: var(--text-primary);
-  font-size: 1.8em; /* Slightly larger title */
+  font-size: 1.8em;
   font-weight: 600;
-  margin-bottom: calc(var(--spacing-unit) * 3); /* 24px */
+  margin-bottom: calc(var(--spacing-unit) * 3);
+}
+
+.dataSourceSelector {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 2);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  padding: calc(var(--spacing-unit) * 1);
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: var(--border-radius-md);
+}
+
+.dataSourceSelector label {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dataSourceSelector input[type="radio"] {
+  cursor: pointer;
+  accent-color: var(--accent-warm);
+}
+
+.visibilityToggles {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  flex-wrap: wrap;
+}
+
+.toggleButton {
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--accent-warm-light);
+  border-radius: var(--border-radius-pill);
+  background-color: transparent;
+  color: var(--accent-warm);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  white-space: nowrap;
+}
+
+.toggleButton.toggleActive {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+}
+
+.toggleButton:hover {
+  border-color: var(--accent-warm);
+}
+
+.toggleButton.toggleActive:hover {
+  background-color: #d68f63;
+  border-color: #d68f63;
 }
 
 .orderInfo {
   text-align: center;
-  margin-bottom: calc(
-    var(--spacing-unit) * 2
-  ); /* Slightly less margin above sliders */
-  font-size: 0.85em; /* Slightly smaller */
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  font-size: 0.85em;
   color: var(--text-secondary);
   background-color: rgba(255, 255, 255, 0.6);
   padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
@@ -32,409 +91,308 @@
   position: relative;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 90%; /* Prevent overflow */
+  max-width: 90%;
   box-sizing: border-box;
 }
 
-/* Container for all sliders */
+/* --- Slider Structure & Controls --- */
 .slidersArea {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing-unit) * 3); /* 24px gap between slider cards */
+  gap: calc(var(--spacing-unit) * 3);
+  overflow-anchor: none;
 }
 
-/* The motion.div wrapper for each slider */
 .sliderWrapper {
   background-color: var(--bg-card);
-  border-radius: var(--border-radius-lg); /* More rounding */
-  padding: calc(var(--spacing-unit) * 2); /* 16px padding inside */
-  box-shadow: 0 4px 15px var(--shadow-color); /* Softer shadow */
-  overflow: hidden; /* Ensure content respects border-radius */
-  border: 1px solid transparent; /* Prevent minor layout shifts if needed */
+  border-radius: var(--border-radius-lg);
+  padding: calc(var(--spacing-unit) * 2);
+  box-shadow: 0 4px 15px var(--shadow-color);
+  overflow: hidden;
+  border: 1px solid transparent;
+  position: relative; /* Needed for z-index/layout */
 }
 
-/* Controls section (buttons) */
 .controls {
   display: flex;
-  justify-content: flex-end; /* Buttons to the right */
-  gap: var(--spacing-unit); /* 8px gap */
-  margin-bottom: calc(var(--spacing-unit) * 2); /* 16px margin below controls */
-  padding-bottom: calc(var(--spacing-unit) * 1.5); /* 12px padding below */
-  border-bottom: 1px solid var(--border-subtle); /* Subtle divider */
+  justify-content: flex-end;
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
-/* Up/Down Buttons */
-.moveButton {
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5); /* 8px 12px padding */
+/* MODIFY .controls */
+.controls {
+  display: flex;
+  justify-content: space-between; /* Key change: space-between */
+  align-items: center; /* Align items vertically */
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Reduced margin slightly */
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* NEW: Group for right-aligned move buttons */
+.moveButtonGroup {
+  display: flex;
+  gap: var(--spacing-unit);
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.controlButton {
+  padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.2); /* Adjust padding */
   font-size: 0.85em;
-  font-weight: 500; /* Medium weight */
+  font-weight: 500;
   cursor: pointer;
-  background-color: var(--accent-warm-light); /* Light accent background */
-  color: var(--accent-warm); /* Accent text color */
-  border: none; /* Remove border */
-  border-radius: var(--border-radius-pill); /* Fully rounded */
-  transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
+  background-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+  border: none;
+  border-radius: var(--border-radius-pill);
+  transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease,
+    color 0.2s ease;
+  display: inline-flex; /* Helps align icon/text if used together */
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 0.5); /* Space between icon and text */
+  line-height: 1; /* Prevent extra height */
 }
 
-.moveButton:hover:not(:disabled) {
-  background-color: var(--accent-warm); /* Darken on hover */
-  color: var(--bg-card); /* White text on hover */
+.controlButton:hover {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
 }
 
-.moveButton:active:not(:disabled) {
-  transform: scale(0.95); /* Press effect */
+.controlButton:active {
+  transform: scale(0.95);
 }
 
-.moveButton:disabled {
+.controlButton:disabled {
+  /* Same disabled styles */
   opacity: 0.4;
   cursor: not-allowed;
-  background-color: #e0e0e0; /* Neutral disabled color */
+  background-color: #e0e0e0;
   color: var(--text-secondary);
+  transform: none;
 }
 
-/* Content area within the slider card */
-.sliderContent {
-  /* No extra styles needed currently */
+/* Add this near other control styles */
+.controlPlaceholder {
+  /* Ensure it has some minimum width or visibility if needed */
+  /* You might not need width if the button itself has padding/margins */
+  /* Or ensure it doesn't collapse if empty: */
+  min-width: 1px; /* Or adjust as needed */
+  /* We hide the placeholder itself, it's just for layout */
+  visibility: hidden;
+  /* Match the button height if alignment looks off */
+  /* height: [height of controlButton]; */
 }
 
-.sliderContent h2 {
-  margin-top: 0;
-  margin-bottom: calc(var(--spacing-unit) * 2); /* 16px */
-  font-size: 1.2em; /* Slightly larger section title */
+/* NEW: Specific style for the modal button */
+.modalButton {
+  background-color: rgba(0, 0, 0, 0.05); /* Subtler background */
+  color: var(--text-secondary);
+  padding: calc(var(--spacing-unit) * 0.8); /* Make it squarer if just icon */
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.modalButton:hover {
+  background-color: rgba(0, 0, 0, 0.1);
   color: var(--text-primary);
-  font-weight: 600; /* Bolder section title */
-  text-align: center;
-  /* Removed border from here, controls have one */
 }
 
-/* Swiper instance styling */
+/* Make icon slightly larger */
+.modalButton svg {
+  font-size: 1.2em;
+}
+
+.sliderTitle {
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  font-size: 1.1em;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+}
+
+/* --- Swiper Styles --- */
 .swiperInstance {
+  --swiper-theme-color: var(--accent-warm);
+  --swiper-navigation-color: var(--accent-warm);
+  --swiper-navigation-size: 18px;
+
   width: 100%;
-  height: 150px; /* Adjust if needed */
-  border-radius: var(--border-radius-md); /* Rounded corners for swiper */
-  overflow: hidden; /* Clip slides */
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  padding-left: 45px;
+  padding-right: 45px;
+  position: relative;
+  margin-bottom: var(--spacing-unit);
+  min-height: 100px; /* Adjust height for content */
 }
 
 .swiperInstance.lockedSwiper {
   opacity: 0.7;
-  /* background-color: #f8f8f8; */ /* Keep it clean */
 }
 
-.lockedSwiper .swiper-button-next,
-.lockedSwiper .swiper-button-prev,
-.lockedSwiper .swiper-pagination {
-  display: none;
-}
-
-/* Individual slide styling */
-.slide {
-  background: linear-gradient(
-    135deg,
-    var(--bg-main),
-    var(--accent-warm-light)
-  ); /* Subtle warm gradient */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
-  font-size: 1.1em; /* Slightly larger slide text */
-  font-weight: 500;
-  color: var(--text-primary);
-  /* border: 1px solid var(--border-subtle); Removed border, relying on background */
-  border-radius: var(--border-radius-md); /* Match swiper rounding */
-  text-align: center;
-  padding: var(--spacing-unit);
-  box-sizing: border-box;
-  cursor: grab; /* Indicate draggable */
-}
-
-.swiperInstance:not(.lockedSwiper) .slide:active {
-  cursor: grabbing;
-}
-
-/* No data message */
-.noData {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 150px; /* Match swiper height */
-  color: var(--text-secondary);
-  font-style: normal; /* Remove italic */
-  background-color: #f7f7f7; /* Very light grey */
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--border-radius-md); /* Match swiper rounding */
-  font-size: 0.9em;
-}
-
-/* Swiper Controls */
+/* Swiper Nav Buttons */
 .swiperInstance .swiper-button-next,
 .swiperInstance .swiper-button-prev {
-  color: var(--accent-warm); /* Use accent color */
-  transform: scale(0.6); /* Smaller buttons */
-  background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
-  border-radius: 50%;
-  width: 35px !important; /* Override default size */
-  height: 35px !important;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-.swiperInstance .swiper-button-next::after,
-.swiperInstance .swiper-button-prev::after {
-  font-size: 16px !important; /* Adjust icon size */
-  font-weight: bold;
-}
-
-.swiperInstance .swiper-pagination-bullet {
-  background-color: var(--accent-warm-light); /* Inactive bullet color */
-  opacity: 0.8;
-  transition: background-color 0.2s ease;
-}
-
-.swiperInstance .swiper-pagination-bullet-active {
-  background-color: var(--accent-warm); /* Active bullet color */
-  opacity: 1;
-}
-
-.visibilityToggles {
-  display: flex;
-  justify-content: center;
-  gap: var(--spacing-unit); /* 8px gap */
-  margin-bottom: calc(var(--spacing-unit) * 3); /* 24px margin below */
-  flex-wrap: wrap; /* Allow wrapping on very small screens */
-}
-
-/* NEW: Individual Toggle Button Style */
-.toggleButton {
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5); /* 6px 12px */
-  font-size: 0.8em;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--accent-warm-light); /* Subtle border */
-  border-radius: var(--border-radius-pill); /* Rounded */
-  background-color: transparent; /* Default transparent */
-  color: var(--accent-warm); /* Default accent color */
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease;
-  white-space: nowrap; /* Prevent text wrapping */
-}
-
-.toggleButton.toggleActive {
-  background-color: var(--accent-warm); /* Active state background */
-  color: var(--bg-card); /* White text */
-  border-color: var(--accent-warm);
-}
-
-.toggleButton:hover {
-  border-color: var(--accent-warm); /* Darken border on hover */
-}
-
-.toggleButton.toggleActive:hover {
-  background-color: #d68f63; /* Slightly darker accent on hover when active */
-  border-color: #d68f63;
-}
-
-/* Keep ALL other styles from the previous "prettier" versions */
-/* ... (variables, body, pageContainer, title, orderInfo, slidersArea, sliderWrapper, controls, moveButton, sliderContent, slide, noData etc.) ... */
-
-/* --- ROBUST Swiper Controls Styling --- */
-
-/* Target the Swiper container with our module class */
-.swiperInstance {
-  /* Set Swiper's CSS Variables within this scope */
-  /* This is the modern and preferred way for Swiper 8+ */
-  --swiper-theme-color: var(
-    --accent-warm
-  ); /* Sets color for pagination bullets AND nav icons */
-  --swiper-navigation-color: var(
-    --accent-warm
-  ); /* Explicitly set nav icon color */
-  --swiper-navigation-size: 18px; /* Size of the arrow icon itself inside the button */
-
-  /* Make space for the buttons if needed */
-  padding-left: 45px;
-  padding-right: 45px;
-  position: relative; /* Needed for positioning buttons inside */
-}
-
-/* Style the button elements themselves */
-.swiperInstance .swiper-button-next,
-.swiperInstance .swiper-button-prev {
-  /* Reset Swiper defaults that might interfere */
   background: none;
   background-image: none;
   border: none;
-
-  /* Apply our custom background, size, shape, shadow */
-  background-color: rgba(255, 255, 255, 0.85); /* White background */
-  border-radius: 50%; /* Circular */
-  width: 38px; /* Our desired button size */
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  width: 38px;
   height: 38px;
-  top: 50%; /* Vertically center */
-  transform: translateY(-50%); /* Precise vertical centering */
-  box-shadow: 0 3px 8px rgba(100, 80, 70, 0.18); /* Slightly stronger shadow */
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 3px 8px rgba(100, 80, 70, 0.18);
   transition: background-color 0.2s ease, opacity 0.2s ease,
     box-shadow 0.2s ease;
-
-  /* Ensure clicks go through */
   z-index: 10;
   cursor: pointer;
 }
 
-/* Remove default ::after content if Swiper adds gradient/etc. */
-/* Though setting --swiper-navigation-color usually handles the icon */
 .swiperInstance .swiper-button-next::after,
 .swiperInstance .swiper-button-prev::after {
-  /* The size is controlled by --swiper-navigation-size */
-  /* The color is controlled by --swiper-navigation-color */
-  font-weight: bold; /* Make icon bolder if desired */
+  font-weight: bold;
 }
 
-/* Position the buttons */
 .swiperInstance .swiper-button-prev {
-  left: 8px; /* Position from edge */
+  left: 8px;
 }
 .swiperInstance .swiper-button-next {
-  right: 8px; /* Position from edge */
+  right: 8px;
 }
 
-/* Hover states */
 .swiperInstance .swiper-button-next:hover,
 .swiperInstance .swiper-button-prev:hover {
-  background-color: rgba(255, 255, 255, 1); /* Fully opaque white on hover */
+  background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 4px 10px rgba(100, 80, 70, 0.22);
 }
 
-/* Disabled state (Swiper adds .swiper-button-disabled) */
 .swiperInstance .swiper-button-disabled {
-  opacity: 0.35 !important; /* Make sure opacity override works */
+  opacity: 0.35 !important;
   cursor: not-allowed !important;
-  pointer-events: none; /* Prevent interaction */
+  pointer-events: none;
 }
 
-/* --- ROBUST Pagination Styling --- */
+/* Swiper Pagination */
 .swiperInstance .swiper-pagination {
-  bottom: 8px !important; /* Adjust position slightly */
-  /* Swiper pagination might have weird positioning sometimes */
+  bottom: 8px !important;
   position: absolute;
   left: 0;
   width: 100%;
-  text-align: center; /* Ensure dots are centered */
+  text-align: center;
 }
 
-/* Inactive bullets */
 .swiperInstance .swiper-pagination-bullet {
   width: 7px;
   height: 7px;
-  background-color: var(--accent-warm-light); /* Use our variable */
-  opacity: 0.6; /* Make inactive more subtle */
+  background-color: var(--accent-warm-light);
+  opacity: 0.6;
   margin: 0 4px !important;
   transition: background-color 0.2s ease, opacity 0.2s ease, width 0.2s ease,
     height 0.2s ease;
-  display: inline-block; /* Ensure proper layout */
-  border-radius: 50%; /* Ensure roundness */
+  display: inline-block;
+  border-radius: 50%;
 }
 
-/* Active bullet */
 .swiperInstance .swiper-pagination-bullet-active {
-  background-color: var(--accent-warm); /* Use our variable */
+  background-color: var(--accent-warm);
   opacity: 1;
-  width: 9px; /* Slightly larger */
+  width: 9px;
   height: 9px;
 }
 
-/* --- Locked Swiper State --- */
-/* Hide controls when the specific instance is locked */
 .swiperInstance.lockedSwiper .swiper-button-next,
 .swiperInstance.lockedSwiper .swiper-button-prev,
 .swiperInstance.lockedSwiper .swiper-pagination {
   display: none;
 }
-/* Keep ALL previous styles */
-/* ... (variables, body, pageContainer, title, toggles, orderInfo, slidersArea, sliderWrapper, controls, moveButton, Swiper styles, etc.) ... */
 
-/* Renamed for clarity */
-.sliderTitle {
-  margin-top: 0;
-  margin-bottom: calc(var(--spacing-unit) * 2);
-  font-size: 1.1em; /* Maybe slightly smaller */
-  color: var(--text-primary);
-  font-weight: 600;
-  text-align: center;
-  padding-bottom: calc(var(--spacing-unit) * 1.5);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-/* Slide content styling */
+/* --- Slide Content Styling --- */
 .slide {
-  /* background: linear-gradient(135deg, var(--bg-main), var(--accent-warm-light)); */ /* Removing gradient for cleaner look with image */
-  background-color: var(--bg-main); /* Use main background */
-  display: flex;
-  flex-direction: column; /* Stack image and text */
-  justify-content: flex-start; /* Align content to top */
-  align-items: center;
-  height: auto; /* Let content determine height */
-  min-height: 250px; /* Ensure minimum height */
-  font-size: 1.1em;
-  font-weight: 500;
-  color: var(--text-primary);
-  border-radius: var(--border-radius-md);
-  text-align: center;
-  padding: 0; /* Remove padding, handled by inner elements */
-  box-sizing: border-box;
-  cursor: grab;
-  overflow: hidden; /* Clip image rounding */
-}
-
-/* Image wrapper within the slide */
-.slideImageWrapper {
-  width: 100%;
-  height: 200px; /* Match image height */
-  overflow: hidden;
-  margin-bottom: var(--spacing-unit);
-  position: relative;
-}
-
-.slideImage {
-  display: block; /* Remove extra space below image */
-  width: 100%;
-  height: 100%;
-  object-fit: cover; /* Crop image nicely */
-}
-
-/* Text content below image */
-.slideTextContent {
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5); /* Add padding here */
+  background-color: var(--accent-slider);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: calc(var(--spacing-unit) * 0.5); /* Small gap between name/subtext */
+  min-height: 100px; /* Match swiper min-height */
+  height: 100%;
+  border-radius: var(--border-radius-md);
+  padding: calc(var(--spacing-unit) * 2);
+  box-sizing: border-box;
+  cursor: grab;
+  overflow: hidden;
+  text-align: center;
+}
+
+.slideTextContent {
+  padding: var(--spacing-unit) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: auto; /* Push text content towards center/bottom if slide is tall */
+  margin-bottom: auto;
+}
+
+.slideTextContentWithIcon {
+  flex-direction: row;
+  justify-content: center;
+  text-align: left;
+}
+
+.slideIcon {
+  flex-shrink: 0;
+  font-size: 1.4em;
+  color: var(--accent-warm);
 }
 
 .slideName {
   font-weight: 600;
-  font-size: 1.1em; /* Slightly larger name */
+  font-size: 1.1em;
+  color: var(--text-primary);
 }
 
 .slideSubText {
   font-size: 0.85em;
   color: var(--text-secondary);
+  text-align: center;
 }
 
-/* NEW: Accordion Styles */
+.noData {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  color: var(--text-secondary);
+  background-color: #f7f7f7;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  padding: calc(var(--spacing-unit) * 2);
+  box-sizing: border-box;
+}
+
+/* --- Accordion Styles --- */
 .accordionContainer {
-  margin-top: calc(var(--spacing-unit) * 2); /* Space above accordion button */
-  padding-top: calc(var(--spacing-unit) * 1.5); /* Space */
-  border-top: 1px solid var(--border-subtle); /* Separator line */
+  margin-top: calc(var(--spacing-unit) * 2);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .detailsButton {
-  display: flex; /* Align text and icon */
-  justify-content: space-between; /* Push icon to right */
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   width: 100%;
   background-color: transparent;
   border: none;
-  padding: calc(var(--spacing-unit) * 0.5) 0; /* Vertical padding only */
+  padding: calc(var(--spacing-unit) * 0.5) 0;
   font-size: 0.95em;
   font-weight: 500;
   color: var(--text-primary);
@@ -455,19 +413,17 @@
 }
 
 .detailsContentWrapper {
-  overflow: hidden; /* Crucial for height animation */
+  overflow: hidden;
 }
 
 .detailsContent {
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 0.5); /* Padding inside details */
-  background-color: rgba(0, 0, 0, 0.02); /* Very subtle background tint */
-  border-radius: var(--border-radius-sm);
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 0.5);
   font-size: 0.85em;
   color: var(--text-secondary);
 }
 
 .detailsContent p {
-  margin: 0 0 calc(var(--spacing-unit) * 0.75) 0; /* Spacing between detail paragraphs */
+  margin: 0 0 calc(var(--spacing-unit) * 0.75) 0;
   line-height: 1.5;
 }
 .detailsContent p:last-child {
@@ -475,128 +431,71 @@
 }
 
 .detailsContent strong {
-  color: var(--text-primary); /* Make labels slightly darker */
+  color: var(--text-primary);
   margin-right: 4px;
 }
 
-/* --- Ensure Swiper takes appropriate height --- */
-/* Adjust height based on typical content */
-.swiperInstance {
-  width: 100%;
-  /* height: 280px; */ /* Adjust height based on image + text */
-  border-radius: var(--border-radius-md);
-  overflow: hidden;
-  padding-left: 45px;
-  padding-right: 45px;
-  position: relative; /* Needed for positioning buttons inside */
-  margin-bottom: var(--spacing-unit); /* Space before accordion */
-}
-
-/* --- No Data (Adjust height) --- */
-.noData {
+/* --- NEW: Modal Styles --- */
+.modalOverlay {
+  position: fixed;
+  inset: 0; /* Replaces top/left/right/bottom: 0 */
+  background-color: rgba(0, 0, 0, 0.65); /* Slightly darker overlay */
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 250px; /* Match approximate slide height */
-  /* ... rest of noData styles ... */
-}
-/* --- Styles for page.module.css --- */
-
-/* Keep ALL existing styles */
-/* ... */
-
-/* Text content below image (or main content area if no image) */
-.slideTextContent {
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-  display: flex; /* ADD: Use flexbox */
-  flex-direction: row; /* ADD: Align icon and text horizontally */
-  align-items: center; /* ADD: Center items vertically */
-  justify-content: center; /* ADD: Center items horizontally */
-  gap: calc(var(--spacing-unit) * 0.75); /* ADD: Space between icon and text */
-  text-align: left; /* Align text to the left relative to the icon */
-  width: 100%; /* Take full width */
+  z-index: 1000;
+  padding: var(--spacing-unit);
   box-sizing: border-box;
 }
 
-/* Style for the icon itself */
-.slideIcon {
-  flex-shrink: 0; /* Prevent icon shrinking */
-  font-size: 1.4em; /* Make icon slightly larger */
-  color: var(--accent-warm); /* Color the icon */
-  /* Add margin if needed, but gap should handle spacing */
+.modalContent {
+  background-color: var(--bg-card);
+  padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  max-width: 90%;
+  width: 450px; /* Or adjust as needed */
+  position: relative; /* For close button positioning */
+  color: var(--text-primary);
+  max-height: 85vh;
+  overflow-y: auto; /* Scroll if content exceeds max-height */
 }
 
-.slideName {
+.modalContent h2 {
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  text-align: center;
+  font-size: 1.3em;
+  color: var(--text-primary);
   font-weight: 600;
-  font-size: 1.1em;
-  /* No changes needed usually */
 }
 
-.slideSubText {
-  font-size: 0.85em;
+.modalContent p {
+  font-size: 0.95em;
   color: var(--text-secondary);
-  /* Move this below the name if desired */
-  /* For Journal, this might be removed if description preview is removed */
-  width: 100%; /* Allow subtext to potentially wrap below */
-  text-align: center; /* Re-center subtext if needed */
-  margin-top: 4px;
+  text-align: center;
+  margin-bottom: var(--spacing-unit); /* Add some bottom margin */
 }
 
-/* Adjust slide layout if needed to accommodate icon better */
-.slide {
-  background-color: var(--bg-main);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: center;
-  height: auto;
-  min-height: 250px; /* Adjust as needed */
-  border-radius: var(--border-radius-md);
-  padding: 0;
-  box-sizing: border-box;
-  cursor: grab;
-  overflow: hidden;
-}
-.slideTextContent {
-  padding: var(--spacing-unit) 0; /* Adjust padding */
-  display: flex; /* Use flex for COLUMN layout by default */
-  flex-direction: column; /* Stack name and subtext */
-  align-items: center; /* Center items horizontally */
-  gap: calc(var(--spacing-unit) * 0.5); /* Gap between name/subtext */
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Style applied ONLY when an icon is present */
-.slideTextContentWithIcon {
-  flex-direction: row; /* Override to row layout */
-  justify-content: center; /* Center icon and text block */
-  text-align: left; /* Align text left relative to icon */
-}
-
-/* --- NEW: Data Source Selector Styles --- */
-.dataSourceSelector {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: calc(var(--spacing-unit) * 2); /* 16px gap */
-  margin-bottom: calc(var(--spacing-unit) * 3); /* 24px margin below */
-  padding: calc(var(--spacing-unit) * 1);
-  background-color: rgba(255, 255, 255, 0.5);
-  border-radius: var(--border-radius-md);
-}
-
-.dataSourceSelector label {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--spacing-unit) * 0.5); /* 4px gap between radio and text */
-  font-size: 0.9em;
+.modalCloseButton {
+  position: absolute;
+  top: calc(var(--spacing-unit) * 1);
+  right: calc(var(--spacing-unit) * 1.2);
+  background: transparent;
+  border: none;
+  font-size: 1.6em; /* Adjust size */
+  font-weight: bold;
   color: var(--text-secondary);
   cursor: pointer;
+  line-height: 1;
+  padding: calc(
+    var(--spacing-unit) * 0.5
+  ); /* Add padding for easier clicking */
+  border-radius: 50%;
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
-.dataSourceSelector input[type="radio"] {
-  cursor: pointer;
-  /* Optional: Add custom styling to radio buttons if desired */
-  accent-color: var(--accent-warm); /* Modern way to color radios */
+.modalCloseButton:hover {
+  color: var(--text-primary);
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover background */
 }

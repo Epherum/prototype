@@ -22,6 +22,7 @@ import {
   IoWalletOutline, // For Finance
   IoNavigateOutline, // For Logistics
   IoClipboardOutline, // For Inventory/Adjustment
+  IoOptionsOutline,
 } from "react-icons/io5";
 
 // Helper
@@ -50,7 +51,7 @@ const ALLOWED_ORDERS = [
   [SLIDER_TYPES.PARTNER, SLIDER_TYPES.JOURNAL, SLIDER_TYPES.GOODS],
   // Order 4 (NOTE: Your description had good->journal->partner, ensure this matches your intent)
   [SLIDER_TYPES.GOODS, SLIDER_TYPES.JOURNAL, SLIDER_TYPES.PARTNER],
-  [SLIDER_TYPES.GOODS, SLIDER_TYPES.PARTNER, SLIDER_TYPES.JOURNAL], // 5 (NEW: Locked Good -> Partner -> Journal)
+  [SLIDER_TYPES.GOODS, SLIDER_TYPES.PARTNER, SLIDER_TYPES.JOURNAL], // 5 (NEW:  Good -> Partner -> Journal)
   [SLIDER_TYPES.PARTNER, SLIDER_TYPES.GOODS, SLIDER_TYPES.JOURNAL],
 ];
 
@@ -78,11 +79,8 @@ function DynamicSlider({
   title,
   data = [],
   onSlideChange,
-  locked,
   activeItemId,
   orderIndex,
-  isItemLocked,
-  // NEW Props for Accordion
   isAccordionOpen,
   onToggleAccordion,
 }) {
@@ -109,7 +107,7 @@ function DynamicSlider({
     // Use realIndex when loop is enabled
     const currentRealIndex =
       swiper.realIndex !== undefined ? swiper.realIndex : swiper.activeIndex;
-    if (!locked && data.length > currentRealIndex) {
+    if (data.length > currentRealIndex) {
       onSlideChange(data[currentRealIndex].id);
     }
   };
@@ -127,17 +125,9 @@ function DynamicSlider({
   }
   // *** END FALLBACK LOGIC ***
 
-  const lockedItemName =
-    isItemLocked && currentItem ? `: ${currentItem.name}` : "";
-
   return (
     <>
-      <h2 className={styles.sliderTitle}>
-        {" "}
-        {/* Renamed class for clarity */}
-        {title}
-        {isItemLocked ? `[LOCKED${lockedItemName}]` : ""}
-      </h2>
+      <h2 className={styles.sliderTitle}>{title}</h2>
       {data.length > 0 ? (
         <Swiper
           onSwiper={(swiper) => {
@@ -147,15 +137,12 @@ function DynamicSlider({
           loop={false} // Enable loop only if more than 1 slide
           spaceBetween={20} // Slightly less space
           slidesPerView={1}
-          navigation={!locked && data.length > 1} // Hide nav if locked or only 1 slide
-          pagination={!locked && data.length > 1 ? { clickable: true } : false} // Hide pagination too
-          allowTouchMove={!locked}
+          navigation={data.length > 1} // Hide nav if only 1 slide
+          pagination={data.length > 1 ? { clickable: true } : false} // Hide pagination too
           onSlideChange={handleSwiperChange}
-          className={`${styles.swiperInstance} ${
-            locked ? styles.lockedSwiper : ""
-          }`}
+          className={`${styles.swiperInstance} `}
           // Key change forces re-init if data fundamentally changes (e.g., filtering to 1 item)
-          key={data.map((d) => d.id).join("-") + `-${locked}`}
+          key={data.map((d) => d.id).join("-")}
           initialSlide={Math.max(
             0,
             data.findIndex((item) => item.id === activeItemId)
@@ -179,14 +166,14 @@ function DynamicSlider({
               <SwiperSlide key={item.id} className={styles.slide}>
                 {/* Image Section (Conditional) - Keep commented out based on previous request */}
                 {/*
-                {(sliderId === SLIDER_TYPES.PARTNER ||
-                  sliderId === SLIDER_TYPES.GOODS) &&
-                  item.imageUrl && (
-                    <div className={styles.slideImageWrapper}>
-                      <Image ... />
-                    </div>
-                )}
-                 */}
+                  {(sliderId === SLIDER_TYPES.PARTNER ||
+                    sliderId === SLIDER_TYPES.GOODS) &&
+                    item.imageUrl && (
+                      <div className={styles.slideImageWrapper}>
+                        <Image ... />
+                      </div>
+                  )}
+                  */}
                 {/* Text Content */}
                 <div
                   className={`${styles.slideTextContent} ${
@@ -320,16 +307,39 @@ function DynamicSlider({
   );
 }
 
-// --- Main Page Component ---
+// --- NEW: Simple Modal Component ---
+function JournalModal({ isOpen, onClose }) {
+  // Use AnimatePresence later if you want fade-in/out
+  if (!isOpen) return null;
+
+  return (
+    // Overlay captures clicks to close
+    <div className={styles.modalOverlay} onClick={onClose}>
+      {/* Content stops propagation so clicking inside doesn't close it */}
+      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <button
+          className={styles.modalCloseButton}
+          onClick={onClose}
+          aria-label="Close modal"
+        >
+          × {/* Simple 'X' character */}
+        </button>
+        <h2>Journal Options</h2>
+        <p>Work in Progress...</p>
+        {/* Future content goes here */}
+      </div>
+    </div>
+  );
+}
+// --- END: Simple Modal Component ---
+
 export default function Home() {
   // === State ===
   const [sliderOrder, setSliderOrder] = useState(INITIAL_ORDER);
-  // NEW: State for locked item
-  const [lockedItem, setLockedItem] = useState(null);
+  const [activeDataSource, setActiveDataSource] = useState("data1");
+  const [activeDataSet, setActiveDataSet] = useState(initialData1);
 
-  const [activeDataSource, setActiveDataSource] = useState("data1"); // 'data1' or 'data2'
-  const [activeDataSet, setActiveDataSet] = useState(initialData1); // Holds the actual data object
-
+  // Restore displayed state
   const [selectedJournalId, setSelectedJournalId] = useState(() =>
     getFirstId(activeDataSet.journals)
   );
@@ -349,453 +359,329 @@ export default function Home() {
     () => activeDataSet.goods
   );
 
-  const handleDataSourceChange = (event) => {
-    const newSourceKey = event.target.value; // 'data1' or 'data2'
-    if (newSourceKey === activeDataSource) return; // No change
+  const [accordionTypeState, setAccordionTypeState] = useState({
+    [SLIDER_TYPES.JOURNAL]: false,
+    [SLIDER_TYPES.PARTNER]: false,
+    [SLIDER_TYPES.GOODS]: false,
+  });
+  const [visibility, setVisibility] = useState({
+    [SLIDER_TYPES.JOURNAL]: true,
+    [SLIDER_TYPES.PARTNER]: true,
+    [SLIDER_TYPES.GOODS]: false,
+  });
 
-    console.log(`Switching data source to: ${newSourceKey}`);
+  const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
+  // --- NEW: Modal Handlers ---
+  const openJournalModal = useCallback(() => setIsJournalModalOpen(true), []);
+  const closeJournalModal = useCallback(() => setIsJournalModalOpen(false), []);
+
+  // === Data Source Change Handler ===
+  const handleDataSourceChange = (event) => {
+    const newSourceKey = event.target.value;
+    if (newSourceKey === activeDataSource) return;
     const newDataSet = newSourceKey === "data1" ? initialData1 : initialData2;
 
     setActiveDataSource(newSourceKey);
     setActiveDataSet(newDataSet);
 
-    // --- RESET ALL DEPENDENT STATE ---
-    console.log("Resetting state due to data source change.");
     const newFirstJournal = getFirstId(newDataSet.journals);
     const newFirstPartner = getFirstId(newDataSet.partners);
     const newFirstGoods = getFirstId(newDataSet.goods);
 
-    setSliderOrder(INITIAL_ORDER); // Reset order
-    setLockedItem(null); // Remove lock
+    setSliderOrder(INITIAL_ORDER);
     setSelectedJournalId(newFirstJournal);
     setSelectedPartnerId(newFirstPartner);
     setSelectedGoodsId(newFirstGoods);
-    setDisplayedJournals(newDataSet.journals); // Directly set displayed data
+    setDisplayedJournals(newDataSet.journals); // Set displayed state on change
     setDisplayedPartners(newDataSet.partners);
     setDisplayedGoods(newDataSet.goods);
-    // Optionally reset visibility/accordion or keep them
-    // setVisibility({
-    //   [SLIDER_TYPES.JOURNAL]: true,
-    //   [SLIDER_TYPES.PARTNER]: true,
-    //   [SLIDER_TYPES.GOODS]: false,
-    // });
-    // setAccordionTypeState({
-    //   [SLIDER_TYPES.JOURNAL]: false,
-    //   [SLIDER_TYPES.PARTNER]: false,
-    //   [SLIDER_TYPES.GOODS]: false,
-    // });
+    setVisibility({
+      [SLIDER_TYPES.JOURNAL]: true,
+      [SLIDER_TYPES.PARTNER]: true,
+      [SLIDER_TYPES.GOODS]: false,
+    });
+    setAccordionTypeState({
+      [SLIDER_TYPES.JOURNAL]: false,
+      [SLIDER_TYPES.PARTNER]: false,
+      [SLIDER_TYPES.GOODS]: false,
+    });
   };
 
-  // --- CHANGE: State for accordion open/closed status, keyed by SLIDER TYPE ---
-  const [accordionTypeState, setAccordionTypeState] = useState({
-    [SLIDER_TYPES.JOURNAL]: false, // Start closed
-    [SLIDER_TYPES.PARTNER]: false, // Start closed
-    [SLIDER_TYPES.GOODS]: false, // Start closed
-  });
-
-  // NEW: State for slider visibility
-  const [visibility, setVisibility] = useState({
-    [SLIDER_TYPES.JOURNAL]: true, // Start visible
-    [SLIDER_TYPES.PARTNER]: true, // Start visible
-    [SLIDER_TYPES.GOODS]: false, // Start hidden
-  });
-
-  // === Derived State ===
-  const getLockedSliderType = () => lockedItem?.type || null;
-  const isSliderLocked = (sliderId) => getLockedSliderType() === sliderId; // Is this *type* of slider locked?
-  const isSpecificItemLocked = (sliderId) =>
-    lockedItem !== null && sliderId === sliderOrder[0]; // Is the first slider containing the locked item?
-
-  // === Filtering Effect ===
+  // === Filtering useEffect (Revised Loop Structure + Enhanced Logging) ===
   useEffect(() => {
-    console.log("--- Recalculating Filters ---");
+    console.log(
+      "%c--- useEffect START (Revised Loop) ---",
+      "color: blue; font-weight: bold;"
+    );
     console.log("Order:", sliderOrder.join(" -> "));
-    console.log("Locked Item:", lockedItem);
     console.log("Current Selections:", {
       journal: selectedJournalId,
       partner: selectedPartnerId,
       goods: selectedGoodsId,
     });
+    console.log("Active Dataset:", activeDataSource);
 
-    // *** Use activeDataSet ***
-    let filteredJournals = [...activeDataSet.journals];
-    let filteredPartners = [...activeDataSet.partners];
-    let filteredGoods = [...activeDataSet.goods];
-    let activeSelections = {
-      journal: selectedJournalId,
-      partner: selectedPartnerId,
-      goods: selectedGoodsId,
-    };
+    // Start with full dataset copies to hold the results for each slider
+    let finalFilteredJournals = [...activeDataSet.journals];
+    let finalFilteredPartners = [...activeDataSet.partners];
+    let finalFilteredGoods = [...activeDataSet.goods];
 
-    // --- Step 1: Apply Lock Filter (if any) ---
-    if (lockedItem) {
-      activeSelections[lockedItem.type] = lockedItem.id;
-      if (lockedItem.type === SLIDER_TYPES.PARTNER) {
-        const lockedPartnerObj = activeDataSet.partners.find(
-          (p) => p.id === lockedItem.id
-        );
-        if (lockedPartnerObj) {
-          console.log(`Applying Lock: PARTNER ${lockedItem.id}`);
-          filteredPartners = [lockedPartnerObj];
-          filteredJournals = activeDataSet.journals.filter((j) =>
-            lockedPartnerObj.journals.includes(j.id)
-          );
-          filteredGoods = activeDataSet.goods.filter((g) =>
-            lockedPartnerObj.goods.includes(g.id)
-          );
-          // Reset selections based on NEW filtered data
-          if (
-            selectedJournalId &&
-            !filteredJournals.some((j) => j.id === selectedJournalId)
-          ) {
-            activeSelections.journal = getFirstId(filteredJournals);
-          }
-          if (
-            selectedGoodsId &&
-            !filteredGoods.some((g) => g.id === selectedGoodsId)
-          ) {
-            activeSelections.goods = getFirstId(filteredGoods);
-          }
-        } else {
-          console.error("Locked partner not found!"); // Should not happen
-          filteredPartners = [];
-          filteredJournals = [];
-          filteredGoods = [];
-        }
-      } else if (lockedItem.type === SLIDER_TYPES.GOODS) {
-        const lockedGoodObj = activeDataSet.goods.find(
-          (g) => g.id === lockedItem.id
-        );
-        if (lockedGoodObj) {
-          console.log(`Applying Lock: GOODS ${lockedItem.id}`);
-          filteredGoods = [lockedGoodObj];
-          filteredJournals = activeDataSet.journals.filter(
-            (j) => j.id === lockedGoodObj.journal
-          );
-          filteredPartners = activeDataSet.partners.filter(
-            (p) =>
-              Array.isArray(lockedGoodObj.ownedBy) &&
-              lockedGoodObj.ownedBy.includes(p.id)
-          );
-          // Reset selections based on NEW filtered data
-          if (
-            selectedJournalId &&
-            !filteredJournals.some((j) => j.id === selectedJournalId)
-          ) {
-            activeSelections.journal = getFirstId(filteredJournals);
-          }
-          if (
-            selectedPartnerId &&
-            !filteredPartners.some((p) => p.id === selectedPartnerId)
-          ) {
-            activeSelections.partner = getFirstId(filteredPartners);
-          }
-        } else {
-          console.error("Locked good not found!");
-          filteredGoods = [];
-          filteredJournals = [];
-          filteredPartners = [];
-        }
-      }
-    }
-
-    // --- Step 2: Apply Sequential Filters based on Order ---
-    let currentJournal = filteredJournals.find(
-      (j) => j.id === activeSelections.journal
-    );
-    let currentPartner = filteredPartners.find(
-      (p) => p.id === activeSelections.partner
-    );
-    let currentGoods = filteredGoods.find(
-      (g) => g.id === activeSelections.goods
-    );
-
-    for (let i = 0; i < sliderOrder.length - 1; i++) {
-      const sourceSlider = sliderOrder[i];
-      const targetSlider = sliderOrder[i + 1];
-      if (isSliderLocked(sourceSlider) || isSliderLocked(targetSlider))
-        continue;
-
+    // Apply filters sequentially based on the order
+    for (let i = 0; i < sliderOrder.length; i++) {
+      const targetSliderType = sliderOrder[i]; // The slider we are calculating data FOR
       console.log(
-        `Filtering Step ${i + 1}: ${sourceSlider} -> ${targetSlider}`
+        `\n%cCalculating Data for Index ${i}: ${targetSliderType}`,
+        "color: green;"
       );
 
-      // Apply filters based on current selections (which might have been updated by lock)
-      // Use the `filteredJournals`, `filteredPartners`, `filteredGoods` lists
+      // Start with the full list for the target slider type *from the original dataset* for this iteration
+      let potentialData =
+        targetSliderType === SLIDER_TYPES.JOURNAL
+          ? [...activeDataSet.journals]
+          : targetSliderType === SLIDER_TYPES.PARTNER
+          ? [...activeDataSet.partners]
+          : [...activeDataSet.goods];
+      console.log(
+        `  Initial potential data count for ${targetSliderType}: ${potentialData.length}`
+      );
 
-      if (isSliderLocked(sourceSlider) || isSliderLocked(targetSlider)) {
+      // Apply filters from ALL sliders ABOVE the target slider
+      for (let j = 0; j < i; j++) {
+        const sourceSliderType = sliderOrder[j]; // The slider acting AS a filter
+        const sourceSelectionId =
+          sourceSliderType === SLIDER_TYPES.JOURNAL
+            ? selectedJournalId
+            : sourceSliderType === SLIDER_TYPES.PARTNER
+            ? selectedPartnerId
+            : selectedGoodsId;
+
+        // Get the *actual* selected item data based on the source's ID
+        // We need the full item details for filtering, so query the original activeDataSet
+        const sourceItem =
+          sourceSliderType === SLIDER_TYPES.JOURNAL
+            ? activeDataSet.journals.find(
+                (item) => item.id === sourceSelectionId
+              )
+            : sourceSliderType === SLIDER_TYPES.PARTNER
+            ? activeDataSet.partners.find(
+                (item) => item.id === sourceSelectionId
+              )
+            : activeDataSet.goods.find((item) => item.id === sourceSelectionId);
+
         console.log(
-          `Skipping filter step ${
-            i + 1
-          }: ${sourceSlider} -> ${targetSlider} (involved locked type)`
+          `  Applying filter from Index ${j}: ${sourceSliderType} (Selected ID: ${sourceSelectionId})`
         );
-        continue;
-      }
 
-      console.log(
-        `Filtering Step ${i + 1}: ${sourceSlider} -> ${targetSlider}`
-      );
-
-      // --- Filtering Logic with NEW CASES ---
-      if (
-        sourceSlider === SLIDER_TYPES.JOURNAL &&
-        targetSlider === SLIDER_TYPES.PARTNER
-      ) {
-        // Standard J -> P
-        if (currentJournal) {
-          filteredPartners = filteredPartners.filter((p) =>
-            p.journals.includes(currentJournal.id)
+        // CRITICAL CHECK: If the selected item from the source slider is null/undefined
+        // (e.g., selection hasn't happened yet, or ID is invalid), we cannot filter based on it.
+        // This often means the target list should be empty.
+        if (!sourceItem) {
+          console.warn(
+            `    Source item for ${sourceSliderType} (ID: ${sourceSelectionId}) is NULL or not found in dataset. Clearing target ${targetSliderType}.`
           );
-          console.log(
-            `  (Std) Filtered Partners by Journal ${currentJournal.id}:`,
-            filteredPartners.map((p) => p.id)
-          );
-        } else {
-          filteredPartners = [];
+          potentialData = []; // If any upstream filter is invalid, the target list is empty
+          break; // No need to apply further filters from other upstream sliders for this target
         }
-      } else if (
-        sourceSlider === SLIDER_TYPES.PARTNER &&
-        targetSlider === SLIDER_TYPES.GOODS
-      ) {
-        // Standard P -> G (potentially filtered by J earlier)
-        if (currentPartner) {
-          filteredGoods = filteredGoods.filter((g) =>
-            currentPartner.goods.includes(g.id)
-          );
-          const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
-          if (currentJournal && journalIndex !== -1 && journalIndex < i) {
-            filteredGoods = filteredGoods.filter(
-              (g) => g.journal === currentJournal.id
+
+        console.log(
+          `    Found source item: ${sourceItem.name || sourceItem.id}`
+        );
+
+        // Apply the filter based on source -> target relationship
+        if (sourceSliderType === SLIDER_TYPES.JOURNAL) {
+          if (targetSliderType === SLIDER_TYPES.PARTNER) {
+            // Filter partners based on if their 'journals' array includes the selected journal's ID
+            potentialData = potentialData.filter(
+              (p) =>
+                Array.isArray(p.journals) && p.journals.includes(sourceItem.id)
+            );
+          } else if (targetSliderType === SLIDER_TYPES.GOODS) {
+            // Filter goods based on if their 'journal' property matches the selected journal's ID
+            potentialData = potentialData.filter(
+              (g) => g.journal === sourceItem.id
             );
           }
-          console.log(
-            `  (Std) Filtered Goods by Partner ${currentPartner.id}:`,
-            filteredGoods.map((g) => g.id)
-          );
-        } else {
-          filteredGoods = [];
-        }
-      } else if (
-        sourceSlider === SLIDER_TYPES.JOURNAL &&
-        targetSlider === SLIDER_TYPES.GOODS
-      ) {
-        // Standard J -> G
-        if (currentJournal) {
-          filteredGoods = filteredGoods.filter(
-            (g) => g.journal === currentJournal.id
-          );
-          console.log(
-            `  (Std) Filtered Goods by Journal ${currentJournal.id}:`,
-            filteredGoods.map((g) => g.id)
-          );
-        } else {
-          filteredGoods = [];
-        }
-      } else if (
-        sourceSlider === SLIDER_TYPES.GOODS &&
-        targetSlider === SLIDER_TYPES.PARTNER
-      ) {
-        // Standard G -> P (potentially filtered by J earlier)
-        if (currentGoods && Array.isArray(currentGoods.ownedBy)) {
-          filteredPartners = filteredPartners.filter((p) =>
-            currentGoods.ownedBy.includes(p.id)
-          );
-          const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
-          if (currentJournal && journalIndex !== -1 && journalIndex < i) {
-            filteredPartners = filteredPartners.filter((p) =>
-              p.journals.includes(currentJournal.id)
+        } else if (sourceSliderType === SLIDER_TYPES.PARTNER) {
+          if (targetSliderType === SLIDER_TYPES.GOODS) {
+            // Filter goods based on if their ID is included in the selected partner's 'goods' array
+            potentialData = potentialData.filter(
+              (g) =>
+                Array.isArray(sourceItem.goods) &&
+                sourceItem.goods.includes(g.id)
+            );
+          } else if (targetSliderType === SLIDER_TYPES.JOURNAL) {
+            // Filter journals based on if their ID is included in the selected partner's 'journals' array
+            potentialData = potentialData.filter(
+              (j) =>
+                Array.isArray(sourceItem.journals) &&
+                sourceItem.journals.includes(j.id)
             );
           }
-          console.log(
-            `  (Std) Filtered Partners by Goods ${currentGoods.id}:`,
-            filteredPartners.map((p) => p.id)
-          );
-        } else {
-          filteredPartners = [];
+        } else if (sourceSliderType === SLIDER_TYPES.GOODS) {
+          if (targetSliderType === SLIDER_TYPES.PARTNER) {
+            // Filter partners based on if their ID is included in the selected good's 'ownedBy' array
+            if (Array.isArray(sourceItem.ownedBy)) {
+              potentialData = potentialData.filter((p) =>
+                sourceItem.ownedBy.includes(p.id)
+              );
+            } else {
+              console.warn(
+                `    Goods item ${sourceItem.id} has invalid 'ownedBy' property. Clearing partners.`
+              );
+              potentialData = []; // Clear if ownedBy isn't array
+            }
+          } else if (targetSliderType === SLIDER_TYPES.JOURNAL) {
+            // Filter journals based on if their ID matches the selected good's 'journal' property
+            potentialData = potentialData.filter(
+              (j) => j.id === sourceItem.journal
+            );
+          }
         }
-
-        // --- NEW Case 5: Order = G -> P -> J ---
-        // Filter J based on selected P (which is already filtered by locked G)
-      } else if (
-        sourceSlider === SLIDER_TYPES.PARTNER &&
-        targetSlider === SLIDER_TYPES.JOURNAL &&
-        sliderOrder[0] === SLIDER_TYPES.GOODS
-      ) {
-        console.log("  Applying Filter for Order G -> P -> J");
-        // The 'filteredJournals' list *already* contains only the locked Good's journal due to Step 1.
-        // We don't need to filter it further based on the partner in this specific setup,
-        // because if the partner owns the good, they are implicitly related to that journal.
-        // If data model changed (partner could own good but not be in journal), this check would be needed:
-        // if (currentPartner && currentJournal) { // currentJournal is the single one from the locked good
-        //     if (!currentPartner.journals.includes(currentJournal.id)) {
-        //         console.log("    Partner not in the locked Good's journal - clearing journals (unlikely scenario)");
-        //         filteredJournals = [];
-        //     }
-        // }
-        // Essentially, for this order, the journal list is fixed by the locked good.
         console.log(
-          `    Journal list fixed by locked good:`,
-          filteredJournals.map((j) => j.id)
+          `    Data count for ${targetSliderType} after ${sourceSliderType} filter: ${potentialData.length}`
         );
+        if (potentialData.length === 0 && j < i - 1) {
+          console.log(
+            `    Target ${targetSliderType} is empty after ${sourceSliderType} filter. No need for further upstream filters.`
+          );
+          break; // Optimization: If list is empty, stop applying more filters from above
+        }
+      } // End inner loop (applying filters from above)
 
-        // --- NEW Case 6: Order = P -> G -> J ---
-        // Filter J based on selected G (which is already filtered by locked P)
-      } else if (
-        sourceSlider === SLIDER_TYPES.GOODS &&
-        targetSlider === SLIDER_TYPES.JOURNAL &&
-        sliderOrder[0] === SLIDER_TYPES.PARTNER
-      ) {
-        console.log("  Applying Filter for Order P -> G -> J");
-        // 'filteredJournals' contains all journals for the locked Partner (from Step 1).
-        // Now, filter this list down to only the journal associated with the currently selected Good.
-        if (currentGoods) {
-          filteredJournals = filteredJournals.filter(
-            (j) => j.id === currentGoods.journal
-          );
-          console.log(
-            `    Filtered Journals by selected Good (${currentGoods.id})'s journal (${currentGoods.journal}):`,
-            filteredJournals.map((j) => j.id)
-          );
-        } else {
-          console.log("    No Good selected, cannot filter Journals further.");
-          // Keep journals filtered by partner, or clear if no good means no specific journal? Clearing seems safer.
-          filteredJournals = [];
-        }
-
-        // --- Existing specific order filters (e.g., Mode 3/4 if different) ---
-        // Review if Mode 3 (G->J->P) or Mode 4 (P->J->G) logic needs adjustments or is covered.
-        // Example: Keep Mode 3's P filter if needed.
-      } else if (
-        sourceSlider === SLIDER_TYPES.JOURNAL &&
-        targetSlider === SLIDER_TYPES.PARTNER &&
-        sliderOrder[0] === SLIDER_TYPES.GOODS
-      ) {
-        console.log("  Applying Filter for Order G -> J -> P");
-        // Filter Partners based on selected Journal (which is fixed to the Good's journal)
-        if (
-          currentJournal &&
-          currentGoods &&
-          Array.isArray(currentGoods.ownedBy)
-        ) {
-          // Partners list initially filtered by owning the Good. Further filter by selected (Good's) Journal.
-          filteredPartners = filteredPartners.filter((p) =>
-            p.journals.includes(currentJournal.id)
-          );
-          console.log(
-            `    Filtered Partners by selected Journal ${currentJournal.id}:`,
-            filteredPartners.map((p) => p.id)
-          );
-        } else {
-          filteredPartners = [];
-        }
-        // Example: Keep Mode 4's G filter if needed.
-      } else if (
-        sourceSlider === SLIDER_TYPES.JOURNAL &&
-        targetSlider === SLIDER_TYPES.GOODS &&
-        sliderOrder[0] === SLIDER_TYPES.PARTNER
-      ) {
-        console.log("  Applying Filter for Order P -> J -> G");
-        // Filter Goods based on selected Journal (which is filtered from Partner's journals)
-        if (currentJournal && currentPartner) {
-          // Goods list initially filtered by owned by Partner. Further filter by selected Journal.
-          filteredGoods = filteredGoods.filter(
-            (g) => g.journal === currentJournal.id
-          );
-          console.log(
-            `    Filtered Goods by selected Journal ${currentJournal.id}:`,
-            filteredGoods.map((g) => g.id)
-          );
-        } else {
-          filteredGoods = [];
-        }
+      // Update the final list for the target slider for this cycle
+      if (targetSliderType === SLIDER_TYPES.JOURNAL) {
+        finalFilteredJournals = potentialData;
+      } else if (targetSliderType === SLIDER_TYPES.PARTNER) {
+        finalFilteredPartners = potentialData;
+      } else if (targetSliderType === SLIDER_TYPES.GOODS) {
+        finalFilteredGoods = potentialData;
       }
-      // --- End Filtering Logic ---
-      // Other specific mode logic might be simplified now due to the lock pre-filter
+      console.log(
+        `%c  Finished calculating for ${targetSliderType}. Final count: ${
+          potentialData.length
+        } [${potentialData.map((d) => d.id).join(", ")}]`,
+        "color: green;"
+      );
+    } // End outer loop (calculating for each slider)
 
-      // Update 'current' selections for the next iteration based on the *newly filtered* lists
-      currentJournal = filteredJournals.find(
-        (j) => j.id === activeSelections.journal
-      );
-      currentPartner = filteredPartners.find(
-        (p) => p.id === activeSelections.partner
-      );
-      currentGoods = filteredGoods.find((g) => g.id === activeSelections.goods);
+    // --- Final State Update ---
+    // Check if the calculated lists are actually different from the current displayed state
+    // This prevents unnecessary re-renders if the data hasn't changed
+    const journalsChanged =
+      JSON.stringify(finalFilteredJournals) !==
+      JSON.stringify(displayedJournals);
+    const partnersChanged =
+      JSON.stringify(finalFilteredPartners) !==
+      JSON.stringify(displayedPartners);
+    const goodsChanged =
+      JSON.stringify(finalFilteredGoods) !== JSON.stringify(displayedGoods);
+
+    if (journalsChanged) {
+      console.log("%cSetting updated Displayed Journals", "color: orange;");
+      setDisplayedJournals(finalFilteredJournals);
+    }
+    if (partnersChanged) {
+      console.log("%cSetting updated Displayed Partners", "color: orange;");
+      setDisplayedPartners(finalFilteredPartners);
+    }
+    if (goodsChanged) {
+      console.log("%cSetting updated Displayed Goods", "color: orange;");
+      setDisplayedGoods(finalFilteredGoods);
+    }
+    if (!journalsChanged && !partnersChanged && !goodsChanged) {
+      console.log("Displayed data lists have not changed.");
     }
 
-    // --- Step 3: Final Update and Selection Reset Check ---
-    console.log("Final Filtered Data:", {
-      journals: filteredJournals.length,
-      partners: filteredPartners.length,
-      goods: filteredGoods.length,
-    });
-    setDisplayedJournals(filteredJournals);
-    setDisplayedPartners(filteredPartners);
-    setDisplayedGoods(filteredGoods);
+    // --- Selection Reset Check ---
+    // IMPORTANT: This check should happen *AFTER* the displayed state might have been updated.
+    // However, running it here means if a reset IS needed, it triggers another useEffect cycle.
+    // Let's proceed with this for now, as it ensures consistency.
+    console.log("%c--- useEffect Checking Selections ---", "color: purple;");
+    let resetTriggered = false; // Track if any reset happens in this cycle
 
-    // Reset selections IF the selected item is no longer valid in the FINAL filtered list
-    // Respect locked item - its selection should not be reset
+    // Check Journal FIRST
     if (
-      lockedItem?.type !== SLIDER_TYPES.JOURNAL &&
       selectedJournalId &&
-      !filteredJournals.some((j) => j.id === selectedJournalId)
+      !finalFilteredJournals.some((j) => j.id === selectedJournalId)
     ) {
-      const newSelection = getFirstId(filteredJournals);
-      console.log(`Resetting Journal selection to ${newSelection}`);
-      setSelectedJournalId(newSelection);
-    }
-    if (
-      lockedItem?.type !== SLIDER_TYPES.PARTNER &&
-      selectedPartnerId &&
-      !filteredPartners.some((p) => p.id === selectedPartnerId)
-    ) {
-      const newSelection = getFirstId(filteredPartners);
-      console.log(`Resetting Partner selection to ${newSelection}`);
-      setSelectedPartnerId(newSelection);
-    }
-    if (
-      lockedItem?.type !== SLIDER_TYPES.GOODS &&
-      selectedGoodsId &&
-      !filteredGoods.some((g) => g.id === selectedGoodsId)
-    ) {
-      const newSelection = getFirstId(filteredGoods);
-      console.log(`Resetting Goods selection to ${newSelection}`);
-      setSelectedGoodsId(newSelection);
+      const newSelection = getFirstId(finalFilteredJournals);
+      console.warn(
+        `!!! Journal selection ${selectedJournalId} invalid in new list [${finalFilteredJournals
+          .map((j) => j.id)
+          .join(", ")}]. Resetting to ${newSelection}.`
+      );
+      setSelectedJournalId(newSelection); // This state change will trigger useEffect again
+      resetTriggered = true;
     }
 
-    // DEPENDENCY ARRAY: Add lockedItem
+    // Check Partner only if Journal didn't need reset
+    if (
+      !resetTriggered &&
+      selectedPartnerId &&
+      !finalFilteredPartners.some((p) => p.id === selectedPartnerId)
+    ) {
+      const newSelection = getFirstId(finalFilteredPartners);
+      console.warn(
+        `!!! Partner selection ${selectedPartnerId} invalid in new list [${finalFilteredPartners
+          .map((p) => p.id)
+          .join(", ")}]. Resetting to ${newSelection}.`
+      );
+      setSelectedPartnerId(newSelection); // This state change will trigger useEffect again
+      resetTriggered = true;
+    }
+
+    // Check Goods only if Journal and Partner didn't need reset
+    if (
+      !resetTriggered &&
+      selectedGoodsId &&
+      !finalFilteredGoods.some((g) => g.id === selectedGoodsId)
+    ) {
+      const newSelection = getFirstId(finalFilteredGoods);
+      console.warn(
+        `!!! Goods selection ${selectedGoodsId} invalid in new list [${finalFilteredGoods
+          .map((g) => g.id)
+          .join(", ")}]. Resetting to ${newSelection}.`
+      );
+      setSelectedGoodsId(newSelection); // This state change will trigger useEffect again
+      resetTriggered = true;
+    }
+
+    if (!resetTriggered) {
+      console.log(
+        "%c--- Selections remain valid this cycle. ---",
+        "color: purple;"
+      );
+    } else {
+      console.log(
+        "%c--- Selection reset was triggered. Expecting useEffect rerun. ---",
+        "color: purple; font-weight: bold;"
+      );
+    }
+    console.log("%c--- useEffect END ---", "color: blue; font-weight: bold;");
   }, [
     sliderOrder,
     selectedJournalId,
     selectedPartnerId,
     selectedGoodsId,
-    lockedItem,
     activeDataSet,
+    // Add displayed state as dependencies ONLY if you want to react to direct changes,
+    // but it's usually derived state, so avoid adding them to prevent infinite loops.
+    // displayedJournals, displayedPartners, displayedGoods
   ]);
 
   // === Event Handlers ===
-  const handleSwipe = useCallback(
-    (sourceSliderId, selectedItemId) => {
-      // Do not update state if the swiped slider is the locked one
-      if (isSliderLocked(sourceSliderId)) {
-        console.log(`Swipe ignored on locked slider: ${sourceSliderId}`);
-        return;
-      }
+  const handleSwipe = useCallback((sourceSliderId, selectedItemId) => {
+    console.log(
+      `Swipe handled on ${sourceSliderId}, selected: ${selectedItemId}`
+    );
+    if (sourceSliderId === SLIDER_TYPES.JOURNAL)
+      setSelectedJournalId(selectedItemId);
+    else if (sourceSliderId === SLIDER_TYPES.PARTNER)
+      setSelectedPartnerId(selectedItemId);
+    else if (sourceSliderId === SLIDER_TYPES.GOODS)
+      setSelectedGoodsId(selectedItemId);
+  }, []); // No dependencies needed now
 
-      console.log(
-        `Swipe handled on ${sourceSliderId}, selected: ${selectedItemId}`
-      );
-      if (sourceSliderId === SLIDER_TYPES.JOURNAL)
-        setSelectedJournalId(selectedItemId);
-      else if (sourceSliderId === SLIDER_TYPES.PARTNER)
-        setSelectedPartnerId(selectedItemId);
-      else if (sourceSliderId === SLIDER_TYPES.GOODS)
-        setSelectedGoodsId(selectedItemId);
-      // useEffect handles filtering
-    },
-    [isSliderLocked]
-  ); // Add dependency
-
-  // --- CHANGE: Accordion Toggle Handler - now operates on SLIDER TYPE ---
   const toggleAccordion = useCallback(
     (sliderType) => {
       if (
@@ -806,10 +692,10 @@ export default function Home() {
           )
         ]
       )
-        return; // Safety check for valid type
+        return;
       setAccordionTypeState((prev) => ({
         ...prev,
-        [sliderType]: !prev[sliderType], // Toggle the state for this specific TYPE
+        [sliderType]: !prev[sliderType],
       }));
       console.log(
         `Toggled accordion for type ${sliderType} to ${!accordionTypeState[
@@ -818,124 +704,45 @@ export default function Home() {
       );
     },
     [accordionTypeState]
-  ); // Dependency updated
+  );
 
-  // --- REFINED moveSlider ---
+  const toggleVisibility = (sliderId) => {
+    setVisibility((prev) => ({ ...prev, [sliderId]: !prev[sliderId] }));
+    console.log(
+      `Toggled visibility for ${sliderId} to ${!visibility[sliderId]}`
+    );
+  };
+
+  // --- moveSlider (Ensure it's Simplified) ---
   const moveSlider = (sliderId, direction) => {
-    // Capture selections *before* changing order
-    const currentSelections = {
-      journal: selectedJournalId,
-      partner: selectedPartnerId,
-      goods: selectedGoodsId,
-    };
-    // Capture the ID of the item that IS CURRENTLY locked, if any
-    const previouslyLockedItemId = lockedItem?.id || null;
-    const previouslyLockedType = lockedItem?.type || null;
-
     setSliderOrder((currentOrder) => {
       const currentIndex = currentOrder.indexOf(sliderId);
       const targetIndex =
         direction === "up" ? currentIndex - 1 : currentIndex + 1;
 
-      if (targetIndex < 0 || targetIndex >= currentOrder.length)
-        return currentOrder;
+      if (targetIndex < 0 || targetIndex >= currentOrder.length) {
+        return currentOrder; // No change if move is out of bounds
+      }
 
       const newOrder = [...currentOrder];
       [newOrder[currentIndex], newOrder[targetIndex]] = [
         newOrder[targetIndex],
         newOrder[currentIndex],
       ];
-      console.log("Order changed:", newOrder);
 
-      const firstSliderType = newOrder[0];
-      let newLockedItem = null;
+      // We rely on the button logic to only call this if the move IS allowed
+      // No need to check isOrderAllowed here again unless you want double safety
+      console.log(
+        `moveSlider: Attempting order change to ${newOrder.join(" -> ")}`
+      );
 
-      // Prepare variables to hold the *final* selections to be set
-      let finalJournalSelection = null;
-      let finalPartnerSelection = null;
-      let finalGoodsSelection = null;
-
-      // Determine lock state based on the NEW order's first item
-      if (firstSliderType === SLIDER_TYPES.PARTNER) {
-        // --- Locking Partner ---
-        const partnerIdToLock = currentSelections.partner;
-        const lockedPartnerObj = activeDataSet.partners.find(
-          (p) => p.id === partnerIdToLock
-        );
-        if (lockedPartnerObj) {
-          newLockedItem = { type: SLIDER_TYPES.PARTNER, id: partnerIdToLock };
-          // *** Use activeDataSet ***
-          const initialFilteredJournals = activeDataSet.journals.filter((j) =>
-            lockedPartnerObj.journals.includes(j.id)
-          );
-          const initialFilteredGoods = activeDataSet.goods.filter((g) =>
-            lockedPartnerObj.goods.includes(g.id)
-          );
-          finalPartnerSelection = partnerIdToLock;
-          finalJournalSelection = getFirstId(initialFilteredJournals);
-          finalGoodsSelection = getFirstId(initialFilteredGoods);
-        } else {
-          // *** Use activeDataSet ***
-          finalJournalSelection = getFirstId(activeDataSet.journals);
-          finalPartnerSelection = getFirstId(activeDataSet.partners);
-          finalGoodsSelection = getFirstId(activeDataSet.goods);
-        }
-      } else if (firstSliderType === SLIDER_TYPES.GOODS) {
-        const goodIdToLock = currentSelections.goods;
-        // *** Use activeDataSet ***
-        const lockedGoodObj = activeDataSet.goods.find(
-          (g) => g.id === goodIdToLock
-        );
-        if (lockedGoodObj) {
-          newLockedItem = { type: SLIDER_TYPES.GOODS, id: goodIdToLock };
-          // *** Use activeDataSet ***
-          const initialFilteredJournals = activeDataSet.journals.filter(
-            (j) => j.id === lockedGoodObj.journal
-          );
-          const initialFilteredPartners = activeDataSet.partners.filter(
-            (p) =>
-              Array.isArray(lockedGoodObj.ownedBy) &&
-              lockedGoodObj.ownedBy.includes(p.id)
-          );
-          finalGoodsSelection = goodIdToLock;
-          finalJournalSelection = getFirstId(initialFilteredJournals);
-          finalPartnerSelection = getFirstId(initialFilteredPartners);
-        } else {
-          // *** Use activeDataSet ***
-          finalJournalSelection = getFirstId(activeDataSet.journals);
-          finalPartnerSelection = getFirstId(activeDataSet.partners);
-          finalGoodsSelection = getFirstId(activeDataSet.goods);
-        }
-      } else {
-        // Not Locking
-        newLockedItem = null;
-        if (previouslyLockedType === SLIDER_TYPES.PARTNER) {
-          finalPartnerSelection = previouslyLockedItemId;
-          // *** Use activeDataSet ***
-          finalJournalSelection = getFirstId(activeDataSet.journals);
-          finalGoodsSelection = getFirstId(activeDataSet.goods);
-        } else if (previouslyLockedType === SLIDER_TYPES.GOODS) {
-          finalGoodsSelection = previouslyLockedItemId;
-          // *** Use activeDataSet ***
-          finalJournalSelection = getFirstId(activeDataSet.journals);
-          finalPartnerSelection = getFirstId(activeDataSet.partners);
-        } else {
-          // *** Use activeDataSet ***
-          finalJournalSelection = getFirstId(activeDataSet.journals);
-          finalPartnerSelection = getFirstId(activeDataSet.partners);
-          finalGoodsSelection = getFirstId(activeDataSet.goods);
-        }
-      }
-
-      setSelectedJournalId(finalJournalSelection);
-      setSelectedPartnerId(finalPartnerSelection);
-      setSelectedGoodsId(finalGoodsSelection);
-      setLockedItem(newLockedItem);
+      // ONLY update the order state. The useEffect handles the consequences.
       return newOrder;
     });
   };
+  // --- END moveSlider ---
 
-  // Helper to get props
+  // --- Helper to get props - Reads from DISPLAYED state ---
   const getSliderProps = (sliderId) => {
     switch (sliderId) {
       case SLIDER_TYPES.JOURNAL:
@@ -947,16 +754,6 @@ export default function Home() {
       default:
         return { data: [], activeItemId: null };
     }
-  };
-
-  const toggleVisibility = (sliderId) => {
-    setVisibility((prev) => ({
-      ...prev,
-      [sliderId]: !prev[sliderId],
-    }));
-    console.log(
-      `Toggled visibility for ${sliderId} to ${!visibility[sliderId]}`
-    );
   };
 
   // === Render ===
@@ -1016,7 +813,6 @@ export default function Home() {
             .filter((id) => !visibility[id])
             .map((id) => SLIDER_CONFIG[id].title)
             .join(", ")})`}
-        {lockedItem ? ` (Locked: ${lockedItem.type} ${lockedItem.id})` : ""}
       </p>
 
       <LayoutGroup>
@@ -1027,8 +823,6 @@ export default function Home() {
               const config = SLIDER_CONFIG[sliderId];
               const { Component, title } = config;
               const { data, activeItemId } = getSliderProps(sliderId);
-              const isLockedForSwiper = isSliderLocked(sliderId);
-              const isContainingLockedItem = isSpecificItemLocked(sliderId);
               // Get accordion state for the currently active item in *this* slider
               // Default to false if no state exists for this item ID yet
               const isAccordionOpenForType = accordionTypeState[sliderId];
@@ -1075,6 +869,9 @@ export default function Home() {
                   key={sliderId}
                   layoutId={sliderId}
                   layout
+                  style={{ order: index }} // Keep order & hide outline
+                  className={styles.sliderWrapper}
+                  // --- ADD Animation Completion Callback ---
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
@@ -1083,29 +880,47 @@ export default function Home() {
                     height: { duration: 0.3, ease: "easeInOut" },
                     layout: { duration: 0.5, ease: "easeInOut" },
                   }}
-                  style={{ order: index }}
-                  className={styles.sliderWrapper}
                 >
-                  {/* --- CONTROLS SECTION - Conditional Rendering --- */}
+                  {/* --- MODIFIED: CONTROLS SECTION --- */}
                   <div className={styles.controls}>
-                    {/* Render "Up" button ONLY if canMoveUp is true */}
-                    {canMoveUp && (
+                    {/* Left side: Either the Options button OR an empty placeholder */}
+                    {sliderId === SLIDER_TYPES.JOURNAL ? (
                       <button
-                        onClick={() => moveSlider(sliderId, "up")}
-                        className={styles.moveButton}
+                        onClick={openJournalModal}
+                        className={`${styles.controlButton} ${styles.modalButton}`}
+                        aria-label="Open Journal Options"
+                        title="Journal Options"
                       >
-                        ▲ Up
+                        <IoOptionsOutline />
                       </button>
+                    ) : (
+                      // {/* Empty div acts as the first element for space-between */}
+                      // {/* Add a non-breaking space or style if needed, but often just the div is enough */}
+                      <div className={styles.controlPlaceholder}> </div>
+                      // Or just <div /> if that works
                     )}
-                    {/* Render "Down" button ONLY if canMoveDown is true */}
-                    {canMoveDown && (
-                      <button
-                        onClick={() => moveSlider(sliderId, "down")}
-                        className={styles.moveButton}
-                      >
-                        ▼ Down
-                      </button>
-                    )}
+
+                    {/* Right side: Wrapper for move buttons */}
+                    <div className={styles.moveButtonGroup}>
+                      {canMoveUp && (
+                        <button
+                          onClick={() => moveSlider(sliderId, "up")}
+                          className={styles.controlButton}
+                          aria-label={`Move ${title} up`}
+                        >
+                          ▲ Up
+                        </button>
+                      )}
+                      {canMoveDown && (
+                        <button
+                          onClick={() => moveSlider(sliderId, "down")}
+                          className={styles.controlButton}
+                          aria-label={`Move ${title} down`}
+                        >
+                          ▼ Down
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {/* --- END CONTROLS MODIFICATION --- */}
                   {/* Component */}
@@ -1114,10 +929,8 @@ export default function Home() {
                     title={title}
                     data={data}
                     onSlideChange={onSlideChangeCallback} // Pass the hook result
-                    locked={isLockedForSwiper}
                     activeItemId={activeItemId}
                     orderIndex={index}
-                    isItemLocked={isContainingLockedItem}
                     // --- CHANGE: Pass type-based state and modified handler ---
                     isAccordionOpen={isAccordionOpenForType}
                     // Pass a function that calls the main toggle with the correct type
@@ -1129,6 +942,7 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </LayoutGroup>
+      <JournalModal isOpen={isJournalModalOpen} onClose={closeJournalModal} />
     </div>
   );
 }
