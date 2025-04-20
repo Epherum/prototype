@@ -499,3 +499,83 @@
   color: var(--text-primary);
   background-color: rgba(0, 0, 0, 0.05); /* Subtle hover background */
 }
+
+/* REMOVE OLD .visibilityToggles if it exists */
+
+/* --- NEW: Swiper for Visibility Toggles Styles --- */
+.visibilitySwiperContainer {
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden; /* Important for rounded corners + Swiper */
+}
+
+.visibilitySwiper {
+  /* No fixed height needed, adjusts to content */
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit); /* Add some padding */
+}
+
+.visibilitySwiperSlide {
+  display: inline-flex !important; /* Use inline-flex for items */
+  align-items: center;
+  width: auto !important; /* Let slide width be determined by content */
+  cursor: grab;
+  user-select: none; /* Prevent text selection during swipe */
+}
+
+.visibilityButton {
+  /* Adapt styles from old .toggleButton or create new */
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  font-size: 0.8em; /* Slightly smaller perhaps */
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--accent-warm-light);
+  border-radius: var(--border-radius-pill);
+  background-color: transparent;
+  color: var(--accent-warm);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+  opacity: 0.7; /* Dim non-active buttons slightly */
+}
+
+.visibilityButton.visibilityActive {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  opacity: 1; /* Fully opaque when active */
+  font-weight: 600;
+}
+
+.visibilityButton:hover {
+  border-color: var(--accent-warm);
+  opacity: 1;
+}
+
+.visibilityButton.visibilityActive:hover {
+  background-color: #d68f63; /* Slightly darker warm accent */
+  border-color: #d68f63;
+}
+
+.visibilityArrow {
+  margin: 0 calc(var(--spacing-unit) * 0.75); /* Space around arrow */
+  font-size: 1.1em;
+  color: var(--text-secondary);
+  flex-shrink: 0; /* Prevent arrow from shrinking */
+  line-height: 1;
+  font-weight: bold;
+}
+/* --- END: Swiper Styles --- */
+
+/* REMOVE .orderInfo Style */
+/* .orderInfo { ... } */
+
+/* Ensure slider wrapper padding isn't excessive if title is inside DynamicSlider now */
+.sliderWrapper {
+  /* Adjust padding if needed */
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+}
+
+/* Ensure DynamicSlider title H2 has appropriate margin if rendered inside it */
+/* Add style if needed: e.g., .dynamicSliderTitle { margin-bottom: ... } */
