@@ -846,7 +846,7 @@ export default function Home() {
               spaceBetween={10} // Slightly more space?
               slidesPerView={"auto"}
               centeredSlides={false}
-              loop={false} // Keep loop disabled
+              loop={true} // Keep loop disabled
               className={styles.visibilitySwiper}
               onSwiper={(swiper) => {
                 visibilitySwiperRef.current = swiper;
