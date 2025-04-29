@@ -1,8 +1,14 @@
+/* ================================== */
 /* --- Global & Page Structure --- */
+/* ================================== */
+/* :root { ... your CSS variables ... } */
+
 .pageContainer {
   max-width: 600px;
   margin: 0 auto;
-  padding: calc(var(--spacing-unit) * 3) calc(var(--spacing-unit) * 2);
+  /* Padding applies around the content area below the sticky header */
+  padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
+    calc(var(--spacing-unit) * 2);
   min-height: 100vh;
   box-sizing: border-box;
 }
@@ -12,6 +18,27 @@
   color: var(--text-primary);
   font-size: 1.8em;
   font-weight: 600;
+  /* Flows below sticky header */
+  margin-top: calc(var(--spacing-unit) * 3);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+}
+
+/* ================================== */
+/* --- Sticky Header Section --- */
+/* ================================== */
+.stickyHeaderContainer {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--bg-main); /* Adjust var name if needed */
+  padding: calc(var(--spacing-unit) * 1.5) 0; /* Adjusted padding */
+  margin: 0 calc(-1 * var(--spacing-unit) * 2); /* Full width bleed */
+  padding-left: calc(var(--spacing-unit) * 2);
+  padding-right: calc(var(--spacing-unit) * 2);
+  box-shadow: 0 2px 0px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 1.5); /* Adjusted gap */
   margin-bottom: calc(var(--spacing-unit) * 3);
 }
 
@@ -20,10 +47,7 @@
   justify-content: center;
   align-items: center;
   gap: calc(var(--spacing-unit) * 2);
-  margin-bottom: calc(var(--spacing-unit) * 3);
-  padding: calc(var(--spacing-unit) * 1);
-  background-color: rgba(255, 255, 255, 0.5);
-  border-radius: var(--border-radius-md);
+  flex-shrink: 0;
 }
 
 .dataSourceSelector label {
@@ -40,17 +64,38 @@
   accent-color: var(--accent-warm);
 }
 
-.visibilityToggles {
-  display: flex;
-  justify-content: center;
-  gap: var(--spacing-unit);
-  margin-bottom: calc(var(--spacing-unit) * 3);
-  flex-wrap: wrap;
+/* Visibility Toggles Swiper */
+.visibilitySwiperContainer {
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-.toggleButton {
+.visibilitySwiper {
+  padding-left: calc(var(--spacing-unit) * 0.5);
+  padding-right: calc(var(--spacing-unit) * 0.5);
+}
+
+.visibilitySwiperSlide {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  cursor: grab;
+  user-select: none;
+  vertical-align: middle;
+  padding: 2px 0;
+}
+
+.visibilitySlideContent {
+  /* Wrapper for motion.div inside slide */
+  display: inline-flex;
+  align-items: center;
+}
+
+.visibilityButton {
   padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
-  font-size: 0.75em;
+  font-size: 0.8em;
   font-weight: 500;
   cursor: pointer;
   border: 1px solid var(--accent-warm-light);
@@ -60,42 +105,52 @@
   transition: background-color 0.2s ease, color 0.2s ease,
     border-color 0.2s ease;
   white-space: nowrap;
+  min-width: 75px;
+  text-align: center;
+  flex-shrink: 0;
+  /* Opacity controlled by motion */
 }
 
-.toggleButton.toggleActive {
+.visibilityButton.visibilityActive {
   background-color: var(--accent-warm);
   color: var(--bg-card);
   border-color: var(--accent-warm);
+  font-weight: 600;
 }
 
-.toggleButton:hover {
+.visibilityButton.visibilityInactive {
+  /* Style for when opacity/scale applied */
+  border-color: #ddd;
+  color: #aaa;
+  background-color: #f9f9f9;
+  /* pointer-events: none; */
+}
+
+.visibilityButton:hover {
   border-color: var(--accent-warm);
 }
-
-.toggleButton.toggleActive:hover {
+.visibilityButton.visibilityActive:hover {
   background-color: #d68f63;
   border-color: #d68f63;
 }
-
-.orderInfo {
-  text-align: center;
-  margin-bottom: calc(var(--spacing-unit) * 2);
-  font-size: 0.85em;
-  color: var(--text-secondary);
-  background-color: rgba(255, 255, 255, 0.6);
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
-  border-radius: var(--border-radius-pill);
-  display: inline-block;
-  margin-left: auto;
-  margin-right: auto;
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 90%;
-  box-sizing: border-box;
+.visibilityButton.visibilityInactive:hover {
+  border-color: #ccc;
 }
 
-/* --- Slider Structure & Controls --- */
+.visibilityArrow {
+  margin-left: calc(var(--spacing-unit) * 0.75);
+  font-size: 1.1em;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  line-height: 1;
+  font-weight: bold;
+  opacity: 1 !important;
+  transition: none;
+}
+
+/* ================================== */
+/* --- Main Content Sliders Area --- */
+/* ================================== */
 .slidersArea {
   display: flex;
   flex-direction: column;
@@ -106,42 +161,31 @@
 .sliderWrapper {
   background-color: var(--bg-card);
   border-radius: var(--border-radius-lg);
-  padding: calc(var(--spacing-unit) * 2);
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
   box-shadow: 0 4px 15px var(--shadow-color);
   overflow: hidden;
   border: 1px solid transparent;
-  position: relative; /* Needed for z-index/layout */
+  position: relative;
 }
 
+/* ================================== */
+/* --- Slider Internal Components --- */
+/* ================================== */
+
+/* --- Controls (Up/Down/Edit/Options) --- */
 .controls {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: var(--spacing-unit);
-  margin-bottom: calc(var(--spacing-unit) * 2);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
   padding-bottom: calc(var(--spacing-unit) * 1.5);
   border-bottom: 1px solid var(--border-subtle);
 }
 
-/* MODIFY .controls */
-.controls {
-  display: flex;
-  justify-content: space-between; /* Key change: space-between */
-  align-items: center; /* Align items vertically */
-  gap: var(--spacing-unit);
-  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Reduced margin slightly */
-  padding-bottom: calc(var(--spacing-unit) * 1.5);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-/* NEW: Group for right-aligned move buttons */
-.moveButtonGroup {
-  display: flex;
-  gap: var(--spacing-unit);
-  flex-shrink: 0; /* Prevent shrinking */
-}
-
+/* General button style used in controls */
 .controlButton {
-  padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.2); /* Adjust padding */
+  padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.2);
   font-size: 0.85em;
   font-weight: 500;
   cursor: pointer;
@@ -151,24 +195,20 @@
   border-radius: var(--border-radius-pill);
   transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease,
     color 0.2s ease;
-  display: inline-flex; /* Helps align icon/text if used together */
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: calc(var(--spacing-unit) * 0.5); /* Space between icon and text */
-  line-height: 1; /* Prevent extra height */
+  gap: calc(var(--spacing-unit) * 0.5);
+  line-height: 1;
 }
-
 .controlButton:hover {
   background-color: var(--accent-warm);
   color: var(--bg-card);
 }
-
 .controlButton:active {
   transform: scale(0.95);
 }
-
 .controlButton:disabled {
-  /* Same disabled styles */
   opacity: 0.4;
   cursor: not-allowed;
   background-color: #e0e0e0;
@@ -176,36 +216,57 @@
   transform: none;
 }
 
-/* Add this near other control styles */
-.controlPlaceholder {
-  /* Ensure it has some minimum width or visibility if needed */
-  /* You might not need width if the button itself has padding/margins */
-  /* Or ensure it doesn't collapse if empty: */
-  min-width: 1px; /* Or adjust as needed */
-  /* We hide the placeholder itself, it's just for layout */
-  visibility: hidden;
-  /* Match the button height if alignment looks off */
-  /* height: [height of controlButton]; */
-}
-
-/* NEW: Specific style for the modal button */
-.modalButton {
-  background-color: rgba(0, 0, 0, 0.05); /* Subtler background */
+/* Specific button styles within controls */
+.editButton {
+  /* For Edit Pencil */
+  background-color: rgba(0, 0, 0, 0.05);
   color: var(--text-secondary);
-  padding: calc(var(--spacing-unit) * 0.8); /* Make it squarer if just icon */
-  flex-shrink: 0; /* Prevent shrinking */
+  padding: calc(var(--spacing-unit) * 0.8);
+  flex-shrink: 0;
+}
+.editButton:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+.editButton svg {
+  font-size: 1.2em;
 }
 
+.modalButton {
+  /* For Journal Options Cog */
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--text-secondary);
+  padding: calc(var(--spacing-unit) * 0.8);
+  flex-shrink: 0;
+}
 .modalButton:hover {
   background-color: rgba(0, 0, 0, 0.1);
   color: var(--text-primary);
 }
-
-/* Make icon slightly larger */
 .modalButton svg {
   font-size: 1.2em;
 }
 
+/* Group for Up/Down buttons */
+.moveButtonGroup {
+  display: flex;
+  gap: var(--spacing-unit);
+  flex-shrink: 0;
+}
+
+/* Placeholder for alignment */
+.controlPlaceholder {
+  min-width: 1px;
+  visibility: hidden;
+  flex-shrink: 0; /* Ensure it takes space if needed */
+  /* Match button size roughly if needed */
+  width: calc(
+    var(--controlButton-padding-horizontal) * 2 + 1.2em
+  ); /* Example approximation */
+  height: calc(var(--controlButton-padding-vertical) * 2 + 1em);
+}
+
+/* --- Swiper Instance within Slider Card --- */
 .sliderTitle {
   margin-top: 0;
   margin-bottom: calc(var(--spacing-unit) * 2);
@@ -215,27 +276,20 @@
   text-align: center;
 }
 
-/* --- Swiper Styles --- */
 .swiperInstance {
   --swiper-theme-color: var(--accent-warm);
   --swiper-navigation-color: var(--accent-warm);
   --swiper-navigation-size: 18px;
-
   width: 100%;
   border-radius: var(--border-radius-md);
   overflow: hidden;
-  padding-left: 45px;
-  padding-right: 45px;
+  padding-left: 45px; /* Space for nav buttons */
+  padding-right: 45px; /* Space for nav buttons */
   position: relative;
   margin-bottom: var(--spacing-unit);
-  min-height: 100px; /* Adjust height for content */
+  min-height: 100px; /* Ensure minimum height */
 }
 
-.swiperInstance.lockedSwiper {
-  opacity: 0.7;
-}
-
-/* Swiper Nav Buttons */
 .swiperInstance .swiper-button-next,
 .swiperInstance .swiper-button-prev {
   background: none;
@@ -253,32 +307,27 @@
   z-index: 10;
   cursor: pointer;
 }
-
 .swiperInstance .swiper-button-next::after,
 .swiperInstance .swiper-button-prev::after {
   font-weight: bold;
 }
-
 .swiperInstance .swiper-button-prev {
   left: 8px;
 }
 .swiperInstance .swiper-button-next {
   right: 8px;
 }
-
 .swiperInstance .swiper-button-next:hover,
 .swiperInstance .swiper-button-prev:hover {
   background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 4px 10px rgba(100, 80, 70, 0.22);
 }
-
 .swiperInstance .swiper-button-disabled {
   opacity: 0.35 !important;
   cursor: not-allowed !important;
   pointer-events: none;
 }
 
-/* Swiper Pagination */
 .swiperInstance .swiper-pagination {
   bottom: 8px !important;
   position: absolute;
@@ -286,7 +335,6 @@
   width: 100%;
   text-align: center;
 }
-
 .swiperInstance .swiper-pagination-bullet {
   width: 7px;
   height: 7px;
@@ -298,7 +346,6 @@
   display: inline-block;
   border-radius: 50%;
 }
-
 .swiperInstance .swiper-pagination-bullet-active {
   background-color: var(--accent-warm);
   opacity: 1;
@@ -306,19 +353,13 @@
   height: 9px;
 }
 
-.swiperInstance.lockedSwiper .swiper-button-next,
-.swiperInstance.lockedSwiper .swiper-button-prev,
-.swiperInstance.lockedSwiper .swiper-pagination {
-  display: none;
-}
-
-/* --- Slide Content Styling --- */
+/* --- Swiper Slide Content --- */
 .slide {
   background-color: var(--accent-slider);
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 150px; /* Match swiper min-height */
+  min-height: 150px;
   height: 100%;
   border-radius: var(--border-radius-md);
   padding: calc(var(--spacing-unit) * 2);
@@ -336,7 +377,7 @@
   gap: calc(var(--spacing-unit) * 0.5);
   width: 100%;
   box-sizing: border-box;
-  margin-top: auto; /* Push text content towards center/bottom if slide is tall */
+  margin-top: auto;
   margin-bottom: auto;
 }
 
@@ -350,6 +391,7 @@
   flex-shrink: 0;
   font-size: 1.4em;
   color: var(--accent-warm);
+  margin-right: calc(var(--spacing-unit) * 0.75);
 }
 
 .slideName {
@@ -378,7 +420,7 @@
   box-sizing: border-box;
 }
 
-/* --- Accordion Styles --- */
+/* --- Accordion (Details Section) --- */
 .accordionContainer {
   margin-top: calc(var(--spacing-unit) * 2);
   padding-top: calc(var(--spacing-unit) * 1.5);
@@ -429,17 +471,18 @@
 .detailsContent p:last-child {
   margin-bottom: 0;
 }
-
 .detailsContent strong {
   color: var(--text-primary);
   margin-right: 4px;
 }
 
-/* --- NEW: Modal Styles --- */
+/* ================================== */
+/* --- Modal Styles --- */
+/* ================================== */
 .modalOverlay {
   position: fixed;
-  inset: 0; /* Replaces top/left/right/bottom: 0 */
-  background-color: rgba(0, 0, 0, 0.65); /* Slightly darker overlay */
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.65);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -450,31 +493,37 @@
 
 .modalContent {
   background-color: var(--bg-card);
-  padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
+  padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 2)
+    calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2); /* Adjusted padding */
   border-radius: var(--border-radius-lg);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   max-width: 90%;
-  width: 450px; /* Or adjust as needed */
-  position: relative; /* For close button positioning */
+  width: 450px;
+  position: relative;
   color: var(--text-primary);
   max-height: 85vh;
-  overflow-y: auto; /* Scroll if content exceeds max-height */
+  display: flex;
+  flex-direction: column;
 }
 
 .modalContent h2 {
   margin-top: 0;
   margin-bottom: calc(var(--spacing-unit) * 2);
+  padding-bottom: calc(var(--spacing-unit) * 1.5); /* Add padding below title */
+  border-bottom: 1px solid var(--border-subtle); /* Separator */
   text-align: center;
   font-size: 1.3em;
   color: var(--text-primary);
   font-weight: 600;
+  flex-shrink: 0;
 }
 
+/* Generic paragraph style within modal */
 .modalContent p {
   font-size: 0.95em;
   color: var(--text-secondary);
   text-align: center;
-  margin-bottom: var(--spacing-unit); /* Add some bottom margin */
+  margin-bottom: var(--spacing-unit);
 }
 
 .modalCloseButton {
@@ -483,99 +532,173 @@
   right: calc(var(--spacing-unit) * 1.2);
   background: transparent;
   border: none;
-  font-size: 1.6em; /* Adjust size */
+  font-size: 1.6em;
   font-weight: bold;
   color: var(--text-secondary);
   cursor: pointer;
   line-height: 1;
-  padding: calc(
-    var(--spacing-unit) * 0.5
-  ); /* Add padding for easier clicking */
+  padding: calc(var(--spacing-unit) * 0.5);
   border-radius: 50%;
   transition: color 0.2s ease, background-color 0.2s ease;
 }
-
 .modalCloseButton:hover {
   color: var(--text-primary);
-  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover background */
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
-/* REMOVE OLD .visibilityToggles if it exists */
-
-/* --- NEW: Swiper for Visibility Toggles Styles --- */
-.visibilitySwiperContainer {
-  margin-bottom: calc(var(--spacing-unit) * 3);
-  padding: calc(var(--spacing-unit) * 0.5) 0;
-  background-color: rgba(255, 255, 255, 0.6);
-  border-radius: var(--border-radius-lg);
-  overflow: hidden; /* Important for rounded corners + Swiper */
+/* --- Journal Modal Specific (Accordion Hierarchy) --- */
+.accountHierarchyContainer {
+  overflow-y: auto;
+  flex-grow: 1;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  padding-right: calc(var(--spacing-unit) * 0.5);
+  margin-right: calc(-1 * var(--spacing-unit) * 0.5);
+  /* REMOVED border */
+  /* border: 1px solid var(--border-subtle); */
+  border-radius: var(--border-radius-sm); /* Optional subtle rounding */
+  /* background-color: rgba(0,0,0, 0.01); */ /* Removed subtle background */
 }
 
-.visibilitySwiper {
-  /* No fixed height needed, adjusts to content */
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit); /* Add some padding */
-}
-
-.visibilitySwiperSlide {
-  display: inline-flex !important; /* Use inline-flex for items */
+/* Styling for the clickable row */
+.accountNodeRow {
+  display: flex;
   align-items: center;
-  width: auto !important; /* Let slide width be determined by content */
-  cursor: grab;
-  user-select: none; /* Prevent text selection during swipe */
-}
-
-.visibilityButton {
-  /* Adapt styles from old .toggleButton or create new */
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
-  font-size: 0.8em; /* Slightly smaller perhaps */
-  font-weight: 500;
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 0.5); /* Reduced horizontal padding */
+  border-radius: var(--border-radius-sm); /* Add slight rounding */
+  transition: background-color 0.15s ease;
+  /* REMOVED border-bottom */
+  /* border-bottom: 1px solid var(--border-subtle); */
   cursor: pointer;
-  border: 1px solid var(--accent-warm-light);
-  border-radius: var(--border-radius-pill);
-  background-color: transparent;
-  color: var(--accent-warm);
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease, opacity 0.2s ease;
-  white-space: nowrap;
-  opacity: 0.7; /* Dim non-active buttons slightly */
+  margin-bottom: 2px; /* Add tiny space between rows */
+}
+.accountNodeRow:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+.accountNodeRow.accountNodeSelected {
+  background-color: var(--accent-warm-lighter);
 }
 
-.visibilityButton.visibilityActive {
+/* Toggle Icon - used as visual indicator */
+.accountNodeToggle {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  margin-right: calc(var(--spacing-unit) * -2.7); /* Increase space */
+  color: var(--text-secondary);
+  line-height: 1;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px; /* Slightly smaller icon */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.accountNodeToggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.accountNodeIconPlaceholder {
+  /* Keep for alignment when no children */
+  display: inline-block;
+  width: 16px;
+  margin-right: calc(var(--spacing-unit) * 0.75);
+  flex-shrink: 0;
+}
+
+.accountNodeCode {
+  font-weight: 500; /* Slightly less bold */
+  color: var(--text-secondary); /* Grey out code slightly */
+  margin-right: calc(var(--spacing-unit) * 1);
+  min-width: 45px; /* Adjusted width */
+  flex-shrink: 0;
+  font-size: 0.85em;
+  text-align: right;
+}
+.accountNodeSelected .accountNodeCode {
+  color: var(--accent-warm); /* Highlight code when selected */
+}
+
+.accountNodeName {
+  font-size: 0.9em;
+  color: var(--text-primary); /* Make name primary */
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.accountNodeSelected .accountNodeName {
+  font-weight: 600; /* Make selected name bolder */
+}
+
+/* Optional: Container for children block */
+.accountNodeChildrenContainer {
+  position: relative; /* For pseudo-element positioning */
+}
+
+.accountNodeChildrenMotionWrapper::before {
+  content: "";
+  position: absolute;
+  left: 10px; /* Align with center of icon (adjust level*25 + 10px in style) */
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border-subtle); /* Dashed line color */
+  /* Dashed effect if needed, otherwise solid */
+  background-image: linear-gradient(
+    to bottom,
+    var(--border-subtle) 50%,
+    transparent 50%
+  );
+  background-size: 1px 6px;
+}
+
+/* --- Modal Action Buttons --- */
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-unit);
+  margin-top: calc(var(--spacing-unit) * 2);
+  padding-top: calc(var(--spacing-unit) * 2);
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.modalActionButton {
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
+  font-size: 0.9em;
+  font-weight: 500;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+.modalActionButton svg {
+  font-size: 1.2em;
+}
+
+.modalButtonPrimary {
   background-color: var(--accent-warm);
   color: var(--bg-card);
-  border-color: var(--accent-warm);
-  opacity: 1; /* Fully opaque when active */
-  font-weight: 600;
+}
+.modalButtonPrimary:hover:not(:disabled) {
+  background-color: #d68f63;
+}
+.modalButtonPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.visibilityButton:hover {
-  border-color: var(--accent-warm);
-  opacity: 1;
-}
-
-.visibilityButton.visibilityActive:hover {
-  background-color: #d68f63; /* Slightly darker warm accent */
-  border-color: #d68f63;
-}
-
-.visibilityArrow {
-  margin: 0 calc(var(--spacing-unit) * 0.75); /* Space around arrow */
-  font-size: 1.1em;
+.modalButtonSecondary {
+  background-color: var(--bg-secondary);
   color: var(--text-secondary);
-  flex-shrink: 0; /* Prevent arrow from shrinking */
-  line-height: 1;
-  font-weight: bold;
+  border: 1px solid var(--border-subtle);
 }
-/* --- END: Swiper Styles --- */
-
-/* REMOVE .orderInfo Style */
-/* .orderInfo { ... } */
-
-/* Ensure slider wrapper padding isn't excessive if title is inside DynamicSlider now */
-.sliderWrapper {
-  /* Adjust padding if needed */
-  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+.modalButtonSecondary:hover {
+  background-color: #f0f0f0;
+  border-color: #ccc;
 }
-
-/* Ensure DynamicSlider title H2 has appropriate margin if rendered inside it */
-/* Add style if needed: e.g., .dynamicSliderTitle { margin-bottom: ... } */

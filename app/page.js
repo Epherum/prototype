@@ -23,6 +23,11 @@ import {
   IoNavigateOutline,
   IoClipboardOutline,
   IoOptionsOutline,
+  IoPencilOutline, // Import Edit Icon
+  IoChevronDownOutline, // Icon for accordion expand
+  IoChevronForwardOutline, // Icon for accordion collapse
+  IoAddCircleOutline,
+  IoCheckmarkCircleOutline,
 } from "react-icons/io5";
 
 // Helper
@@ -230,12 +235,181 @@ function DynamicSlider({
   );
 }
 
-// --- JournalModal Component ---
-function JournalModal({ isOpen, onClose }) {
-  if (!isOpen) return null;
+// --- MODIFIED: Recursive component to render each node ---
+// --- MODIFIED: Recursive component to render each node ---
+// --- MODIFIED: Recursive component to render each node ---
+function AccountNode({
+  node,
+  level = 0,
+  openNodes,
+  toggleNode,
+  selectedAccountId,
+  onSelectNode,
+}) {
+  const isOpen = openNodes[node.id] ?? false;
+  const hasChildren = node.children && node.children.length > 0;
+  const isSelected = node.id === selectedAccountId;
+
+  const handleRowClick = () => {
+    onSelectNode(node.id); // Always select
+    if (hasChildren) {
+      toggleNode(node.id); // Toggle if children exist
+    }
+  };
+
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+    // Use a fragment or simple div, no specific container style needed unless desired
+    <>
+      {/* Clickable row */}
+      <div
+        className={`${styles.accountNodeRow} ${
+          isSelected ? styles.accountNodeSelected : ""
+        }`}
+        style={{ paddingLeft: `${level * 25}px` }} // Indentation applied here
+        onClick={handleRowClick}
+        role="button"
+        tabIndex={0}
+        aria-selected={isSelected}
+        aria-expanded={hasChildren ? isOpen : undefined}
+        onKeyDown={(e) =>
+          (e.key === "Enter" || e.key === " ") && handleRowClick()
+        }
+      >
+        {/* Toggle Icon */}
+        <span className={styles.accountNodeToggle} aria-hidden="true">
+          {hasChildren ? (
+            isOpen ? (
+              <IoChevronDownOutline />
+            ) : (
+              <IoChevronForwardOutline />
+            )
+          ) : (
+            <span className={styles.accountNodeIconPlaceholder}></span>
+          )}
+        </span>
+        {/* Account Info */}
+        <span className={styles.accountNodeCode}>{node.code}</span>
+        <span className={styles.accountNodeName}>{node.name}</span>
+      </div>
+
+      {/* --- Children Rendering Section - Ensure Structure is Correct --- */}
+      <div className={styles.accountNodeChildrenContainer}>
+        {" "}
+        {/* Optional: Wrapper for styling children block */}
+        <AnimatePresence initial={false}>
+          {hasChildren &&
+            isOpen && ( // Condition MUST be here
+              <motion.div
+                key={`${node.id}-children`} // Key is essential
+                initial="collapsed"
+                animate="open"
+                exit="collapsed"
+                variants={{
+                  // Explicitly define variants
+                  open: { opacity: 1, height: "auto" },
+                  collapsed: { opacity: 0, height: 0 },
+                }}
+                transition={{ duration: 0.2, ease: "easeInOut" }}
+                // Style for animation and hierarchy line
+                style={{
+                  overflow: "hidden",
+                  // Apply paddingLeft instead of margin for border alignment
+                  paddingLeft: `${level * 25 + 20}px`, // Align with text start
+                  position: "relative", // Needed for pseudo-element line
+                }}
+                // Add pseudo-element for the vertical line if desired
+                className={styles.accountNodeChildrenMotionWrapper}
+              >
+                {/* Vertical line using pseudo-element */}
+                {/* Render children recursively */}
+                {node.children.map((childNode) => (
+                  <AccountNode
+                    key={childNode.id}
+                    node={childNode}
+                    level={level + 1}
+                    openNodes={openNodes}
+                    toggleNode={toggleNode}
+                    selectedAccountId={selectedAccountId}
+                    onSelectNode={onSelectNode}
+                  />
+                ))}
+              </motion.div>
+            )}
+        </AnimatePresence>
+      </div>
+      {/* --- End Children Rendering Section --- */}
+    </>
+  );
+}
+// --- MODIFIED: JournalModal Component ---
+function JournalModal({ isOpen, onClose, hierarchy = [] }) {
+  const [openNodes, setOpenNodes] = useState({});
+  const [selectedAccountId, setSelectedAccountId] = useState(null); // NEW: Track selected node ID
+
+  const toggleNode = useCallback((nodeId) => {
+    setOpenNodes((prev) => ({ ...prev, [nodeId]: !prev[nodeId] }));
+  }, []);
+
+  const handleSelectNode = useCallback((nodeId) => {
+    setSelectedAccountId(nodeId); // Update selected ID state
+    console.log("Selected Account Node ID:", nodeId); // Log selection
+  }, []);
+
+  const handleConfirmSelection = () => {
+    if (selectedAccountId) {
+      console.log("CONFIRMED SELECTION:", selectedAccountId);
+      // Here you would typically pass the selectedAccountId back to the parent
+      // e.g., by changing onClose to onSelect(selectedAccountId)
+      onClose(); // Close modal for now
+    }
+  };
+
+  const handleAddNew = () => {
+    console.log("Add New Account Clicked");
+    // Logic to handle adding a new account would go here (e.g., open another form)
+    onClose(); // Close modal for now
+  };
+
+  // Reset states when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setOpenNodes({});
+      setSelectedAccountId(null);
+    }
+  }, [isOpen]);
+
+  return (
+    // Use motion.div for the overlay to animate it
+    <motion.div
+      className={styles.modalOverlay}
+      onClick={onClose} // Close on overlay click
+      // Animation Props
+      key="journal-modal" // Added key for AnimatePresence tracking
+      initial="closed" // Start in 'closed' state
+      animate="open" // Animate to 'open' state when present
+      exit="closed" // Animate back to 'closed' state on exit
+      variants={{
+        // Define animation states
+        open: { opacity: 1 },
+        closed: { opacity: 0 },
+      }}
+      transition={{ duration: 0.3, ease: "easeInOut" }} // Control timing
+    >
+      {/* Use motion.div for the content as well for potential scale/slide animation */}
+      <motion.div
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking content
+        // Optional: Add different animation for the content (e.g., scale)
+        variants={{
+          open: {
+            opacity: 1,
+            scale: 1,
+            transition: { delay: 0.1, duration: 0.3 },
+          }, // Delay content slightly
+          closed: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
+        }}
+        // Inherits initial/animate/exit from parent overlay, or define explicitly
+      >
         <button
           className={styles.modalCloseButton}
           onClick={onClose}
@@ -243,13 +417,50 @@ function JournalModal({ isOpen, onClose }) {
         >
           ×
         </button>
-        <h2>Journal Options / Hierarchy</h2>
-        <p>Work in Progress... (Accordion Waterfall Here)</p>
-      </div>
-    </div>
+        <h2>Select Journal Account</h2>
+
+        {/* Hierarchy List */}
+        <div className={styles.accountHierarchyContainer}>
+          {/* ... Map over hierarchy calling AccountNode ... */}
+          {hierarchy.length > 0 ? (
+            hierarchy.map((rootNode) => (
+              <AccountNode
+                key={rootNode.id}
+                node={rootNode}
+                level={0}
+                openNodes={openNodes}
+                toggleNode={toggleNode}
+                selectedAccountId={selectedAccountId}
+                onSelectNode={handleSelectNode}
+              />
+            ))
+          ) : (
+            <p>No hierarchy data available.</p>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        <div className={styles.modalActions}>
+          {/* ... Add New / Select buttons ... */}
+          <button
+            className={`${styles.modalButtonSecondary} ${styles.modalActionButton}`}
+            onClick={handleAddNew}
+          >
+            <IoAddCircleOutline /> Add New
+          </button>
+          <button
+            className={`${styles.modalButtonPrimary} ${styles.modalActionButton}`}
+            onClick={handleConfirmSelection}
+            disabled={!selectedAccountId}
+          >
+            <IoCheckmarkCircleOutline /> Select
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
-
+// --- END JournalModal ---
 // --- Main Page Component ---
 export default function Home() {
   // === State ===
@@ -315,6 +526,22 @@ export default function Home() {
     [SLIDER_TYPES.DOCUMENT]: false,
   });
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
+
+  // --- NEW: Ref for Visibility Swiper ---
+  const visibilitySwiperRef = useRef(null);
+
+  // --- NEW: Effect to update Visibility Swiper on Order Change ---
+  useEffect(() => {
+    if (visibilitySwiperRef.current) {
+      console.log("Updating visibility swiper due to order change.");
+      // Give Swiper a chance to recognize the new DOM structure after React render
+      requestAnimationFrame(() => {
+        visibilitySwiperRef.current?.update();
+        // Optional: Reset scroll position if needed, although loop might handle this
+        // visibilitySwiperRef.current?.slideToLoop(0, 0);
+      });
+    }
+  }, [sliderOrder]); // Re-run when sliderOrder changes
 
   // === Handlers ===
   const handleDataSourceChange = (event) => {
@@ -536,15 +763,13 @@ export default function Home() {
   }, []); // Depends only on setAccordionTypeState which is stable
 
   const toggleVisibility = useCallback((sliderId) => {
-    if (
-      !sliderId ||
-      !SLIDER_TYPES[
-        Object.keys(SLIDER_TYPES).find((key) => SLIDER_TYPES[key] === sliderId)
-      ]
-    )
-      return;
+    if (!sliderId || !SLIDER_CONFIG[sliderId]) return;
     setVisibility((prev) => ({ ...prev, [sliderId]: !prev[sliderId] }));
-  }, []); // Depends only on setVisibility which is stable
+    // Update swiper after a short delay AFTER state change allows render
+    setTimeout(() => {
+      visibilitySwiperRef.current?.update();
+    }, 50); // Small delay helps swiper recalc layout
+  }, []);
 
   // Simplified moveSlider (no order checks)
   const moveSlider = (sliderId, direction) => {
@@ -586,129 +811,185 @@ export default function Home() {
   // === Render ===
   return (
     <div className={styles.pageContainer}>
-      <h1 className={styles.title}>Project Interface</h1> {/* Updated Title */}
-      {/* Data Source Selector */}
-      <div className={styles.dataSourceSelector}>
-        <label>
-          <input
-            type="radio"
-            name="dataSource"
-            value="data1"
-            checked={activeDataSource === "data1"}
-            onChange={handleDataSourceChange}
-          />
-          All Data
-        </label>
-        <label>
-          <input
-            type="radio"
-            name="dataSource"
-            value="data2"
-            checked={activeDataSource === "data2"}
-            onChange={handleDataSourceChange}
-          />
-          Filtered Data (Triplets)
-        </label>
-      </div>
-      {/* Visibility Toggles Swiper */}
-      <div className={styles.visibilitySwiperContainer}>
-        <Swiper
-          key={`visibility-swiper-${sliderOrder.join("-")}`} // Re-init on order change
-          modules={[Navigation]} // Add Navigation if needed
-          spaceBetween={5}
-          slidesPerView={"auto"}
-          centeredSlides={false}
-          loop={true}
-          // navigation // Uncomment for prev/next arrows on the swiper
-          className={styles.visibilitySwiper}
-        >
-          {sliderOrder.map((sliderId, index) => (
-            <SwiperSlide
-              key={sliderId}
-              className={styles.visibilitySwiperSlide}
+      {/* Page Title */}
+      <h1 className={styles.title}>Project Interface</h1>
+      {/* Sticky Header Container */}
+      <div className={styles.stickyHeaderContainer}>
+        {/* Data Source Selector */}
+        <div className={styles.dataSourceSelector}>
+          <label>
+            <input
+              type="radio"
+              name="dataSource"
+              value="data1"
+              checked={activeDataSource === "data1"}
+              onChange={handleDataSourceChange}
+            />{" "}
+            All Data
+          </label>
+          <label>
+            <input
+              type="radio"
+              name="dataSource"
+              value="data2"
+              checked={activeDataSource === "data2"}
+              onChange={handleDataSourceChange}
+            />{" "}
+            Filtered Data (Triplets)
+          </label>
+        </div>
+        {/* Visibility Toggles Swiper */}
+        <LayoutGroup id="visibility-toggles-layout">
+          <div className={styles.visibilitySwiperContainer}>
+            <Swiper
+              modules={[Navigation]}
+              spaceBetween={10} // Slightly more space?
+              slidesPerView={"auto"}
+              centeredSlides={false}
+              loop={false} // Keep loop disabled
+              className={styles.visibilitySwiper}
+              onSwiper={(swiper) => {
+                visibilitySwiperRef.current = swiper;
+              }}
+              observer={true}
+              observeParents={true}
+              // navigation // Optional: Add Prev/Next buttons
             >
-              <button
-                onClick={() => toggleVisibility(sliderId)}
-                className={`${styles.visibilityButton} ${
-                  visibility[sliderId] ? styles.visibilityActive : ""
-                }`}
-                aria-pressed={visibility[sliderId]}
-              >
-                {SLIDER_CONFIG[sliderId]?.title || sliderId}
-              </button>
-              {/* Arrow rendered conditionally based on original array index */}
-              {index < sliderOrder.length - 1 && (
-                <span className={styles.visibilityArrow} aria-hidden="true">
-                  →
-                </span>
-              )}
-            </SwiperSlide>
-          ))}
-        </Swiper>
+              {sliderOrder.map((sliderId, index) => {
+                const config = SLIDER_CONFIG[sliderId];
+                const title = config?.title || sliderId;
+                const isCurrentlyVisible = visibility[sliderId];
+
+                // Calculate visible index
+                let visibleIndex = -1;
+                if (isCurrentlyVisible) {
+                  const visibleOrder = sliderOrder.filter(
+                    (id) => visibility[id]
+                  );
+                  visibleIndex = visibleOrder.indexOf(sliderId);
+                }
+
+                return (
+                  // SwiperSlide itself is stable
+                  <SwiperSlide
+                    key={sliderId}
+                    className={styles.visibilitySwiperSlide}
+                  >
+                    {/* --- REMOVED AnimatePresence --- */}
+                    {/* Always render motion.div, animate based on state */}
+                    <motion.div
+                      layout // Animate layout changes from reordering
+                      layoutId={sliderId} // ID for tracking during reorder
+                      className={styles.visibilitySlideContent}
+                      // --- Animate based on visibility state ---
+                      initial={false} // Don't run initial animation based on visibility state on load
+                      animate={{
+                        opacity: isCurrentlyVisible ? 1 : 0.4, // Fade hidden items
+                        scale: isCurrentlyVisible ? 1 : 0.95, // Slightly shrink hidden items
+                        // Remove width animation, let content define width
+                      }}
+                      transition={{ duration: 0.2, ease: "easeInOut" }}
+                    >
+                      <button
+                        onClick={() => toggleVisibility(sliderId)}
+                        // Apply active style based on visibility, remove general non-active opacity
+                        className={`${styles.visibilityButton} ${
+                          isCurrentlyVisible
+                            ? styles.visibilityActive
+                            : styles.visibilityInactive
+                        }`}
+                        // Disable button clicks if hidden? Optional.
+                        // disabled={!isCurrentlyVisible}
+                        // Use aria-hidden for accessibility if truly hidden visually by opacity/scale
+                        aria-hidden={!isCurrentlyVisible}
+                        aria-pressed={isCurrentlyVisible}
+                      >
+                        {/* Show number only if visible */}
+                        {isCurrentlyVisible ? `${visibleIndex + 1}: ` : ""}
+                        {title}
+                      </button>
+                      {/* Arrow: Render always but maybe fade with button? */}
+                      {index < sliderOrder.length - 1 && (
+                        <motion.span
+                          className={styles.visibilityArrow}
+                          aria-hidden="true"
+                          // Animate arrow along with button
+                          initial={false}
+                          animate={{ opacity: isCurrentlyVisible ? 1 : 0.4 }}
+                          transition={{ duration: 0.2, ease: "easeInOut" }}
+                        >
+                          →
+                        </motion.span>
+                      )}
+                    </motion.div>
+                  </SwiperSlide>
+                );
+              })}
+            </Swiper>
+          </div>
+        </LayoutGroup>
+        {/* End Visibility Toggles Swiper */}
       </div>
-      {/* Main Sliders Area */}
-      <LayoutGroup>
+      {/* End Sticky Header Container */}
+      {/* Main Sliders Area - */}
+      <LayoutGroup id="main-sliders-layout">
+        {" "}
+        {/* Optional: Add ID for clarity */}
         <div className={styles.slidersArea}>
           <AnimatePresence>
             {sliderOrder.map((sliderId, index) => {
               const config = SLIDER_CONFIG[sliderId];
-              if (!config) return null;
+              // Render logic checks visibility state BEFORE rendering
+              if (!config || !visibility[sliderId]) return null;
 
-              const { Component, title } = config;
+              const { Component, title: sliderTitle } = config;
               const { data, activeItemId } = getSliderProps(sliderId);
               const isAccordionOpenForType = accordionTypeState[sliderId];
-
               const canMoveUp = index > 0;
               const canMoveDown = index < sliderOrder.length - 1;
-
-              // Define callbacks inside map or ensure stable reference if defined outside
               const onSlideChangeCallback = (id) => handleSwipe(sliderId, id);
               const onToggleAccordionCallback = () => toggleAccordion(sliderId);
 
-              // Conditional rendering based on visibility state
-              if (!visibility[sliderId]) {
-                // Although we don't render, AnimatePresence needs a key if elements might exit
-                // However, since we return null directly, it might be okay.
-                // If exit animations fail, wrap this in a null-rendering motion.div with a key.
-                return null;
-              }
-
               return (
+                // This motion.div uses the SAME layoutId string (e.g., "journal")
+                // but it's tracked within THIS LayoutGroup, separate from the header
                 <motion.div
-                  key={sliderId} // Key for map and AnimatePresence
-                  layoutId={sliderId} // Key for LayoutGroup animation
-                  layout
-                  style={{ order: index }} // Use inline style for order for Framer Motion
+                  key={sliderId} // Key for React map
+                  layoutId={sliderId} // ID tracked within *this* group
+                  layout // Enable layout animation
+                  style={{ order: index }} // Apply visual order for flexbox
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{
                     opacity: { duration: 0.3, ease: "easeInOut" },
                     height: { duration: 0.3, ease: "easeInOut" },
-                    layout: { duration: 0.5, ease: "easeInOut" },
+                    layout: { duration: 0.5, ease: "easeInOut" }, // Layout animation timing
                   }}
                   className={styles.sliderWrapper}
                 >
                   {/* Controls */}
                   <div className={styles.controls}>
-                    {sliderId === SLIDER_TYPES.JOURNAL ? (
-                      <button
-                        onClick={openJournalModal}
-                        className={`${styles.controlButton} ${styles.modalButton}`}
-                        aria-label="Open Journal Options"
-                        title="Journal Options"
-                      >
-                        <IoOptionsOutline />
-                      </button>
-                    ) : (
-                      <div className={styles.controlPlaceholder}> </div>
-                    )}
+                    {/* Edit Button (Left Aligned Example) */}
+                    <button
+                      onClick={
+                        sliderId === SLIDER_TYPES.JOURNAL
+                          ? openJournalModal // Trigger modal only for Journal
+                          : () => console.log(`Edit clicked for ${sliderId}`) // Placeholder for others
+                      }
+                      className={`${styles.controlButton} ${styles.editButton}`}
+                      aria-label={`Edit ${sliderTitle}`}
+                      title={`Edit ${sliderTitle}`}
+                    >
+                      <IoOptionsOutline />
+                    </button>
+
                     <div className={styles.moveButtonGroup}>
                       {canMoveUp && (
                         <button
                           onClick={() => moveSlider(sliderId, "up")}
                           className={styles.controlButton}
-                          aria-label={`Move ${title} up`}
+                          aria-label={`Move ${sliderTitle} up`}
                         >
                           ▲ Up
                         </button>
@@ -717,18 +998,17 @@ export default function Home() {
                         <button
                           onClick={() => moveSlider(sliderId, "down")}
                           className={styles.controlButton}
-                          aria-label={`Move ${title} down`}
+                          aria-label={`Move ${sliderTitle} down`}
                         >
                           ▼ Down
                         </button>
                       )}
                     </div>
                   </div>
-
-                  {/* Render Slider Component */}
+                  {/* Component */}
                   <Component
                     sliderId={sliderId}
-                    title={title} // Pass title here
+                    title={sliderTitle}
                     data={data}
                     onSlideChange={onSlideChangeCallback}
                     activeItemId={activeItemId}
@@ -740,9 +1020,22 @@ export default function Home() {
             })}
           </AnimatePresence>
         </div>
-      </LayoutGroup>
-      {/* Journal Modal */}
-      <JournalModal isOpen={isJournalModalOpen} onClose={closeJournalModal} />
-    </div>
+      </LayoutGroup>{" "}
+      {/* --- END Main Sliders LayoutGroup --- */}
+      {/* --- WRAP MODAL in AnimatePresence --- */}
+      <AnimatePresence>
+        {/* Conditionally render based on state */}
+        {isJournalModalOpen && (
+          <JournalModal
+            // Key prop might not be strictly needed here if overlay has one
+            // key="journal-modal-instance"
+            isOpen={isJournalModalOpen} // Pass state down (though AnimatePresence controls mounting)
+            onClose={closeJournalModal}
+            hierarchy={activeDataSet?.account_hierarchy || []}
+          />
+        )}
+      </AnimatePresence>
+      {/* --- END AnimatePresence Wrapper --- */}
+    </div> // End pageContainer
   );
-}
+} // End Home Component

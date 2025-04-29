@@ -1,4 +1,109 @@
 {
+  "account_hierarchy": [
+    {
+      "id": "cat-1",
+      "code": "1",
+      "name": "Assets",
+      "children": [
+        { "id": "acc-101", "code": "101", "name": "Cash", "children": [] },
+        { "id": "acc-120", "code": "120", "name": "Inventory", "children": [] }
+      ]
+    },
+    {
+      "id": "cat-2",
+      "code": "2",
+      "name": "Liabilities",
+      "children": [
+        {
+          "id": "acc-201",
+          "code": "201",
+          "name": "Accounts Payable",
+          "children": []
+        }
+      ]
+    },
+    { "id": "cat-3", "code": "3", "name": "Equity", "children": [] },
+    {
+      "id": "cat-4",
+      "code": "4",
+      "name": "Revenue",
+      "children": [
+        {
+          "id": "acc-401",
+          "code": "401",
+          "name": "Sales Revenue",
+          "children": [
+            {
+              "id": "sub-401-1",
+              "code": "401-1",
+              "name": "Product Line A Sales",
+              "children": []
+            },
+            {
+              "id": "sub-401-2",
+              "code": "401-2",
+              "name": "Service Revenue",
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": "acc-450",
+          "code": "450",
+          "name": "Interest Income",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "cat-5",
+      "code": "5",
+      "name": "Cost of Goods Sold",
+      "children": [
+        {
+          "id": "acc-501",
+          "code": "501",
+          "name": "Material Costs",
+          "children": []
+        },
+        {
+          "id": "acc-505",
+          "code": "505",
+          "name": "Manufacturing Overhead",
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "cat-6",
+      "code": "6",
+      "name": "Expenses",
+      "children": [
+        { "id": "acc-610", "code": "610", "name": "Salaries", "children": [] },
+        {
+          "id": "acc-620",
+          "code": "620",
+          "name": "Marketing",
+          "children": [
+            {
+              "id": "sub-620-1",
+              "code": "620-1",
+              "name": "Advertising",
+              "children": []
+            },
+            {
+              "id": "sub-620-2",
+              "code": "620-2",
+              "name": "Trade Shows",
+              "children": []
+            }
+          ]
+        }
+      ]
+    },
+    { "id": "cat-7", "code": "7", "name": "Other Income", "children": [] },
+    { "id": "cat-8", "code": "8", "name": "Other Expense", "children": [] }
+  ],
   "journals": [
     {
       "id": "journal-1",
