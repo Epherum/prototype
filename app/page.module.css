@@ -702,3 +702,102 @@
   background-color: #f0f0f0;
   border-color: #ccc;
 }
+
+/* page.module.css */
+
+/* ... existing styles ... */
+
+/* ================================== */
+/* --- Journal Hierarchy Styles --- */
+/* ================================== */
+
+.journalParentHeader {
+  display: flex;
+  justify-content: flex-start; /* Align parent info to the left */
+  align-items: center;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  padding-bottom: calc(var(--spacing-unit) * 1);
+  /* Optional: Add a border or different background */
+  /* border-bottom: 1px dashed var(--border-subtle); */
+  min-height: 30px; /* Ensure space even if no parent selected */
+}
+
+.journalParentInfo {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--accent-warm-light); /* Light accent background */
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  border-radius: var(--border-radius-sm);
+  margin-right: auto; /* Pushes move buttons to the right in the controls flex */
+}
+
+/* --- Journal Hierarchy Slide Content --- */
+.slide {
+  /* Keep existing slide styles */
+  /* Ensure enough space for grandchild buttons */
+  /* min-height: 200px; maybe? */
+  justify-content: space-between; /* Push grandchild containers to top/bottom */
+  padding: var(--spacing-unit); /* Adjust padding if needed */
+}
+
+.slideTextContent {
+  /* Center Child Name */
+  /* Removed top/bottom auto margin if using space-between on .slide */
+  margin-top: 0;
+  margin-bottom: 0;
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 1) 0; /* Adjust vertical padding */
+}
+
+.slideName {
+  /* Child Name Style */
+  font-size: 1.2em; /* Slightly larger */
+  font-weight: 600;
+}
+
+.slideSubText {
+  /* Child Code Style */
+  font-size: 0.8em;
+  margin-top: 2px;
+}
+
+.grandchildButtonsContainer {
+  display: flex;
+  flex-wrap: wrap; /* Allow wrapping if many grandchildren */
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  min-height: 30px; /* Reserve space */
+}
+
+.grandchildButton {
+  padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 1);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: #ffffff;
+  color: var(--accent-warm);
+  border: 1px solid var(--accent-warm-light);
+  border-radius: var(--border-radius-pill);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, transform 0.1s ease;
+  line-height: 1;
+  flex-shrink: 0; /* Prevent shrinking */
+  min-width: 40px;
+  text-align: center;
+}
+
+.grandchildButton:hover {
+  background-color: var(--accent-warm-light);
+  border-color: var(--accent-warm);
+}
+
+.grandchildButtonActive {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+  transform: scale(1.05); /* Slightly larger when active */
+}

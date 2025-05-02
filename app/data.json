@@ -104,38 +104,7 @@
     { "id": "cat-7", "code": "7", "name": "Other Income", "children": [] },
     { "id": "cat-8", "code": "8", "name": "Other Expense", "children": [] }
   ],
-  "journals": [
-    {
-      "id": "journal-1",
-      "name": "Procurement (Buy)",
-      "description": "Tracks incoming raw materials..."
-    },
-    {
-      "id": "journal-2",
-      "name": "Sales Orders (Sell)",
-      "description": "Records customer orders..."
-    },
-    {
-      "id": "journal-3",
-      "name": "Manufacturing",
-      "description": "Details the production process..."
-    },
-    {
-      "id": "journal-4",
-      "name": "Finance & Payments",
-      "description": "Manages invoices, payments..."
-    },
-    {
-      "id": "journal-5",
-      "name": "Logistics & Shipping",
-      "description": "Oversees the movement..."
-    },
-    {
-      "id": "journal-6",
-      "name": "Inventory Adjustment",
-      "description": "Records changes in stock..."
-    }
-  ],
+
   "partners": [
     {
       "id": "partner-a",
