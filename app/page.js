@@ -28,13 +28,10 @@ import {
   IoChevronForwardOutline, // Icon for accordion collapse
   IoAddCircleOutline,
   IoCheckmarkCircleOutline,
+  IoTrashBinOutline,
 } from "react-icons/io5";
 
-// Helper
-const getFirstId = (arr) =>
-  arr && arr.length > 0 && arr[0] ? arr[0].id : null;
-
-// --- NEW Helper: Find Node in Hierarchy ---
+// --- Helper: Find Node in Hierarchy ---
 const findNodeById = (nodes, nodeId) => {
   if (!nodes || !nodeId) return null;
   for (const node of nodes) {
@@ -51,6 +48,10 @@ const findNodeById = (nodes, nodeId) => {
   return null;
 };
 
+// Helper
+const getFirstId = (arr) =>
+  arr && arr.length > 0 && arr[0] ? arr[0].id : null;
+
 // --- Constants ---
 const SLIDER_TYPES = {
   JOURNAL: "journal",
@@ -60,178 +61,213 @@ const SLIDER_TYPES = {
   DOCUMENT: "document", // New
 };
 
-// --- NEW: JournalHierarchySlider Component ---
+const INITIAL_ORDER = [
+  SLIDER_TYPES.JOURNAL,
+  SLIDER_TYPES.PARTNER,
+  SLIDER_TYPES.GOODS,
+  SLIDER_TYPES.PROJECT,
+  SLIDER_TYPES.DOCUMENT,
+];
+
+const JOURNAL_ICONS = {
+  J01: IoCartOutline,
+  J02: IoPricetagOutline,
+  J03: IoBuildOutline,
+};
+
+// page.js
+
+// ... imports, other components ...
+
+// --- JournalHierarchySlider Component (MODIFIED) ---
 function JournalHierarchySlider({
   sliderId,
-  title, // "Journal"
+  title,
+  // Mode and Data Props
+  mode,
   hierarchyData = [],
+  childNodes = [],
+  topLevelJournalData = [],
+  // ID Props
   selectedParentId,
   selectedChildId,
   selectedGrandchildId,
-  onSelectChild, // Callback when swiper changes child
-  onSelectGrandchild, // Callback when grandchild button clicked
-  onOpenModal, // Callback to open parent selection modal
+  // Callback Props
+  onSelectParent,
+  onSelectChild,
+  onSelectGrandchild,
+  onOpenModal,
+  // UI Props
   isAccordionOpen,
   onToggleAccordion,
 }) {
-  const swiperRef = useRef(null); // Ref to control Swiper instance
-
-  // --- Find Nodes ---
+  const swiperRef = useRef(null);
+  const dataForSwiper = mode === "parents" ? topLevelJournalData : childNodes;
+  const activeItemIdForSwiper =
+    mode === "parents" ? selectedParentId : selectedChildId;
   const parentNode = findNodeById(hierarchyData, selectedParentId);
-  const childNodes = parentNode?.children || []; // Data for the Swiper
-  const currentChildNode = findNodeById(childNodes, selectedChildId);
-  const grandchildNodes = currentChildNode?.children || []; // Data for grandchild buttons
+  const currentChildNode =
+    mode === "children" ? findNodeById(childNodes, selectedChildId) : null;
+  const grandchildNodes = currentChildNode?.children || [];
 
-  // --- Swiper Logic ---
   const initialSlideIndex = Math.max(
     0,
-    childNodes.findIndex((node) => node?.id === selectedChildId)
+    dataForSwiper.findIndex((node) => node?.id === activeItemIdForSwiper)
   );
 
-  // Effect to update swiper when selectedChildId changes EXTERNALLY (e.g., parent change)
   useEffect(() => {
-    const newIndex = childNodes.findIndex(
-      (node) => node?.id === selectedChildId
+    const newIndex = dataForSwiper.findIndex(
+      (node) => node?.id === activeItemIdForSwiper
     );
     if (
       swiperRef.current &&
       newIndex !== -1 &&
       newIndex !== swiperRef.current.activeIndex
     ) {
-      console.log(
-        `JournalHierarchySlider (${sliderId}): External child change detected. Sliding to index ${newIndex}`
-      );
       swiperRef.current.slideTo(newIndex);
     }
-  }, [selectedChildId, childNodes, sliderId]); // Re-run if selected child or the list of children changes
+  }, [activeItemIdForSwiper, dataForSwiper, sliderId, mode]);
 
   const handleSwiperChange = (swiper) => {
     const currentRealIndex = swiper.activeIndex;
-    if (
-      childNodes &&
-      childNodes.length > currentRealIndex &&
-      childNodes[currentRealIndex]
-    ) {
-      const newChildId = childNodes[currentRealIndex].id;
+    if (dataForSwiper?.[currentRealIndex]) {
+      const newId = dataForSwiper[currentRealIndex].id;
       console.log(
-        `JournalHierarchySlider (${sliderId}): Swipe Change. Index: ${currentRealIndex}, New Child ID: ${newChildId}`
+        `JournalHierarchySlider (${sliderId}, Mode: ${mode}): Swipe. Index: ${currentRealIndex}, ID: ${newId}. WAITING FOR EXPLICIT SELECTION IN PARENT MODE.`
       );
-      // Call the callback passed from Home to update state
-      onSelectChild(newChildId);
-    } else {
-      console.warn(
-        `JournalHierarchySlider (${sliderId}): Swipe Change - Invalid index (${currentRealIndex}) or childNodes. Len: ${childNodes?.length}`
-      );
+      // In 'parents' mode, swipe changes the viewed slide, but selection happens via button.
+      // In 'children' mode, swipe IS the selection.
+      if (mode === "children" && onSelectChild) {
+        onSelectChild(newId);
+      }
+      // If mode is 'parents', onSelectParent will be called by the button inside the slide.
     }
   };
 
-  // Key for Swiper based on parent (to recreate if parent changes drastically)
-  // and childNodes length to handle potential data loading issues.
-  const swiperKey = `${sliderId}-parent-${selectedParentId}-len${childNodes.length}-activeChild${selectedChildId}`;
+  const swiperKey = `${sliderId}-mode-${mode}-parent-${selectedParentId}-len${dataForSwiper.length}-active${activeItemIdForSwiper}`;
 
   return (
     <>
-      {/* Parent Display (Example placement) */}
-      <div className={styles.journalParentHeader}>
-        <span className={styles.journalParentInfo}>
-          {parentNode
-            ? `${parentNode.code} - ${parentNode.name}`
-            : "Select Parent"}
-        </span>
-        {/* Button to open modal is now in Home component's controls section */}
-      </div>
-
-      <h2 className={styles.sliderTitle}>{title} - Level 2 (Children)</h2>
-
-      {childNodes.length > 0 ? (
+      {mode === "children" && parentNode && (
+        <div className={styles.journalParentHeader}>
+          <span className={styles.journalParentInfo}>
+            Parent: {parentNode.code} - {parentNode.name}
+          </span>
+        </div>
+      )}
+      <h2 className={styles.sliderTitle}>
+        {title} -{" "}
+        {mode === "parents"
+          ? "Select Top-Level Category"
+          : `Children of ${parentNode?.code || "N/A"}`}
+      </h2>
+      {dataForSwiper.length > 0 ? (
         <Swiper
           key={swiperKey}
-          ref={swiperRef} // Assign ref
+          ref={swiperRef}
           modules={[Navigation, Pagination]}
           initialSlide={initialSlideIndex}
           loop={false}
           spaceBetween={20}
           slidesPerView={1}
-          navigation={childNodes.length > 1}
-          pagination={childNodes.length > 1 ? { clickable: true } : false}
-          onSlideChangeTransitionEnd={handleSwiperChange}
+          navigation={dataForSwiper.length > 1}
+          pagination={dataForSwiper.length > 1 ? { clickable: true } : false}
+          onSlideChangeTransitionEnd={handleSwiperChange} // Swiping in parent mode now just shows, button selects
           onSwiper={(swiper) => {
             swiperRef.current = swiper;
-          }} // Store swiper instance
+          }}
           observer={true}
           observeParents={true}
-          className={`${styles.swiperInstance} ${styles.journalSwiperInstance}`} // Add specific class if needed
+          className={`${styles.swiperInstance} ${styles.journalSwiperInstance}`}
         >
-          {childNodes.map((childNode) => {
-            if (!childNode) return null; // Safety check
+          {dataForSwiper.map((node) => {
+            if (!node) return null;
 
-            // Find grandchildren specific to *this* child slide
-            const currentGrandchildren = childNode.children || [];
-
-            return (
-              <SwiperSlide key={childNode.id} className={styles.slide}>
-                {/* Grandchild Buttons Container (Above Name) */}
-                <div className={styles.grandchildButtonsContainer}>
-                  {currentGrandchildren.slice(0, 2).map(
-                    (
-                      gc // Example: Max 2 above
-                    ) => (
-                      <button
-                        key={gc.id}
-                        onClick={() => onSelectGrandchild(gc.id)}
-                        className={`${styles.grandchildButton} ${
-                          selectedGrandchildId === gc.id
-                            ? styles.grandchildButtonActive
-                            : ""
-                        }`}
-                      >
-                        {gc.code}
-                      </button>
-                    )
+            if (mode === "parents") {
+              return (
+                <SwiperSlide
+                  key={node.id}
+                  className={`${styles.slide} ${styles.parentModeSlide}`}
+                >
+                  {" "}
+                  {/* Added parentModeSlide class */}
+                  <div className={styles.slideTextContent}>
+                    <span className={styles.slideName}>
+                      {node.name || node.id || "Unnamed Category"}
+                    </span>
+                    <span className={styles.slideSubText}>{node.code}</span>
+                  </div>
+                  {/* --- NEW: Select Button within Parent Mode Slide --- */}
+                  {onSelectParent && ( // Ensure callback is provided
+                    <button
+                      onClick={() => onSelectParent(node.id)}
+                      className={styles.selectParentButton}
+                    >
+                      Select Category: {node.code}
+                    </button>
                   )}
-                </div>
-
-                {/* Child Name */}
-                <div className={styles.slideTextContent}>
-                  <span className={styles.slideName}>
-                    {childNode.name || childNode.id || "Unnamed Child"}
-                  </span>
-                  <span className={styles.slideSubText}>{childNode.code}</span>
-                </div>
-
-                {/* Grandchild Buttons Container (Below Name) */}
-                <div className={styles.grandchildButtonsContainer}>
-                  {currentGrandchildren.slice(2).map(
-                    (
-                      gc // Example: Rest below
-                    ) => (
-                      <button
-                        key={gc.id}
-                        onClick={() => onSelectGrandchild(gc.id)}
-                        className={`${styles.grandchildButton} ${
-                          selectedGrandchildId === gc.id
-                            ? styles.grandchildButtonActive
-                            : ""
-                        }`}
-                      >
-                        {gc.code}
-                      </button>
-                    )
-                  )}
-                </div>
-              </SwiperSlide>
-            );
+                </SwiperSlide>
+              );
+            } else {
+              // mode === 'children'
+              const currentGrandchildren = node.children || [];
+              return (
+                <SwiperSlide key={node.id} className={styles.slide}>
+                  <div className={styles.grandchildButtonsContainer}>
+                    {onSelectGrandchild &&
+                      currentGrandchildren.slice(0, 2).map((gc) => (
+                        <button
+                          key={gc.id}
+                          onClick={() => onSelectGrandchild(gc.id)}
+                          className={`${styles.grandchildButton} ${
+                            selectedGrandchildId === gc.id
+                              ? styles.grandchildButtonActive
+                              : ""
+                          }`}
+                        >
+                          {gc.code}
+                        </button>
+                      ))}
+                  </div>
+                  <div className={styles.slideTextContent}>
+                    <span className={styles.slideName}>
+                      {node.name || node.id || "Unnamed Child"}
+                    </span>
+                    <span className={styles.slideSubText}>{node.code}</span>
+                  </div>
+                  <div className={styles.grandchildButtonsContainer}>
+                    {onSelectGrandchild &&
+                      currentGrandchildren.slice(2).map((gc) => (
+                        <button
+                          key={gc.id}
+                          onClick={() => onSelectGrandchild(gc.id)}
+                          className={`${styles.grandchildButton} ${
+                            selectedGrandchildId === gc.id
+                              ? styles.grandchildButtonActive
+                              : ""
+                          }`}
+                        >
+                          {gc.code}
+                        </button>
+                      ))}
+                  </div>
+                </SwiperSlide>
+              );
+            }
           })}
         </Swiper>
       ) : (
         <div className={styles.noData}>
-          No child accounts under '{parentNode?.name || "selected parent"}'.
+          {mode === "parents"
+            ? "No top-level categories found."
+            : `No child accounts under '${
+                parentNode?.name || "selected parent"
+              }'.`}
         </div>
       )}
-
-      {/* Accordion Section (Displays details of the SELECTED CHILD) */}
-      {currentChildNode && (
+      {mode === "children" && currentChildNode && onToggleAccordion && (
         <div className={styles.accordionContainer}>
+          {/* ... Accordion content ... */}
           <button
             onClick={onToggleAccordion}
             className={styles.detailsButton}
@@ -250,7 +286,14 @@ function JournalHierarchySlider({
             {isAccordionOpen && (
               <motion.div
                 key={`details-${currentChildNode.id}`}
-                // ... accordion animation props ...
+                initial="collapsed"
+                animate="open"
+                exit="collapsed"
+                variants={{
+                  open: { opacity: 1, height: "auto", marginTop: "8px" },
+                  collapsed: { opacity: 0, height: 0, marginTop: "0px" },
+                }}
+                transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
                 className={styles.detailsContentWrapper}
               >
                 <div className={styles.detailsContent}>
@@ -267,7 +310,6 @@ function JournalHierarchySlider({
                     <strong>Has Grandchildren:</strong>{" "}
                     {grandchildNodes.length > 0 ? "Yes" : "No"}
                   </p>
-                  {/* Add more details if available */}
                 </div>
               </motion.div>
             )}
@@ -278,34 +320,7 @@ function JournalHierarchySlider({
   );
 }
 
-const SLIDER_CONFIG = {
-  [SLIDER_TYPES.JOURNAL]: {
-    Component: JournalHierarchySlider,
-    title: "Journal",
-  },
-  [SLIDER_TYPES.PARTNER]: { Component: DynamicSlider, title: "Partner" },
-  [SLIDER_TYPES.GOODS]: { Component: DynamicSlider, title: "Goods" },
-  [SLIDER_TYPES.PROJECT]: { Component: DynamicSlider, title: "Project" }, // New
-  [SLIDER_TYPES.DOCUMENT]: { Component: DynamicSlider, title: "Document" }, // New
-};
-
-const INITIAL_ORDER = [
-  SLIDER_TYPES.JOURNAL,
-  SLIDER_TYPES.PARTNER,
-  SLIDER_TYPES.GOODS,
-  SLIDER_TYPES.PROJECT,
-  SLIDER_TYPES.DOCUMENT,
-];
-
-// Removed ALLOWED_ORDERS and isOrderAllowed
-
-const JOURNAL_ICONS = {
-  J01: IoCartOutline, // Example ID mapping
-  J02: IoPricetagOutline, // Example ID mapping
-  J03: IoBuildOutline, // Example ID mapping
-  // Add more mappings based on your actual Journal IDs
-};
-
+// ... DynamicSlider, AccountNode, JournalModal, Home (with its render method updated as in Step 1) ...
 // --- DynamicSlider Component (Simplified Version) ---
 function DynamicSlider({
   sliderId,
@@ -316,7 +331,6 @@ function DynamicSlider({
   isAccordionOpen,
   onToggleAccordion,
 }) {
-  // Calculate initialSlide index based on current props for THIS render
   const initialSlideIndex = Math.max(
     0,
     data.findIndex((item) => item?.id === activeItemId)
@@ -326,7 +340,7 @@ function DynamicSlider({
   );
 
   const handleSwiperChange = (swiper) => {
-    const currentRealIndex = swiper.activeIndex; // Simplified
+    const currentRealIndex = swiper.activeIndex;
     if (data && data.length > currentRealIndex && data[currentRealIndex]) {
       console.log(
         `DynamicSlider (${sliderId}): Swipe Change. Index: ${currentRealIndex}, New ID: ${data[currentRealIndex].id}`
@@ -339,7 +353,6 @@ function DynamicSlider({
     }
   };
 
-  // Find Current Item for Accordion
   let currentItemForAccordion = data.find((item) => item?.id === activeItemId);
   if (
     !currentItemForAccordion &&
@@ -353,7 +366,6 @@ function DynamicSlider({
     currentItemForAccordion = data[initialSlideIndex];
   }
 
-  // SIMPLE Key for Swiper
   const swiperKey = `${sliderId}-len${data.length}-active${activeItemId}`;
 
   return (
@@ -375,7 +387,7 @@ function DynamicSlider({
           className={`${styles.swiperInstance}`}
         >
           {data.map((item) => {
-            if (!item) return null; // Safety check
+            if (!item) return null;
             const IconComponent =
               sliderId === SLIDER_TYPES.JOURNAL && JOURNAL_ICONS[item.id]
                 ? JOURNAL_ICONS[item.id]
@@ -394,17 +406,14 @@ function DynamicSlider({
                       aria-hidden="true"
                     />
                   )}
-                  {/* Display name, handle cases where name might not exist directly */}
                   <span className={styles.slideName}>
                     {item.name || item.id || "Unnamed Item"}
                   </span>
-                  {/* Add specific subtext if available and needed */}
                   {sliderId === SLIDER_TYPES.GOODS && item.unit_code && (
                     <span className={styles.slideSubText}>
                       {item.unit_code}
                     </span>
                   )}
-                  {/* ... other potential subtext ... */}
                 </div>
               </SwiperSlide>
             );
@@ -413,8 +422,7 @@ function DynamicSlider({
       ) : (
         <div className={styles.noData}>No items match criteria.</div>
       )}
-      {/* Accordion Section */}
-      {currentItemForAccordion && (
+      {currentItemForAccordion && onToggleAccordion && (
         <div className={styles.accordionContainer}>
           <button
             onClick={onToggleAccordion}
@@ -445,7 +453,6 @@ function DynamicSlider({
                 className={styles.detailsContentWrapper}
               >
                 <div className={styles.detailsContent}>
-                  {/* Display details available on the item */}
                   {currentItemForAccordion.description && (
                     <p>
                       <strong>Description:</strong>{" "}
@@ -462,7 +469,6 @@ function DynamicSlider({
                       <strong>ID:</strong> {currentItemForAccordion.id}
                     </p>
                   )}
-                  {/* Add more details specific to type if needed */}
                 </div>
               </motion.div>
             )}
@@ -473,9 +479,7 @@ function DynamicSlider({
   );
 }
 
-// --- MODIFIED: Recursive component to render each node ---
-// --- MODIFIED: Recursive component to render each node ---
-// --- MODIFIED: Recursive component to render each node ---
+// --- AccountNode Component (CORRECTED CLICK/TOGGLE LOGIC) ---
 function AccountNode({
   node,
   level = 0,
@@ -483,28 +487,57 @@ function AccountNode({
   toggleNode,
   selectedAccountId,
   onSelectNode,
+  onTriggerAddChildToNode,
+  onDeleteNode,
 }) {
   const isOpen = openNodes[node.id] ?? false;
   const hasChildren = node.children && node.children.length > 0;
   const isSelected = node.id === selectedAccountId;
 
+  // Handles click on the entire row
   const handleRowClick = () => {
-    onSelectNode(node.id); // Always select
+    onSelectNode(node.id); // Always select the node
     if (hasChildren) {
-      toggleNode(node.id); // Toggle if children exist
+      toggleNode(node.id); // If it has children, also toggle its open state
+    }
+  };
+
+  // Handles click specifically on the toggle icon
+  const handleToggleIconClick = (e) => {
+    e.stopPropagation(); // Prevent the row click from firing
+    if (hasChildren) {
+      toggleNode(node.id); // Only toggle if it has children
+    }
+  };
+
+  const handleAddChildClick = (e) => {
+    e.stopPropagation(); // Prevent row click from firing
+    if (onTriggerAddChildToNode) {
+      onTriggerAddChildToNode(node.id, node.code);
+    }
+  };
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    if (onDeleteNode) {
+      // Confirmation
+      if (
+        window.confirm(
+          `Are you sure you want to delete "${node.code} - ${node.name}"? This will also delete all its sub-accounts.`
+        )
+      ) {
+        onDeleteNode(node.id);
+      }
     }
   };
 
   return (
-    // Use a fragment or simple div, no specific container style needed unless desired
     <>
-      {/* Clickable row */}
       <div
         className={`${styles.accountNodeRow} ${
           isSelected ? styles.accountNodeSelected : ""
         }`}
-        style={{ paddingLeft: `${level * 25}px` }} // Indentation applied here
-        onClick={handleRowClick}
+        style={{ paddingLeft: `${level * 25}px` }}
+        onClick={handleRowClick} // Main click handler for the row
         role="button"
         tabIndex={0}
         aria-selected={isSelected}
@@ -513,8 +546,17 @@ function AccountNode({
           (e.key === "Enter" || e.key === " ") && handleRowClick()
         }
       >
-        {/* Toggle Icon */}
-        <span className={styles.accountNodeToggle} aria-hidden="true">
+        {/* Toggle Icon - click specifically toggles */}
+        <span
+          className={styles.accountNodeToggle}
+          onClick={handleToggleIconClick} // Specific handler for icon
+          aria-hidden="true"
+          role="button" // Make it act like a button for accessibility
+          tabIndex={0} // Make it focusable
+          onKeyDown={(e) =>
+            (e.key === "Enter" || e.key === " ") && handleToggleIconClick(e)
+          } // Keyboard accessible
+        >
           {hasChildren ? (
             isOpen ? (
               <IoChevronDownOutline />
@@ -525,66 +567,86 @@ function AccountNode({
             <span className={styles.accountNodeIconPlaceholder}></span>
           )}
         </span>
-        {/* Account Info */}
         <span className={styles.accountNodeCode}>{node.code}</span>
         <span className={styles.accountNodeName}>{node.name}</span>
-      </div>
-
-      {/* --- Children Rendering Section - Ensure Structure is Correct --- */}
-      <div className={styles.accountNodeChildrenContainer}>
-        {" "}
-        {/* Optional: Wrapper for styling children block */}
-        <AnimatePresence initial={false}>
-          {hasChildren &&
-            isOpen && ( // Condition MUST be here
-              <motion.div
-                key={`${node.id}-children`} // Key is essential
-                initial="collapsed"
-                animate="open"
-                exit="collapsed"
-                variants={{
-                  // Explicitly define variants
-                  open: { opacity: 1, height: "auto" },
-                  collapsed: { opacity: 0, height: 0 },
-                }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
-                // Style for animation and hierarchy line
-                style={{
-                  overflow: "hidden",
-                  // Apply paddingLeft instead of margin for border alignment
-                  paddingLeft: `${level * 25 + 20}px`, // Align with text start
-                  position: "relative", // Needed for pseudo-element line
-                }}
-                // Add pseudo-element for the vertical line if desired
-                className={styles.accountNodeChildrenMotionWrapper}
+        {/* Action Buttons Container */}
+        <div className={styles.accountNodeActions}>
+          {isSelected && onTriggerAddChildToNode && (
+            <button
+              onClick={handleAddChildClick}
+              className={styles.accountNodeActionButton}
+              title={`Add sub-account to ${node.name}`}
+            >
+              <IoAddCircleOutline />
+            </button>
+          )}
+          {isSelected &&
+            onDeleteNode && ( // Show delete if selected and callback exists
+              <button
+                onClick={handleDeleteClick}
+                className={`${styles.accountNodeActionButton} ${styles.accountNodeDeleteButton}`}
+                title={`Delete account ${node.name}`}
               >
-                {/* Vertical line using pseudo-element */}
-                {/* Render children recursively */}
-                {node.children.map((childNode) => (
-                  <AccountNode
-                    key={childNode.id}
-                    node={childNode}
-                    level={level + 1}
-                    openNodes={openNodes}
-                    toggleNode={toggleNode}
-                    selectedAccountId={selectedAccountId}
-                    onSelectNode={onSelectNode}
-                  />
-                ))}
-              </motion.div>
+                <IoTrashBinOutline />
+              </button>
             )}
+        </div>
+      </div>
+      <div className={styles.accountNodeChildrenContainer}>
+        <AnimatePresence initial={false}>
+          {hasChildren && isOpen && (
+            <motion.div
+              key={`${node.id}-children`}
+              initial="collapsed"
+              animate="open"
+              exit="collapsed"
+              variants={{
+                open: { opacity: 1, height: "auto" },
+                collapsed: { opacity: 0, height: 0 },
+              }}
+              transition={{ duration: 0.2, ease: "easeInOut" }}
+              style={{
+                overflow: "hidden",
+                paddingLeft: `${level * 25 + 20}px`,
+                position: "relative",
+              }}
+              className={styles.accountNodeChildrenMotionWrapper}
+            >
+              {node.children.map((childNode) => (
+                <AccountNode
+                  key={childNode.id}
+                  node={childNode}
+                  level={level + 1}
+                  openNodes={openNodes}
+                  toggleNode={toggleNode}
+                  selectedAccountId={selectedAccountId}
+                  onSelectNode={onSelectNode}
+                  onTriggerAddChildToNode={onTriggerAddChildToNode}
+                  onDeleteNode={onDeleteNode} // Pass the prop down
+                />
+              ))}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
-      {/* --- End Children Rendering Section --- */}
     </>
   );
 }
-// page.js
-// ... other imports, components etc ...
+// --- END AccountNode ---
 
-// --- JournalModal Component (CORRECTED) ---
-function JournalModal({ isOpen, onClose, onConfirmSelection, hierarchy = [] }) {
-  // Props: onClose, onConfirmSelection
+// ... (Rest of your page.js: JournalModal, AddJournalModal, Home component, etc.)
+// --- END AccountNode ---
+// --- JournalModal Component (MODIFIED) ---
+function JournalModal({
+  isOpen,
+  onClose,
+  onConfirmSelection, // Renamed from handleConfirmSelection, now selects parent
+  onSetMode, // *** NEW PROP ***
+  hierarchy = [],
+  onTriggerAdd,
+  onTriggerAddChild, // For adding a child to a specific node
+  onDeleteAccount,
+}) {
   const [openNodes, setOpenNodes] = useState({});
   const [selectedAccountId, setSelectedAccountId] = useState(null);
 
@@ -597,59 +659,59 @@ function JournalModal({ isOpen, onClose, onConfirmSelection, hierarchy = [] }) {
     console.log("Selected Account Node ID:", nodeId);
   }, []);
 
-  // This is the INTERNAL click handler for the "Select" button
-  const handleConfirmSelectionClick = () => {
+  // Handler for the standard "Select Category" button
+  const handleConfirmParentSelectionClick = () => {
     if (selectedAccountId) {
-      console.log("Modal Confirm Button Clicked. ID:", selectedAccountId);
-      // Call the CALLBACK PROP passed from Home component
+      console.log(
+        "Modal Confirm Parent Selection Clicked. ID:",
+        selectedAccountId
+      );
       if (onConfirmSelection) {
-        onConfirmSelection(selectedAccountId); // Call the prop function
+        onConfirmSelection(selectedAccountId); // This selects the parent AND sets mode='children' in Home
       }
-      onClose(); // Close the modal using the onClose prop
-    } else {
-      console.log("Modal Confirm Button Clicked, but no account selected.");
+      onClose(); // Close the modal
     }
   };
 
-  const handleAddNew = () => {
-    console.log("Add New Account Clicked");
-    // Logic for adding new account would go here
-    onClose(); // Close modal for now
+  // *** NEW Handler for the "Show Top-Level" button ***
+  const handleShowTopLevelClick = () => {
+    console.log("Modal Show Top-Level Clicked.");
+    if (onSetMode) {
+      onSetMode("parents"); // Tell Home to change the Journal Slider mode
+    }
+    onClose(); // Close the modal
+  };
+  // This "Add New" button is for adding a TOP-LEVEL category
+  const handleAddNewTopLevel = () => {
+    console.log("Add New Top-Level Account Clicked in JournalModal");
+    if (onTriggerAdd) {
+      const context = { level: "top", parentId: null, parentCode: null };
+      onTriggerAdd(context); // This calls openAddJournalModalWithContext in Home
+    }
   };
 
-  // Reset states when modal closes/opens
   useEffect(() => {
     if (!isOpen) {
       setOpenNodes({});
       setSelectedAccountId(null);
     }
-    // Optionally reset scroll position of hierarchy container on open
-    // const container = document.querySelector(`.${styles.accountHierarchyContainer}`);
-    // if (isOpen && container) {
-    //     container.scrollTop = 0;
-    // }
   }, [isOpen]);
 
   return (
-    // Use motion.div for the overlay to animate it
     <motion.div
       className={styles.modalOverlay}
-      onClick={onClose} // Close on overlay click
-      key="journal-modal-overlay" // More specific key
+      onClick={onClose}
+      key="journal-modal-overlay"
       initial="closed"
       animate="open"
       exit="closed"
-      variants={{
-        open: { opacity: 1 },
-        closed: { opacity: 0 },
-      }}
+      variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
       transition={{ duration: 0.3, ease: "easeInOut" }}
     >
-      {/* Use motion.div for the content */}
       <motion.div
         className={styles.modalContent}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking content
-        key="journal-modal-content" // More specific key
+        onClick={(e) => e.stopPropagation()}
+        key="journal-modal-content"
         variants={{
           open: {
             opacity: 1,
@@ -658,17 +720,26 @@ function JournalModal({ isOpen, onClose, onConfirmSelection, hierarchy = [] }) {
           },
           closed: { opacity: 0, scale: 0.95, transition: { duration: 0.2 } },
         }}
-        // Inherits initial/animate/exit from parent overlay
       >
         <button
           className={styles.modalCloseButton}
-          onClick={onClose} // Use onClose prop
+          onClick={onClose}
           aria-label="Close modal"
         >
           ×
         </button>
-        <h2>Select Journal Account Category</h2> {/* Updated Title */}
-        {/* Hierarchy List */}
+        <h2>Select Journal Account Category</h2>
+
+        <div className={styles.modalTopActions}>
+          <button
+            className={`${styles.modalButtonSecondary} ${styles.modalActionButton}`}
+            onClick={handleShowTopLevelClick}
+          >
+            <IoNavigateOutline />
+            Show Top-Level Categories in Slider
+          </button>
+        </div>
+
         <div className={styles.accountHierarchyContainer}>
           {hierarchy.length > 0 ? (
             hierarchy.map((rootNode) => (
@@ -680,51 +751,280 @@ function JournalModal({ isOpen, onClose, onConfirmSelection, hierarchy = [] }) {
                 toggleNode={toggleNode}
                 selectedAccountId={selectedAccountId}
                 onSelectNode={handleSelectNode}
+                onTriggerAddChildToNode={onTriggerAddChild} // *** PASS THE PROP HERE ***
+                onDeleteNode={onDeleteAccount} // *** PASS THE PROP HERE ***
               />
             ))
           ) : (
             <p>No hierarchy data available.</p>
           )}
         </div>
-        {/* Action Buttons */}
+
         <div className={styles.modalActions}>
+          {/* This button now explicitly adds a TOP-LEVEL category */}
           <button
             className={`${styles.modalButtonSecondary} ${styles.modalActionButton}`}
-            onClick={handleAddNew}
+            onClick={handleAddNewTopLevel}
           >
-            <IoAddCircleOutline /> Add New
+            <IoAddCircleOutline /> Add Top-Level
           </button>
           <button
             className={`${styles.modalButtonPrimary} ${styles.modalActionButton}`}
-            // *** ENSURE THIS onClick CALLS the INTERNAL handler ***
-            onClick={handleConfirmSelectionClick}
+            onClick={handleConfirmParentSelectionClick} // Renamed internal handler
             disabled={!selectedAccountId}
           >
-            <IoCheckmarkCircleOutline /> Select Category {/* Updated Label */}
+            <IoCheckmarkCircleOutline /> Select Category
           </button>
         </div>
       </motion.div>
     </motion.div>
   );
 }
-// --- END JournalModal ---
 
-// ... rest of your page.js (Home component etc.)
+// --- AddJournalModal Component (Full Current Version with Validation) ---
+function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
+  // const [newId, setNewId] = useState(""); // ID will be auto-generated from code
+  const [newCodeSuffix, setNewCodeSuffix] = useState(""); // User types only the suffix
+  const [newName, setNewName] = useState("");
+  const [error, setError] = useState("");
+
+  let codePrefixForDisplay = ""; // e.g., "4" or "401" or "401-12" (parent's code for display)
+  let codeSeparator = ""; // "" for level 2, "-" for level 3+
+  let codePatternHint = "";
+  let finalCodeForNewAccount = ""; // For constructing the full code
+
+  // Determine level and parent info
+  let currentLevel = 1; // Default to top-level
+  if (context?.parentCode) {
+    if (
+      !context.parentCode.includes("-") &&
+      context.parentCode.length === 1 &&
+      /^\d$/.test(context.parentCode)
+    ) {
+      currentLevel = 2; // Child of top-level
+      codePrefixForDisplay = context.parentCode;
+      codeSeparator = "";
+      codePatternHint = `Enter 2 digits (e.g., "01" for code ${context.parentCode}01)`;
+    } else {
+      currentLevel = 3; // Grandchild or deeper (could be more levels)
+      codePrefixForDisplay = context.parentCode;
+      codeSeparator = "-";
+      codePatternHint = `Enter 1 or 2 digits (e.g., "01" for code ${context.parentCode}-01)`;
+    }
+  } else {
+    // Top-level
+    codePatternHint = `Enter a single digit (1-9)`;
+  }
+
+  useEffect(() => {
+    if (isOpen) {
+      setNewCodeSuffix(""); // User always types the suffix part
+      setNewName("");
+      setError("");
+      setTimeout(() => {
+        document.getElementById("newJournalCodeSuffix")?.focus();
+      }, 100);
+    }
+  }, [isOpen, context]);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError("");
+
+    const trimmedSuffix = newCodeSuffix.trim();
+    const trimmedName = newName.trim();
+
+    if (!trimmedSuffix || !trimmedName) {
+      // Suffix and Name are required
+      setError("Code Suffix and Name fields are required.");
+      return;
+    }
+
+    // --- Strict Code Validation ---
+    if (currentLevel === 1) {
+      // Top-Level
+      if (!/^[1-9]$/.test(trimmedSuffix)) {
+        // Single digit 1-9
+        setError("Top-level code must be a single digit (1-9).");
+        return;
+      }
+      finalCodeForNewAccount = trimmedSuffix;
+    } else if (currentLevel === 2) {
+      // Child of Top-Level (e.g., 4 -> 401)
+      if (!/^\d{2}$/.test(trimmedSuffix)) {
+        // Exactly two digits
+        setError(
+          `Level 2 code suffix (after "${codePrefixForDisplay}") must be exactly two digits. e.g., "01"`
+        );
+        return;
+      }
+      finalCodeForNewAccount = codePrefixForDisplay + trimmedSuffix;
+    } else {
+      // Level 3+ (e.g., 401 -> 401-01 or 401-12-01)
+      if (!/^\d{1,2}$/.test(trimmedSuffix)) {
+        // One or two digits for the suffix part
+        setError(
+          `Level 3+ code suffix (after "${codePrefixForDisplay}${codeSeparator}") must be one or two digits. e.g., "01"`
+        );
+        return;
+      }
+      finalCodeForNewAccount =
+        codePrefixForDisplay + codeSeparator + trimmedSuffix;
+    }
+    // --- End Validation ---
+
+    // ID is now the same as the code
+    const newAccountId = finalCodeForNewAccount;
+
+    // Check for duplicate ID/Code (this should ideally be in Home's handleAddJournalSubmit
+    // as it has the full hierarchy. For now, we proceed.)
+
+    onSubmit({
+      id: newAccountId,
+      code: finalCodeForNewAccount,
+      name: trimmedName,
+      children: [],
+    });
+    onClose();
+  };
+
+  if (!isOpen) return null;
+
+  let title = "Add New Journal Account";
+  if (context) {
+    if (context.level === "top" || !context.parentCode) {
+      // Corrected condition for top level
+      title = "Add New Top-Level Category";
+    } else {
+      // Adding child/grandchild
+      const parentDisplayName = context.parentName
+        ? `${context.parentCode} - ${context.parentName}`
+        : context.parentCode || context.parentId;
+      title = `Add Sub-Account to "${parentDisplayName}"`;
+    }
+  }
+
+  return (
+    <motion.div
+      className={styles.modalOverlay}
+      key="add-journal-modal-overlay"
+      initial="closed"
+      animate="open"
+      exit="closed"
+      variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
+      transition={{ duration: 0.2, ease: "easeInOut" }}
+      style={{ zIndex: 1001 }} // Ensure it's on top
+    >
+      <motion.div
+        className={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+        key="add-journal-modal-content"
+        variants={{
+          open: {
+            opacity: 1,
+            scale: 1,
+            y: 0,
+            transition: { delay: 0.05, duration: 0.25 },
+          },
+          closed: {
+            opacity: 0,
+            scale: 0.95,
+            y: "5%",
+            transition: { duration: 0.2 },
+          },
+        }}
+      >
+        <button
+          className={styles.modalCloseButton}
+          onClick={onClose}
+          aria-label="Close"
+        >
+          ×
+        </button>
+        <h2>{title}</h2>
+        <form onSubmit={handleSubmit} className={styles.addJournalForm}>
+          {error && <p className={styles.formError}>{error}</p>}
+          <div className={styles.formGroup}>
+            <label htmlFor="newJournalCodeSuffix">
+              Account Code{" "}
+              {currentLevel > 1
+                ? `Suffix (after "${codePrefixForDisplay}${codeSeparator}")`
+                : ""}{" "}
+              :
+            </label>
+            <input
+              type="text"
+              id="newJournalCodeSuffix" // Changed ID
+              value={newCodeSuffix}
+              onChange={(e) => setNewCodeSuffix(e.target.value)}
+              placeholder={codePatternHint} // Placeholder shows hint for suffix
+              required
+              aria-describedby={error ? "formErrorText" : undefined}
+            />
+            {currentLevel > 1 && ( // Show constructed code preview
+              <small className={styles.inputHint}>
+                Full Code Preview: {codePrefixForDisplay}
+                {codeSeparator}
+                {newCodeSuffix || "XX"}
+              </small>
+            )}
+          </div>
+          <div className={styles.formGroup}>
+            <label htmlFor="newJournalName">Account Name:</label>
+            <input
+              type="text"
+              id="newJournalName"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g., Advertising Campaign"
+              required
+              aria-describedby={error ? "formErrorText" : undefined}
+            />
+          </div>
+          <div
+            className={styles.modalActions}
+            style={{ marginTop: "var(--spacing-unit)" }}
+          >
+            <button
+              type="button"
+              className={`${styles.modalButtonSecondary} ${styles.modalActionButton}`}
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className={`${styles.modalButtonPrimary} ${styles.modalActionButton}`}
+            >
+              <IoAddCircleOutline /> Add Account
+            </button>
+          </div>
+        </form>
+        {error && (
+          <div id="formErrorText" role="alert" style={{ display: "none" }}>
+            {error}
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+// --- END AddJournalModal ---
+
+// ... (Rest of your page.js: AccountNode, JournalModal, JournalHierarchySlider, DynamicSlider, Home component, etc.)
 // --- Main Page Component ---
 export default function Home() {
   // === State ===
   const [sliderOrder, setSliderOrder] = useState(INITIAL_ORDER);
   const [activeDataSource, setActiveDataSource] = useState("data1");
-  // Load initial data - adjust based on where your structured data comes from
   const [activeDataSet, setActiveDataSet] = useState(initialData1);
 
-  // --- Selections ---
-  // !! Journal Selection State Overhaul !!
-  const initialParentId = "cat-6"; // Default Parent
+  // --- Journal State ---
+  const initialParentId = "cat-6";
   const [selectedParentJournalId, setSelectedParentJournalId] =
     useState(initialParentId);
+  const [journalSliderMode, setJournalSliderMode] = useState("children"); // 'children' or 'parents'
 
-  // Find initial child and grandchild based on parent
   const getInitialChildAndGrandchild = useCallback((parentId, dataset) => {
     const parentNode = findNodeById(dataset?.account_hierarchy, parentId);
     const firstChild = parentNode?.children?.[0];
@@ -733,16 +1033,16 @@ export default function Home() {
       childId: firstChild?.id || null,
       grandchildId: firstGrandchild?.id || null,
     };
-  }, []); // No dependencies needed, it's a pure function of its args
+  }, []);
 
   const { childId: initialChildId, grandchildId: initialGrandchildId } =
     getInitialChildAndGrandchild(initialParentId, activeDataSet);
-
   const [selectedChildJournalId, setSelectedChildJournalId] =
     useState(initialChildId);
   const [selectedGrandchildJournalId, setSelectedGrandchildJournalId] =
     useState(initialGrandchildId);
 
+  // Other selections
   const [selectedPartnerId, setSelectedPartnerId] = useState(() =>
     getFirstId(activeDataSet?.partners)
   );
@@ -751,12 +1051,12 @@ export default function Home() {
   );
   const [selectedProjectId, setSelectedProjectId] = useState(
     "project-placeholder"
-  ); // Placeholder ID
+  );
   const [selectedDocumentId, setSelectedDocumentId] = useState(
     "document-placeholder"
-  ); // Placeholder ID
+  );
 
-  // --- Displayed Data (Filtered) ---
+  // Placeholders for Project/Document
   const placeholderProjectData = [
     { id: "project-placeholder", name: "Sample Project" },
   ];
@@ -764,6 +1064,7 @@ export default function Home() {
     { id: "document-placeholder", name: "Specification Doc" },
   ];
 
+  // Displayed Data (Filtered)
   const [displayedPartners, setDisplayedPartners] = useState(
     () => activeDataSet?.partners || []
   );
@@ -777,7 +1078,7 @@ export default function Home() {
     placeholderDocumentData
   );
 
-  // --- UI State ---
+  // UI State
   const [accordionTypeState, setAccordionTypeState] = useState({
     [SLIDER_TYPES.JOURNAL]: false,
     [SLIDER_TYPES.PARTNER]: false,
@@ -794,21 +1095,80 @@ export default function Home() {
   });
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
 
-  // --- NEW: Ref for Visibility Swiper ---
+  // --- NEW State for AddJournalModal ---
+  const [isAddJournalModalOpen, setIsAddJournalModalOpen] = useState(false);
+  const [addJournalContext, setAddJournalContext] = useState(null); // { level: 'top'/'child'/'grandchild', parentId: 'some-id' or null }
+
   const visibilitySwiperRef = useRef(null);
 
-  // --- NEW: Effect to update Visibility Swiper on Order Change ---
+  // --- Effects ---
   useEffect(() => {
+    // For visibility swiper
     if (visibilitySwiperRef.current) {
       console.log("Updating visibility swiper due to order change.");
-      // Give Swiper a chance to recognize the new DOM structure after React render
       requestAnimationFrame(() => {
         visibilitySwiperRef.current?.update();
-        // Optional: Reset scroll position if needed, although loop might handle this
-        // visibilitySwiperRef.current?.slideToLoop(0, 0);
       });
     }
-  }, [sliderOrder]); // Re-run when sliderOrder changes
+  }, [sliderOrder]);
+
+  // Filtering useEffect
+  useEffect(() => {
+    console.log(
+      "%c--- useEffect START (Filter Logic) ---",
+      "color: blue; font-weight: bold;"
+    );
+    // ... (Current filtering logic, ensure it uses selectedChildJournalId or other relevant ID)
+    // For now, assuming it uses selectedChildJournalId if Journal is a filter source
+    const activeJournalFilterId = selectedChildJournalId;
+
+    let finalFilteredPartners = activeDataSet?.partners || [];
+    let finalFilteredGoods = activeDataSet?.goods || [];
+    // ... (Your placeholder or actual filtering logic for partners, goods etc.)
+
+    if (
+      JSON.stringify(displayedPartners) !==
+      JSON.stringify(finalFilteredPartners)
+    )
+      setDisplayedPartners(finalFilteredPartners);
+    if (JSON.stringify(displayedGoods) !== JSON.stringify(finalFilteredGoods))
+      setDisplayedGoods(finalFilteredGoods);
+
+    // Selection Reset Checks
+    let resetTriggered = false;
+    if (
+      !resetTriggered &&
+      selectedPartnerId &&
+      !finalFilteredPartners.some((p) => p?.id === selectedPartnerId)
+    ) {
+      setSelectedPartnerId(getFirstId(finalFilteredPartners));
+      resetTriggered = true;
+    }
+    if (
+      !resetTriggered &&
+      selectedGoodsId &&
+      !finalFilteredGoods.some((g) => g?.id === selectedGoodsId)
+    ) {
+      setSelectedGoodsId(getFirstId(finalFilteredGoods));
+      resetTriggered = true;
+    }
+    // ... Project/Document reset checks ...
+    console.log("%c--- useEffect END ---", "color: blue; font-weight: bold;");
+  }, [
+    sliderOrder,
+    selectedParentJournalId,
+    selectedChildJournalId,
+    selectedGrandchildJournalId, // Journal selections
+    selectedPartnerId,
+    selectedGoodsId,
+    selectedProjectId,
+    selectedDocumentId, // Other selections
+    activeDataSet,
+    displayedPartners,
+    displayedGoods,
+    displayedProjects,
+    displayedDocuments, // To compare before setting
+  ]);
 
   // === Handlers ===
   const handleDataSourceChange = (event) => {
@@ -819,36 +1179,30 @@ export default function Home() {
     setActiveDataSource(newSourceKey);
     setActiveDataSet(newDataSet);
 
-    // Reset Journal selections based on new dataset
-    const newInitialParentId = "cat-6"; // Or derive differently if needed
+    const newInitialParentId = "cat-6";
     const { childId: newChildId, grandchildId: newGrandchildId } =
       getInitialChildAndGrandchild(newInitialParentId, newDataSet);
     setSelectedParentJournalId(newInitialParentId);
     setSelectedChildJournalId(newChildId);
     setSelectedGrandchildJournalId(newGrandchildId);
+    setJournalSliderMode("children"); // Reset mode
 
-    // Reset displayed data
-    setDisplayedJournals(newDataSet?.journals || []);
+    setSelectedPartnerId(getFirstId(newDataSet?.partners));
+    setSelectedGoodsId(getFirstId(newDataSet?.goods));
+    setSelectedProjectId("project-placeholder");
+    setSelectedDocumentId("document-placeholder");
+
     setDisplayedPartners(newDataSet?.partners || []);
     setDisplayedGoods(newDataSet?.goods || []);
     setDisplayedProjects(placeholderProjectData);
     setDisplayedDocuments(placeholderDocumentData);
 
-    // Reset UI state
     setSliderOrder(INITIAL_ORDER);
     setVisibility({
-      [SLIDER_TYPES.JOURNAL]: true,
-      [SLIDER_TYPES.PARTNER]: true,
-      [SLIDER_TYPES.GOODS]: true,
-      [SLIDER_TYPES.PROJECT]: false,
-      [SLIDER_TYPES.DOCUMENT]: false,
+      /* ... initial visibility ... */
     });
     setAccordionTypeState({
-      [SLIDER_TYPES.JOURNAL]: false,
-      [SLIDER_TYPES.PARTNER]: false,
-      [SLIDER_TYPES.GOODS]: false,
-      [SLIDER_TYPES.PROJECT]: false,
-      [SLIDER_TYPES.DOCUMENT]: false,
+      /* ... initial accordion state ... */
     });
     setIsJournalModalOpen(false);
   };
@@ -856,260 +1210,367 @@ export default function Home() {
   const openJournalModal = useCallback(() => setIsJournalModalOpen(true), []);
   const closeJournalModal = useCallback(() => setIsJournalModalOpen(false), []);
 
-  // === Filtering useEffect ===
-  // Needs careful review regarding which Journal ID to use for filtering
-  useEffect(() => {
-    console.log(
-      "%c--- useEffect START (Filter Logic - NEEDS UPDATE for Journal Hierarchy) ---",
-      "color: blue; font-weight: bold;"
-    );
-    console.log("Order:", sliderOrder.join(" -> "));
-    console.log("Selections:", {
-      ParentJ: selectedParentJournalId,
-      ChildJ: selectedChildJournalId,
-      GrandchildJ: selectedGrandchildJournalId,
-      P: selectedPartnerId,
-      G: selectedGoodsId,
-      Pr: selectedProjectId,
-      D: selectedDocumentId,
-    });
-
-    // --- !!! Placeholder Filtering Logic - NEEDS UPDATE !!! ---
-    // Determine which Journal ID (parent, child, grandchild) is relevant for filtering
-    // For now, let's assume the CHILD ID is the primary filter key from Journal
-    const activeJournalFilterId = selectedChildJournalId; // Or maybe grandchild?
-
-    // `finalFilteredJournals` is no longer needed as a separate list here.
-    // The JournalHierarchySlider derives its display data from the hierarchy.
-    let finalFilteredPartners = activeDataSet?.partners || [];
-    let finalFilteredGoods = activeDataSet?.goods || [];
-    const finalFilteredProjects = placeholderProjectData; // Assuming these are static for now
-    const finalFilteredDocuments = placeholderDocumentData; // Assuming these are static for now
-
-    // --- !!! START REPLACEMENT SECTION FOR DB LOGIC (Placeholder) !!! ---
-    // PSEUDOCODE - NEEDS REAL IMPLEMENTATION based on `activeJournalFilterId`,
-    // `selectedPartnerId`, `selectedGoodsId`, and `sliderOrder`.
-    // This logic would potentially filter `finalFilteredPartners`, `finalFilteredGoods`,
-    // and maybe even indirectly affect which parts of the hierarchy are *valid*
-    // (though the current structure doesn't directly support filtering the hierarchy itself easily).
-
-    /*
-    const selections = {
-        [SLIDER_TYPES.JOURNAL]: activeJournalFilterId, // Use the relevant journal ID
-        [SLIDER_TYPES.PARTNER]: selectedPartnerId,
-        [SLIDER_TYPES.GOODS]: selectedGoodsId,
-        // ...
-    };
-
-    let currentFilteredData = {
-        [SLIDER_TYPES.PARTNER]: activeDataSet?.partners || [],
-        [SLIDER_TYPES.GOODS]: activeDataSet?.goods || [],
-        [SLIDER_TYPES.PROJECT]: finalFilteredProjects,
-        [SLIDER_TYPES.DOCUMENT]: finalFilteredDocuments,
-    };
-
-
-    for (let i = 0; i < sliderOrder.length; i++) {
-        const targetSlider = sliderOrder[i];
-        if (targetSlider === SLIDER_TYPES.JOURNAL) continue; // Skip Journal itself for filtering its internal list
-
-        let potentialData = [...currentFilteredData[targetSlider]];
-
-        for (let j = 0; j < i; j++) {
-             const sourceSlider = sliderOrder[j];
-             const sourceSelectionId = selections[sourceSlider];
-             if (!sourceSelectionId) continue;
-
-             // !!! IMPLEMENT ACTUAL FILTERING RULES HERE !!!
-             // Example: Filter Partners based on Journal selection
-             // if (sourceSlider === SLIDER_TYPES.JOURNAL && targetSlider === SLIDER_TYPES.PARTNER) {
-             //    potentialData = filterPartnersByJournal(potentialData, sourceSelectionId, activeDataSet.journal_partner_links);
-             // }
-             // // Example: Filter Goods based on Journal AND Partner selections
-             // if (targetSlider === SLIDER_TYPES.GOODS) {
-             //    const journalSel = selections[SLIDER_TYPES.JOURNAL];
-             //    const partnerSel = selections[SLIDER_TYPES.PARTNER];
-             //    if (sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) < i && sliderOrder.indexOf(SLIDER_TYPES.PARTNER) < i) {
-             //       potentialData = filterGoodsByJournalAndPartner(potentialData, journalSel, partnerSel, activeDataSet.valid_combinations);
-             //    } else if (sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) < i) {
-             //       potentialData = filterGoodsByJournal(potentialData, journalSel, activeDataSet.journal_good_links);
-             //    } // etc.
-             // }
-
-
-             if (potentialData.length === 0) break;
-         }
-         currentFilteredData[targetSlider] = potentialData;
+  const handleSetJournalMode = useCallback((mode) => {
+    if (mode === "parents" || mode === "children") {
+      console.log("Setting Journal Slider Mode to:", mode);
+      setJournalSliderMode(mode);
+    } else {
+      console.warn("Invalid journal slider mode requested:", mode);
     }
+  }, []);
 
-    finalFilteredPartners = currentFilteredData[SLIDER_TYPES.PARTNER];
-    finalFilteredGoods = currentFilteredData[SLIDER_TYPES.GOODS];
-    // Update Project/Document if they become filterable
-    // finalFilteredProjects = currentFilteredData[SLIDER_TYPES.PROJECT];
-    // finalFilteredDocuments = currentFilteredData[SLIDER_TYPES.DOCUMENT];
-    */
-    // --- !!! END REPLACEMENT SECTION FOR DB LOGIC !!! ---
-
-    // --- Final State Update ---
-    console.log(
-      "%cSetting Displayed State (Excluding Journal)",
-      "color: orange;"
-    );
-    // Remove the check and update for displayedJournals
-    // if (JSON.stringify(displayedJournals) !== JSON.stringify(finalFilteredJournals)) // REMOVED
-    //  setDisplayedJournals(finalFilteredJournals); // REMOVED
-
-    if (
-      JSON.stringify(displayedPartners) !==
-      JSON.stringify(finalFilteredPartners)
-    )
-      setDisplayedPartners(finalFilteredPartners);
-    if (JSON.stringify(displayedGoods) !== JSON.stringify(finalFilteredGoods))
-      setDisplayedGoods(finalFilteredGoods);
-
-    // Update Project/Document if their data changes based on filtering
-    // IMPORTANT: Only update if they actually changed to avoid loops
-    if (
-      JSON.stringify(displayedProjects) !==
-      JSON.stringify(finalFilteredProjects)
-    )
-      setDisplayedProjects(finalFilteredProjects);
-    if (
-      JSON.stringify(displayedDocuments) !==
-      JSON.stringify(finalFilteredDocuments)
-    )
-      setDisplayedDocuments(finalFilteredDocuments);
-
-    // --- Selection Reset Check ---
-    // Journal reset logic needs refinement. For now, rely on selection handlers.
-    // The primary concern is if the selected *other* items become invalid due to a Journal change.
-    console.log(
-      "%c--- Checking Selections (Excluding Journal Reset for now) ---",
-      "color: purple;"
-    );
-    let resetTriggered = false;
-
-    // Check Partner validity against the newly filtered list
-    if (
-      !resetTriggered && // Only reset one thing at a time to avoid cascading resets in one cycle
-      selectedPartnerId &&
-      !finalFilteredPartners.some((p) => p?.id === selectedPartnerId)
-    ) {
-      const newSelection = getFirstId(finalFilteredPartners);
-      console.warn(
-        `!!! Resetting Partner selection to ${newSelection} (was ${selectedPartnerId}) due to filter change.`
+  const handleSelectParentJournal = useCallback(
+    (parentId) => {
+      console.log("New Parent Selected:", parentId);
+      if (!findNodeById(activeDataSet?.account_hierarchy, parentId)) {
+        console.error("Selected Parent ID not found in hierarchy:", parentId);
+        return;
+      }
+      setSelectedParentJournalId(parentId);
+      const { childId: newChildId, grandchildId: newGrandchildId } =
+        getInitialChildAndGrandchild(parentId, activeDataSet);
+      setSelectedChildJournalId(newChildId);
+      setSelectedGrandchildJournalId(newGrandchildId);
+      setJournalSliderMode("children");
+      console.log(
+        ` -> New Child: ${newChildId}, New Grandchild: ${newGrandchildId}. Mode set to 'children'.`
       );
-      setSelectedPartnerId(newSelection);
-      resetTriggered = true;
-    }
-    // Check Goods validity against the newly filtered list
-    if (
-      !resetTriggered &&
-      selectedGoodsId &&
-      !finalFilteredGoods.some((g) => g?.id === selectedGoodsId)
-    ) {
-      const newSelection = getFirstId(finalFilteredGoods);
-      console.warn(
-        `!!! Resetting Goods selection to ${newSelection} (was ${selectedGoodsId}) due to filter change.`
-      );
-      setSelectedGoodsId(newSelection);
-      resetTriggered = true;
-    }
-    // Add checks for Project/Document if they become filterable and resettable
-    if (
-      !resetTriggered &&
-      selectedProjectId &&
-      !finalFilteredProjects.some((proj) => proj?.id === selectedProjectId)
-    ) {
-      const newSelection = getFirstId(finalFilteredProjects);
-      console.warn(
-        `!!! Resetting Project selection to ${newSelection} (was ${selectedProjectId}) due to filter change.`
-      );
-      setSelectedProjectId(newSelection);
-      resetTriggered = true;
-    }
-    if (
-      !resetTriggered &&
-      selectedDocumentId &&
-      !finalFilteredDocuments.some((doc) => doc?.id === selectedDocumentId)
-    ) {
-      const newSelection = getFirstId(finalFilteredDocuments);
-      console.warn(
-        `!!! Resetting Document selection to ${newSelection} (was ${selectedDocumentId}) due to filter change.`
-      );
-      setSelectedDocumentId(newSelection);
-      resetTriggered = true;
-    }
+    },
+    [activeDataSet, getInitialChildAndGrandchild]
+  );
 
-    console.log("%c--- useEffect END ---", "color: blue; font-weight: bold;");
-  }, [
-    sliderOrder,
-    // Journal dependencies:
-    selectedParentJournalId,
-    selectedChildJournalId,
-    selectedGrandchildJournalId,
-    // Other dependencies:
-    selectedPartnerId,
-    selectedGoodsId,
-    selectedProjectId,
-    selectedDocumentId,
-    activeDataSet,
-    // State setters are stable, no need to include them
-    // Avoid displayedXYZ states here unless absolutely needed for a specific comparison logic
-    displayedPartners, // Need to include if comparing against previous state
-    displayedGoods, // Need to include if comparing against previous state
-    displayedProjects, // Need to include if comparing against previous state
-    displayedDocuments, // Need to include if comparing against previous state
-  ]);
+  const handleSelectJournalChild = useCallback(
+    (childId) => {
+      console.log("Child Selected:", childId);
+      const parentNode = findNodeById(
+        activeDataSet?.account_hierarchy,
+        selectedParentJournalId
+      );
+      const isValidChild = parentNode?.children?.some((c) => c.id === childId);
 
-  // === Event Handlers ===
-  const handleSwipe = useCallback(
-    (sourceSliderId, selectedItemId) => {
-      console.log(`Swipe: ${sourceSliderId}, New ID: ${selectedItemId}`);
-      if (sourceSliderId === SLIDER_TYPES.JOURNAL) {
-        // This now means the *child* has changed via Swiper
-        setSelectedChildJournalId(selectedItemId);
-        // Reset grandchild to the first one of the new child
-        const childNode = findNodeById(
-          activeDataSet?.account_hierarchy,
-          selectedItemId
-        );
+      if (isValidChild) {
+        setSelectedChildJournalId(childId);
+        const childNode = findNodeById(parentNode.children, childId);
         const firstGrandchild = childNode?.children?.[0];
         setSelectedGrandchildJournalId(firstGrandchild?.id || null);
-        console.log(
-          ` -> Journal Child: ${selectedItemId}, Reset Grandchild: ${
-            firstGrandchild?.id || null
-          }`
+        console.log(` -> Reset Grandchild: ${firstGrandchild?.id || null}`);
+      } else {
+        console.warn(
+          `Selected child ${childId} is not valid under parent ${selectedParentJournalId}. Selection ignored.`
         );
-      } else if (sourceSliderId === SLIDER_TYPES.PARTNER)
-        setSelectedPartnerId(selectedItemId);
-      // ... rest of handleSwipe
+      }
     },
-    [activeDataSet]
-  ); // Added activeDataSet dependency for findNodeById
+    [activeDataSet, selectedParentJournalId]
+  );
 
-  // NEW: Handler for grandchild button clicks
   const handleSelectGrandchildJournal = useCallback((grandchildId) => {
     console.log("Grandchild Selected:", grandchildId);
     setSelectedGrandchildJournalId(grandchildId);
   }, []);
 
-  // NEW: Handler for when modal confirms a new PARENT selection
-  const handleSelectParentJournal = useCallback(
-    (parentId) => {
-      console.log("New Parent Selected:", parentId);
-      setSelectedParentJournalId(parentId);
-      // Reset child and grandchild based on the new parent
-      const { childId: newChildId, grandchildId: newGrandchildId } =
-        getInitialChildAndGrandchild(parentId, activeDataSet);
-      setSelectedChildJournalId(newChildId);
-      setSelectedGrandchildJournalId(newGrandchildId);
+  const handleSwipe = useCallback((sourceSliderId, selectedItemId) => {
+    console.log(`Swipe: ${sourceSliderId}, New ID: ${selectedItemId}`);
+    if (sourceSliderId === SLIDER_TYPES.PARTNER)
+      setSelectedPartnerId(selectedItemId);
+    else if (sourceSliderId === SLIDER_TYPES.GOODS)
+      setSelectedGoodsId(selectedItemId);
+    else if (sourceSliderId === SLIDER_TYPES.PROJECT)
+      setSelectedProjectId(selectedItemId);
+    else if (sourceSliderId === SLIDER_TYPES.DOCUMENT)
+      setSelectedDocumentId(selectedItemId);
+  }, []);
+
+  const openAddJournalModalWithContext = useCallback((context) => {
+    console.log("Opening Add Journal Modal with context:", context);
+    setAddJournalContext(context);
+    setIsAddJournalModalOpen(true);
+    setIsJournalModalOpen(false); // Close the main journal modal
+  }, []);
+
+  const closeAddJournalModal = useCallback(() => {
+    setIsAddJournalModalOpen(false);
+    setAddJournalContext(null);
+  }, []);
+
+  // page.js / Home component
+
+  const handleAddJournalSubmit = useCallback(
+    (newAccountData) => {
+      // newAccountData is {id, code, name, children}
       console.log(
-        ` -> New Child: ${newChildId}, New Grandchild: ${newGrandchildId}`
-      );
+        "Submitting new journal account:",
+        newAccountData,
+        "Using context:",
+        addJournalContext
+      ); // Use addJournalContext
+
+      setActiveDataSet((currentDataset) => {
+        const originalHierarchy = currentDataset.account_hierarchy || [];
+        const proposedNewId = newAccountData.id; // This is the final code/ID
+
+        // --- More Robust Duplicate ID/Code Check ---
+        // Use addJournalContext here
+        if (
+          addJournalContext?.level === "top" ||
+          !addJournalContext?.parentId
+        ) {
+          // For top-level, check if ID exists anywhere at the top
+          if (originalHierarchy.some((node) => node.id === proposedNewId)) {
+            alert(
+              `Error: Top-level Account Code/ID "${proposedNewId}" already exists.`
+            );
+            setIsAddJournalModalOpen(true); // Re-open add modal
+            return currentDataset; // Important: return original dataset on error
+          }
+        } else {
+          // For children, check if ID exists under the specific parent
+          const parentNode = findNodeById(
+            originalHierarchy,
+            addJournalContext.parentId
+          ); // Use addJournalContext
+          if (
+            parentNode &&
+            parentNode.children &&
+            parentNode.children.some((child) => child.id === proposedNewId)
+          ) {
+            alert(
+              `Error: Account Code/ID "${proposedNewId}" already exists under parent "${addJournalContext.parentCode}".`
+            ); // Use addJournalContext
+            setIsAddJournalModalOpen(true);
+            return currentDataset;
+          }
+          if (!parentNode) {
+            alert(
+              `Error: Parent node "${addJournalContext.parentId}" not found for adding child.`
+            ); // Use addJournalContext
+            setIsAddJournalModalOpen(true);
+            return currentDataset;
+          }
+        }
+        // --- End Duplicate Check ---
+
+        const newHierarchy = JSON.parse(JSON.stringify(originalHierarchy));
+
+        let newParentIdToSelect = selectedParentJournalId;
+        let newChildIdToSelect = selectedChildJournalId;
+
+        // Use addJournalContext here as well for adding logic
+        if (
+          addJournalContext?.level === "top" ||
+          !addJournalContext?.parentId
+        ) {
+          newHierarchy.push(newAccountData);
+          newParentIdToSelect = newAccountData.id;
+        } else {
+          const findAndAdd = (nodes, parentId, newItem) => {
+            for (let i = 0; i < nodes.length; i++) {
+              if (nodes[i].id === parentId) {
+                nodes[i].children.push(newItem);
+                return true;
+              }
+              if (nodes[i].children?.length > 0) {
+                if (findAndAdd(nodes[i].children, parentId, newItem))
+                  return true;
+              }
+            }
+            return false;
+          };
+          if (
+            !findAndAdd(
+              newHierarchy,
+              addJournalContext.parentId,
+              newAccountData
+            )
+          ) {
+            // Use addJournalContext
+            alert(
+              `Critical Error: Could not add child. Parent "${addJournalContext.parentId}" disappeared or structure issue.`
+            ); // Use addJournalContext
+            setIsAddJournalModalOpen(true);
+            return currentDataset;
+          }
+          newParentIdToSelect = addJournalContext.parentId; // Use addJournalContext
+          newChildIdToSelect = newAccountData.id;
+        }
+
+        // Update selections:
+        if (
+          addJournalContext?.level === "top" ||
+          !addJournalContext?.parentId
+        ) {
+          // Use addJournalContext
+          handleSelectParentJournal(newParentIdToSelect);
+        } else if (addJournalContext?.parentId) {
+          // Use addJournalContext
+          setSelectedParentJournalId(newParentIdToSelect);
+          setSelectedChildJournalId(newChildIdToSelect);
+          setSelectedGrandchildJournalId(null);
+          setJournalSliderMode("children");
+        }
+
+        return { ...currentDataset, account_hierarchy: newHierarchy };
+      });
+
+      closeAddJournalModal();
     },
-    [activeDataSet, getInitialChildAndGrandchild]
-  ); // Dependencies
+    [
+      addJournalContext,
+      selectedParentJournalId,
+      getInitialChildAndGrandchild,
+      handleSelectParentJournal,
+    ]
+  ); // addJournalContext IS a dependency
+  // page.js / Home component
+
+  const handleDeleteJournalAccount = useCallback(
+    (accountIdToDelete) => {
+      console.log("Attempting to delete account ID:", accountIdToDelete);
+
+      setActiveDataSet((currentDataset) => {
+        const hierarchyCopy = JSON.parse(
+          JSON.stringify(currentDataset.account_hierarchy || [])
+        );
+        let nodeWasRemoved = false;
+
+        const removeNodeRecursively = (nodes, idToRemove) => {
+          /* ... same as your provided code ... */
+          for (let i = nodes.length - 1; i >= 0; i--) {
+            if (nodes[i].id === idToRemove) {
+              nodes.splice(i, 1);
+              nodeWasRemoved = true;
+              return true;
+            }
+            if (nodes[i].children && nodes[i].children.length > 0) {
+              if (removeNodeRecursively(nodes[i].children, idToRemove)) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        removeNodeRecursively(hierarchyCopy, accountIdToDelete);
+
+        if (!nodeWasRemoved) {
+          console.warn(
+            "Node to delete was not found in hierarchy:",
+            accountIdToDelete
+          );
+          return currentDataset;
+        }
+        console.log("Node deleted. New hierarchy (copy):", hierarchyCopy);
+
+        let newParentId = selectedParentJournalId;
+        let newChildId = selectedChildJournalId;
+        let newGrandchildId = selectedGrandchildJournalId;
+        let newMode = journalSliderMode;
+
+        const idStillExists = (id, hierarchy) => !!findNodeById(hierarchy, id);
+
+        // Determine the parent of the deleted node, if it wasn't top-level
+        let parentOfDeletedNodeId = null;
+        if (accountIdToDelete !== newParentId) {
+          // If we didn't delete the currently selected parent
+          const findParent = (nodes, childId) => {
+            for (const node of nodes) {
+              if (node.children?.some((c) => c.id === childId)) return node.id;
+              if (node.children?.length > 0) {
+                const foundParent = findParent(node.children, childId);
+                if (foundParent) return foundParent;
+              }
+            }
+            return null;
+          };
+          parentOfDeletedNodeId = findParent(hierarchyCopy, accountIdToDelete);
+        }
+
+        // If the selected parent was deleted, select the first available top-level.
+        if (
+          !idStillExists(newParentId, hierarchyCopy) ||
+          accountIdToDelete === newParentId
+        ) {
+          newParentId = getFirstId(hierarchyCopy) || null;
+          newMode = newParentId ? "children" : "parents"; // Default to children if a parent exists
+        }
+
+        // If the selected child was deleted OR its parent changed/was deleted, find a new child.
+        const currentParentNode = findNodeById(hierarchyCopy, newParentId);
+        if (
+          !idStillExists(newChildId, hierarchyCopy) ||
+          accountIdToDelete === newChildId ||
+          (currentParentNode &&
+            !currentParentNode.children?.some((c) => c.id === newChildId))
+        ) {
+          newChildId = getFirstId(currentParentNode?.children) || null;
+        }
+
+        // If the selected grandchild was deleted OR its parent (the child) changed/was deleted, find a new grandchild.
+        let currentChildNodeForGrandchildren = null;
+        if (newParentId && newChildId) {
+          // Only look for child if parent is valid
+          const tempParent = findNodeById(hierarchyCopy, newParentId);
+          currentChildNodeForGrandchildren = findNodeById(
+            tempParent?.children,
+            newChildId
+          );
+        }
+
+        if (
+          !idStillExists(newGrandchildId, hierarchyCopy) ||
+          accountIdToDelete === newGrandchildId ||
+          (currentChildNodeForGrandchildren &&
+            !currentChildNodeForGrandchildren.children?.some(
+              (gc) => gc.id === newGrandchildId
+            ))
+        ) {
+          newGrandchildId =
+            getFirstId(currentChildNodeForGrandchildren?.children) || null;
+        }
+
+        // Final safety: if no valid parent, clear children and set mode
+        if (!newParentId) {
+          newChildId = null;
+          newGrandchildId = null;
+          newMode = "parents";
+        } else if (newMode === "parents" && newParentId) {
+          // If was in 'parents' mode but now have a valid parent
+          newMode = "children";
+        }
+
+        console.log(
+          "Selections after delete - Parent:",
+          newParentId,
+          "Child:",
+          newChildId,
+          "Grandchild:",
+          newGrandchildId,
+          "Mode:",
+          newMode
+        );
+
+        setSelectedParentJournalId(newParentId);
+        setSelectedChildJournalId(newChildId);
+        setSelectedGrandchildJournalId(newGrandchildId);
+        setJournalSliderMode(newMode);
+
+        // Also, ensure the selection within the JournalModal itself is cleared if the deleted item was selected there
+        // This might require passing a reset function to JournalModal or relying on its useEffect for isOpen.
+        // For now, if JournalModal is open and selectedAccountId was the one deleted, it should naturally become unselected.
+
+        return {
+          ...currentDataset,
+          account_hierarchy: hierarchyCopy,
+        };
+      });
+    },
+    [
+      selectedParentJournalId,
+      selectedChildJournalId,
+      selectedGrandchildJournalId,
+      journalSliderMode,
+      getInitialChildAndGrandchild,
+    ]
+  ); // Added getInitial...
 
   const toggleAccordion = useCallback((sliderType) => {
     if (
@@ -1125,120 +1586,153 @@ export default function Home() {
       ...prev,
       [sliderType]: !prev[sliderType],
     }));
-  }, []); // Depends only on setAccordionTypeState which is stable
+  }, []);
 
   const toggleVisibility = useCallback((sliderId) => {
     if (!sliderId || !SLIDER_CONFIG[sliderId]) return;
     setVisibility((prev) => ({ ...prev, [sliderId]: !prev[sliderId] }));
-    // Update swiper after a short delay AFTER state change allows render
     setTimeout(() => {
       visibilitySwiperRef.current?.update();
-    }, 50); // Small delay helps swiper recalc layout
-  }, []);
+    }, 50);
+  }, []); // SLIDER_CONFIG is constant so not needed in deps
 
-  // --- MODIFIED moveSlider ---
   const moveSlider = useCallback(
     (sliderId, direction) => {
-      // Use functional update to ensure we have the latest order and visibility
       setSliderOrder((currentOrder) => {
         const currentIndex = currentOrder.indexOf(sliderId);
-
-        // Should not happen in practice, but good safeguard
-        if (currentIndex === -1 || !visibility[sliderId]) {
-          console.warn(
-            `moveSlider called for invalid or hidden sliderId: ${sliderId}`
-          );
-          return currentOrder;
-        }
-
+        if (currentIndex === -1 || !visibility[sliderId]) return currentOrder;
         let targetIndex = -1;
-
-        // Find the *next visible* slider index in the desired direction
         if (direction === "up") {
           for (let i = currentIndex - 1; i >= 0; i--) {
-            const potentialTargetId = currentOrder[i];
-            if (visibility[potentialTargetId]) {
-              // Check if the potential target is visible
+            if (visibility[currentOrder[i]]) {
               targetIndex = i;
-              break; // Found the first visible item above
+              break;
             }
           }
         } else {
-          // direction === "down"
           for (let i = currentIndex + 1; i < currentOrder.length; i++) {
-            const potentialTargetId = currentOrder[i];
-            if (visibility[potentialTargetId]) {
-              // Check if the potential target is visible
+            if (visibility[currentOrder[i]]) {
               targetIndex = i;
-              break; // Found the first visible item below
+              break;
             }
           }
         }
-
-        // If no visible target was found (already at the edge relative to visible items)
-        if (targetIndex === -1) {
-          console.log(
-            `moveSlider: No visible target found for ${sliderId} in direction ${direction}.`
-          );
-          return currentOrder; // No change needed
-        }
-
-        // Create a new array and perform the swap
+        if (targetIndex === -1) return currentOrder;
         const newOrder = [...currentOrder];
-        // Swap the slider being moved with the found visible target slider
         [newOrder[currentIndex], newOrder[targetIndex]] = [
           newOrder[targetIndex],
           newOrder[currentIndex],
         ];
-
-        console.log(
-          `moveSlider: Order changed from ${currentOrder.join(
-            " -> "
-          )} to ${newOrder.join(" -> ")}`
-        );
-        return newOrder; // Return the updated order
+        console.log(`moveSlider: Order change to ${newOrder.join(" -> ")}`);
+        return newOrder;
       });
     },
     [visibility]
-  ); // Add visibility as a dependency!
+  ); // visibility is a dependency
 
-  // --- MODIFIED getSliderProps ---
+  // --- SLIDER_CONFIG & getSliderProps ---
+  const SLIDER_CONFIG = {
+    [SLIDER_TYPES.JOURNAL]: {
+      Component: JournalHierarchySlider,
+      title: "Journal",
+    },
+    [SLIDER_TYPES.PARTNER]: { Component: DynamicSlider, title: "Partner" },
+    [SLIDER_TYPES.GOODS]: { Component: DynamicSlider, title: "Goods" },
+    [SLIDER_TYPES.PROJECT]: { Component: DynamicSlider, title: "Project" },
+    [SLIDER_TYPES.DOCUMENT]: { Component: DynamicSlider, title: "Document" },
+  };
+
   const getSliderProps = (sliderId) => {
     switch (sliderId) {
       case SLIDER_TYPES.JOURNAL:
-        // Props for JournalHierarchySlider
-        return {
-          hierarchyData: activeDataSet?.account_hierarchy || [],
-          selectedParentId: selectedParentJournalId,
-          selectedChildId: selectedChildJournalId,
-          selectedGrandchildId: selectedGrandchildJournalId,
-          onSelectChild: (childId) =>
-            handleSwipe(SLIDER_TYPES.JOURNAL, childId), // Reuse handleSwipe logic for child change
-          onSelectGrandchild: handleSelectGrandchildJournal,
-          onOpenModal: openJournalModal, // To open the selection modal
-        };
+        const topLevelJournals = activeDataSet?.account_hierarchy || [];
+        const parentNode = findNodeById(
+          topLevelJournals,
+          selectedParentJournalId
+        );
+        const childNodes = parentNode?.children || [];
+
+        if (journalSliderMode === "parents") {
+          return {
+            mode: "parents",
+            onOpenModal: openJournalModal,
+            hierarchyData: topLevelJournals,
+            topLevelJournalData: topLevelJournals,
+            selectedParentId: selectedParentJournalId,
+            onSelectParent: handleSelectParentJournal,
+            selectedChildId: null,
+            selectedGrandchildId: null,
+            onSelectChild: undefined,
+            onSelectGrandchild: undefined,
+            isAccordionOpen: false,
+            onToggleAccordion: undefined,
+          };
+        } else {
+          // mode === 'children'
+          return {
+            mode: "children",
+            onOpenModal: openJournalModal,
+            hierarchyData: topLevelJournals,
+            childNodes: childNodes,
+            selectedParentId: selectedParentJournalId,
+            selectedChildId: selectedChildJournalId,
+            selectedGrandchildId: selectedGrandchildJournalId,
+            onSelectChild: handleSelectJournalChild,
+            onSelectGrandchild: handleSelectGrandchildJournal,
+            isAccordionOpen: accordionTypeState[SLIDER_TYPES.JOURNAL],
+            onToggleAccordion: () => toggleAccordion(SLIDER_TYPES.JOURNAL),
+            topLevelJournalData: [],
+            onSelectParent: undefined,
+          };
+        }
       case SLIDER_TYPES.PARTNER:
-        return { data: displayedPartners, activeItemId: selectedPartnerId };
+        return {
+          data: displayedPartners,
+          activeItemId: selectedPartnerId,
+          onSlideChange: (id) => handleSwipe(sliderId, id),
+          isAccordionOpen: accordionTypeState[sliderId],
+          onToggleAccordion: () => toggleAccordion(sliderId),
+        };
       case SLIDER_TYPES.GOODS:
-        return { data: displayedGoods, activeItemId: selectedGoodsId };
+        return {
+          data: displayedGoods,
+          activeItemId: selectedGoodsId,
+          onSlideChange: (id) => handleSwipe(sliderId, id),
+          isAccordionOpen: accordionTypeState[sliderId],
+          onToggleAccordion: () => toggleAccordion(sliderId),
+        };
       case SLIDER_TYPES.PROJECT:
-        return { data: displayedProjects, activeItemId: selectedProjectId };
+        return {
+          data: displayedProjects,
+          activeItemId: selectedProjectId,
+          onSlideChange: (id) => handleSwipe(sliderId, id),
+          isAccordionOpen: accordionTypeState[sliderId],
+          onToggleAccordion: () => toggleAccordion(sliderId),
+        };
       case SLIDER_TYPES.DOCUMENT:
-        return { data: displayedDocuments, activeItemId: selectedDocumentId };
+        return {
+          data: displayedDocuments,
+          activeItemId: selectedDocumentId,
+          onSlideChange: (id) => handleSwipe(sliderId, id),
+          isAccordionOpen: accordionTypeState[sliderId],
+          onToggleAccordion: () => toggleAccordion(sliderId),
+        };
       default:
-        return { data: [], activeItemId: null }; // Or specific props for default
+        return {
+          data: [],
+          activeItemId: null,
+          isAccordionOpen: false,
+          onToggleAccordion: undefined,
+          onSlideChange: undefined,
+        };
     }
   };
 
   // === Render ===
   return (
     <div className={styles.pageContainer}>
-      {/* Page Title */}
       <h1 className={styles.title}>Project Interface</h1>
-
-      {/* Sticky Header Container */}
       <div className={styles.stickyHeaderContainer}>
-        {/* Data Source Selector */}
         <div className={styles.dataSourceSelector}>
           <label>
             <input
@@ -1261,8 +1755,6 @@ export default function Home() {
             Filtered Data (Triplets)
           </label>
         </div>
-
-        {/* Visibility Toggles Swiper */}
         <LayoutGroup id="visibility-toggles-layout">
           <div className={styles.visibilitySwiperContainer}>
             <Swiper
@@ -1270,21 +1762,18 @@ export default function Home() {
               spaceBetween={10}
               slidesPerView={"auto"}
               centeredSlides={false}
-              loop={false} // Keep loop disabled for accurate indexing representation
+              loop={true}
               className={styles.visibilitySwiper}
               onSwiper={(swiper) => {
                 visibilitySwiperRef.current = swiper;
               }}
               observer={true}
               observeParents={true}
-              // navigation // Optional: Add Prev/Next buttons
             >
               {sliderOrder.map((sliderId, index) => {
                 const config = SLIDER_CONFIG[sliderId];
                 const title = config?.title || sliderId;
                 const isCurrentlyVisible = visibility[sliderId];
-
-                // Calculate visible index (for display purposes only)
                 let visibleIndex = -1;
                 if (isCurrentlyVisible) {
                   const visibleOrder = sliderOrder.filter(
@@ -1292,15 +1781,14 @@ export default function Home() {
                   );
                   visibleIndex = visibleOrder.indexOf(sliderId);
                 }
-
                 return (
                   <SwiperSlide
                     key={sliderId}
                     className={styles.visibilitySwiperSlide}
                   >
                     <motion.div
-                      layout // Animate layout changes from reordering
-                      layoutId={`visibility-${sliderId}`} // Use a distinct layoutId prefix for this group
+                      layout
+                      layoutId={`visibility-${sliderId}`}
                       className={styles.visibilitySlideContent}
                       initial={false}
                       animate={{
@@ -1318,11 +1806,9 @@ export default function Home() {
                         }`}
                         aria-pressed={isCurrentlyVisible}
                       >
-                        {/* Show number only if visible */}
-                        {isCurrentlyVisible ? `${visibleIndex + 1}: ` : ""}
+                        {isCurrentlyVisible ? `${visibleIndex + 1}: ` : ""}{" "}
                         {title}
                       </button>
-                      {/* Arrow: Render always but maybe fade with button? */}
                       {index < sliderOrder.length - 1 && (
                         <motion.span
                           className={styles.visibilityArrow}
@@ -1341,132 +1827,78 @@ export default function Home() {
             </Swiper>
           </div>
         </LayoutGroup>
-        {/* End Visibility Toggles Swiper */}
       </div>
-      {/* End Sticky Header Container */}
 
-      {/* Main Sliders Area */}
-      {/* Use a DIFFERENT LayoutGroup ID or remove ID if nesting causes issues */}
       <LayoutGroup id="main-sliders-layout-group">
         <div className={styles.slidersArea}>
           <AnimatePresence initial={false}>
             {sliderOrder.map((sliderId, index) => {
-              // Render logic checks visibility state BEFORE rendering
               if (!visibility[sliderId]) return null;
-
               const config = SLIDER_CONFIG[sliderId];
-              // Ensure config exists before destructuring
               if (!config) {
-                console.error(
-                  `Configuration missing for sliderId: ${sliderId}`
-                );
+                console.error(`Config missing for ${sliderId}`);
                 return null;
               }
               const { Component, title: sliderTitle } = config;
-
-              // Get props using the updated function, specific to the slider type
-              const sliderSpecificProps = getSliderProps(sliderId);
-
-              // Common UI state/logic
-              const isAccordionOpenForType = accordionTypeState[sliderId];
-              const onToggleAccordionCallback = () => toggleAccordion(sliderId);
-
-              // Determine if move buttons should be enabled based on VISIBLE items
-              // Calculate visible index within the currently visible sliders
+              const sliderProps = getSliderProps(sliderId);
               const visibleOrder = sliderOrder.filter((id) => visibility[id]);
               const currentVisibleIndex = visibleOrder.indexOf(sliderId);
               const canMoveUp = currentVisibleIndex > 0;
               const canMoveDown = currentVisibleIndex < visibleOrder.length - 1;
 
-              // Callback for standard sliders (non-Journal)
-              const onSlideChangeCallback =
-                sliderId !== SLIDER_TYPES.JOURNAL
-                  ? (id) => handleSwipe(sliderId, id)
-                  : undefined; // JournalHierarchySlider uses onSelectChild prop
-
               return (
                 <motion.div
-                  key={sliderId} // Key for React map
-                  layoutId={sliderId} // ID tracked within *this* group
-                  layout // Enable layout animation
-                  style={{ order: index }} // Apply visual order based on full sliderOrder
-                  initial={{ opacity: 0, height: 0, y: 20 }} // Added slight Y animation
+                  key={sliderId}
+                  layoutId={sliderId}
+                  layout
+                  style={{ order: index }}
+                  initial={{ opacity: 0, height: 0, y: 20 }}
                   animate={{ opacity: 1, height: "auto", y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -20 }} // Added slight Y animation
+                  exit={{ opacity: 0, height: 0, y: -20 }}
                   transition={{
-                    opacity: { duration: 0.3, ease: "easeInOut" },
-                    height: { duration: 0.3, ease: "easeInOut" },
-                    y: { duration: 0.3, ease: "easeInOut" },
-                    layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] }, // Smoother layout easing
+                    opacity: { duration: 0.3 },
+                    height: { duration: 0.3 },
+                    y: { duration: 0.3 },
+                    layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
                   }}
                   className={styles.sliderWrapper}
                 >
-                  {/* Controls */}
                   <div className={styles.controls}>
-                    {/* Edit Button */}
                     <button
                       onClick={
-                        // Use the specific onOpenModal from props if it exists (for Journal), otherwise default
-                        sliderSpecificProps.onOpenModal
-                          ? sliderSpecificProps.onOpenModal
-                          : () => console.log(`Options clicked for ${sliderId}`)
+                        sliderProps.onOpenModal
+                          ? sliderProps.onOpenModal
+                          : () => console.log(`Options for ${sliderId}`)
                       }
                       className={`${styles.controlButton} ${styles.editButton}`}
-                      aria-label={`Options for ${sliderTitle}`} // More generic label
+                      aria-label={`Options for ${sliderTitle}`}
                       title={`Options for ${sliderTitle}`}
                     >
                       <IoOptionsOutline />
                     </button>
-
-                    {/* Parent Info Display for Journal - RENDERED INSIDE JournalHierarchySlider */}
-                    {/* {sliderId === SLIDER_TYPES.JOURNAL && (
-                        <span className={styles.journalParentInfo}>
-                            {parentNode ? `${parentNode.code} - ${parentNode.name}` : 'Select Parent'}
-                        </span>
-                    )} */}
-
-                    {/* Move Buttons */}
                     <div className={styles.moveButtonGroup}>
                       {canMoveUp && (
                         <button
                           onClick={() => moveSlider(sliderId, "up")}
                           className={styles.controlButton}
-                          aria-label={`Move ${sliderTitle} up`}
-                          // disabled={!canMoveUp} // Use CSS if preferred
                         >
                           ▲ Up
                         </button>
                       )}
-                      {/* Add spacer if only one button is visible */}
-                      {/* {(!canMoveUp && canMoveDown) && <div style={{width: '60px'}}></div>} */}
                       {canMoveDown && (
                         <button
                           onClick={() => moveSlider(sliderId, "down")}
                           className={styles.controlButton}
-                          aria-label={`Move ${sliderTitle} down`}
-                          // disabled={!canMoveDown} // Use CSS if preferred
                         >
                           ▼ Down
                         </button>
                       )}
-                      {/* Add spacer if only one button is visible */}
-                      {/* {(!canMoveDown && canMoveUp) && <div style={{width: '60px'}}></div>} */}
                     </div>
                   </div>
-
-                  {/* Render the correct component with its specific props */}
-                  {/* Component receives sliderId, title automatically */}
                   <Component
                     sliderId={sliderId}
-                    title={sliderTitle} // Pass title explicitly if needed by component
-                    // Spread the specific props fetched for this slider type
-                    {...sliderSpecificProps}
-                    // Pass common props needed by all slider types
-                    // Note: DynamicSlider expects 'data' and 'activeItemId' which are inside sliderSpecificProps
-                    onSlideChange={onSlideChangeCallback} // Only for non-journal sliders
-                    isAccordionOpen={isAccordionOpenForType}
-                    onToggleAccordion={onToggleAccordionCallback}
-                    // Pass any other common props needed by BOTH slider types here
+                    title={sliderTitle}
+                    {...sliderProps}
                   />
                 </motion.div>
               );
@@ -1474,22 +1906,46 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </LayoutGroup>
-      {/* --- END Main Sliders LayoutGroup --- */}
 
-      {/* --- Journal Modal --- */}
       <AnimatePresence>
-        {/* Conditionally render based on state */}
         {isJournalModalOpen && (
           <JournalModal
-            // key="journal-modal-instance" // Key can sometimes help AnimatePresence
-            isOpen={isJournalModalOpen} // Pass state down
+            isOpen={isJournalModalOpen}
             onClose={closeJournalModal}
-            onConfirmSelection={handleSelectParentJournal} // Handler to update parent state
-            hierarchy={activeDataSet?.account_hierarchy || []} // Pass the hierarchy data
+            onConfirmSelection={handleSelectParentJournal}
+            onSetMode={handleSetJournalMode}
+            hierarchy={activeDataSet?.account_hierarchy || []}
+            onTriggerAdd={openAddJournalModalWithContext} // For "Add Top-Level" button
+            onDeleteAccount={handleDeleteJournalAccount} // *** PASS DELETE HANDLER ***
+            // *** PASS `openAddJournalModalWithContext` FOR ADDING CHILDREN ***
+            // It expects a context object, which AccountNode will now provide partially
+            onTriggerAddChild={(parentId, parentCode) => {
+              const parentNodeDetails = findNodeById(
+                activeDataSet?.account_hierarchy,
+                parentId
+              ); // Find the parent node
+              openAddJournalModalWithContext({
+                level: "child",
+                parentId: parentId,
+                parentCode: parentCode,
+                parentName: parentNodeDetails?.name || "", // Pass parent's name
+              });
+            }}
           />
         )}
       </AnimatePresence>
-      {/* --- END AnimatePresence Wrapper --- */}
-    </div> // End pageContainer
+
+      {/* Add Journal Modal (new one) */}
+      <AnimatePresence>
+        {isAddJournalModalOpen && (
+          <AddJournalModal
+            isOpen={isAddJournalModalOpen}
+            onClose={closeAddJournalModal}
+            onSubmit={handleAddJournalSubmit}
+            context={addJournalContext}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
-} // End Home component
+}

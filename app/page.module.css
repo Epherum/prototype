@@ -801,3 +801,360 @@
   font-weight: 600;
   transform: scale(1.05); /* Slightly larger when active */
 }
+
+/* page.module.css */
+
+/* ... existing styles ... */
+
+/* ================================== */
+/* --- Sticky Header Section --- */
+/* ================================== */
+.stickyHeaderContainer {
+  /* ... existing styles ... */
+  gap: calc(var(--spacing-unit) * 2); /* Increase gap slightly if needed */
+}
+
+/* --- Journal Category Scroller Styles --- */
+.journalCategoryScrollerContainer {
+  width: 100%;
+  overflow: hidden; /* Hide potential overflow */
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  border-top: 1px solid var(--border-subtle); /* Optional separator */
+  border-bottom: 1px solid var(--border-subtle); /* Optional separator */
+}
+
+.journalCategoryScroller {
+  /* Add padding to prevent buttons touching edges */
+  padding-left: calc(var(--spacing-unit) * 0.5);
+  padding-right: calc(var(--spacing-unit) * 0.5);
+}
+
+.journalCategorySlide {
+  width: auto !important; /* Important for slidesPerView: 'auto' */
+  display: inline-flex !important; /* Ensure inline layout */
+  vertical-align: middle;
+}
+
+.journalCategoryButton {
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  font-size: 0.8em; /* Slightly smaller than visibility toggles */
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid #ccc; /* Neutral border */
+  border-radius: var(--border-radius-pill);
+  background-color: var(--bg-card); /* White background */
+  color: var(--text-secondary); /* Greyish text */
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease, transform 0.1s ease;
+  white-space: nowrap; /* Prevent text wrapping */
+  text-align: center;
+}
+
+.journalCategoryButton:hover {
+  border-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+}
+
+.journalCategoryButtonActive {
+  background-color: var(--accent-warm);
+  color: var(--bg-card); /* White text on accent */
+  border-color: var(--accent-warm);
+  font-weight: 600;
+  /* transform: scale(1.03); Optional subtle scale */
+}
+
+.journalCategoryButtonActive:hover {
+  background-color: #d68f63; /* Darker accent on hover when active */
+  border-color: #d68f63;
+}
+
+/* page.module.css */
+
+/* ... existing styles ... */
+
+/* --- REMOVE these if not used elsewhere ---
+.journalCategoryScrollerContainer { ... }
+.journalCategoryScroller { ... }
+.journalCategorySlide { ... }
+.journalCategoryButton { ... }
+.journalCategoryButtonActive { ... }
+*/
+
+/* --- Journal Hierarchy Styles --- */
+/* ... existing .journalParentHeader, .journalParentInfo ... */
+
+/* Swiper slide when in 'parents' mode */
+.parentModeSlide {
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center content vertically */
+  align-items: center;
+  padding-bottom: calc(
+    var(--spacing-unit) * 2
+  ) !important; /* Ensure space for button */
+}
+
+.parentModeSlide .slideTextContent {
+  margin-bottom: calc(
+    var(--spacing-unit) * 2
+  ); /* Space between text and button */
+}
+
+.selectParentButton {
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border: none;
+  border-radius: var(--border-radius-md);
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  margin-top: calc(var(--spacing-unit) * -0.5); /* Space above the button */
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.selectParentButton:hover {
+  background-color: #d68f63; /* Darker accent */
+}
+
+.selectParentButton:active {
+  transform: scale(0.97);
+}
+
+/* page.module.css */
+/* ... existing styles ... */
+
+/* --- Add Journal Modal Form Styles --- */
+.addJournalForm {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 1.5);
+  margin-top: calc(var(--spacing-unit) * 1.5);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.formGroup label {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.formGroup input[type="text"] {
+  padding: calc(var(--spacing-unit) * 1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  font-size: 1em;
+  color: var(--text-primary);
+  background-color: #fff; /* Ensure readable background */
+}
+.formGroup input[type="text"]:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-light);
+}
+
+.formError {
+  color: #d8000c; /* Red for errors */
+  background-color: #ffd2d2; /* Light red background */
+  border: 1px solid #d8000c;
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.85em;
+  text-align: center;
+}
+
+/* Ensure modal actions in AddJournalModal have some top margin if form is short */
+.addJournalForm .modalActions {
+  margin-top: var(
+    --spacing-unit
+  ); /* Add if not already spaced by form elements */
+  padding-top: calc(var(--spacing-unit) * 1.5); /* Consistent padding */
+  border-top: 1px solid var(--border-subtle); /* Separator */
+}
+
+/* Ensure AddJournalModal is above the previous one if both are somehow rendered */
+/* We handle this with z-index in the component style prop for simplicity for now */
+
+/* page.module.css */
+/* ... existing styles ... */
+
+/* --- Account Node Styles --- */
+.accountNodeRow {
+  /* ... existing styles ... */
+  position: relative; /* For positioning the add button if needed, or rely on flex */
+  /* Ensure items are vertically centered if button height differs */
+  align-items: center;
+}
+
+.accountNodeName {
+  /* ... existing styles ... */
+  flex-grow: 1; /* Allow name to take up space */
+  margin-right: var(--spacing-unit); /* Space before add button */
+}
+
+.accountNodeAddChildButton {
+  background: transparent;
+  border: none;
+  color: var(--accent-warm);
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.5);
+  margin-left: auto; /* Pushes button to the right */
+  font-size: 1.1em; /* Adjust icon size */
+  line-height: 1;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.accountNodeAddChildButton:hover {
+  background-color: var(--accent-warm-light);
+  color: #c77a50; /* Darker accent */
+}
+
+.accountNodeAddChildButton svg {
+  display: block; /* Helps with exact centering sometimes */
+}
+
+/* ... rest of your CSS ... */
+
+/* page.module.css */
+/* ... existing styles ... */
+
+.inputHint {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  margin-top: calc(var(--spacing-unit) * 0.25);
+}
+
+/* ... rest of your CSS ... */
+
+/* page.module.css */
+/* ... existing styles ... */
+
+.accountNodeRow {
+  /* ... existing styles ... */
+  justify-content: space-between; /* Helps align actions to the right */
+}
+
+.accountNodeName {
+  margin-right: auto; /* Pushes actions container to the right */
+  padding-right: var(--spacing-unit); /* Some space before actions */
+}
+
+.accountNodeActions {
+  /* New container for action buttons */
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+.accountNodeActionButton {
+  /* Common style for add/delete in AccountNode */
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.5);
+  font-size: 1.1em;
+  line-height: 1;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.accountNodeActionButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.accountNodeAddChildButton {
+  /* Extends common style */
+  color: var(--accent-warm);
+}
+.accountNodeAddChildButton:hover {
+  color: #c77a50;
+  background-color: var(--accent-warm-light);
+}
+
+.accountNodeDeleteButton {
+  /* Extends common style */
+  color: #cc0000; /* Red for delete */
+}
+.accountNodeDeleteButton:hover {
+  color: #a30000; /* Darker red */
+  background-color: rgba(255, 0, 0, 0.1); /* Light red background on hover */
+}
+
+/* ... rest of your css ... */
+
+/* page.module.css */
+/* ... existing styles ... */
+
+.journalSliderHeader {
+  text-align: center;
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  padding-bottom: calc(var(--spacing-unit) * 1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.journalTopLevelTitle {
+  font-size: 1em; /* Smaller than main slider title */
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin: 0 0 calc(var(--spacing-unit) * 0.5) 0;
+}
+
+.level2NavContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Pushes buttons to sides */
+  gap: var(--spacing-unit);
+  margin-top: calc(var(--spacing-unit) * 0.5);
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  background-color: rgba(0, 0, 0, 0.02);
+  border-radius: var(--border-radius-sm);
+}
+.level2NavContainerSingle {
+  /* For when there's only one L2 or no L2 */
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.level2NavButton {
+  background-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+  border: none;
+  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: bold;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+.level2NavButton:hover {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+}
+
+.level2CurrentName {
+  font-size: 1.05em; /* Make current L2 name prominent */
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0 var(--spacing-unit);
+  text-align: center;
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
