@@ -1590,3 +1590,26 @@
   /* ... existing styles ... */
   touch-action: manipulation; /* If double-clicking these rows triggers actions */
 }
+
+/* page.module.css */
+
+/* ... existing styles ... */
+
+/* Optional: Override for L3 Scroller if needed */
+.level3ScrollerSwiperOverride {
+  /* Example: maybe slightly different margins or nav button size/color */
+  /* --swiper-navigation-size: 14px; */
+  /* margin-top: calc(var(--spacing-unit) * 0.5); */
+}
+
+/* Optional: If L3 buttons need slightly different text styling inside scroller */
+.l3ButtonNameInScroller {
+  display: block; /* If you want name on a new line */
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70px; /* Adjust so it doesn't make buttons too wide */
+}

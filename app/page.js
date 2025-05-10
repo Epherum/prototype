@@ -48,22 +48,24 @@ const findNodeById = (nodes, nodeId) => {
 
 // page.js (add this helper function near findNodeById)
 
+// page.js (near findNodeById)
 const findParentOfNode = (nodeId, hierarchy, parent = null) => {
   if (!hierarchy || !nodeId) return null;
   for (const node of hierarchy) {
     if (node.id === nodeId) {
-      return parent; // Found the node, return its accumulated parent
+      return parent; // Found the node, return its *immediate* parent in this search context
     }
     if (node.children && node.children.length > 0) {
-      const foundParent = findParentOfNode(nodeId, node.children, node); // Pass current node as parent
-      if (foundParent) {
-        return foundParent; // If found in children, this will propagate up
+      // Pass current 'node' as the parent for the recursive call
+      const foundParentInChild = findParentOfNode(nodeId, node.children, node);
+      if (foundParentInChild !== null) {
+        const found = findParentOfNode(nodeId, node.children, node); // Pass 'node' as the parent for children search
+        if (found) return found; // If found in children, propagate it up
       }
     }
   }
   return null; // Node not found in this branch
 };
-
 const getFirstId = (arr) =>
   arr && arr.length > 0 && arr[0] ? arr[0].id : null;
 
@@ -89,34 +91,33 @@ const JOURNAL_ICONS = {
 };
 const ROOT_JOURNAL_ID = "__ROOT__";
 
-// page.js - JournalHierarchySlider component
-
-// page.js - JournalHierarchySlider component
-
 function JournalHierarchySlider({
-  // ... (props as before, including onSelectTopLevel, onToggleLevel2Id, onNavigateContextDown, rootJournalIdConst)
   sliderId,
   title,
   hierarchyData,
   selectedTopLevelId,
   selectedLevel2Ids,
-  activeMainSwiperL3Id,
+  selectedLevel3Ids, // ADD
   onSelectTopLevel,
   onToggleLevel2Id,
-  onSelectMainSwiperL3Id,
+  onToggleLevel3Id, // ADD
+  onL3DoubleClick, // ADD
   onOpenModal,
-  isAccordionOpen,
-  onToggleAccordion,
+  isAccordionOpen, // This prop might become unused if L3 accordion is removed
+  onToggleAccordion, // This prop might become unused
   rootJournalIdConst,
   onNavigateContextDown,
 }) {
-  const mainSwiperInstanceRef = useRef(null);
+  // const mainSwiperInstanceRef = useRef(null); // Will be for the new L3 scroller
+  const l3ScrollerSwiperInstanceRef = useRef(null); // RENAME for clarity
   const level2ScrollerSwiperInstanceRef = useRef(null);
 
   const l2ClickTimeoutRef = useRef(null);
-  const l2LastClickItemIdRef = useRef(null); // To track which item was last clicked
+  const l2LastClickItemIdRef = useRef(null);
 
-  // ...
+  // ADD: Refs for L3 click/double-click detection
+  const l3ClickTimeoutRef = useRef(null);
+  const l3LastClickItemIdRef = useRef(null);
 
   // New handler for L2 items that manages single vs. double click
   const handleL2ItemInteraction = (itemId) => {
@@ -170,13 +171,16 @@ function JournalHierarchySlider({
     );
   }, [selectedTopLevelId, hierarchyData, rootJournalIdConst]);
 
-  const level3NodesForMainSwiper = useMemo(() => {
+  // RENAME: level3NodesForMainSwiper -> level3NodesForScroller
+  const level3NodesForScroller = useMemo(() => {
+    // RENAMED
     if (!selectedLevel2Ids || selectedLevel2Ids.length === 0) return [];
     const sourceForSelectedL2s =
       selectedTopLevelId === rootJournalIdConst
         ? hierarchyData
-        : currentL1ContextNode?.children; // currentL1ContextNode is used here
+        : currentL1ContextNode?.children;
     if (!sourceForSelectedL2s) return [];
+
     const validSelectedL2ContextNodes = sourceForSelectedL2s.filter(
       (node) =>
         selectedLevel2Ids.includes(node.id) &&
@@ -193,107 +197,29 @@ function JournalHierarchySlider({
     selectedTopLevelId,
     selectedLevel2Ids,
     hierarchyData,
-    currentL1ContextNode, // <<< ADD THIS DEPENDENCY
+    currentL1ContextNode,
     rootJournalIdConst,
   ]);
 
   const l2ScrollerKey = useMemo(() => {
     return `${sliderId}-L2scroller-L1-${selectedTopLevelId}-dataLen${level2NodesForScroller.length}`;
   }, [sliderId, selectedTopLevelId, level2NodesForScroller.length]);
-  // Adding hierarchyData as a dep if the content of nodes (not just count) can change:
-  // }, [sliderId, selectedTopLevelId, level2NodesForScroller.length, hierarchyData]);
-  // Key (correctly excludes activeMainSwiperL3Id)
-  const mainL3SwiperKey = useMemo(() => {
-    return `${sliderId}-L3swiper-L1-${selectedTopLevelId}-L2sel-${selectedLevel2Ids.join(
+
+  // MODIFIED: l3ScrollerKey
+  // It should change if L1, selected L2s, or the actual list of L3 nodes change.
+  // It should NOT change merely because selectedLevel3Ids changes.
+  const l3ScrollerKey = useMemo(() => {
+    return `${sliderId}-L3scroller-L1-${selectedTopLevelId}-L2sel-${selectedLevel2Ids.join(
       "_"
-    )}-len${level3NodesForMainSwiper.length}`;
+    )}-dataLen${level3NodesForScroller.length}`;
+    // REMOVED: -L3sel-${selectedLevel3Ids.join("_")}
   }, [
     sliderId,
     selectedTopLevelId,
     selectedLevel2Ids,
-    level3NodesForMainSwiper.length,
+    level3NodesForScroller.length, // Depends on the actual nodes available
+    // REMOVED: selectedLevel3Ids from dependencies
   ]);
-
-  // Initial slide index (correctly includes activeMainSwiperL3Id)
-  const initialL3SwiperIndex = useMemo(() => {
-    return Math.max(
-      0,
-      level3NodesForMainSwiper.findIndex(
-        (node) => node?.id === activeMainSwiperL3Id
-      )
-    );
-  }, [activeMainSwiperL3Id, level3NodesForMainSwiper]);
-
-  // useEffect to synchronize Swiper when activeMainSwiperL3Id changes programmatically
-  useEffect(() => {
-    const swiper = mainSwiperInstanceRef.current;
-    if (swiper && level3NodesForMainSwiper.length > 0) {
-      const targetIndex = level3NodesForMainSwiper.findIndex(
-        (node) => node?.id === activeMainSwiperL3Id
-      );
-      if (targetIndex !== -1 && swiper.activeIndex !== targetIndex) {
-        // Ensure Swiper's internal slide count matches our data before trying to slide
-        // This can be important if data updates and Swiper's DOM update are not perfectly in sync
-        if (
-          swiper.slides &&
-          swiper.slides.length === level3NodesForMainSwiper.length
-        ) {
-          console.log(
-            `L3 Swiper Sync (useEffect): Target index ${targetIndex}, current ${swiper.activeIndex}. Sliding.`
-          );
-          swiper.slideTo(targetIndex, 0); // Slide with 0 speed
-        } else if (swiper.slidesGrid) {
-          // If slide counts don't match, Swiper might need an update.
-          // This scenario is more likely if the key DIDN'T change but the content did (e.g. item content changed but not length/IDs)
-          console.log(
-            "L3 Swiper Sync (useEffect): Slide count mismatch, updating Swiper then attempting slide."
-          );
-          swiper.update();
-          // After update, Swiper might have adjusted its activeIndex or slide structure.
-          // It's often safer to let the next render cycle with updated initialSlide handle it if data structure changed.
-          // Or, attempt to slide again, carefully.
-          const updatedTargetIndex = level3NodesForMainSwiper.findIndex(
-            (node) => node?.id === activeMainSwiperL3Id
-          );
-          if (
-            updatedTargetIndex !== -1 &&
-            swiper.activeIndex !== updatedTargetIndex
-          ) {
-            swiper.slideTo(updatedTargetIndex, 0);
-          }
-        }
-      }
-    }
-    // This effect specifically reacts to a desired change in the active slide ID from props,
-    // or if the list of slides changes which might invalidate the current active slide.
-  }, [activeMainSwiperL3Id, level3NodesForMainSwiper]); // Not including initialL3SwiperIndex as it's derived from these.
-
-  const currentL3ItemForAccordion = useMemo(() => {
-    if (!activeMainSwiperL3Id) return null;
-    return findNodeById(level3NodesForMainSwiper, activeMainSwiperL3Id);
-  }, [activeMainSwiperL3Id, level3NodesForMainSwiper]);
-
-  // --- Handler for when user swipes the L3 Swiper ---
-  const handleMainL3SwiperChange = (swiper) => {
-    // This is Swiper's onSlideChangeTransitionEnd
-    const currentRealIndex = swiper.activeIndex;
-    if (level3NodesForMainSwiper?.[currentRealIndex]) {
-      const newL3Id = level3NodesForMainSwiper[currentRealIndex].id;
-      // Only update Home's state if the swiped-to ID is different from the current active ID
-      if (onSelectMainSwiperL3Id && newL3Id !== activeMainSwiperL3Id) {
-        console.log(
-          `L3 Swiper User Swipe: New L3 ID selected by swipe: ${newL3Id}`
-        );
-        onSelectMainSwiperL3Id(newL3Id); // This updates activeMainSwiperL3Id in Home
-      }
-    } else if (
-      level3NodesForMainSwiper.length === 0 &&
-      activeMainSwiperL3Id !== null
-    ) {
-      // If swiper becomes empty, tell Home (should be rare if data clears first)
-      if (onSelectMainSwiperL3Id) onSelectMainSwiperL3Id(null);
-    }
-  };
 
   // --- NEW: Double Click Handlers ---
   const handleL2ItemDoubleClick = (l2ItemId) => {
@@ -356,6 +282,41 @@ function JournalHierarchySlider({
     if (onSelectTopLevel) {
       // Pass the current selectedTopLevelId as the childToSelectInL2 for the new parent context
       onSelectTopLevel(newL1ParentContextId, selectedTopLevelId);
+    }
+  };
+
+  // ADD: Handler for L3 items (single vs. double click)
+  const handleL3ItemInteraction = (itemId) => {
+    if (l3LastClickItemIdRef.current === itemId) {
+      clearTimeout(l3ClickTimeoutRef.current);
+      l3LastClickItemIdRef.current = null;
+      console.log(
+        `%cL3 BUTTON (${itemId}): Manual Double-Click Detected!`,
+        "color: green; font-weight: bold;"
+      );
+      handleL3ItemDoubleClick(itemId); // Call new L3 double-click logic
+    } else {
+      l3LastClickItemIdRef.current = itemId;
+      clearTimeout(l3ClickTimeoutRef.current);
+      l3ClickTimeoutRef.current = setTimeout(() => {
+        console.log(
+          `%cL3 BUTTON (${itemId}): Manual Single Click Detected (Toggle).`,
+          "color: blue;"
+        );
+        onToggleLevel3Id(itemId);
+        l3LastClickItemIdRef.current = null;
+      }, 250);
+    }
+  };
+
+  // ADD: Handler for L3 item double-click
+  const handleL3ItemDoubleClick = (l3ItemId) => {
+    const isItemSelected = selectedLevel3Ids.includes(l3ItemId);
+    console.log(
+      `L3 Item Double Click: ${l3ItemId}, Is Selected: ${isItemSelected}`
+    );
+    if (onL3DoubleClick) {
+      onL3DoubleClick(l3ItemId, isItemSelected); // Delegate to Home
     }
   };
 
@@ -458,139 +419,96 @@ function JournalHierarchySlider({
 
       {/* Backdrop is removed as click-away is handled by document event listener */}
 
-      <h2
-        className={styles.sliderTitle}
-        style={{ marginTop: "var(--spacing-unit)" }}
+      {/* L3 Scroller Title */}
+      <h3
+        className={
+          styles.level2ScrollerTitle
+        } /* Re-use L2 title style or create new */
       >
-        {selectedTopLevelId === rootJournalIdConst
-          ? selectedLevel2Ids.length > 0
-            ? `Children of: ${selectedLevel2Ids
-                .map(
-                  (id) => findNodeById(level2NodesForScroller, id)?.code || id
-                )
-                .join(", ")}`
-            : "Select Top-Level Account(s) Above"
-          : selectedLevel2Ids.length > 0
-          ? `Level 3 Accounts (from L2: ${selectedLevel2Ids
-              .map((id) => findNodeById(level2NodesForScroller, id)?.code || id)
+        {selectedLevel2Ids.length > 0
+          ? `Level 3 Accounts (Children of L2: ${selectedLevel2Ids
+              .map((id) => {
+                const l1Node =
+                  selectedTopLevelId === rootJournalIdConst
+                    ? { children: hierarchyData }
+                    : findNodeById(hierarchyData, selectedTopLevelId);
+                const l2Node = findNodeById(l1Node?.children, id);
+                return l2Node?.code || id;
+              })
               .join(", ")})`
           : "Select L2 Account(s) Above"}
-      </h2>
+      </h3>
 
-      {level3NodesForMainSwiper.length > 0 ? (
-        <Swiper
-          key={mainL3SwiperKey}
-          onSwiper={(swiper) => {
-            mainSwiperInstanceRef.current = swiper;
-          }}
-          modules={[Navigation, Pagination]}
-          initialSlide={initialL3SwiperIndex}
-          loop={false}
-          spaceBetween={20}
-          slidesPerView={1}
-          navigation={level3NodesForMainSwiper.length > 1}
-          pagination={
-            level3NodesForMainSwiper.length > 1 ? { clickable: true } : false
-          }
-          onSlideChangeTransitionEnd={handleMainL3SwiperChange}
-          observer={true}
-          observeParents={true}
-          className={`${styles.swiperInstance} ${styles.journalL3SwiperInstance}`}
-        >
-          {level3NodesForMainSwiper.map((l3Node) => {
-            if (!l3Node || typeof l3Node.id !== "string" || l3Node.id === "") {
-              console.warn("Skipping L3 slide for invalid node:", l3Node);
-              return null;
-            }
-            const sourceForL2Parents =
-              selectedTopLevelId === rootJournalIdConst
-                ? hierarchyData
-                : currentL1ContextNode?.children;
-            const l2ParentOfThisL3 = sourceForL2Parents?.find(
-              (l2) =>
-                selectedLevel2Ids.includes(l2.id) &&
-                l2.children?.some((l3) => l3.id === l3Node.id)
-            );
-            return (
-              <SwiperSlide key={l3Node.id} className={styles.slide}>
-                <div className={styles.slideTextContent}>
-                  <span className={styles.slideName}>
-                    {l3Node.name || l3Node.id || "Unnamed L3 Account"}
-                  </span>
-                  <span className={styles.slideSubText}>
-                    {l3Node.code || "N/A"}
-                  </span>
-                  {l2ParentOfThisL3 && (
-                    <span className={styles.slideSubTextDetail}>
-                      (Child of L2: {l2ParentOfThisL3.code})
-                    </span>
-                  )}
-                </div>
-              </SwiperSlide>
-            );
-          })}
-        </Swiper>
+      {/* NEW L3 Scroller (modeled after L2 Scroller) */}
+      {level3NodesForScroller.length > 0 ? (
+        <div className={styles.level2ScrollerContainer}>
+          {" "}
+          {/* Re-use L2 container style or new */}
+          <Swiper
+            key={l3ScrollerKey} // Use new key
+            onSwiper={(swiper) => {
+              l3ScrollerSwiperInstanceRef.current = swiper; // Use new ref
+            }}
+            modules={[Navigation]}
+            slidesPerView={"auto"}
+            spaceBetween={8}
+            navigation={level3NodesForScroller.length > 4} // Conditional navigation
+            className={`${styles.level2ScrollerSwiper} ${styles.level3ScrollerSwiperOverride}`} // Re-use L2 swiper style, add override if needed
+            observer={true}
+            observeParents={true}
+          >
+            {level3NodesForScroller.map((l3Node) => {
+              if (
+                !l3Node ||
+                typeof l3Node.id !== "string" ||
+                l3Node.id === ""
+              ) {
+                console.warn(
+                  "Skipping L3 scroller button for invalid node:",
+                  l3Node
+                );
+                return null;
+              }
+              return (
+                <SwiperSlide
+                  key={l3Node.id}
+                  className={styles.level2ScrollerSlideNoOverflow} // Re-use L2 slide style
+                >
+                  <div className={styles.l2ButtonInteractiveWrapper}>
+                    {" "}
+                    {/* Re-use L2 wrapper style */}
+                    <button
+                      onClick={() => handleL3ItemInteraction(l3Node.id)} // Use L3 interaction handler
+                      onContextMenu={(e) => e.preventDefault()}
+                      className={`${styles.level2Button} ${
+                        // Re-use L2 button style
+                        selectedLevel3Ids.includes(l3Node.id)
+                          ? styles.level2ButtonActive
+                          : ""
+                      }`}
+                      title={`${l3Node.code} - ${l3Node.name || "Unnamed"}`}
+                    >
+                      {l3Node.code || "N/A"}
+                      {/* Optionally display more info like name if space allows, or on hover */}
+                      {/* <span className={styles.l3ButtonNameInScroller}>{l3Node.name}</span> */}
+                    </button>
+                  </div>
+                </SwiperSlide>
+              );
+            })}
+          </Swiper>
+        </div>
       ) : (
-        <div className={styles.noData}>
+        <div className={styles.noDataSmall}>
           {selectedLevel2Ids.length > 0
             ? "No Level 3 accounts for currently selected Level 2s."
-            : selectedTopLevelId === rootJournalIdConst
-            ? "Select Top-Level account(s) above to see children."
             : "Select Level 2 account(s) above to see children."}
-        </div>
-      )}
-
-      {currentL3ItemForAccordion && onToggleAccordion && (
-        <div className={styles.accordionContainer}>
-          <button
-            onClick={onToggleAccordion}
-            className={styles.detailsButton}
-            aria-expanded={isAccordionOpen}
-          >
-            Details ({currentL3ItemForAccordion.name || "N/A"})
-            <span
-              className={`${styles.accordionIcon} ${
-                isAccordionOpen ? styles.accordionIconOpen : ""
-              }`}
-            >
-              ▼
-            </span>
-          </button>
-          <AnimatePresence initial={false}>
-            {isAccordionOpen && (
-              <motion.div
-                key={`details-accordion-${currentL3ItemForAccordion.id}`}
-                initial="collapsed"
-                animate="open"
-                exit="collapsed"
-                variants={{
-                  open: { opacity: 1, height: "auto", marginTop: "8px" },
-                  collapsed: { opacity: 0, height: 0, marginTop: "0px" },
-                }}
-                transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
-                className={styles.detailsContentWrapper}
-              >
-                <div className={styles.detailsContent}>
-                  <p>
-                    <strong>Name:</strong>{" "}
-                    {currentL3ItemForAccordion.name || "N/A"}
-                  </p>
-                  <p>
-                    <strong>Code:</strong>{" "}
-                    {currentL3ItemForAccordion.code || "N/A"}
-                  </p>
-                  <p>
-                    <strong>ID:</strong> {currentL3ItemForAccordion.id}
-                  </p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       )}
     </>
   );
 }
+
 // --- DynamicSlider Component (Unchanged from original) ---
 function DynamicSlider({
   sliderId,
@@ -1290,7 +1208,7 @@ export default function Home() {
   const [selectedTopLevelJournalId, setSelectedTopLevelJournalId] =
     useState(initialTopLevelId);
   const [selectedLevel2JournalIds, setSelectedLevel2JournalIds] = useState([]);
-  const [activeMainSwiperL3Id, setActiveMainSwiperL3Id] = useState(null);
+  const [selectedLevel3JournalIds, setSelectedLevel3JournalIds] = useState([]);
 
   const placeholderProjectData = [
     { id: "project-placeholder", name: "Sample Project" },
@@ -1335,55 +1253,8 @@ export default function Home() {
   // Home.js
 
   useEffect(() => {
-    const topNode =
-      selectedTopLevelJournalId === ROOT_JOURNAL_ID
-        ? { children: activeDataSet?.account_hierarchy || [] } // Treat L1s as children of Root for this logic
-        : findNodeById(
-            activeDataSet?.account_hierarchy,
-            selectedTopLevelJournalId
-          );
-
-    let currentL3IsValid = false;
-    if (activeMainSwiperL3Id && topNode) {
-      // Check if activeMainSwiperL3Id is a child of any of the currently selectedLevel2JournalIds
-      for (const l2Id of selectedLevel2JournalIds) {
-        const l2Node = findNodeById(topNode.children, l2Id);
-        if (
-          l2Node &&
-          l2Node.children?.some((l3) => l3.id === activeMainSwiperL3Id)
-        ) {
-          currentL3IsValid = true;
-          break;
-        }
-      }
-    }
-
-    // If current active L3 is no longer valid (e.g., its L2 parent was deselected)
-    // OR if no L3 is active and there are L2s selected, then pick a default L3.
-    if (!currentL3IsValid) {
-      const { firstActiveL3Id: newDefaultL3Id } = getInitialL2L3Selection(
-        selectedTopLevelJournalId,
-        selectedLevel2JournalIds,
-        activeDataSet
-      );
-      // Only set if different to avoid loop, and only if a new default actually exists or needs to be nulled
-      if (activeMainSwiperL3Id !== newDefaultL3Id) {
-        console.log(
-          `Home useEffect (L3 default setter): Current L3 invalid or unset. New default L3: ${newDefaultL3Id}. Old active L3: ${activeMainSwiperL3Id}`
-        );
-        setActiveMainSwiperL3Id(newDefaultL3Id);
-      }
-    }
-    // This effect runs when L1 or L2 selections change, or if dataset changes.
-    // It also includes activeMainSwiperL3Id to re-validate it if it changes externally (less common).
-  }, [
-    selectedTopLevelJournalId,
-    selectedLevel2JournalIds,
-    activeDataSet,
-    activeMainSwiperL3Id, // Re-validate if it changes
-    getInitialL2L3Selection, // getInitialL2L3Selection is stable due to useCallback
-    ROOT_JOURNAL_ID,
-  ]);
+    setSelectedLevel3JournalIds([]);
+  }, [selectedLevel2JournalIds, selectedTopLevelJournalId]);
 
   const [selectedPartnerId, setSelectedPartnerId] = useState(() =>
     getFirstId(activeDataSet?.partners)
@@ -1445,8 +1316,8 @@ export default function Home() {
       selectedTopLevelJournalId,
       "L2s:",
       selectedLevel2JournalIds,
-      "Active L3:",
-      activeMainSwiperL3Id
+      "Selected L3s:", // Corrected line
+      selectedLevel3JournalIds // Corrected variable
     );
 
     // For now, just use all data
@@ -1476,7 +1347,7 @@ export default function Home() {
     sliderOrder,
     selectedTopLevelJournalId,
     selectedLevel2JournalIds,
-    activeMainSwiperL3Id,
+    selectedLevel3JournalIds,
     selectedPartnerId,
     selectedGoodsId,
     selectedProjectId,
@@ -1493,14 +1364,11 @@ export default function Home() {
     setActiveDataSource(newSourceKey);
     setActiveDataSet(newDataSet);
 
-    const newInitialTopLevelId = "cat-4";
     setSelectedTopLevelJournalId(ROOT_JOURNAL_ID); // Reset to root view
     setSelectedLevel2JournalIds([]);
-    // activeMainSwiperL3Id will be updated by its useEffect
 
     setSelectedPartnerId(getFirstId(newDataSet?.partners));
     setSelectedGoodsId(getFirstId(newDataSet?.goods));
-    // ... reset other states ...
   };
 
   const openJournalModal = useCallback(() => setIsJournalModalOpen(true), []);
@@ -1564,18 +1432,18 @@ export default function Home() {
       } else {
         setSelectedLevel2JournalIds([]);
       }
-      // activeMainSwiperL3Id will be updated by its useEffect based on new L1/L2 selections
+      setSelectedLevel3JournalIds([]); // ADD: Clear L3 selections when L1 changes
     },
     [activeDataSet, ROOT_JOURNAL_ID]
   ); // Dependencies
 
-  const handleNavigateContextDown = useCallback(
-    ({ currentL1ToBecomeL2, longPressedL2ToBecomeL3 }) => {
-      // currentL1ToBecomeL2 is the ID of the L1 context we are navigating AWAY from.
-      // longPressedL2ToBecomeL3 is the ID of the L2 item (in the old L1 context) that triggered the "Go Down" action.
+  // page.js - Home component
 
+  const handleNavigateContextDown = useCallback(
+    // This is for L2 "Go Down"
+    ({ currentL1ToBecomeL2, longPressedL2ToBecomeL3: targetL2NowL3 }) => {
       console.log(
-        `Home: Navigating Context Down. Old L1: ${currentL1ToBecomeL2}, Target L3 (from old L2): ${longPressedL2ToBecomeL3}`
+        `Home: Navigating Context Down (from L2). Old L1: ${currentL1ToBecomeL2}, Target L2 (to become L3): ${targetL2NowL3}`
       );
 
       let newL1ContextId;
@@ -1584,30 +1452,26 @@ export default function Home() {
         activeDataSet.account_hierarchy
       );
 
-      if (parentOfOldL1) {
-        newL1ContextId = parentOfOldL1.id;
-      } else {
-        newL1ContextId = ROOT_JOURNAL_ID; // If old L1 was a top-level, its parent context is Root
-      }
+      newL1ContextId = parentOfOldL1 ? parentOfOldL1.id : ROOT_JOURNAL_ID;
 
-      // Now, call handleSelectTopLevelJournal to set the new L1 context,
-      // and pass currentL1ToBecomeL2 as the L2 item to select in that new context,
-      // and longPressedL2ToBecomeL3 to be the target L3.
-      handleSelectTopLevelJournal(newL1ContextId, currentL1ToBecomeL2); // This sets L1 and L2
+      console.log(
+        `  New L1 context will be ${newL1ContextId}, previous L1 ${currentL1ToBecomeL2} should be selected in L2.`
+      );
 
-      // After the L1 and L2 selections are set by handleSelectTopLevelJournal,
-      // we need to set the active L3.
-      // The useEffect for activeMainSwiperL3Id might pick up the first child of currentL1ToBecomeL2.
-      // We want to specifically target longPressedL2ToBecomeL3.
-      // This needs to happen *after* selectedLevel2JournalIds is updated.
-      // A slight delay or a more sophisticated state update sequence might be needed if it doesn't select correctly.
-      // For now, let's assume the main useEffect for activeMainSwiperL3Id will handle it if currentL1ToBecomeL2 has longPressedL2ToBecomeL3 as a child.
-      // To be more explicit:
-      setActiveMainSwiperL3Id(longPressedL2ToBecomeL3); // Set this directly after other selections change
+      setSelectedTopLevelJournalId(newL1ContextId);
+      setSelectedLevel2JournalIds([currentL1ToBecomeL2]); // Old L1 becomes selected L2
+
+      // The targetL2NowL3 (which was an L2 under currentL1ToBecomeL2) is now an L3. Select it.
+      setSelectedLevel3JournalIds([targetL2NowL3]);
     },
-    [activeDataSet, ROOT_JOURNAL_ID, handleSelectTopLevelJournal]
-  ); // setActiveMainSwiperL3Id is stable
-
+    [
+      activeDataSet,
+      ROOT_JOURNAL_ID,
+      setSelectedTopLevelJournalId,
+      setSelectedLevel2JournalIds,
+      setSelectedLevel3JournalIds,
+    ] // Added stable setters
+  );
   const handleToggleLevel2JournalId = useCallback(
     (level2IdToToggle) => {
       // Validate level2IdToToggle based on current selectedTopLevelJournalId
@@ -1632,16 +1496,286 @@ export default function Home() {
         const newSelectedL2Ids = prevSelectedL2Ids.includes(level2IdToToggle)
           ? prevSelectedL2Ids.filter((id) => id !== level2IdToToggle)
           : [...prevSelectedL2Ids, level2IdToToggle];
-        // activeMainSwiperL3Id will be updated by its useEffect
         return newSelectedL2Ids;
       });
+      setSelectedLevel3JournalIds([]); // ADD: Clear L3 selections when L2s change
     },
     [activeDataSet, selectedTopLevelJournalId]
   ); // ROOT_JOURNAL_ID is constant
 
-  const handleSelectMainSwiperL3Id = useCallback((l3Id) => {
-    setActiveMainSwiperL3Id(l3Id);
-  }, []);
+  // ADD: Handler for toggling L3 items
+  const handleToggleLevel3JournalId = useCallback(
+    (level3IdToToggle) => {
+      // Validation: L3 must be a child of one of the selected L2s
+      let l3IsValid = false;
+      const l1Node =
+        selectedTopLevelJournalId === ROOT_JOURNAL_ID
+          ? { id: ROOT_JOURNAL_ID, children: activeDataSet.account_hierarchy }
+          : findNodeById(
+              activeDataSet.account_hierarchy,
+              selectedTopLevelJournalId
+            );
+
+      if (l1Node) {
+        for (const l2Id of selectedLevel2JournalIds) {
+          const l2Node = findNodeById(l1Node.children, l2Id);
+          if (
+            l2Node &&
+            l2Node.children?.some((l3) => l3.id === level3IdToToggle)
+          ) {
+            l3IsValid = true;
+            break;
+          }
+        }
+      }
+
+      if (!l3IsValid) {
+        console.warn(
+          `Attempted to toggle invalid L3 ID "${level3IdToToggle}" for current L1/L2 context.`
+        );
+        return;
+      }
+
+      setSelectedLevel3JournalIds((prevSelectedL3Ids) =>
+        prevSelectedL3Ids.includes(level3IdToToggle)
+          ? prevSelectedL3Ids.filter((id) => id !== level3IdToToggle)
+          : [...prevSelectedL3Ids, level3IdToToggle]
+      );
+    },
+    [
+      activeDataSet,
+      selectedTopLevelJournalId,
+      selectedLevel2JournalIds,
+      ROOT_JOURNAL_ID,
+    ]
+  );
+
+  const handleNavigateFromL3Up = useCallback(
+    ({ l3ItemId }) => {
+      console.log(
+        `Home: Navigating Up from L3 item ${l3ItemId}. It will become selected L2.`
+      );
+
+      if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
+        // SCENARIO: L1 is Root.
+        // selectedLevel2JournalIds contains actual L1 account IDs (e.g., "cat-4").
+        // l3ItemId is an actual L2 account ID (e.g., "acc-401"), child of one of the selectedLevel2JournalIds.
+        // EXPECTATION: The L1 parent of l3ItemId (e.g. "cat-4") becomes the new L1.
+        //              l3ItemId (e.g. "acc-401") becomes the selected L2.
+
+        let actualL1ParentOfL3 = null; // This will be the actual L1 node (e.g., "cat-4")
+
+        // Find which of the selectedLevel2JournalIds (actual L1s) is the parent of l3ItemId
+        for (const actualL1Id of selectedLevel2JournalIds) {
+          const actualL1Node = findNodeById(
+            activeDataSet.account_hierarchy,
+            actualL1Id
+          );
+          if (
+            actualL1Node &&
+            actualL1Node.children?.some(
+              (actualL2Node) => actualL2Node.id === l3ItemId
+            )
+          ) {
+            actualL1ParentOfL3 = actualL1Node;
+            break;
+          }
+        }
+
+        if (!actualL1ParentOfL3) {
+          console.error(
+            `Error in L3 Up (L1=Root): Could not find actual L1 parent for L3 item ${l3ItemId} (which is an actual L2).`
+          );
+          return;
+        }
+
+        const newL1Id = actualL1ParentOfL3.id; // e.g., "cat-4"
+        const newL2toSelect = l3ItemId; // e.g., "acc-401"
+
+        console.log(
+          `  L3 Up (L1=Root): New L1: ${newL1Id} (parent of ${l3ItemId}), L2 to select: ${newL2toSelect}`
+        );
+        setSelectedTopLevelJournalId(newL1Id);
+        setSelectedLevel2JournalIds([newL2toSelect]);
+        setSelectedLevel3JournalIds([]);
+      } else {
+        // STANDARD CASE: L1 is a specific account.
+        // (This part was already correct as per Option 1 Project Spec)
+        let l2ParentOfClickedL3 = null;
+        const currentL1Node = findNodeById(
+          activeDataSet.account_hierarchy,
+          selectedTopLevelJournalId
+        );
+        if (!currentL1Node || !currentL1Node.children) {
+          console.error(
+            `Error in L3 Up (Standard): Current L1 context ${selectedTopLevelJournalId} not found or has no children.`
+          );
+          return;
+        }
+
+        for (const l2Node of currentL1Node.children) {
+          if (
+            selectedLevel2JournalIds.includes(l2Node.id) &&
+            l2Node.children?.some((l3) => l3.id === l3ItemId)
+          ) {
+            l2ParentOfClickedL3 = l2Node;
+            break;
+          }
+        }
+
+        if (!l2ParentOfClickedL3) {
+          console.error(
+            `Error in L3 Up (Standard): Could not find L2 parent for L3 item ${l3ItemId} under L1 ${selectedTopLevelJournalId}.`
+          );
+          return;
+        }
+
+        const newL1Id = l2ParentOfClickedL3.id; // The L2 parent becomes the new L1
+        const newL2toSelect = l3ItemId; // The clicked L3 becomes the selected L2
+
+        console.log(
+          `  L3 Up (Standard): New L1: ${newL1Id}, L2 to select: ${newL2toSelect}`
+        );
+        setSelectedTopLevelJournalId(newL1Id);
+        setSelectedLevel2JournalIds([newL2toSelect]);
+        setSelectedLevel3JournalIds([]);
+      }
+    },
+    [
+      activeDataSet,
+      selectedTopLevelJournalId,
+      selectedLevel2JournalIds,
+      ROOT_JOURNAL_ID,
+      setSelectedTopLevelJournalId,
+      setSelectedLevel2JournalIds,
+      setSelectedLevel3JournalIds,
+    ]
+  );
+  const handleNavigateFromL3Down = useCallback(
+    ({ l3ItemId }) => {
+      console.log(`Home: Navigating Down from unselected L3 item ${l3ItemId}.`);
+
+      if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
+        console.warn(
+          "Cannot 'Go Down' from an L3 item when L1 context is Root and L3 is not selected. This action is typically 'Go Up' to make its L2 parent the L1."
+        );
+        // Fallback: Make the L2 parent of this (unselected) L3 the new L1 context.
+        // This is similar to L2 double-click when L1 is Root and L2 is unselected.
+        let actualL2ParentOfL3 = null; // This will be an actual L2 account
+
+        // Iterate through L1s (which are L2s in Root view)
+        for (const l1Node of activeDataSet.account_hierarchy) {
+          if (selectedLevel2JournalIds.includes(l1Node.id)) {
+            // Check selected L1s (acting as L2s)
+            // Iterate through L2s (which are L3s in Root view)
+            if (l1Node.children) {
+              for (const l2Node of l1Node.children) {
+                if (
+                  l2Node.children?.some((l3Child) => l3Child.id === l3ItemId)
+                ) {
+                  actualL2ParentOfL3 = l2Node; // This is the L2 node that is parent of l3ItemId
+                  break;
+                }
+              }
+            }
+          }
+          if (actualL2ParentOfL3) break;
+        }
+
+        if (actualL2ParentOfL3) {
+          console.log(
+            `  L3 Down (L1=Root, L3 unselected): Making L2 parent ${actualL2ParentOfL3.id} of L3 ${l3ItemId} the new L1.`
+          );
+          setSelectedTopLevelJournalId(actualL2ParentOfL3.id);
+          setSelectedLevel2JournalIds([l3ItemId]); // The double-clicked L3 becomes the selected L2
+          setSelectedLevel3JournalIds([]);
+        } else {
+          console.error(
+            `L3 Down (L1=Root, L3 unselected): Could not find L2 parent for L3 item ${l3ItemId}.`
+          );
+        }
+        return;
+      }
+
+      // Standard Case: L1 is not Root.
+      // 1. Find the parent of the current L1. This becomes the new L1.
+      const parentOfCurrentL1 = findParentOfNode(
+        selectedTopLevelJournalId,
+        activeDataSet.account_hierarchy
+      );
+      const newL1ContextId = parentOfCurrentL1
+        ? parentOfCurrentL1.id
+        : ROOT_JOURNAL_ID;
+
+      // 2. The current L1 (selectedTopLevelJournalId) becomes the selected L2 in the new L1 context.
+      const oldL1ToBecomeSelectedL2 = selectedTopLevelJournalId;
+
+      // 3. The double-clicked l3ItemId needs to be targeted as a selected L3.
+      //    Its direct parent (an L2 in the *original* L1 context) will now be an L3 item
+      //    (as it's a child of oldL1ToBecomeSelectedL2). We need to select that original L2 parent.
+
+      let originalL2ParentOfDClickedL3 = null;
+      const currentL1Node = findNodeById(
+        activeDataSet.account_hierarchy,
+        selectedTopLevelJournalId
+      );
+      if (currentL1Node && currentL1Node.children) {
+        for (const originalL2Node of currentL1Node.children) {
+          // We need to check if this originalL2Node is one of the *currently selected L2s*
+          // because the l3ItemId comes from a selected L2's children.
+          if (
+            selectedLevel2JournalIds.includes(originalL2Node.id) &&
+            originalL2Node.children?.some((l3) => l3.id === l3ItemId)
+          ) {
+            originalL2ParentOfDClickedL3 = originalL2Node;
+            break;
+          }
+        }
+      }
+
+      if (!originalL2ParentOfDClickedL3) {
+        console.error(
+          `L3 Down (Standard): Could not find the original L2 parent of L3 item ${l3ItemId}.`
+        );
+        // Fallback or error handling
+        setSelectedTopLevelJournalId(newL1ContextId);
+        setSelectedLevel2JournalIds([oldL1ToBecomeSelectedL2]);
+        setSelectedLevel3JournalIds([]); // Clear L3s if target can't be found
+        return;
+      }
+
+      console.log(
+        `  L3 Down (Standard): New L1: ${newL1ContextId}. Old L1 (${oldL1ToBecomeSelectedL2}) becomes selected L2. Original L2 parent (${originalL2ParentOfDClickedL3.id}) of dbl-clicked L3 becomes selected L3.`
+      );
+
+      setSelectedTopLevelJournalId(newL1ContextId);
+      setSelectedLevel2JournalIds([oldL1ToBecomeSelectedL2]);
+      setSelectedLevel3JournalIds([originalL2ParentOfDClickedL3.id]); // Select the original L2 parent, which is now an L3
+    },
+    [
+      activeDataSet,
+      selectedTopLevelJournalId,
+      selectedLevel2JournalIds,
+      ROOT_JOURNAL_ID,
+      setSelectedTopLevelJournalId,
+      setSelectedLevel2JournalIds,
+      setSelectedLevel3JournalIds,
+    ]
+  );
+
+  const handleL3DoubleClick = useCallback(
+    (l3ItemId, isSelected) => {
+      console.log(
+        `Home: L3 Item ${l3ItemId} double-clicked. IsSelected: ${isSelected}`
+      );
+      if (isSelected) {
+        handleNavigateFromL3Up({ l3ItemId });
+      } else {
+        handleNavigateFromL3Down({ l3ItemId });
+      }
+    },
+    [handleNavigateFromL3Up, handleNavigateFromL3Down]
+  ); // Correct dependencies
 
   const handleSwipe = useCallback((sourceSliderId, selectedItemId) => {
     if (sourceSliderId === SLIDER_TYPES.PARTNER)
@@ -1812,49 +1946,72 @@ export default function Home() {
       // For now, call them directly, acknowledging potential stale reads if not careful.
       let newTopLevelId = selectedTopLevelJournalId;
       let newL2Ids = [...selectedLevel2JournalIds];
-      // let newActiveL3Id = activeMainSwiperL3Id; // This will be derived
+      let newL3Ids = [...selectedLevel3JournalIds]; // ADDED
 
-      const currentHierarchy = activeDataSet.account_hierarchy; // This is stale if called immediately!
-      // Better to work with the hierarchyCopy conceptually.
-      // For safety, pass hierarchyCopy to findNodeById if needed here.
+      const currentHierarchy = activeDataSet.account_hierarchy; // This is stale!
+      // It's better to get the hierarchy from the setActiveDataSet callback if possible,
+      // or re-find nodes based on the assumption that deletion was successful.
 
-      const idStillExists = (id, hierarchy) => !!findNodeById(hierarchy, id);
+      const idStillExists = (id, hierarchyToSearch) =>
+        !!findNodeById(hierarchyToSearch, id);
+      const updatedHierarchy = JSON.parse(
+        JSON.stringify(activeDataSet.account_hierarchy || [])
+      ); // Create a working copy
+      // (Assume 'removeNodeRecursively' has modified 'updatedHierarchy' if it were available here)
+      // This part is tricky because `activeDataSet` hasn't updated yet in this scope.
+      // The logic should ideally be inside the `setActiveDataSet` callback or run after it.
 
-      // If selected L1 was deleted or no longer exists
+      // If selected L1 was deleted
       if (
         accountIdToDelete === newTopLevelId ||
-        !idStillExists(newTopLevelId, currentHierarchy)
+        !idStillExists(newTopLevelId, updatedHierarchy)
       ) {
-        // use currentHierarchy (stale) or derive from context
-        newTopLevelId = getFirstId(currentHierarchy) || null; // This should be hierarchyCopy
+        newTopLevelId = getFirstId(updatedHierarchy) || ROOT_JOURNAL_ID; // Fallback
         newL2Ids = [];
-        newMode = newTopLevelId ? "children" : "parents";
+        newL3Ids = [];
       }
 
-      // Filter out deleted L2 IDs or L2 IDs whose L1 parent might have changed/deleted
+      // Filter out deleted L2 IDs
       const currentTopNodeAfterDelete = findNodeById(
-        currentHierarchy,
+        updatedHierarchy,
         newTopLevelId
-      ); // stale hierarchy
+      );
       newL2Ids = newL2Ids.filter(
         (id) =>
           id !== accountIdToDelete &&
-          idStillExists(id, currentHierarchy) && // stale hierarchy
+          idStillExists(id, updatedHierarchy) &&
           currentTopNodeAfterDelete?.children?.some((c) => c.id === id)
       );
 
-      // The useEffect for activeMainSwiperL3Id will handle its update.
-      // So, we just need to set L1 and L2s.
+      // Filter out deleted L3 IDs
+      let validL3SourceNodes = [];
+      if (currentTopNodeAfterDelete) {
+        newL2Ids.forEach((l2Id) => {
+          const l2Node = findNodeById(currentTopNodeAfterDelete.children, l2Id);
+          if (l2Node && l2Node.children) {
+            validL3SourceNodes.push(...l2Node.children);
+          }
+        });
+      }
+      newL3Ids = newL3Ids.filter(
+        (id) =>
+          id !== accountIdToDelete &&
+          idStillExists(id, updatedHierarchy) &&
+          validL3SourceNodes.some((c) => c.id === id)
+      );
+
       setSelectedTopLevelJournalId(newTopLevelId);
       setSelectedLevel2JournalIds(newL2Ids);
+      setSelectedLevel3JournalIds(newL3Ids); // SET UPDATED L3 IDs
     },
     [
       selectedTopLevelJournalId,
       selectedLevel2JournalIds,
-      activeMainSwiperL3Id,
-      activeDataSet,
+      selectedLevel3JournalIds, // ADDED
+      activeDataSet, // activeDataSet is a dep
+      ROOT_JOURNAL_ID,
     ]
-  ); // activeDataSet is a dep
+  );
 
   const toggleAccordion = useCallback((sliderType) => {
     if (
@@ -1936,11 +2093,12 @@ export default function Home() {
           hierarchyData: hierarchy,
           selectedTopLevelId: selectedTopLevelJournalId, // Can be "cat-4" or "__ROOT__"
           selectedLevel2Ids: selectedLevel2JournalIds,
-          activeMainSwiperL3Id: activeMainSwiperL3Id,
+          selectedLevel3Ids: selectedLevel3JournalIds, // ADD
 
           onSelectTopLevel: handleSelectTopLevelJournal, // Used by "Select Category" button if JHS implements it
           onToggleLevel2Id: handleToggleLevel2JournalId,
-          onSelectMainSwiperL3Id: handleSelectMainSwiperL3Id,
+          onToggleLevel3Id: handleToggleLevel3JournalId, // ADD
+          onL3DoubleClick: handleL3DoubleClick, // ADD
           onOpenModal: openJournalModal,
 
           isAccordionOpen: accordionTypeState[SLIDER_TYPES.JOURNAL],
