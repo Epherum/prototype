@@ -94,14 +94,15 @@ const ROOT_JOURNAL_ID = "__ROOT__";
 // page.js - JournalHierarchySlider component
 
 function JournalHierarchySlider({
+  // ... (props as before, including onSelectTopLevel, onToggleLevel2Id, onNavigateContextDown, rootJournalIdConst)
   sliderId,
   title,
   hierarchyData,
   selectedTopLevelId,
-  selectedLevel2Ids, // This is ALWAYS used for L3 display now
+  selectedLevel2Ids,
   activeMainSwiperL3Id,
-  onSelectTopLevel, // Only called by "Go Up" or Modal selection
-  onToggleLevel2Id, // THIS IS THE PRIMARY ACTION FOR L2 BUTTON CLICKS
+  onSelectTopLevel,
+  onToggleLevel2Id,
   onSelectMainSwiperL3Id,
   onOpenModal,
   isAccordionOpen,
@@ -112,15 +113,38 @@ function JournalHierarchySlider({
   const mainSwiperInstanceRef = useRef(null);
   const level2ScrollerSwiperInstanceRef = useRef(null);
 
-  // --- NEW State for L1 Context Navigation ---
-  const [l1NavOptionsVisible, setL1NavOptionsVisible] = useState(false);
-  const l1LongPressTimerRef = useRef(null);
+  const l2ClickTimeoutRef = useRef(null);
+  const l2LastClickItemIdRef = useRef(null); // To track which item was last clicked
 
-  // --- NEW/MODIFIED: State for Long-Press Navigation ---
-  const [navContextItemId, setNavContextItemId] = useState(null); // ID of L2 item showing nav options
-  const [showNavOptions, setShowNavOptions] = useState(false);
-  const longPressTimerRef = useRef(null);
-  const itemBeingPressedRef = useRef(null); // To avoid issues with stale closures in timer
+  // ...
+
+  // New handler for L2 items that manages single vs. double click
+  const handleL2ItemInteraction = (itemId) => {
+    if (l2LastClickItemIdRef.current === itemId) {
+      // This is the second click on the same item quickly - treat as double click
+      clearTimeout(l2ClickTimeoutRef.current);
+      l2LastClickItemIdRef.current = null; // Reset for next interaction
+      console.log(
+        `%cL2 BUTTON (${itemId}): Manual Double-Click Detected!`,
+        "color: purple; font-weight: bold;"
+      );
+      handleL2ItemDoubleClick(itemId); // Call your existing double-click logic
+    } else {
+      // This is the first click, or a click on a different item
+      l2LastClickItemIdRef.current = itemId;
+      clearTimeout(l2ClickTimeoutRef.current); // Clear any previous timer
+
+      l2ClickTimeoutRef.current = setTimeout(() => {
+        // Timer expired, it was a single click
+        console.log(
+          `%cL2 BUTTON (${itemId}): Manual Single Click Detected (Toggle).`,
+          "color: orange;"
+        );
+        onToggleLevel2Id(itemId);
+        l2LastClickItemIdRef.current = null; // Reset
+      }, 250); // Adjust timeout (e.g., 250-300ms)
+    }
+  };
 
   // --- EXISTING: useMemo hooks for data, keys, indices (ensure these are up-to-date from previous steps) ---
   const currentL1ContextNode = useMemo(() => {
@@ -151,7 +175,7 @@ function JournalHierarchySlider({
     const sourceForSelectedL2s =
       selectedTopLevelId === rootJournalIdConst
         ? hierarchyData
-        : currentL1ContextNode?.children;
+        : currentL1ContextNode?.children; // currentL1ContextNode is used here
     if (!sourceForSelectedL2s) return [];
     const validSelectedL2ContextNodes = sourceForSelectedL2s.filter(
       (node) =>
@@ -169,23 +193,15 @@ function JournalHierarchySlider({
     selectedTopLevelId,
     selectedLevel2Ids,
     hierarchyData,
-    currentL1ContextNode,
+    currentL1ContextNode, // <<< ADD THIS DEPENDENCY
     rootJournalIdConst,
   ]);
 
-  const l2ScrollerKey = useMemo(
-    () =>
-      `${sliderId}-L2scroller-L1-${selectedTopLevelId}-L2sel-${selectedLevel2Ids.join(
-        "_"
-      )}-len${level2NodesForScroller.length}`,
-    [
-      sliderId,
-      selectedTopLevelId,
-      selectedLevel2Ids,
-      level2NodesForScroller.length,
-    ]
-  );
-
+  const l2ScrollerKey = useMemo(() => {
+    return `${sliderId}-L2scroller-L1-${selectedTopLevelId}-dataLen${level2NodesForScroller.length}`;
+  }, [sliderId, selectedTopLevelId, level2NodesForScroller.length]);
+  // Adding hierarchyData as a dep if the content of nodes (not just count) can change:
+  // }, [sliderId, selectedTopLevelId, level2NodesForScroller.length, hierarchyData]);
   // Key (correctly excludes activeMainSwiperL3Id)
   const mainL3SwiperKey = useMemo(() => {
     return `${sliderId}-L3swiper-L1-${selectedTopLevelId}-L2sel-${selectedLevel2Ids.join(
@@ -279,243 +295,101 @@ function JournalHierarchySlider({
     }
   };
 
-  // --- NEW/MODIFIED: Long Press Handlers & Navigation Actions ---
-  const handleL2PressStart = (itemId) => {
-    clearTimeout(longPressTimerRef.current);
-    itemBeingPressedRef.current = itemId; // Store the item being pressed
-    longPressTimerRef.current = setTimeout(() => {
-      if (itemBeingPressedRef.current === itemId) {
-        // Check if still pressing the same item
-        console.log("Long press detected on L2 item:", itemId);
-        setNavContextItemId(itemId);
-        setShowNavOptions(true);
-      }
-    }, 700); // 700ms for long press
-  };
-
-  const handleL2PressEnd = (clickedItemId, eventType) => {
-    // eventType: 'click' or 'release'
-    clearTimeout(longPressTimerRef.current);
-    itemBeingPressedRef.current = null; // Clear the item being pressed
-
-    // If options are shown and it's a 'release' (mouseup/touchend not on an option button),
-    // we let the click-away listener handle closing.
-    // If it was a 'click' on the button itself while options were shown, that click is handled by option buttons.
-    if (
-      showNavOptions &&
-      navContextItemId === clickedItemId &&
-      eventType === "release"
-    ) {
-      return;
-    }
-
-    // If it was a normal click (not a long press that showed options, and not a release while options are shown)
-    if (eventType === "click" && !showNavOptions) {
-      if (selectedTopLevelId === rootJournalIdConst) {
-        if (onSelectTopLevel) onSelectTopLevel(clickedItemId);
-      } else {
-        onToggleLevel2Id(clickedItemId);
-      }
-    }
-  };
-
-  // MODIFIED: Added useCallback for useEffect dependency array
-  const closeNavOptions = useCallback(() => {
-    setShowNavOptions(false);
-    setNavContextItemId(null);
-  }, []);
-
-  // NEW: Click Away Listener for Nav Options
-  useEffect(() => {
-    if (!showNavOptions) return;
-
-    const handleClickOutside = (event) => {
-      // Check if the click target or any of its parents has the 'data-l2-button-active-nav' attribute
-      if (event.target.closest("[data-l2-button-active-nav]") === null) {
-        closeNavOptions();
-      }
-    };
-    // Use mousedown to catch click before it might trigger other button's onClick
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside); // For touch devices
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [showNavOptions, closeNavOptions]); // navContextItemId is not needed here
-
-  const handleGoUp = (itemId) => {
+  // --- NEW: Double Click Handlers ---
+  const handleL2ItemDoubleClick = (l2ItemId) => {
+    const isItemSelected = selectedLevel2Ids.includes(l2ItemId);
     console.log(
-      `Go Up from L2 item: ${itemId}. It becomes the new L1 context.`
+      `L2 Item Double Click: ${l2ItemId}, Is Selected: ${isItemSelected}`
     );
-    if (onSelectTopLevel) {
-      onSelectTopLevel(itemId);
-    }
-    closeNavOptions();
-  };
 
-  const handleGoDown = (itemId) => {
-    if (selectedTopLevelId === rootJournalIdConst) {
-      console.warn(
-        "Cannot 'Go Down' from an L1 item when viewing Root context."
-      );
-      closeNavOptions();
-      return;
-    }
-
-    console.log(
-      `Attempting Go Down: Current L1="${selectedTopLevelId}", Item Pressed="${itemId}".`
-    );
-    if (onNavigateContextDown) {
-      // Prop from Home
-      onNavigateContextDown({
-        currentL1ToBecomeL2: selectedTopLevelId, // The L1 context we are moving away from
-        longPressedL2ToBecomeL3: itemId, // The L2 item that was long-pressed
-      });
+    if (isItemSelected) {
+      // If SELECTED, perform "Go Up": make this l2Item the new L1 context
+      console.log(`  Action: Go Up - ${l2ItemId} becomes new L1 context.`);
+      if (onSelectTopLevel) {
+        onSelectTopLevel(l2ItemId); // Home's handleSelectTopLevelJournal clears L2s
+      }
     } else {
-      console.error(
-        "onNavigateContextDown handler is not provided to JournalHierarchySlider"
+      // If NOT SELECTED, perform "Go Down": make parent of current L1 the new L1 context,
+      // maintaining context to this l2ItemId (which becomes an L3)
+      console.log(
+        `  Action: Go Down - Context shifts, aiming for ${l2ItemId} as L3.`
       );
-    }
-    closeNavOptions();
-  };
-
-  // --- NEW: Long Press Handlers for L1 Context Display ---
-  const handleL1ContextPressStart = () => {
-    // Don't allow "Go Down" if already at Root
-    if (selectedTopLevelId === rootJournalIdConst) return;
-
-    clearTimeout(l1LongPressTimerRef.current);
-    l1LongPressTimerRef.current = setTimeout(() => {
-      setL1NavOptionsVisible(true);
-    }, 700);
-  };
-
-  const handleL1ContextPressEnd = () => {
-    clearTimeout(l1LongPressTimerRef.current);
-    // If options are visible, a short tap on the L1 context area itself might dismiss them,
-    // or we rely on clicking the "Go Down" button or a backdrop.
-    // For now, let the backdrop/action buttons handle dismissal.
-  };
-
-  const closeL1NavOptions = useCallback(() => {
-    setL1NavOptionsVisible(false);
-  }, []);
-
-  // NEW: Click Away Listener for L1 Nav Options (similar to L2's)
-  useEffect(() => {
-    if (!l1NavOptionsVisible) return;
-    const handleClickOutside = (event) => {
-      if (event.target.closest("[data-l1-nav-active]") === null) {
-        closeL1NavOptions();
+      if (selectedTopLevelId === rootJournalIdConst) {
+        console.warn(
+          "Cannot 'Go Down' from an L2 item when L1 context is Root and item is not selected. This typically means 'Go Up' to make it L1."
+        );
+        // Fallback: Treat as "Go Up" if at root and not selected (makes it L1)
+        // Or, this state (double-clicking unselected L1 from Root view) might need specific UX.
+        // For now, to prevent getting stuck, let's make it go up.
+        if (onSelectTopLevel) onSelectTopLevel(l2ItemId);
+      } else {
+        if (onNavigateContextDown) {
+          onNavigateContextDown({
+            currentL1ToBecomeL2: selectedTopLevelId,
+            longPressedL2ToBecomeL3: l2ItemId, // Re-using 'longPressed' for clarity of target
+          });
+        }
       }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("touchstart", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("touchstart", handleClickOutside);
-    };
-  }, [l1NavOptionsVisible, closeL1NavOptions]);
+    }
+  };
 
-  // --- NEW: Navigation Action for L1 Context "Go Down" ---
-  const handleL1ContextGoDown = () => {
+  const handleL1ContextDoubleClick = () => {
+    console.log(`L1 Context Double Click: Current L1 is ${selectedTopLevelId}`);
     if (selectedTopLevelId === rootJournalIdConst) {
-      console.warn("Cannot 'Go Down' further; already at Root context.");
-      closeL1NavOptions();
-      return;
+      console.warn("L1 Context is Root, 'Go Down' (to parent) action is N/A.");
+      return; // Cannot go "down" (to parent) from Root
     }
 
-    // Find the parent of the current selectedTopLevelId
+    // Perform "Go Down": Make the parent of the current L1 context the new L1 context.
+    // The item that *was* the L1 context should become selected in the L2 scroller.
     let newL1ParentContextId;
     const parentNode = findParentOfNode(selectedTopLevelId, hierarchyData);
-
     if (parentNode) {
       newL1ParentContextId = parentNode.id;
     } else {
-      // If selectedTopLevelId was an L1 account, its parent context is Root
-      newL1ParentContextId = rootJournalIdConst;
+      newL1ParentContextId = rootJournalIdConst; // Parent is Root
     }
 
     console.log(
-      `L1 Context Go Down: From ${selectedTopLevelId} to ${newL1ParentContextId}`
+      `  Action: Go Down - New L1 context will be ${newL1ParentContextId}, previous L1 ${selectedTopLevelId} should be selected in L2.`
     );
     if (onSelectTopLevel) {
-      // onSelectTopLevel will set the new L1 context.
-      // It should also clear selectedLevel2JournalIds and activeMainSwiperL3Id.
-      // We also want to select the node we just "came down from" (selectedTopLevelId)
-      // in the L2 scroller of the new parent context.
-      // This requires onSelectTopLevel to be smarter or have an additional parameter.
-
-      // For now, simpler: onSelectTopLevel just changes the L1 context.
-      // User will see the new L2 scroller and can select from there.
-      // To make it smoother, `Home`'s `handleSelectTopLevelJournal` could be enhanced.
-      onSelectTopLevel(newL1ParentContextId, selectedTopLevelId); // Pass childToSelectInL2
+      // Pass the current selectedTopLevelId as the childToSelectInL2 for the new parent context
+      onSelectTopLevel(newL1ParentContextId, selectedTopLevelId);
     }
-    closeL1NavOptions();
   };
 
   // --- RENDER LOGIC ---
   return (
     <>
-      <div
-        className={`${styles.journalParentHeader} ${
-          l1NavOptionsVisible ? styles.l1NavActive : ""
-        }`}
-        onMouseDown={handleL1ContextPressStart}
-        onMouseUp={handleL1ContextPressEnd}
-        onTouchStart={handleL1ContextPressStart}
-        onTouchEnd={handleL1ContextPressEnd}
-        onContextMenu={(e) => e.preventDefault()} // Prevent native context menu
-        // Add data attribute for click-away listener
-        {...(l1NavOptionsVisible && { "data-l1-nav-active": "true" })}
-        style={{ position: "relative" }} // For positioning options
+      {/* MODIFIED: L1 Context Display Area - now uses onDoubleClick */}
+      <nDo
+        className={styles.journalParentHeader} // Remove .l1NavActive if it was for long-press state
+        onDoubleClick={() => {
+          // Add a direct console log here
+          console.log("L1 Context DIV onDoubleClick FIRED!");
+          handleL1ContextDoubleClick();
+        }}
+        // onContextMenu={(e) => e.preventDefault()} // Keep if you still want to prevent right-click menu
+        style={{
+          cursor:
+            selectedTopLevelId !== rootJournalIdConst ? "pointer" : "default",
+        }} // Indicate interactivity
       >
         <span className={styles.journalParentInfo}>
-          Current Context: {currentL1ContextNode?.code || "N/A"} -{" "}
+          {currentL1ContextNode?.code || "N/A"} -{" "}
           {currentL1ContextNode?.name || "Overview"}
-          {selectedTopLevelId !== rootJournalIdConst && " (Hold to Go Down)"}
+          {selectedTopLevelId !== rootJournalIdConst && " "}
         </span>
-
-        {/* NEW: L1 Navigation Options */}
-        {l1NavOptionsVisible && selectedTopLevelId !== rootJournalIdConst && (
-          <motion.div
-            className={styles.l1NavOptionsOverlay} // New CSS class
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <button
-              className={`${styles.navOptionButtonInside} ${styles.navOptionGoDownInside}`} // Reuse L2's button style
-              onClick={(e) => {
-                e.stopPropagation(); // Prevent L1 context pressEnd from firing if not desired
-                handleL1ContextGoDown();
-              }}
-            >
-              <span className={styles.navIcon}>▼</span> Go Down (to Parent
-              Context)
-            </button>
-            {/* Optional dismiss button for L1 options */}
-            <button
-              className={styles.navOptionDismissInsideL1} // Potentially different style/position
-              onClick={(e) => {
-                e.stopPropagation();
-                closeL1NavOptions();
-              }}
-            >
-              ×
-            </button>
-          </motion.div>
-        )}
-      </div>
+        {/* REMOVED: L1 Navigation Options Overlay */}
+      </nDo>
 
       <h3 className={styles.level2ScrollerTitle}>
         {selectedTopLevelId === rootJournalIdConst
-          ? "Top-Level Accounts (Click to View Children, Hold for Options)"
+          ? "Top-Level Accounts"
           : `Level 2 Accounts (Children of ${
               currentL1ContextNode?.code || "..."
-            }, Hold for Options)`}
+            })`}
       </h3>
 
       {level2NodesForScroller.length > 0 ? (
@@ -545,137 +419,28 @@ function JournalHierarchySlider({
                 );
                 return null;
               }
-              const isNavContextActive =
-                navContextItemId === l2ContextNode.id && showNavOptions;
 
               return (
-                // MODIFIED: SwiperSlide class might need adjustment based on your CSS for overflow
                 <SwiperSlide
                   key={l2ContextNode.id}
                   className={styles.level2ScrollerSlideNoOverflow}
                 >
-                  {/* MODIFIED: This wrapper will handle the layout animation (scaling) */}
-                  <motion.div
-                    className={`${styles.l2ButtonInteractiveWrapper} ${
-                      isNavContextActive ? styles.l2ButtonWithOptionsActive : ""
-                    }`}
-                    onContextMenu={(e) => e.preventDefault()} // Keep for desktop
-                    // Animate the scale and potentially other properties
-                    animate={isNavContextActive ? "expanded" : "normal"}
-                    variants={{
-                      normal: {
-                        scale: 1,
-                        // minWidth: 'auto', // Or specific width of normal button
-                        // height: 'auto', // Or specific height
-                        // zIndex: 5, // Ensure it's above others normally
-                        transition: { duration: 0.2, ease: "easeOut" },
-                      },
-                      expanded: {
-                        scale: 1.05, // Or a fixed larger size if preferred via width/height
-                        // minWidth: '180px', // Match CSS if using fixed expanded size
-                        // height: '90px',   // Match CSS
-                        zIndex: 10, // Bring to front when expanded
-                        transition: { duration: 0.3, ease: "circOut" },
-                      },
-                    }}
-                    // Add data-attribute for click-away listener
-                    {...(isNavContextActive && {
-                      "data-l2-button-active-nav": "true",
-                    })}
-                  >
-                    {/* AnimatePresence to handle fade in/out of button content vs options */}
-                    <AnimatePresence initial={false} mode="wait">
-                      {!isNavContextActive && (
-                        <motion.button
-                          key="normal-button-content" // Stable key for this state
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.15 }}
-                          onMouseDown={() =>
-                            handleL2PressStart(l2ContextNode.id)
-                          }
-                          onMouseUp={() =>
-                            handleL2PressEnd(l2ContextNode.id, "release")
-                          }
-                          onTouchStart={() =>
-                            handleL2PressStart(l2ContextNode.id)
-                          }
-                          onTouchEnd={() =>
-                            handleL2PressEnd(l2ContextNode.id, "release")
-                          }
-                          onClick={(e) => {
-                            if (isNavContextActive) {
-                              e.preventDefault();
-                              return;
-                            }
-                            // --- CORRECTED onClick LOGIC ---
-                            // A normal click on an L2 scroller item ALWAYS toggles its selection
-                            // for displaying its children in the L3 swiper.
-                            // The type of item (L1 account or L2 account) in the scroller
-                            // is determined by selectedTopLevelId, but the click action is consistent.
-                            console.log(
-                              `Normal Click: Toggling item ${l2ContextNode.id} for L3 display. Current L1 context: ${selectedTopLevelId}`
-                            );
-                            onToggleLevel2Id(l2ContextNode.id);
-                          }}
-                          className={`${styles.level2Button} ${
-                            // Highlighting is now ALWAYS based on selectedLevel2Ids
-                            selectedLevel2Ids.includes(l2ContextNode.id)
-                              ? styles.level2ButtonActive
-                              : ""
-                          }`}
-                          title={`${l2ContextNode.code} - ${
-                            l2ContextNode.name || "Unnamed"
-                          }`}
-                        >
-                          {l2ContextNode.code || "N/A"}
-                        </motion.button>
-                      )}
-
-                      {isNavContextActive && (
-                        <motion.div
-                          key="expanded-options-content" // Stable key for this state
-                          className={styles.l2ButtonExpandedWithOptions}
-                          onContextMenu={(e) => e.preventDefault()} // Keep for desktop
-                          initial={{ opacity: 0, scale: 0.9 }} // Start slightly smaller and faded
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
-                          transition={{ duration: 0.2, delay: 0.05 }} // Slight delay for content after wrapper scales
-                        >
-                          <div className={styles.expandedButtonHeader}>
-                            <span>
-                              {l2ContextNode.code} -{" "}
-                              {l2ContextNode.name || "Unnamed"}
-                            </span>
-                            <button
-                              className={styles.navOptionDismissInside}
-                              onClick={closeNavOptions}
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className={styles.navOptionsInside}>
-                            <button
-                              className={`${styles.navOptionButtonInside} ${styles.navOptionGoUpInside}`}
-                              onClick={() => handleGoUp(l2ContextNode.id)}
-                            >
-                              <span className={styles.navIcon}>▲</span> Go Up
-                            </button>
-                            {selectedTopLevelId !== rootJournalIdConst && (
-                              <button
-                                className={`${styles.navOptionButtonInside} ${styles.navOptionGoDownInside}`}
-                                onClick={() => handleGoDown(l2ContextNode.id)}
-                              >
-                                <span className={styles.navIcon}>▼</span> Go
-                                Down
-                              </button>
-                            )}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                  <div className={styles.l2ButtonInteractiveWrapper}>
+                    <button
+                      onClick={() => handleL2ItemInteraction(l2ContextNode.id)} // Use the new interaction handler
+                      onContextMenu={(e) => e.preventDefault()} // Keep if desired
+                      className={`${styles.level2Button} ${
+                        selectedLevel2Ids.includes(l2ContextNode.id)
+                          ? styles.level2ButtonActive
+                          : ""
+                      }`}
+                      title={`${l2ContextNode.code} - ${
+                        l2ContextNode.name || "Unnamed"
+                      } `}
+                    >
+                      {l2ContextNode.code || "N/A"}
+                    </button>
+                  </div>
                 </SwiperSlide>
               );
             })}
@@ -840,16 +605,10 @@ function DynamicSlider({
     0,
     data.findIndex((item) => item?.id === activeItemId)
   );
-  console.log(
-    `DynamicSlider Render (${sliderId}): ActiveItemID Prop: ${activeItemId}, Initial Index Calc: ${initialSlideIndex}, Data length: ${data.length}`
-  );
 
   const handleSwiperChange = (swiper) => {
     const currentRealIndex = swiper.activeIndex;
     if (data && data.length > currentRealIndex && data[currentRealIndex]) {
-      console.log(
-        `DynamicSlider (${sliderId}): Swipe Change. Index: ${currentRealIndex}, New ID: ${data[currentRealIndex].id}`
-      );
       onSlideChange(data[currentRealIndex].id);
     } else {
       console.warn(
@@ -1064,6 +823,7 @@ function AccountNode({
       }
     }
   };
+  const indentSize = 15; // px per level - Reduced from previous 20 or 25
 
   return (
     <>
@@ -1071,14 +831,14 @@ function AccountNode({
         className={`${styles.accountNodeRow} ${
           isSelected ? styles.accountNodeSelected : ""
         }`}
-        style={{ paddingLeft: `${level * 20}px` }} // Reduced indent slightly
-        onClick={handleRowSingleClick} // Changed
-        onDoubleClick={handleRowDoubleClick} // NEW
-        role="treeitem" // More appropriate ARIA role
+        // --- MODIFIED: Inline style for padding ---
+        style={{ paddingLeft: `${level * indentSize}px` }}
+        onClick={handleRowSingleClick}
+        onDoubleClick={handleRowDoubleClick}
+        role="treeitem"
         tabIndex={0}
         aria-selected={isSelected}
         aria-expanded={hasChildren ? isOpen : undefined}
-        // onKeyDown might need update if Enter/Space no longer toggle but select/double-click
       >
         <span
           className={styles.accountNodeToggle}
@@ -1126,6 +886,7 @@ function AccountNode({
         </div>
       </div>
       {/* Children rendering part remains the same, ensuring props are passed down */}
+      {/* Children Rendering - Indentation of this block's content is handled by the recursive call's `level` */}
       <div className={styles.accountNodeChildrenContainer}>
         <AnimatePresence initial={false}>
           {hasChildren && isOpen && (
@@ -1139,10 +900,17 @@ function AccountNode({
                 collapsed: { opacity: 0, height: 0 },
               }}
               transition={{ duration: 0.2, ease: "easeInOut" }}
+              // --- MODIFIED: Padding for children's motion wrapper can also be adjusted if it was adding extra ---
+              // This padding was for the connecting line. If line style changes, this might need to change.
+              // For now, let's assume the line starts relative to the parent's toggle.
+              // The `AccountNode` rows themselves get their padding from `level * indentSize`.
+              // This style below was for the connecting line's container; its paddingLeft should align with child node's icons.
+              // Example: if icon area + its margin is X, this should be X.
+              // For now, we'll rely on the child AccountNode's own padding.
               style={{
                 overflow: "hidden",
-                paddingLeft: `${level * 25 + 20}px`, // Adjusted to align with line if used
-                position: "relative",
+                position: "relative", // For connecting line if re-enabled
+                // paddingLeft: `${level * indentSize + (indentSize / 2)}px`, // Example: if line needs to be indented more
               }}
               className={styles.accountNodeChildrenMotionWrapper}
             >
@@ -1267,8 +1035,7 @@ function JournalModal({
         >
           ×
         </button>
-        <h2>Select or Manage Journal Account</h2> {/* Updated Title */}
-        {/* REMOVED: modalTopActions div and its button */}
+        <h2>Manage Journals</h2>
         <div className={styles.accountHierarchyContainer}>
           {hierarchy.length > 0 ? (
             hierarchy.map(
@@ -1744,6 +1511,14 @@ export default function Home() {
   // It sets the new "parent" for the L2 scroller.
   const handleSelectTopLevelJournal = useCallback(
     (newTopLevelId, childToSelectInL2 = null) => {
+      // Ensure newTopLevelId is valid (not an empty string, exists, or is ROOT)
+      if (!newTopLevelId && newTopLevelId !== ROOT_JOURNAL_ID) {
+        console.error(
+          "handleSelectTopLevelJournal called with invalid newTopLevelId:",
+          newTopLevelId
+        );
+        return;
+      }
       if (
         newTopLevelId !== ROOT_JOURNAL_ID &&
         !findNodeById(activeDataSet?.account_hierarchy, newTopLevelId)
@@ -1755,35 +1530,83 @@ export default function Home() {
         return;
       }
 
+      console.log(
+        `Home: Setting L1 context to: ${newTopLevelId}. Attempting to select L2 child: ${
+          childToSelectInL2 || "none"
+        }`
+      );
       setSelectedTopLevelJournalId(newTopLevelId);
 
       if (childToSelectInL2) {
-        // Ensure childToSelectInL2 is a valid child of newTopLevelId (or newTopLevelId is ROOT and childToSelectInL2 is an L1)
-        let l2SourceNodes;
+        let l2SourceNodesForValidation;
         if (newTopLevelId === ROOT_JOURNAL_ID) {
-          l2SourceNodes = activeDataSet?.account_hierarchy || [];
+          l2SourceNodesForValidation = activeDataSet?.account_hierarchy || [];
         } else {
           const topNode = findNodeById(
             activeDataSet?.account_hierarchy,
             newTopLevelId
           );
-          l2SourceNodes = topNode?.children || [];
+          l2SourceNodesForValidation = topNode?.children || [];
         }
-        if (l2SourceNodes.some((node) => node.id === childToSelectInL2)) {
+
+        if (
+          l2SourceNodesForValidation.some(
+            (node) => node.id === childToSelectInL2
+          )
+        ) {
           setSelectedLevel2JournalIds([childToSelectInL2]);
         } else {
-          setSelectedLevel2JournalIds([]); // Clear if childToSelectInL2 is not valid for new context
+          console.warn(
+            `Home: childToSelectInL2 "${childToSelectInL2}" not found under new L1 context "${newTopLevelId}". Clearing L2 selection.`
+          );
+          setSelectedLevel2JournalIds([]);
         }
       } else {
-        setSelectedLevel2JournalIds([]); // Always reset L2 selections if no specific child is to be selected
+        setSelectedLevel2JournalIds([]);
       }
-      // activeMainSwiperL3Id will be updated by its useEffect based on new L1/L2
-      console.log(
-        `New Top Level context set to: ${newTopLevelId}. Child to select in L2: ${childToSelectInL2}`
-      );
+      // activeMainSwiperL3Id will be updated by its useEffect based on new L1/L2 selections
     },
     [activeDataSet, ROOT_JOURNAL_ID]
   ); // Dependencies
+
+  const handleNavigateContextDown = useCallback(
+    ({ currentL1ToBecomeL2, longPressedL2ToBecomeL3 }) => {
+      // currentL1ToBecomeL2 is the ID of the L1 context we are navigating AWAY from.
+      // longPressedL2ToBecomeL3 is the ID of the L2 item (in the old L1 context) that triggered the "Go Down" action.
+
+      console.log(
+        `Home: Navigating Context Down. Old L1: ${currentL1ToBecomeL2}, Target L3 (from old L2): ${longPressedL2ToBecomeL3}`
+      );
+
+      let newL1ContextId;
+      const parentOfOldL1 = findParentOfNode(
+        currentL1ToBecomeL2,
+        activeDataSet.account_hierarchy
+      );
+
+      if (parentOfOldL1) {
+        newL1ContextId = parentOfOldL1.id;
+      } else {
+        newL1ContextId = ROOT_JOURNAL_ID; // If old L1 was a top-level, its parent context is Root
+      }
+
+      // Now, call handleSelectTopLevelJournal to set the new L1 context,
+      // and pass currentL1ToBecomeL2 as the L2 item to select in that new context,
+      // and longPressedL2ToBecomeL3 to be the target L3.
+      handleSelectTopLevelJournal(newL1ContextId, currentL1ToBecomeL2); // This sets L1 and L2
+
+      // After the L1 and L2 selections are set by handleSelectTopLevelJournal,
+      // we need to set the active L3.
+      // The useEffect for activeMainSwiperL3Id might pick up the first child of currentL1ToBecomeL2.
+      // We want to specifically target longPressedL2ToBecomeL3.
+      // This needs to happen *after* selectedLevel2JournalIds is updated.
+      // A slight delay or a more sophisticated state update sequence might be needed if it doesn't select correctly.
+      // For now, let's assume the main useEffect for activeMainSwiperL3Id will handle it if currentL1ToBecomeL2 has longPressedL2ToBecomeL3 as a child.
+      // To be more explicit:
+      setActiveMainSwiperL3Id(longPressedL2ToBecomeL3); // Set this directly after other selections change
+    },
+    [activeDataSet, ROOT_JOURNAL_ID, handleSelectTopLevelJournal]
+  ); // setActiveMainSwiperL3Id is stable
 
   const handleToggleLevel2JournalId = useCallback(
     (level2IdToToggle) => {
@@ -1827,40 +1650,6 @@ export default function Home() {
       setSelectedGoodsId(selectedItemId);
     // ...
   }, []);
-
-  const handleNavigateContextDown = useCallback(
-    ({ currentL1ToBecomeL2, longPressedL2ToBecomeL3 }) => {
-      console.log(
-        `Navigating Context Down: currentL1ToBecomeL2=${currentL1ToBecomeL2}, longPressedL2ToBecomeL3=${longPressedL2ToBecomeL3}`
-      );
-
-      // 1. Find the parent of currentL1ToBecomeL2. This is the new L1 context.
-      let newL1ContextId;
-      const parentOfCurrentL1 = findParentOfNode(
-        currentL1ToBecomeL2,
-        activeDataSet.account_hierarchy
-      );
-
-      if (parentOfCurrentL1) {
-        newL1ContextId = parentOfCurrentL1.id;
-      } else {
-        // If currentL1ToBecomeL2 was a top-level account, its parent context is Root
-        newL1ContextId = ROOT_JOURNAL_ID;
-      }
-
-      // 2. Set the new L1 context
-      setSelectedTopLevelJournalId(newL1ContextId);
-
-      // 3. The currentL1ToBecomeL2 should now be selected in the L2 scroller
-      //    (This assumes currentL1ToBecomeL2 is a valid child of newL1ContextId, which it should be)
-      setSelectedLevel2JournalIds([currentL1ToBecomeL2]);
-
-      // 4. The longPressedL2ToBecomeL3 should be the active item in the L3 swiper
-      //    (This assumes longPressedL2ToBecomeL3 is a valid child of currentL1ToBecomeL2)
-      setActiveMainSwiperL3Id(longPressedL2ToBecomeL3);
-    },
-    [activeDataSet, ROOT_JOURNAL_ID]
-  ); // findParentOfNode, setSelected..., setActive... are stable
 
   const openAddJournalModalWithContext = useCallback((context) => {
     setAddJournalContext(context);
@@ -2402,7 +2191,7 @@ export default function Home() {
             hierarchy={[
               {
                 id: ROOT_JOURNAL_ID_FOR_MODAL,
-                name: "All Accounts (Root)",
+                name: ``,
                 code: "ROOT",
                 children: activeDataSet?.account_hierarchy || [],
                 // Add a flag to identify it as the special root, if needed by AccountNode

@@ -443,6 +443,9 @@
   width: 100%;
   padding: calc(var(--spacing-unit) * 0.5) 0;
   margin-bottom: calc(var(--spacing-unit) * 1.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .level2ScrollerSwiper {
@@ -511,7 +514,6 @@
 /* Journal L3 Main Swiper (if overrides needed from .swiperInstance) */
 .journalL3SwiperInstance {
   /* Example: Maybe different min-height or slide padding */
-  /* min-height: 120px; */
 }
 
 /* Journal L1 Parent Mode Swiper Slide */
@@ -839,7 +841,7 @@
   margin-left: calc(
     var(--spacing-unit) * 0.5
   ); /* Space after toggle/placeholder */
-  margin-right: calc(var(--spacing-unit) * 1);
+  margin-right: calc(var(--spacing-unit) * -5);
   min-width: 45px;
   flex-shrink: 0;
   font-size: 0.85em;
@@ -1498,4 +1500,93 @@
   -ms-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+/* page.module.css */
+
+/* --- Account Node Styles (in JournalModal) --- */
+.accountNodeRow {
+  display: flex;
+  align-items: center;
+  /* padding-top and padding-bottom define row height, keep them reasonable */
+  padding-top: calc(var(--spacing-unit) * 0.75);
+  padding-bottom: calc(var(--spacing-unit) * 0.75);
+  /* padding-right for space before end of row, can be small */
+  padding-right: calc(var(--spacing-unit) * 0.5);
+  /* padding-left is now controlled by inline style: level * indentSize */
+  border-radius: var(--border-radius-sm);
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+  margin-bottom: 1px; /* Minimal space between rows */
+  position: relative;
+}
+/* ... .accountNodeRow:hover, .accountNodeRow.accountNodeSelected ... */
+
+.accountNodeToggle {
+  /* Chevron icon container */
+  flex-shrink: 0; /* Prevent shrinking */
+  width: 20px; /* Adjust if your icons are smaller/larger. Was 16px icon in 16px box, or 20px box. */
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  margin-right: calc(
+    var(--spacing-unit) * 0.5
+  ); /* MODIFIED: Reduced space after chevron */
+  /* The negative margin used previously was: margin-right: calc(var(--spacing-unit) * -2.7); 
+     This was likely to pull the code/name leftwards. We achieve that now by reducing indent 
+     and margins on other elements. Let's avoid large negative margins if possible.
+  */
+}
+.accountNodeToggle svg {
+  width: 16px; /* Actual icon size */
+  height: 16px;
+}
+
+.accountNodeIconPlaceholder {
+  /* For alignment when no children */
+  flex-shrink: 0;
+  width: 20px; /* Match .accountNodeToggle width */
+  height: 20px; /* Match .accountNodeToggle height */
+  margin-right: calc(
+    var(--spacing-unit) * 0.5
+  ); /* MODIFIED: Match .accountNodeToggle margin */
+}
+
+.accountNodeCode {
+  flex-shrink: 0; /* Prevent shrinking */
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.8em; /* MODIFIED: Slightly smaller font for code */
+  margin-right: calc(
+    var(--spacing-unit) * -1
+  ); /* MODIFIED: Reduced space after code */
+  text-align: left; /* If codes are short, left align might look better than right */
+}
+.accountNodeSelected .accountNodeCode {
+  color: var(--accent-warm);
+}
+
+.journalParentHeader {
+  /* ... existing styles (position: relative, transition, etc.) ... */
+  cursor: pointer; /* If the whole area is double-clickable */
+  touch-action: manipulation; /* Prevent double-tap zoom */
+  /* user-select: none etc. are already there for text selection prevention */
+}
+
+.level2Button {
+  /* ... existing styles ... */
+  touch-action: manipulation; /* Prevent double-tap zoom */
+}
+
+/* OR, if the wrapper receives the event more reliably due to structure: */
+.l2ButtonInteractiveWrapper {
+  /* ... existing styles ... */
+  touch-action: manipulation; /* Prevent double-tap zoom */
+}
+
+.accountNodeRow {
+  /* ... existing styles ... */
+  touch-action: manipulation; /* If double-clicking these rows triggers actions */
 }
