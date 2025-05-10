@@ -1455,3 +1455,47 @@
 .navOptionDismissInsideL1:hover {
   color: var(--text-primary);
 }
+
+/* page.module.css */
+
+.journalParentInfo, /* The span holding the L1 context text */
+.level2Button {
+  /* Your L2 buttons */
+  /* Standard CSS to prevent text selection */
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* Internet Explorer/Edge */
+  user-select: none; /* Non-prefixed version, currently supported by Chrome, Opera, Edge */
+
+  /* For iOS Safari, to prevent callout menu on long press (copy, share, etc.) */
+  -webkit-touch-callout: none;
+}
+
+/* Apply to the interactive wrappers as well if the issue persists */
+.journalParentHeader, /* The clickable L1 context header div */
+.l2ButtonInteractiveWrapper {
+  /* The wrapper around L2 buttons */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* If your L1 options overlay contains text you don't want selectable during interaction */
+.l1NavOptionsOverlay {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* If your L2 expanded options view contains text you don't want selectable */
+.l2ButtonExpandedWithOptions {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

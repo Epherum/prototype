@@ -556,7 +556,10 @@ function JournalHierarchySlider({
                 >
                   {/* MODIFIED: This wrapper will handle the layout animation (scaling) */}
                   <motion.div
-                    className={`${styles.l2ButtonInteractiveWrapper}`}
+                    className={`${styles.l2ButtonInteractiveWrapper} ${
+                      isNavContextActive ? styles.l2ButtonWithOptionsActive : ""
+                    }`}
+                    onContextMenu={(e) => e.preventDefault()} // Keep for desktop
                     // Animate the scale and potentially other properties
                     animate={isNavContextActive ? "expanded" : "normal"}
                     variants={{
@@ -579,7 +582,6 @@ function JournalHierarchySlider({
                     {...(isNavContextActive && {
                       "data-l2-button-active-nav": "true",
                     })}
-                    onContextMenu={(e) => e.preventDefault()} // Prevent native context menu
                   >
                     {/* AnimatePresence to handle fade in/out of button content vs options */}
                     <AnimatePresence initial={false} mode="wait">
@@ -635,6 +637,7 @@ function JournalHierarchySlider({
                         <motion.div
                           key="expanded-options-content" // Stable key for this state
                           className={styles.l2ButtonExpandedWithOptions}
+                          onContextMenu={(e) => e.preventDefault()} // Keep for desktop
                           initial={{ opacity: 0, scale: 0.9 }} // Start slightly smaller and faded
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.9 }}
