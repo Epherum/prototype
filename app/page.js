@@ -466,6 +466,7 @@ function JournalHierarchySlider({
         onMouseUp={handleL1ContextPressEnd}
         onTouchStart={handleL1ContextPressStart}
         onTouchEnd={handleL1ContextPressEnd}
+        onContextMenu={(e) => e.preventDefault()} // Prevent native context menu
         // Add data attribute for click-away listener
         {...(l1NavOptionsVisible && { "data-l1-nav-active": "true" })}
         style={{ position: "relative" }} // For positioning options
@@ -578,6 +579,7 @@ function JournalHierarchySlider({
                     {...(isNavContextActive && {
                       "data-l2-button-active-nav": "true",
                     })}
+                    onContextMenu={(e) => e.preventDefault()} // Prevent native context menu
                   >
                     {/* AnimatePresence to handle fade in/out of button content vs options */}
                     <AnimatePresence initial={false} mode="wait">
