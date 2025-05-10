@@ -1,16 +1,36 @@
-/* ================================== */
-/* --- Global & Page Structure --- */
-/* ================================== */
-/* :root { ... your CSS variables ... } */
+/* ==========================================================================
+   1. GLOBAL & PAGE STRUCTURE
+   ========================================================================== */
+
+/* :root {
+  --spacing-unit: 8px;
+  --text-primary: #333;
+  --text-secondary: #777;
+  --bg-main: #fff;
+  --bg-card: #fff;
+  --bg-secondary: #f0f0f0;
+  --accent-warm: #E89F71;
+  --accent-warm-light: #FAEBD7;
+  --accent-warm-lighter: #FFF5E8;
+  --accent-slider: #FDF5EF;
+  --border-subtle: #eee;
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-pill: 999px;
+  --shadow-color: rgba(0, 0, 0, 0.08);
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+} */
 
 .pageContainer {
   max-width: 600px;
   margin: 0 auto;
-  /* Padding applies around the content area below the sticky header */
   padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
     calc(var(--spacing-unit) * 2);
   min-height: 100vh;
   box-sizing: border-box;
+  /* If a transform here is causing issues for fixed modals, it needs to be removed or modals need portaling */
+  /* Example: transform: translateZ(0); /* This would create a stacking context */
 }
 
 .title {
@@ -18,27 +38,25 @@
   color: var(--text-primary);
   font-size: 1.8em;
   font-weight: 600;
-  /* Flows below sticky header */
   margin-top: calc(var(--spacing-unit) * 3);
   margin-bottom: calc(var(--spacing-unit) * 3);
 }
 
-/* ================================== */
-/* --- Sticky Header Section --- */
-/* ================================== */
+/* ==========================================================================
+   2. STICKY HEADER
+   ========================================================================== */
+
 .stickyHeaderContainer {
   position: sticky;
   top: 0;
-  z-index: 100;
-  background-color: var(--bg-main); /* Adjust var name if needed */
-  padding: calc(var(--spacing-unit) * 1.5) 0; /* Adjusted padding */
-  margin: 0 calc(-1 * var(--spacing-unit) * 2); /* Full width bleed */
-  padding-left: calc(var(--spacing-unit) * 2);
-  padding-right: calc(var(--spacing-unit) * 2);
-  box-shadow: 0 2px 0px rgba(0, 0, 0, 0.08);
+  z-index: 100; /* Lower than modals */
+  background-color: var(--bg-main);
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+  margin: 0 calc(-1 * var(--spacing-unit) * 2); /* Bleed effect */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); /* Slightly softer shadow */
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing-unit) * 1.5); /* Adjusted gap */
+  gap: calc(var(--spacing-unit) * 2);
   margin-bottom: calc(var(--spacing-unit) * 3);
 }
 
@@ -64,7 +82,7 @@
   accent-color: var(--accent-warm);
 }
 
-/* Visibility Toggles Swiper */
+/* Visibility Toggles Swiper (in Sticky Header) */
 .visibilitySwiperContainer {
   width: 100%;
   flex-shrink: 0;
@@ -72,23 +90,21 @@
 }
 
 .visibilitySwiper {
-  padding-left: calc(var(--spacing-unit) * 0.5);
-  padding-right: calc(var(--spacing-unit) * 0.5);
+  padding: 0 calc(var(--spacing-unit) * 0.5); /* Horizontal padding */
 }
 
 .visibilitySwiperSlide {
-  display: inline-flex !important;
+  display: inline-flex !important; /* Swiper specific */
   align-items: center;
   justify-content: center;
-  width: auto !important;
+  width: auto !important; /* Swiper specific for slidesPerView: 'auto' */
   cursor: grab;
   user-select: none;
   vertical-align: middle;
-  padding: 2px 0;
+  padding: 2px 0; /* Minimal vertical padding for the slide wrapper */
 }
 
 .visibilitySlideContent {
-  /* Wrapper for motion.div inside slide */
   display: inline-flex;
   align-items: center;
 }
@@ -108,7 +124,6 @@
   min-width: 75px;
   text-align: center;
   flex-shrink: 0;
-  /* Opacity controlled by motion */
 }
 
 .visibilityButton.visibilityActive {
@@ -119,18 +134,17 @@
 }
 
 .visibilityButton.visibilityInactive {
-  /* Style for when opacity/scale applied */
   border-color: #ddd;
   color: #aaa;
   background-color: #f9f9f9;
-  /* pointer-events: none; */
 }
 
-.visibilityButton:hover {
+.visibilityButton:hover:not(.visibilityActive) {
+  /* Only apply hover if not active for inactive style */
   border-color: var(--accent-warm);
 }
 .visibilityButton.visibilityActive:hover {
-  background-color: #d68f63;
+  background-color: #d68f63; /* Darker accent */
   border-color: #d68f63;
 }
 .visibilityButton.visibilityInactive:hover {
@@ -144,18 +158,18 @@
   flex-shrink: 0;
   line-height: 1;
   font-weight: bold;
-  opacity: 1 !important;
-  transition: none;
+  /* Opacity handled by motion.div, keep this simple */
 }
 
-/* ================================== */
-/* --- Main Content Sliders Area --- */
-/* ================================== */
+/* ==========================================================================
+   3. MAIN CONTENT SLIDERS AREA
+   ========================================================================== */
+
 .slidersArea {
   display: flex;
   flex-direction: column;
   gap: calc(var(--spacing-unit) * 3);
-  overflow-anchor: none;
+  overflow-anchor: none; /* Prevents scroll jumping during layout changes */
 }
 
 .sliderWrapper {
@@ -163,16 +177,15 @@
   border-radius: var(--border-radius-lg);
   padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
   box-shadow: 0 4px 15px var(--shadow-color);
-  overflow: hidden;
-  border: 1px solid transparent;
-  position: relative;
+  overflow: hidden; /* Important for rounded corners and content clipping */
+  border: 1px solid transparent; /* Placeholder for potential focus/active states */
+  position: relative; /* For absolute positioning of internal elements if needed */
 }
 
-/* ================================== */
-/* --- Slider Internal Components --- */
-/* ================================== */
+/* ==========================================================================
+   4. SLIDER INTERNAL CONTROLS (Edit, Up/Down buttons)
+   ========================================================================== */
 
-/* --- Controls (Up/Down/Edit/Options) --- */
 .controls {
   display: flex;
   justify-content: space-between;
@@ -183,8 +196,8 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-/* General button style used in controls */
 .controlButton {
+  /* General style for Up/Down buttons */
   padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.2);
   font-size: 0.85em;
   font-weight: 500;
@@ -216,13 +229,14 @@
   transform: none;
 }
 
-/* Specific button styles within controls */
 .editButton {
-  /* For Edit Pencil */
+  /* For Options/Edit icon button */
   background-color: rgba(0, 0, 0, 0.05);
   color: var(--text-secondary);
-  padding: calc(var(--spacing-unit) * 0.8);
+  padding: calc(var(--spacing-unit) * 0.8); /* Make it squarer for icon */
   flex-shrink: 0;
+  /* Inherits .controlButton radius if also applied, or set new one */
+  border-radius: 50%; /* Example for round icon button */
 }
 .editButton:hover {
   background-color: rgba(0, 0, 0, 0.1);
@@ -230,44 +244,24 @@
 }
 .editButton svg {
   font-size: 1.2em;
+  display: block; /* Helps with icon alignment */
 }
 
-.modalButton {
-  /* For Journal Options Cog */
-  background-color: rgba(0, 0, 0, 0.05);
-  color: var(--text-secondary);
-  padding: calc(var(--spacing-unit) * 0.8);
-  flex-shrink: 0;
-}
-.modalButton:hover {
-  background-color: rgba(0, 0, 0, 0.1);
-  color: var(--text-primary);
-}
-.modalButton svg {
-  font-size: 1.2em;
-}
-
-/* Group for Up/Down buttons */
 .moveButtonGroup {
   display: flex;
   gap: var(--spacing-unit);
   flex-shrink: 0;
 }
 
-/* Placeholder for alignment */
-.controlPlaceholder {
-  min-width: 1px;
-  visibility: hidden;
-  flex-shrink: 0; /* Ensure it takes space if needed */
-  /* Match button size roughly if needed */
-  width: calc(
-    var(--controlButton-padding-horizontal) * 2 + 1.2em
-  ); /* Example approximation */
-  height: calc(var(--controlButton-padding-vertical) * 2 + 1em);
-}
+/* --- .modalButton was identical to .editButton, removed redundancy --- */
+/* If .modalButton is used for a different purpose, re-add its specific styles */
 
-/* --- Swiper Instance within Slider Card --- */
+/* ==========================================================================
+   5. SWIPER INSTANCES (General Styles)
+   ========================================================================== */
+
 .sliderTitle {
+  /* Title above each Swiper instance */
   margin-top: 0;
   margin-bottom: calc(var(--spacing-unit) * 2);
   font-size: 1.1em;
@@ -277,39 +271,38 @@
 }
 
 .swiperInstance {
-  --swiper-theme-color: var(--accent-warm);
-  --swiper-navigation-color: var(--accent-warm);
-  --swiper-navigation-size: 18px;
+  /* Common class for all main Swipers within sliders */
+  --swiper-theme-color: var(--accent-warm); /* For pagination active bullet */
+  --swiper-navigation-color: var(--accent-warm); /* For nav arrows */
+  --swiper-navigation-size: 18px; /* Default arrow size */
+
   width: 100%;
   border-radius: var(--border-radius-md);
-  overflow: hidden;
-  padding-left: 45px; /* Space for nav buttons */
-  padding-right: 45px; /* Space for nav buttons */
-  position: relative;
-  margin-bottom: var(--spacing-unit);
-  min-height: 100px; /* Ensure minimum height */
+  overflow: hidden; /* Important for Swiper */
+  padding-left: 45px; /* Space for prev nav button */
+  padding-right: 45px; /* Space for next nav button */
+  position: relative; /* For nav/pagination positioning */
+  margin-bottom: var(
+    --spacing-unit
+  ); /* Space before accordion or next element */
+  min-height: 100px; /* Ensure it has some height even if empty */
+  box-sizing: border-box;
 }
 
 .swiperInstance .swiper-button-next,
 .swiperInstance .swiper-button-prev {
-  background: none;
-  background-image: none;
-  border: none;
   background-color: rgba(255, 255, 255, 0.85);
   border-radius: 50%;
-  width: 38px;
-  height: 38px;
+  width: 38px; /* Default width */
+  height: 38px; /* Default height */
   top: 50%;
   transform: translateY(-50%);
   box-shadow: 0 3px 8px rgba(100, 80, 70, 0.18);
   transition: background-color 0.2s ease, opacity 0.2s ease,
     box-shadow 0.2s ease;
-  z-index: 10;
+  z-index: 10; /* Above slides */
   cursor: pointer;
-}
-.swiperInstance .swiper-button-next::after,
-.swiperInstance .swiper-button-prev::after {
-  font-weight: bold;
+  /* Swiper's default ::after content is used for arrows, these are fine */
 }
 .swiperInstance .swiper-button-prev {
   left: 8px;
@@ -317,19 +310,20 @@
 .swiperInstance .swiper-button-next {
   right: 8px;
 }
+
 .swiperInstance .swiper-button-next:hover,
 .swiperInstance .swiper-button-prev:hover {
   background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 4px 10px rgba(100, 80, 70, 0.22);
 }
 .swiperInstance .swiper-button-disabled {
-  opacity: 0.35 !important;
+  opacity: 0.35 !important; /* Swiper uses !important */
   cursor: not-allowed !important;
   pointer-events: none;
 }
 
 .swiperInstance .swiper-pagination {
-  bottom: 8px !important;
+  bottom: 8px !important; /* Swiper specific */
   position: absolute;
   left: 0;
   width: 100%;
@@ -340,29 +334,36 @@
   height: 7px;
   background-color: var(--accent-warm-light);
   opacity: 0.6;
-  margin: 0 4px !important;
+  margin: 0 4px !important; /* Swiper specific */
   transition: background-color 0.2s ease, opacity 0.2s ease, width 0.2s ease,
     height 0.2s ease;
   display: inline-block;
   border-radius: 50%;
 }
 .swiperInstance .swiper-pagination-bullet-active {
-  background-color: var(--accent-warm);
+  background-color: var(--swiper-theme-color); /* Uses Swiper variable */
   opacity: 1;
   width: 9px;
   height: 9px;
 }
 
-/* --- Swiper Slide Content --- */
+/* ==========================================================================
+   6. SWIPER SLIDE CONTENT (General Styles)
+   ========================================================================== */
+
 .slide {
+  /* Common style for a SwiperSlide's content wrapper */
   background-color: var(--accent-slider);
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 150px;
-  height: 100%;
-  border-radius: var(--border-radius-md);
-  padding: calc(var(--spacing-unit) * 2);
+  justify-content: center; /* Default to center content */
+  min-height: 150px; /* Ensure slides have a decent height */
+  height: 100%; /* Fill Swiper's height */
+  border-radius: var(
+    --border-radius-md
+  ); /* Match .swiperInstance if not transparent */
+  padding: calc(var(--spacing-unit) * 1.5) var(--spacing-unit); /* Adjusted padding */
   box-sizing: border-box;
   cursor: grab;
   overflow: hidden;
@@ -370,18 +371,17 @@
 }
 
 .slideTextContent {
-  padding: var(--spacing-unit) 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: calc(var(--spacing-unit) * 0.5);
   width: 100%;
   box-sizing: border-box;
-  margin-top: auto;
-  margin-bottom: auto;
+  /* margin-top: auto; margin-bottom: auto; /* Removed for more explicit control if needed */
 }
 
 .slideTextContentWithIcon {
+  /* For slides with a leading icon */
   flex-direction: row;
   justify-content: center;
   text-align: left;
@@ -398,29 +398,193 @@
   font-weight: 600;
   font-size: 1.1em;
   color: var(--text-primary);
+  word-break: break-word; /* Prevent long names from breaking layout */
 }
 
 .slideSubText {
   font-size: 0.85em;
   color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   7. JOURNAL SLIDER SPECIFIC STYLES
+   ========================================================================== */
+
+.journalParentHeader {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  padding-bottom: calc(var(--spacing-unit) * 1);
+  min-height: 30px;
+}
+
+.journalParentInfo {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--accent-warm-light);
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  border-radius: var(--border-radius-sm);
+  margin-right: auto;
+}
+
+/* L2 Scroller (New) */
+.level2ScrollerTitle {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: center;
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  margin-bottom: calc(var(--spacing-unit) * 0.75);
+}
+
+.level2ScrollerContainer {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+}
+
+.level2ScrollerSwiper {
+  /* Specific Swiper for L2 buttons */
+  padding: 0 calc(var(--spacing-unit) * 0.5); /* For nav button spacing if active */
+  --swiper-navigation-size: 16px;
+  --swiper-navigation-color: var(--text-secondary);
+  /* No need for main .swiperInstance padding-left/right here */
+}
+
+.level2ScrollerSwiper .swiper-button-next,
+.level2ScrollerSwiper .swiper-button-prev {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  background-color: rgba(230, 230, 230, 0.7);
+  border-radius: 50%;
+  /* z-index from .swiperInstance applies if these are direct children */
+}
+.level2ScrollerSwiper .swiper-button-next:hover,
+.level2ScrollerSwiper .swiper-button-prev:hover {
+  background-color: rgba(220, 220, 220, 0.9);
+}
+
+.level2ScrollerSlide {
+  /* SwiperSlide for L2 buttons */
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0; /* Minimal vertical padding */
+}
+
+.level2Button {
+  padding: calc(var(--spacing-unit) * 0.65) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.8em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-pill);
+  background-color: #f8f8f8;
+  color: var(--text-secondary);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  white-space: nowrap;
+  min-width: 50px;
   text-align: center;
 }
-
-.noData {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100px;
-  color: var(--text-secondary);
-  background-color: #f7f7f7;
-  border: 1px dashed var(--border-subtle);
-  border-radius: var(--border-radius-md);
-  font-size: 0.9em;
-  padding: calc(var(--spacing-unit) * 2);
-  box-sizing: border-box;
+.level2Button:hover:not(.level2ButtonActive) {
+  border-color: var(--accent-warm-light);
+  background-color: #f0f0f0;
+}
+.level2ButtonActive,
+.level2ButtonActive:hover {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+}
+.level2ButtonActive:hover {
+  background-color: #d68f63;
+  border-color: #d68f63;
 }
 
-/* --- Accordion (Details Section) --- */
+/* Journal L3 Main Swiper (if overrides needed from .swiperInstance) */
+.journalL3SwiperInstance {
+  /* Example: Maybe different min-height or slide padding */
+  /* min-height: 120px; */
+}
+
+/* Journal L1 Parent Mode Swiper Slide */
+.parentModeSlide {
+  /* Extends .slide */
+  justify-content: center; /* Default for .slide, can be more specific */
+  padding-bottom: calc(
+    var(--spacing-unit) * 2
+  ) !important; /* Ensure space for button */
+}
+.parentModeSlide .slideTextContent {
+  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Space before button */
+}
+.selectParentButton {
+  /* Button within L1 parent mode slide */
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border: none;
+  border-radius: var(--border-radius-md);
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  /* margin-top already handled by .slideTextContent margin-bottom */
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+.selectParentButton:hover {
+  background-color: #d68f63;
+}
+.selectParentButton:active {
+  transform: scale(0.97);
+}
+
+/* Detail text for L3 slides showing L2 parent */
+.slideSubTextDetail {
+  font-size: 0.75em;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+/* Old Grandchild buttons (commented out as L3s are now main slides) */
+/*
+.grandchildButtonsContainer { ... }
+.grandchildButton { ... }
+.grandchildButtonActive { ... }
+*/
+
+/* Old Journal Category Scroller (if this was a separate feature, it's now replaced by L2 Scroller) */
+/*
+.journalCategoryScrollerContainer { ... }
+.journalCategoryScroller { ... }
+.journalCategorySlide { ... }
+.journalCategoryButton { ... }
+.journalCategoryButtonActive { ... }
+*/
+
+/* Old Journal Header styles (if specific, might be replaced or integrated) */
+/*
+.journalSliderHeader { ... }
+.journalTopLevelTitle { ... }
+.level2NavContainer { ... }
+.level2NavContainerSingle { ... }
+.level2NavButton { ... }
+.level2CurrentName { ... }
+*/
+
+/* ==========================================================================
+   8. ACCORDION STYLES
+   ========================================================================== */
+
 .accordionContainer {
   margin-top: calc(var(--spacing-unit) * 2);
   padding-top: calc(var(--spacing-unit) * 1.5);
@@ -449,12 +613,12 @@
   transition: transform 0.3s ease;
   color: var(--text-secondary);
 }
-
 .accordionIconOpen {
   transform: rotate(180deg);
 }
 
 .detailsContentWrapper {
+  /* For Framer Motion height animation */
   overflow: hidden;
 }
 
@@ -463,7 +627,6 @@
   font-size: 0.85em;
   color: var(--text-secondary);
 }
-
 .detailsContent p {
   margin: 0 0 calc(var(--spacing-unit) * 0.75) 0;
   line-height: 1.5;
@@ -476,50 +639,53 @@
   margin-right: 4px;
 }
 
-/* ================================== */
-/* --- Modal Styles --- */
-/* ================================== */
+/* ==========================================================================
+   9. MODAL STYLES (General Overlay & Content)
+   ========================================================================== */
+
 .modalOverlay {
   position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.65);
+  inset: 0; /* top: 0; right: 0; bottom: 0; left: 0; */
+  background-color: var(--overlay-bg, rgba(0, 0, 0, 0.65));
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 1000; /* High z-index to be on top */
   padding: var(--spacing-unit);
   box-sizing: border-box;
+  overflow-y: auto; /* Allow scrolling if modal content is too tall */
 }
 
 .modalContent {
   background-color: var(--bg-card);
-  padding: calc(var(--spacing-unit) * 2.5) calc(var(--spacing-unit) * 2)
-    calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2); /* Adjusted padding */
+  padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2)
+    calc(var(--spacing-unit) * 2);
   border-radius: var(--border-radius-lg);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
   max-width: 90%;
-  width: 450px;
-  position: relative;
+  width: 450px; /* Default width */
+  position: relative; /* Crucial for close button positioning */
   color: var(--text-primary);
-  max-height: 85vh;
+  max-height: 85vh; /* Limit height, works with overflow-y on overlay */
   display: flex;
   flex-direction: column;
+  margin: auto; /* Helps with centering if overlay uses overflow */
 }
 
 .modalContent h2 {
+  /* Modal Title */
   margin-top: 0;
   margin-bottom: calc(var(--spacing-unit) * 2);
-  padding-bottom: calc(var(--spacing-unit) * 1.5); /* Add padding below title */
-  border-bottom: 1px solid var(--border-subtle); /* Separator */
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle);
   text-align: center;
   font-size: 1.3em;
-  color: var(--text-primary);
   font-weight: 600;
-  flex-shrink: 0;
+  flex-shrink: 0; /* Prevent title from shrinking if content grows */
 }
 
-/* Generic paragraph style within modal */
 .modalContent p {
+  /* Generic paragraph inside modal */
   font-size: 0.95em;
   color: var(--text-secondary);
   text-align: center;
@@ -537,135 +703,31 @@
   color: var(--text-secondary);
   cursor: pointer;
   line-height: 1;
-  padding: calc(var(--spacing-unit) * 0.5);
+  padding: calc(var(--spacing-unit) * 0.5); /* Clickable area */
   border-radius: 50%;
   transition: color 0.2s ease, background-color 0.2s ease;
+  z-index: 10; /* Above modal content's other elements */
 }
 .modalCloseButton:hover {
   color: var(--text-primary);
   background-color: rgba(0, 0, 0, 0.05);
 }
 
-/* --- Journal Modal Specific (Accordion Hierarchy) --- */
-.accountHierarchyContainer {
-  overflow-y: auto;
-  flex-grow: 1;
-  margin-bottom: calc(var(--spacing-unit) * 2);
-  padding-right: calc(var(--spacing-unit) * 0.5);
-  margin-right: calc(-1 * var(--spacing-unit) * 0.5);
-  /* REMOVED border */
-  /* border: 1px solid var(--border-subtle); */
-  border-radius: var(--border-radius-sm); /* Optional subtle rounding */
-  /* background-color: rgba(0,0,0, 0.01); */ /* Removed subtle background */
-}
-
-/* Styling for the clickable row */
-.accountNodeRow {
-  display: flex;
-  align-items: center;
-  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 0.5); /* Reduced horizontal padding */
-  border-radius: var(--border-radius-sm); /* Add slight rounding */
-  transition: background-color 0.15s ease;
-  /* REMOVED border-bottom */
-  /* border-bottom: 1px solid var(--border-subtle); */
-  cursor: pointer;
-  margin-bottom: 2px; /* Add tiny space between rows */
-}
-.accountNodeRow:hover {
-  background-color: rgba(0, 0, 0, 0.03);
-}
-.accountNodeRow.accountNodeSelected {
-  background-color: var(--accent-warm-lighter);
-}
-
-/* Toggle Icon - used as visual indicator */
-.accountNodeToggle {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  margin-right: calc(var(--spacing-unit) * -2.7); /* Increase space */
-  color: var(--text-secondary);
-  line-height: 1;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px; /* Slightly smaller icon */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.accountNodeToggle svg {
-  width: 16px;
-  height: 16px;
-}
-
-.accountNodeIconPlaceholder {
-  /* Keep for alignment when no children */
-  display: inline-block;
-  width: 16px;
-  margin-right: calc(var(--spacing-unit) * 0.75);
-  flex-shrink: 0;
-}
-
-.accountNodeCode {
-  font-weight: 500; /* Slightly less bold */
-  color: var(--text-secondary); /* Grey out code slightly */
-  margin-right: calc(var(--spacing-unit) * 1);
-  min-width: 45px; /* Adjusted width */
-  flex-shrink: 0;
-  font-size: 0.85em;
-  text-align: right;
-}
-.accountNodeSelected .accountNodeCode {
-  color: var(--accent-warm); /* Highlight code when selected */
-}
-
-.accountNodeName {
-  font-size: 0.9em;
-  color: var(--text-primary); /* Make name primary */
-  flex-grow: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.accountNodeSelected .accountNodeName {
-  font-weight: 600; /* Make selected name bolder */
-}
-
-/* Optional: Container for children block */
-.accountNodeChildrenContainer {
-  position: relative; /* For pseudo-element positioning */
-}
-
-.accountNodeChildrenMotionWrapper::before {
-  content: "";
-  position: absolute;
-  left: 10px; /* Align with center of icon (adjust level*25 + 10px in style) */
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background-color: var(--border-subtle); /* Dashed line color */
-  /* Dashed effect if needed, otherwise solid */
-  background-image: linear-gradient(
-    to bottom,
-    var(--border-subtle) 50%,
-    transparent 50%
-  );
-  background-size: 1px 6px;
-}
-
-/* --- Modal Action Buttons --- */
 .modalActions {
+  /* Container for primary/secondary action buttons at modal bottom */
   display: flex;
   justify-content: flex-end;
   gap: var(--spacing-unit);
-  margin-top: calc(var(--spacing-unit) * 2);
-  padding-top: calc(var(--spacing-unit) * 2);
+  margin-top: calc(var(--spacing-unit) * 2); /* Space above actions */
+  padding-top: calc(
+    var(--spacing-unit) * 2
+  ); /* Space below content before actions */
   border-top: 1px solid var(--border-subtle);
-  flex-shrink: 0;
+  flex-shrink: 0; /* Prevent actions from shrinking */
 }
 
 .modalActionButton {
+  /* Common style for modal action buttons */
   padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
   font-size: 0.9em;
   font-weight: 500;
@@ -703,236 +765,185 @@
   border-color: #ccc;
 }
 
-/* page.module.css */
-
-/* ... existing styles ... */
-
-/* ================================== */
-/* --- Journal Hierarchy Styles --- */
-/* ================================== */
-
-.journalParentHeader {
+/* For action buttons at the top of a modal, if any */
+.modalTopActions {
   display: flex;
-  justify-content: flex-start; /* Align parent info to the left */
-  align-items: center;
-  margin-bottom: calc(var(--spacing-unit) * 1);
-  padding-bottom: calc(var(--spacing-unit) * 1);
-  /* Optional: Add a border or different background */
-  /* border-bottom: 1px dashed var(--border-subtle); */
-  min-height: 30px; /* Ensure space even if no parent selected */
+  justify-content: center; /* Or flex-end, etc. */
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  flex-shrink: 0;
 }
 
-.journalParentInfo {
-  font-size: 0.9em;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background-color: var(--accent-warm-light); /* Light accent background */
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+/* ==========================================================================
+   10. JOURNAL MODAL SPECIFICS (Account Hierarchy Tree)
+   ========================================================================== */
+
+.accountHierarchyContainer {
+  /* Scrollable area for the tree */
+  overflow-y: auto;
+  flex-grow: 1; /* Takes available vertical space */
+  margin-bottom: calc(var(--spacing-unit) * 2); /* Space before modal actions */
+  /* Optional: padding/border if desired for the container itself */
+  /* padding: var(--spacing-unit); */
+  /* border: 1px solid var(--border-subtle); */
+  /* border-radius: var(--border-radius-sm); */
+}
+
+.accountNodeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Pushes actions to the right */
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.5); /* Adjusted padding */
   border-radius: var(--border-radius-sm);
-  margin-right: auto; /* Pushes move buttons to the right in the controls flex */
-}
-
-/* --- Journal Hierarchy Slide Content --- */
-.slide {
-  /* Keep existing slide styles */
-  /* Ensure enough space for grandchild buttons */
-  /* min-height: 200px; maybe? */
-  justify-content: space-between; /* Push grandchild containers to top/bottom */
-  padding: var(--spacing-unit); /* Adjust padding if needed */
-}
-
-.slideTextContent {
-  /* Center Child Name */
-  /* Removed top/bottom auto margin if using space-between on .slide */
-  margin-top: 0;
-  margin-bottom: 0;
-  text-align: center;
-  padding: calc(var(--spacing-unit) * 1) 0; /* Adjust vertical padding */
-}
-
-.slideName {
-  /* Child Name Style */
-  font-size: 1.2em; /* Slightly larger */
-  font-weight: 600;
-}
-
-.slideSubText {
-  /* Child Code Style */
-  font-size: 0.8em;
-  margin-top: 2px;
-}
-
-.grandchildButtonsContainer {
-  display: flex;
-  flex-wrap: wrap; /* Allow wrapping if many grandchildren */
-  justify-content: center;
-  gap: calc(var(--spacing-unit) * 0.75);
-  width: 100%;
-  padding: calc(var(--spacing-unit) * 0.5) 0;
-  min-height: 30px; /* Reserve space */
-}
-
-.grandchildButton {
-  padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 1);
-  font-size: 0.75em;
-  font-weight: 500;
+  transition: background-color 0.15s ease;
   cursor: pointer;
-  background-color: #ffffff;
-  color: var(--accent-warm);
-  border: 1px solid var(--accent-warm-light);
-  border-radius: var(--border-radius-pill);
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease, transform 0.1s ease;
+  margin-bottom: 2px; /* Small gap between rows */
+  position: relative; /* For ::before pseudo-elements if used for lines */
+}
+.accountNodeRow:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+.accountNodeRow.accountNodeSelected {
+  background-color: var(--accent-warm-lighter);
+}
+
+.accountNodeToggle {
+  /* Chevron icon for expanding/collapsing */
+  /* margin-right: calc(var(--spacing-unit) * 0.75); Original was negative, let's try positive with flex order */
+  color: var(--text-secondary);
   line-height: 1;
-  flex-shrink: 0; /* Prevent shrinking */
-  min-width: 40px;
-  text-align: center;
-}
-
-.grandchildButton:hover {
-  background-color: var(--accent-warm-light);
-  border-color: var(--accent-warm);
-}
-
-.grandchildButtonActive {
-  background-color: var(--accent-warm);
-  color: var(--bg-card);
-  border-color: var(--accent-warm);
-  font-weight: 600;
-  transform: scale(1.05); /* Slightly larger when active */
-}
-
-/* page.module.css */
-
-/* ... existing styles ... */
-
-/* ================================== */
-/* --- Sticky Header Section --- */
-/* ================================== */
-.stickyHeaderContainer {
-  /* ... existing styles ... */
-  gap: calc(var(--spacing-unit) * 2); /* Increase gap slightly if needed */
-}
-
-/* --- Journal Category Scroller Styles --- */
-.journalCategoryScrollerContainer {
-  width: 100%;
-  overflow: hidden; /* Hide potential overflow */
-  padding: calc(var(--spacing-unit) * 0.5) 0;
-  border-top: 1px solid var(--border-subtle); /* Optional separator */
-  border-bottom: 1px solid var(--border-subtle); /* Optional separator */
-}
-
-.journalCategoryScroller {
-  /* Add padding to prevent buttons touching edges */
-  padding-left: calc(var(--spacing-unit) * 0.5);
-  padding-right: calc(var(--spacing-unit) * 0.5);
-}
-
-.journalCategorySlide {
-  width: auto !important; /* Important for slidesPerView: 'auto' */
-  display: inline-flex !important; /* Ensure inline layout */
-  vertical-align: middle;
-}
-
-.journalCategoryButton {
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
-  font-size: 0.8em; /* Slightly smaller than visibility toggles */
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid #ccc; /* Neutral border */
-  border-radius: var(--border-radius-pill);
-  background-color: var(--bg-card); /* White background */
-  color: var(--text-secondary); /* Greyish text */
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease, transform 0.1s ease;
-  white-space: nowrap; /* Prevent text wrapping */
-  text-align: center;
-}
-
-.journalCategoryButton:hover {
-  border-color: var(--accent-warm-light);
-  color: var(--accent-warm);
-}
-
-.journalCategoryButtonActive {
-  background-color: var(--accent-warm);
-  color: var(--bg-card); /* White text on accent */
-  border-color: var(--accent-warm);
-  font-weight: 600;
-  /* transform: scale(1.03); Optional subtle scale */
-}
-
-.journalCategoryButtonActive:hover {
-  background-color: #d68f63; /* Darker accent on hover when active */
-  border-color: #d68f63;
-}
-
-/* page.module.css */
-
-/* ... existing styles ... */
-
-/* --- REMOVE these if not used elsewhere ---
-.journalCategoryScrollerContainer { ... }
-.journalCategoryScroller { ... }
-.journalCategorySlide { ... }
-.journalCategoryButton { ... }
-.journalCategoryButtonActive { ... }
-*/
-
-/* --- Journal Hierarchy Styles --- */
-/* ... existing .journalParentHeader, .journalParentInfo ... */
-
-/* Swiper slide when in 'parents' mode */
-.parentModeSlide {
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* Center content vertically */
-  align-items: center;
-  padding-bottom: calc(
-    var(--spacing-unit) * 2
-  ) !important; /* Ensure space for button */
-}
-
-.parentModeSlide .slideTextContent {
-  margin-bottom: calc(
-    var(--spacing-unit) * 2
-  ); /* Space between text and button */
-}
-
-.selectParentButton {
-  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
-  font-size: 0.9em;
-  font-weight: 600;
-  cursor: pointer;
-  background-color: var(--accent-warm);
-  color: var(--bg-card);
-  border: none;
-  border-radius: var(--border-radius-md);
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  margin-top: calc(var(--spacing-unit) * -0.5); /* Space above the button */
+  flex-shrink: 0;
+  width: 20px; /* Clickable area for toggle */
+  height: 20px;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  /* order: 1; /* If using flex order */
+}
+.accountNodeToggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.accountNodeIconPlaceholder {
+  /* For alignment when no children */
+  display: inline-block;
+  width: 20px; /* Match .accountNodeToggle width */
+  flex-shrink: 0;
+  /* order: 1; */
+}
+
+.accountNodeCode {
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-left: calc(
+    var(--spacing-unit) * 0.5
+  ); /* Space after toggle/placeholder */
+  margin-right: calc(var(--spacing-unit) * 1);
+  min-width: 45px;
+  flex-shrink: 0;
+  font-size: 0.85em;
+  text-align: right;
+  /* order: 2; */
+}
+.accountNodeSelected .accountNodeCode {
+  color: var(--accent-warm);
+}
+
+.accountNodeName {
+  font-size: 0.9em;
+  color: var(--text-primary);
+  flex-grow: 1; /* Takes up remaining space */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: var(--spacing-unit); /* Space before action buttons */
+  /* order: 3; */
+}
+.accountNodeSelected .accountNodeName {
+  font-weight: 600;
+}
+
+.accountNodeActions {
+  /* Container for Add/Delete icons in tree row */
+  display: flex;
+  align-items: center;
   gap: calc(var(--spacing-unit) * 0.5);
+  flex-shrink: 0;
+  /* order: 4; */
 }
 
-.selectParentButton:hover {
-  background-color: #d68f63; /* Darker accent */
+.accountNodeActionButton {
+  /* Common style for Add/Delete icons */
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.5);
+  font-size: 1.1em;
+  line-height: 1;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.accountNodeActionButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
-.selectParentButton:active {
-  transform: scale(0.97);
+.accountNodeAddChildButton {
+  /* Specific Add icon style */
+  color: var(--accent-warm);
+}
+.accountNodeAddChildButton:hover {
+  color: #c77a50; /* Darker accent */
+  background-color: var(--accent-warm-light);
 }
 
-/* page.module.css */
-/* ... existing styles ... */
+.accountNodeDeleteButton {
+  /* Specific Delete icon style */
+  color: #cc0000;
+}
+.accountNodeDeleteButton:hover {
+  color: #a30000;
+  background-color: rgba(255, 0, 0, 0.1);
+}
 
-/* --- Add Journal Modal Form Styles --- */
+.accountNodeChildrenContainer {
+  /* Wrapper for children nodes when expanded */
+  position: relative;
+}
+.accountNodeChildrenMotionWrapper {
+  /* For Framer Motion, applies padding for indent */
+  /* padding-left handled by inline style in component based on level */
+  position: relative; /* For pseudo-element line */
+}
+.accountNodeChildrenMotionWrapper::before {
+  /* Vertical connector line */
+  content: "";
+  position: absolute;
+  left: 10px; /* Adjust to align with center of parent's toggle icon */
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border-subtle);
+  /* Optional dashed line effect */
+  /* background-image: linear-gradient(to bottom, var(--border-subtle) 50%, transparent 50%); */
+  /* background-size: 1px 6px; */
+}
+
+/* ==========================================================================
+   11. ADD JOURNAL MODAL SPECIFICS (Form Styles)
+   ========================================================================== */
+
 .addJournalForm {
   display: flex;
   flex-direction: column;
   gap: calc(var(--spacing-unit) * 1.5);
-  margin-top: calc(var(--spacing-unit) * 1.5);
+  margin-top: calc(var(--spacing-unit) * 1.5); /* Space after modal title */
+  flex-grow: 1; /* Allows form to take space if modal content area is scrollable */
+  overflow-y: auto; /* If form itself becomes too long */
+  padding-bottom: var(--spacing-unit); /* Padding at bottom of form */
 }
 
 .formGroup {
@@ -953,7 +964,7 @@
   border-radius: var(--border-radius-sm);
   font-size: 1em;
   color: var(--text-primary);
-  background-color: #fff; /* Ensure readable background */
+  background-color: #fff; /* Or var(--bg-main) if it's distinct */
 }
 .formGroup input[type="text"]:focus {
   outline: none;
@@ -962,199 +973,485 @@
 }
 
 .formError {
-  color: #d8000c; /* Red for errors */
-  background-color: #ffd2d2; /* Light red background */
+  color: #d8000c;
+  background-color: #ffd2d2;
   border: 1px solid #d8000c;
   padding: var(--spacing-unit);
   border-radius: var(--border-radius-sm);
   font-size: 0.85em;
   text-align: center;
+  margin-bottom: var(--spacing-unit); /* Space below error */
 }
 
-/* Ensure modal actions in AddJournalModal have some top margin if form is short */
-.addJournalForm .modalActions {
-  margin-top: var(
-    --spacing-unit
-  ); /* Add if not already spaced by form elements */
-  padding-top: calc(var(--spacing-unit) * 1.5); /* Consistent padding */
-  border-top: 1px solid var(--border-subtle); /* Separator */
-}
+/* .addJournalForm .modalActions: Already covered by general .modalActions */
 
-/* Ensure AddJournalModal is above the previous one if both are somehow rendered */
-/* We handle this with z-index in the component style prop for simplicity for now */
+/* ==========================================================================
+   12. UTILITY / HELPER STYLES
+   ========================================================================== */
 
-/* page.module.css */
-/* ... existing styles ... */
-
-/* --- Account Node Styles --- */
-.accountNodeRow {
-  /* ... existing styles ... */
-  position: relative; /* For positioning the add button if needed, or rely on flex */
-  /* Ensure items are vertically centered if button height differs */
-  align-items: center;
-}
-
-.accountNodeName {
-  /* ... existing styles ... */
-  flex-grow: 1; /* Allow name to take up space */
-  margin-right: var(--spacing-unit); /* Space before add button */
-}
-
-.accountNodeAddChildButton {
-  background: transparent;
-  border: none;
-  color: var(--accent-warm);
-  cursor: pointer;
-  padding: calc(var(--spacing-unit) * 0.5);
-  margin-left: auto; /* Pushes button to the right */
-  font-size: 1.1em; /* Adjust icon size */
-  line-height: 1;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
+.noData {
+  /* For empty Swiper instances */
+  display: flex;
   justify-content: center;
+  align-items: center;
+  min-height: 100px;
+  color: var(--text-secondary);
+  background-color: #f7f7f7;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  padding: calc(var(--spacing-unit) * 2);
+  box-sizing: border-box;
+  margin: var(--spacing-unit) 0; /* Consistent margin */
 }
 
-.accountNodeAddChildButton:hover {
-  background-color: var(--accent-warm-light);
-  color: #c77a50; /* Darker accent */
+.noDataSmall {
+  /* For smaller empty states, like L2 scroller */
+  text-align: center;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  padding: var(--spacing-unit) 0;
+  font-style: italic;
 }
-
-.accountNodeAddChildButton svg {
-  display: block; /* Helps with exact centering sometimes */
-}
-
-/* ... rest of your CSS ... */
-
-/* page.module.css */
-/* ... existing styles ... */
 
 .inputHint {
+  /* Hint text below form inputs */
   font-size: 0.8em;
   color: var(--text-secondary);
   margin-top: calc(var(--spacing-unit) * 0.25);
 }
 
-/* ... rest of your CSS ... */
+/* page.module.css (add these new styles) */
 
-/* page.module.css */
-/* ... existing styles ... */
-
-.accountNodeRow {
-  /* ... existing styles ... */
-  justify-content: space-between; /* Helps align actions to the right */
+.l2ButtonWrapper {
+  position: relative; /* For positioning nav options */
+  display: inline-block; /* Or flex, depending on desired layout with button */
 }
 
-.accountNodeName {
-  margin-right: auto; /* Pushes actions container to the right */
-  padding-right: var(--spacing-unit); /* Some space before actions */
+.l2ButtonShaking {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both infinite;
+  /* You might want to apply shaking only while options are visible */
 }
 
-.accountNodeActions {
-  /* New container for action buttons */
+@keyframes shake {
+  10%,
+  90% {
+    transform: translate3d(-1px, 0, 0) scale(1.02);
+  }
+  20%,
+  80% {
+    transform: translate3d(2px, 0, 0) scale(1.02);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translate3d(-3px, 0, 0) scale(1.02);
+  }
+  40%,
+  60% {
+    transform: translate3d(3px, 0, 0) scale(1.02);
+  }
+}
+
+.navOptionsOverlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%); /* Center on the button */
+  display: flex;
+  flex-direction: column; /* Stack Go Up and Go Down */
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 2); /* More space between up/down */
+  z-index: 20; /* Above the button itself */
+  padding: var(--spacing-unit);
+  /* background-color: rgba(255, 255, 255, 0.95); Optional: semi-transparent bg for options container */
+  /* border-radius: var(--border-radius-md); */
+  /* box-shadow: 0 2px 10px rgba(0,0,0,0.2); */
+  width: auto; /* Fit content */
+  pointer-events: auto; /* Allow clicks on options */
+}
+
+.navOptionButton {
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.2s, transform 0.1s;
   display: flex;
   align-items: center;
   gap: calc(var(--spacing-unit) * 0.5);
-  flex-shrink: 0; /* Prevent shrinking */
+  white-space: nowrap;
+}
+.navOptionButton:hover {
+  background-color: #f0f0f0;
+}
+.navOptionButton:active {
+  transform: scale(0.95);
 }
 
-.accountNodeActionButton {
-  /* Common style for add/delete in AccountNode */
-  background: transparent;
+.navOptionGoUp {
+  position: absolute; /* Position relative to .l2ButtonWrapper */
+  bottom: calc(100% + var(--spacing-unit) * 0.5); /* Above the button */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.navOptionGoDown {
+  position: absolute; /* Position relative to .l2ButtonWrapper */
+  top: calc(100% + var(--spacing-unit) * 0.5); /* Below the button */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.navIcon {
+  font-size: 0.9em;
+}
+
+.navOptionDismiss {
+  /* Small dismiss button, optional */
+  position: absolute;
+  top: -12px; /* Adjust for best placement */
+  right: -12px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
   border: none;
-  cursor: pointer;
-  padding: calc(var(--spacing-unit) * 0.5);
-  font-size: 1.1em;
-  line-height: 1;
   border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 21;
 }
-.accountNodeActionButton:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.accountNodeAddChildButton {
-  /* Extends common style */
-  color: var(--accent-warm);
-}
-.accountNodeAddChildButton:hover {
-  color: #c77a50;
-  background-color: var(--accent-warm-light);
+.navOptionDismiss:hover {
+  background: rgba(0, 0, 0, 0.8);
 }
 
-.accountNodeDeleteButton {
-  /* Extends common style */
-  color: #cc0000; /* Red for delete */
+.navOptionsBackdrop {
+  /* Full-screen backdrop to click-away */
+  position: fixed;
+  inset: 0;
+  background-color: transparent; /* Invisible */
+  z-index: 19; /* Below options overlay, above other content */
 }
-.accountNodeDeleteButton:hover {
-  color: #a30000; /* Darker red */
-  background-color: rgba(255, 0, 0, 0.1); /* Light red background on hover */
-}
-
-/* ... rest of your css ... */
 
 /* page.module.css */
-/* ... existing styles ... */
 
-.journalSliderHeader {
-  text-align: center;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
-  padding-bottom: calc(var(--spacing-unit) * 1);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.journalTopLevelTitle {
-  font-size: 1em; /* Smaller than main slider title */
-  color: var(--text-secondary);
-  font-weight: 500;
-  margin: 0 0 calc(var(--spacing-unit) * 0.5) 0;
-}
-
-.level2NavContainer {
-  display: flex;
+/* Change previous .level2ScrollerSlide to prevent overflow issues from other attempts */
+.level2ScrollerSlideNoOverflow {
+  /* NEW or rename previous .level2ScrollerSlide */
+  width: auto !important;
+  display: inline-flex !important;
   align-items: center;
-  justify-content: space-between; /* Pushes buttons to sides */
-  gap: var(--spacing-unit);
-  margin-top: calc(var(--spacing-unit) * 0.5);
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  background-color: rgba(0, 0, 0, 0.02);
-  border-radius: var(--border-radius-sm);
-}
-.level2NavContainerSingle {
-  /* For when there's only one L2 or no L2 */
-  text-align: center;
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  color: var(--text-secondary);
-  font-style: italic;
+  justify-content: center;
+  padding: calc(
+    var(--spacing-unit) * 0.5
+  ); /* Give some space around the interactive wrapper */
+  /* overflow: hidden; /* This slide should now clip its content if wrapper scales */
 }
 
-.level2NavButton {
-  background-color: var(--accent-warm-light);
-  color: var(--accent-warm);
-  border: none;
-  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-  font-size: 0.9em;
-  font-weight: bold;
-  transition: background-color 0.2s;
-  flex-shrink: 0;
-}
-.level2NavButton:hover {
-  background-color: var(--accent-warm);
-  color: var(--bg-card);
+.l2ButtonInteractiveWrapper {
+  position: relative; /* For containing absolutely positioned dismiss button if needed */
+  display: flex; /* Helps with centering button or expanded content */
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease-out, min-width 0.2s ease-out,
+    padding 0.2s ease-out;
+  /* Normal state width should be determined by .level2Button */
 }
 
-.level2CurrentName {
-  font-size: 1.05em; /* Make current L2 name prominent */
+.level2Button {
+  /* Existing button style - ensure it defines a base size */
+  padding: calc(var(--spacing-unit) * 0.65) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.8em;
+  /* ... other existing styles for .level2Button ... */
+  position: relative; /* So its content is above any potential background */
+  z-index: 5;
+  box-sizing: border-box;
+}
+
+/* Active state when options are shown - button scales and changes appearance */
+.l2ButtonWithOptionsActive {
+  transform: scale(1.1); /* Slightly larger */
+  /* min-width: 150px; /* Expanded width to hold options */
+  /* padding: var(--spacing-unit); /* Adjust padding for expanded view */
+  /* background-color: var(--bg-card); /* Change background */
+  /* border: 1px solid var(--accent-warm); */
+  /* box-shadow: 0 4px 12px rgba(0,0,0,0.15); */
+  border-radius: var(--border-radius-md); /* Can make it more card-like */
+  z-index: 10; /* Bring to front */
+}
+
+.l2ButtonExpandedWithOptions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch; /* Make children take full width */
+  justify-content: space-between;
+  width: 180px; /* Fixed expanded width, adjust as needed */
+  min-height: 90px; /* Fixed expanded height */
+  padding: var(--spacing-unit);
+  background-color: var(--bg-card);
+  border: 1px solid var(--accent-warm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius-md);
+  box-sizing: border-box;
+  cursor: default; /* No more button cursor for the wrapper */
+}
+
+.expandedButtonHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
   font-weight: 600;
   color: var(--text-primary);
-  padding: 0 var(--spacing-unit);
-  text-align: center;
-  flex-grow: 1;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.expandedButtonHeader span {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.navOptionDismissInside {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2em;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 var(--spacing-unit) 0 0; /* Minimal padding */
+  line-height: 1;
+}
+.navOptionDismissInside:hover {
+  color: var(--text-primary);
+}
+
+.navOptionsInside {
+  display: flex;
+  flex-direction: column; /* Stack options vertically */
+  gap: calc(var(--spacing-unit) * 0.75);
+  flex-grow: 1;
+  justify-content: center; /* Center options vertically */
+}
+
+.navOptionButtonInside {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* Center text and icon */
+  gap: calc(var(--spacing-unit) * 0.5);
+  text-align: center;
+}
+.navOptionButtonInside:hover {
+  background-color: #e0e0e0;
+  border-color: #ccc;
+}
+.navOptionButtonInside .navIcon {
+  font-size: 0.9em;
+}
+
+/* Remove old .navOptionsOverlay, .navOptionGoUp, .navOptionGoDown (external ones) */
+/* Also remove .l2ButtonShaking if not desired, or apply it to .l2ButtonWithOptionsActive */
+/* Remove .navOptionsBackdrop */
+
+/* Ensure Swiper slides DO NOT allow overflow if the button itself is scaling and containing everything */
+/* .level2ScrollerSlide {
+  overflow: hidden !important; /* Revert if it was visible before */
+/* } */
+/* Actually, for scaling to work visually without clipping by other slides immediately,
+   the slide itself might still need overflow:visible, but its direct content wrapper for the
+   button interaction should manage its own boundaries carefully.
+   Let's keep .level2ScrollerSlideNoOverflow without explicit overflow, let Swiper manage.
+   The .l2ButtonInteractiveWrapper will be the one scaling.
+*/
+
+/* page.module.css */
+
+.level2ScrollerSlideNoOverflow {
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--spacing-unit) * 0.5);
+  /* overflow: visible; /* If scaling makes it go outside slide bounds and look good */
+}
+
+.l2ButtonInteractiveWrapper {
+  position: relative;
+  display: flex; /* Changed to flex to better manage content switching */
+  align-items: center;
+  justify-content: center;
+  /* Transition for properties NOT handled by Framer's `animate` prop, if any */
+  /* Framer's `animate` on scale/width/height is usually sufficient */
+  /* min-width and padding will be animated by variants if included there */
+  border-radius: var(--border-radius-pill); /* Base radius for normal button */
+  /* Add outline for debugging wrapper bounds */
+  /* outline: 1px dashed blue; */
+}
+
+/* .l2ButtonWithOptionsActive class is now primarily for Framer Motion's `animate="expanded"` target */
+/* Styles previously in .l2ButtonWithOptionsActive like box-shadow, border can be part of the 'expanded' variant or .l2ButtonExpandedWithOptions */
+
+.level2Button {
+  /* Normal button style */
+  /* ... existing styles ... */
+  /* Ensure it has a defined size or relies on padding for its size */
+  min-width: 50px; /* Or whatever your normal button width is */
+  box-sizing: border-box;
+  /* No transform here, Framer Motion handles it on the wrapper */
+}
+
+.l2ButtonExpandedWithOptions {
+  /* This div now represents the content of the expanded state */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  width: 180px; /* Desired expanded width */
+  min-height: 90px; /* Desired expanded height */
+  padding: var(--spacing-unit);
+  background-color: var(--bg-card);
+  border: 1px solid var(--accent-warm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius-md); /* Radius for the expanded card */
+  box-sizing: border-box;
+  cursor: default;
+  /* Opacity and scale handled by Framer Motion on this div */
+}
+
+.expandedButtonHeader {
+  /* Styles remain the same */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.expandedButtonHeader span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: var(--spacing-unit); /* Space before dismiss button */
+}
+
+.navOptionDismissInside {
+  /* Styles remain the same */
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2em;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.navOptionDismissInside:hover {
+  color: var(--text-primary);
+}
+
+.navOptionsInside {
+  /* Styles remain the same */
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.navOptionButtonInside {
+  /* Styles remain the same */
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  text-align: center;
+}
+.navOptionButtonInside:hover {
+  background-color: #e0e0e0;
+  border-color: #ccc;
+}
+.navOptionButtonInside .navIcon {
+  font-size: 0.9em;
+}
+
+/* page.module.css */
+
+/* Style for the L1 context header when its nav options are active */
+.journalParentHeader {
+  /* Make sure it has position: relative if not already for options overlay */
+  position: relative;
+  /* Add cursor: pointer if entire area is long-pressable and not just text */
+  /* cursor: pointer; */
+  /* transition for any visual feedback on long-press activation */
+  transition: background-color 0.2s ease;
+}
+.journalParentHeader.l1NavActive {
+  /* Example style when L1 nav is active */
+  background-color: var(--accent-warm-lighter); /* Subtle highlight */
+}
+
+.l1NavOptionsOverlay {
+  position: absolute;
+  bottom: calc(100% + var(--spacing-unit)); /* Position above the header */
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-card);
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 30; /* Ensure it's above the header content */
+  display: flex; /* For layout of button and dismiss */
+  align-items: center;
+  gap: var(--spacing-unit);
+}
+
+/* Reuse .navOptionButtonInside and .navIcon from L2 options if style is the same */
+/* .navOptionButtonInside { ... } */
+/* .navIcon { ... } */
+
+.navOptionDismissInsideL1 {
+  /* Specific dismiss for L1 if needed */
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2em; /* Make it a bit larger or distinct */
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.25);
+  line-height: 1;
+}
+.navOptionDismissInsideL1:hover {
+  color: var(--text-primary);
 }
