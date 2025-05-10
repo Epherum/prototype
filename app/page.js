@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react"; // Added useMemo
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
-import Image from "next/image";
 import styles from "./page.module.css";
 import initialData1 from "./data.json";
 import initialData2 from "./data2.json";
@@ -17,15 +16,10 @@ import {
   IoCartOutline,
   IoPricetagOutline,
   IoBuildOutline,
-  IoWalletOutline,
-  IoNavigateOutline,
-  IoClipboardOutline,
   IoOptionsOutline,
-  IoPencilOutline,
   IoChevronDownOutline,
   IoChevronForwardOutline,
   IoAddCircleOutline,
-  IoCheckmarkCircleOutline,
   IoTrashBinOutline,
 } from "react-icons/io5";
 
@@ -66,6 +60,7 @@ const findParentOfNode = (nodeId, hierarchy, parent = null) => {
   }
   return null; // Node not found in this branch
 };
+
 const getFirstId = (arr) =>
   arr && arr.length > 0 && arr[0] ? arr[0].id : null;
 
@@ -93,7 +88,6 @@ const ROOT_JOURNAL_ID = "__ROOT__";
 
 function JournalHierarchySlider({
   sliderId,
-  title,
   hierarchyData,
   selectedTopLevelId,
   selectedLevel2Ids,
@@ -102,9 +96,6 @@ function JournalHierarchySlider({
   onToggleLevel2Id,
   onToggleLevel3Id, // ADD
   onL3DoubleClick, // ADD
-  onOpenModal,
-  isAccordionOpen, // This prop might become unused if L3 accordion is removed
-  onToggleAccordion, // This prop might become unused
   rootJournalIdConst,
   onNavigateContextDown,
 }) {
@@ -281,7 +272,7 @@ function JournalHierarchySlider({
     );
     if (onSelectTopLevel) {
       // Pass the current selectedTopLevelId as the childToSelectInL2 for the new parent context
-      onSelectTopLevel(newL1ParentContextId, selectedTopLevelId);
+      onSelectTopLevel(newL1ParentContextId, null); // NEW: do not pre-select
     }
   };
 
@@ -363,7 +354,7 @@ function JournalHierarchySlider({
             modules={[Navigation]}
             slidesPerView={"auto"}
             spaceBetween={8}
-            navigation={level2NodesForScroller.length > 4}
+            navigation={false}
             className={styles.level2ScrollerSwiper}
             observer={true}
             observeParents={true}
@@ -442,8 +433,6 @@ function JournalHierarchySlider({
       {/* NEW L3 Scroller (modeled after L2 Scroller) */}
       {level3NodesForScroller.length > 0 ? (
         <div className={styles.level2ScrollerContainer}>
-          {" "}
-          {/* Re-use L2 container style or new */}
           <Swiper
             key={l3ScrollerKey} // Use new key
             onSwiper={(swiper) => {
@@ -452,7 +441,7 @@ function JournalHierarchySlider({
             modules={[Navigation]}
             slidesPerView={"auto"}
             spaceBetween={8}
-            navigation={level3NodesForScroller.length > 4} // Conditional navigation
+            navigation={false} // Conditional navigation
             className={`${styles.level2ScrollerSwiper} ${styles.level3ScrollerSwiperOverride}`} // Re-use L2 swiper style, add override if needed
             observer={true}
             observeParents={true}
@@ -1250,12 +1239,6 @@ export default function Home() {
     []
   ); // ROOT_JOURNAL_ID is a constant
 
-  // Home.js
-
-  useEffect(() => {
-    setSelectedLevel3JournalIds([]);
-  }, [selectedLevel2JournalIds, selectedTopLevelJournalId]);
-
   const [selectedPartnerId, setSelectedPartnerId] = useState(() =>
     getFirstId(activeDataSet?.partners)
   );
@@ -1306,6 +1289,15 @@ export default function Home() {
       visibilitySwiperRef.current?.update();
     }
   }, [sliderOrder]);
+
+  console.log(
+    "HOME RENDER - L1:",
+    selectedTopLevelJournalId,
+    "L2s:",
+    selectedLevel2JournalIds,
+    "L3s:",
+    selectedLevel3JournalIds
+  );
 
   useEffect(() => {
     // Placeholder for actual filtering logic based on selected journal items.
@@ -1462,7 +1454,7 @@ export default function Home() {
       setSelectedLevel2JournalIds([currentL1ToBecomeL2]); // Old L1 becomes selected L2
 
       // The targetL2NowL3 (which was an L2 under currentL1ToBecomeL2) is now an L3. Select it.
-      setSelectedLevel3JournalIds([targetL2NowL3]);
+      setSelectedLevel3JournalIds([]); // NEW: do not pre-select the target L3
     },
     [
       activeDataSet,
@@ -1472,18 +1464,25 @@ export default function Home() {
       setSelectedLevel3JournalIds,
     ] // Added stable setters
   );
+  // page.js - Home component
   const handleToggleLevel2JournalId = useCallback(
     (level2IdToToggle) => {
-      // Validate level2IdToToggle based on current selectedTopLevelJournalId
+      // Validate level2IdToToggle (as before)
       let l2SourceNodes;
+      let currentL1Node; // To find children later
+
       if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
         l2SourceNodes = activeDataSet?.account_hierarchy || [];
+        currentL1Node = {
+          id: ROOT_JOURNAL_ID,
+          children: activeDataSet.account_hierarchy,
+        };
       } else {
-        const topNode = findNodeById(
+        currentL1Node = findNodeById(
           activeDataSet?.account_hierarchy,
           selectedTopLevelJournalId
         );
-        l2SourceNodes = topNode?.children || [];
+        l2SourceNodes = currentL1Node?.children || [];
       }
       if (!l2SourceNodes.some((node) => node.id === level2IdToToggle)) {
         console.warn(
@@ -1492,20 +1491,77 @@ export default function Home() {
         return;
       }
 
-      setSelectedLevel2JournalIds((prevSelectedL2Ids) => {
-        const newSelectedL2Ids = prevSelectedL2Ids.includes(level2IdToToggle)
-          ? prevSelectedL2Ids.filter((id) => id !== level2IdToToggle)
-          : [...prevSelectedL2Ids, level2IdToToggle];
-        return newSelectedL2Ids;
-      });
-      setSelectedLevel3JournalIds([]); // ADD: Clear L3 selections when L2s change
-    },
-    [activeDataSet, selectedTopLevelJournalId]
-  ); // ROOT_JOURNAL_ID is constant
+      // Calculate the new set of selected L2 IDs
+      const newSelectedL2Ids = selectedLevel2JournalIds.includes(
+        level2IdToToggle
+      )
+        ? selectedLevel2JournalIds.filter((id) => id !== level2IdToToggle)
+        : [...selectedLevel2JournalIds, level2IdToToggle];
 
+      setSelectedLevel2JournalIds(newSelectedL2Ids);
+
+      // INSTEAD OF CLEARING L3s, VALIDATE AND FILTER THEM:
+      // setSelectedLevel3JournalIds([]); // OLD: Clears L3 selections
+
+      // NEW LOGIC: Filter existing L3 selections
+      setSelectedLevel3JournalIds((prevSelectedL3Ids) => {
+        if (newSelectedL2Ids.length === 0) {
+          return []; // If no L2s are selected, no L3s can be selected
+        }
+        const validL3s = [];
+        for (const l3Id of prevSelectedL3Ids) {
+          // Check if this l3Id is a child of ANY of the newSelectedL2Ids
+          let l3StillValid = false;
+          for (const newL2Id of newSelectedL2Ids) {
+            const newL2Node = findNodeById(currentL1Node?.children, newL2Id); // Source for L2s is currentL1Node.children
+            if (
+              newL2Node &&
+              newL2Node.children?.some((l3Child) => l3Child.id === l3Id)
+            ) {
+              l3StillValid = true;
+              break;
+            }
+          }
+          if (l3StillValid) {
+            validL3s.push(l3Id);
+          }
+        }
+        console.log(
+          "Filtered L3s based on new L2s:",
+          validL3s,
+          "Prev L3s:",
+          prevSelectedL3Ids,
+          "New L2s:",
+          newSelectedL2Ids
+        );
+        return validL3s;
+      });
+    },
+    [
+      activeDataSet,
+      selectedTopLevelJournalId,
+      selectedLevel2JournalIds,
+      ROOT_JOURNAL_ID,
+      setSelectedLevel2JournalIds,
+      setSelectedLevel3JournalIds,
+    ] // Added setters to dep array
+  );
   // ADD: Handler for toggling L3 items
   const handleToggleLevel3JournalId = useCallback(
     (level3IdToToggle) => {
+      console.log("handleToggleLevel3JournalId CALLED for:", level3IdToToggle);
+      console.log(
+        "  BEFORE L3 toggle - Current L1:",
+        selectedTopLevelJournalId
+      );
+      console.log(
+        "  BEFORE L3 toggle - Current L2s:",
+        selectedLevel2JournalIds
+      ); // <<< IMPORTANT
+      console.log(
+        "  BEFORE L3 toggle - Current L3s:",
+        selectedLevel3JournalIds
+      );
       // Validation: L3 must be a child of one of the selected L2s
       let l3IsValid = false;
       const l1Node =
@@ -1743,14 +1799,9 @@ export default function Home() {
         setSelectedLevel3JournalIds([]); // Clear L3s if target can't be found
         return;
       }
-
-      console.log(
-        `  L3 Down (Standard): New L1: ${newL1ContextId}. Old L1 (${oldL1ToBecomeSelectedL2}) becomes selected L2. Original L2 parent (${originalL2ParentOfDClickedL3.id}) of dbl-clicked L3 becomes selected L3.`
-      );
-
       setSelectedTopLevelJournalId(newL1ContextId);
       setSelectedLevel2JournalIds([oldL1ToBecomeSelectedL2]);
-      setSelectedLevel3JournalIds([originalL2ParentOfDClickedL3.id]); // Select the original L2 parent, which is now an L3
+      setSelectedLevel3JournalIds([]); // NEW: do not pre-select
     },
     [
       activeDataSet,
