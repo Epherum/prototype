@@ -3,24 +3,24 @@
    ========================================================================== */
 
 /* :root {
-  --spacing-unit: 8px;
-  --text-primary: #333;
-  --text-secondary: #777;
-  --bg-main: #fff;
-  --bg-card: #fff;
-  --bg-secondary: #f0f0f0;
-  --accent-warm: #E89F71;
-  --accent-warm-light: #FAEBD7;
-  --accent-warm-lighter: #FFF5E8;
-  --accent-slider: #FDF5EF;
+  --bg-main: #fdf8f2; 
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a; 
+  --text-secondary: #7a7a7a;
+  --accent-warm: #e89f71; 
+  --accent-warm-light: #f3d4c2; 
+  --accent-slider: #fff0e8; 
   --border-subtle: #eee;
-  --border-radius-sm: 4px;
-  --border-radius-md: 8px;
-  --border-radius-lg: 12px;
-  --border-radius-pill: 999px;
-  --shadow-color: rgba(0, 0, 0, 0.08);
-  --overlay-bg: rgba(0, 0, 0, 0.65);
-} */
+  --shadow-color: rgba(100, 100, 100, 0.1);
+
+  --border-radius-lg: 16px; 
+  --border-radius-md: 12px; 
+  --border-radius-sm: 8px;
+  --border-radius-pill: 50px;
+
+  --spacing-unit: 8px;
+} 
+*/
 
 .pageContainer {
   max-width: 600px;
@@ -29,8 +29,6 @@
     calc(var(--spacing-unit) * 2);
   min-height: 100vh;
   box-sizing: border-box;
-  /* If a transform here is causing issues for fixed modals, it needs to be removed or modals need portaling */
-  /* Example: transform: translateZ(0); /* This would create a stacking context */
 }
 
 .title {

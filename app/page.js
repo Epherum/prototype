@@ -311,6 +311,18 @@ function JournalHierarchySlider({
     }
   };
 
+  // --- Helper function to get node codes from IDs ---
+  // This function will need access to the relevant node lists
+  const getNodeCodesFromIds = (ids, nodeList) => {
+    if (!ids || ids.length === 0 || !nodeList || nodeList.length === 0) {
+      return "None"; // Or maybe an empty string or "Select..."
+    }
+    return ids
+      .map((id) => findNodeById(nodeList, id)?.code || id) // Find node in the provided list
+      .filter(Boolean) // Remove null/undefined if a node wasn't found (shouldn't happen ideally)
+      .join(", ");
+  };
+
   // --- RENDER LOGIC ---
   return (
     <>
@@ -338,10 +350,14 @@ function JournalHierarchySlider({
 
       <h3 className={styles.level2ScrollerTitle}>
         {selectedTopLevelId === rootJournalIdConst
-          ? "Top-Level Accounts"
-          : `Level 2 Accounts (Children of ${
-              currentL1ContextNode?.code || "..."
-            })`}
+          ? `Selected Top-Level: ${getNodeCodesFromIds(
+              selectedLevel2Ids,
+              level2NodesForScroller
+            )}`
+          : `Selected L2: ${getNodeCodesFromIds(
+              selectedLevel2Ids,
+              level2NodesForScroller
+            )}`}
       </h3>
 
       {level2NodesForScroller.length > 0 ? (
@@ -408,26 +424,14 @@ function JournalHierarchySlider({
         </div>
       )}
 
-      {/* Backdrop is removed as click-away is handled by document event listener */}
-
       {/* L3 Scroller Title */}
-      <h3
-        className={
-          styles.level2ScrollerTitle
-        } /* Re-use L2 title style or create new */
-      >
-        {selectedLevel2Ids.length > 0
-          ? `Level 3 Accounts (Children of L2: ${selectedLevel2Ids
-              .map((id) => {
-                const l1Node =
-                  selectedTopLevelId === rootJournalIdConst
-                    ? { children: hierarchyData }
-                    : findNodeById(hierarchyData, selectedTopLevelId);
-                const l2Node = findNodeById(l1Node?.children, id);
-                return l2Node?.code || id;
-              })
-              .join(", ")})`
-          : "Select L2 Account(s) Above"}
+      <h3 className={styles.level2ScrollerTitle}>
+        {selectedLevel2Ids.length === 0
+          ? "Select L2 Account(s) Above"
+          : `Selected L3: ${getNodeCodesFromIds(
+              selectedLevel3Ids,
+              level3NodesForScroller
+            )}`}
       </h3>
 
       {/* NEW L3 Scroller (modeled after L2 Scroller) */}
