@@ -1611,3 +1611,194 @@
   text-overflow: ellipsis;
   max-width: 70px; /* Adjust so it doesn't make buttons too wide */
 }
+
+/* === STYLES FOR DOCUMENT CREATION FEATURE === */
+
+.createDocumentButton,
+.cancelDocumentButton {
+  background-color: #4caf50; /* Green for create */
+  color: white;
+  padding-left: calc(var(--spacing-unit) * 1);
+  padding-right: calc(var(--spacing-unit) * 1);
+}
+.createDocumentButton:hover {
+  background-color: #45a049;
+}
+.cancelDocumentButton {
+  background-color: #f44336; /* Red for cancel */
+}
+.cancelDocumentButton:hover {
+  background-color: #da190b;
+}
+
+.swiperLocked .swiper-button-next,
+.swiperLocked .swiper-button-prev,
+.swiperLocked .swiper-pagination {
+  display: none !important;
+}
+.swiperLocked .slide {
+  cursor: default !important;
+  opacity: 0.7; /* Indicate locked state */
+}
+.swiperLocked .slide:hover {
+  /* No hover effects when locked */
+}
+
+.slideSelectedForDocument {
+  border: 3px solid var(--accent-warm) !important; /* Thicker border */
+  box-shadow: 0 0 10px rgba(232, 159, 113, 0.7); /* Softer shadow */
+  transform: scale(1.02); /* Slight zoom */
+  transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.slideSelectedForDocument::after {
+  /* Optional overlay for selected state */
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(232, 159, 113, 0.1); /* Light tint */
+  border-radius: var(--border-radius-md); /* Match slide radius */
+  pointer-events: none;
+}
+
+.selectedGoodIndicator {
+  position: absolute;
+  top: 8px; /* Adjusted */
+  right: 8px; /* Adjusted */
+  background-color: var(--accent-warm);
+  color: white;
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  font-size: 0.75em;
+  border-radius: var(--border-radius-sm);
+  font-weight: bold;
+  z-index: 5; /* Ensure above slide content if needed */
+}
+
+.documentGoodDetails {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--border-subtle);
+}
+.documentGoodDetails h4 {
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 1.5); /* More space */
+  font-size: 1em; /* Slightly larger */
+  color: var(--text-primary);
+  text-align: center;
+}
+.documentGoodDetails .formGroup {
+  margin-bottom: calc(var(--spacing-unit) * 1.25);
+  display: flex; /* Align label and input */
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between; /* Pushes input to the right */
+}
+.documentGoodDetails .formGroup label {
+  font-size: 0.9em; /* Consistent label size */
+  color: var(--text-secondary);
+  flex-basis: 40%; /* Give label some width */
+  margin-right: var(--spacing-unit);
+}
+.documentGoodDetails .formGroup input,
+.formInputSmall {
+  /* Generic class for these inputs */
+  font-size: 0.95em;
+  padding: calc(var(--spacing-unit) * 0.75);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  width: auto; /* Let flexbox determine width */
+  flex-grow: 1; /* Input takes remaining space */
+  max-width: 150px; /* Prevent very wide inputs */
+}
+
+.documentGoodDetails .addButton,
+.documentGoodDetails .removeButton {
+  width: 100%;
+  margin-top: var(--spacing-unit); /* Space above add/remove */
+  margin-bottom: var(--spacing-unit);
+  justify-content: center;
+  font-size: 0.9em;
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+}
+.documentGoodDetails .addButton {
+  background-color: #28a745; /* Green */
+  color: white;
+}
+.documentGoodDetails .addButton:hover {
+  background-color: #218838;
+}
+.documentGoodDetails .removeButton {
+  background-color: #dc3545; /* Red */
+  color: white;
+}
+.documentGoodDetails .removeButton:hover {
+  background-color: #c82333;
+}
+
+.finishDocumentContainer {
+  display: flex;
+  justify-content: center;
+  margin-top: calc(var(--spacing-unit) * 3);
+  margin-bottom: calc(var(--spacing-unit) * 3); /* More space at bottom */
+  padding: var(--spacing-unit); /* Padding around button */
+}
+.finishDocumentButton {
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 4); /* Wider padding */
+  font-size: 1.1em;
+  font-weight: 600;
+  min-width: 280px; /* Wider button */
+  border-radius: var(--border-radius-lg); /* More rounded */
+}
+
+.confirmationSection {
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.confirmationSection:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+.confirmationSection h3 {
+  font-size: 1.15em; /* Slightly larger heading */
+  color: var(--text-primary);
+  margin-top: 0;
+  margin-bottom: var(--spacing-unit);
+}
+.confirmationSection p {
+  font-size: 0.95em; /* Consistent text size */
+  color: var(--text-secondary);
+  margin: calc(var(--spacing-unit) * 0.5) 0;
+  text-align: left;
+  line-height: 1.6;
+}
+.confirmationGoodsList {
+  list-style: none;
+  padding-left: 0;
+  max-height: 200px; /* Add scroll for many items */
+  overflow-y: auto;
+}
+.confirmationGoodsList li {
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 0.5); /* Some horizontal padding */
+  border-bottom: 1px dashed var(--border-subtle);
+  background-color: #fdfdfd; /* Slight off-white for list items */
+  border-radius: var(--border-radius-sm);
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+.confirmationGoodsList li:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+.confirmationGoodsList li strong {
+  color: var(--text-primary);
+  font-size: 1em;
+  display: block; /* Make name take full width */
+  margin-bottom: 2px;
+}
+.confirmationGoodsList li p {
+  font-size: 0.9em; /* Slightly larger detail text */
+  margin: 2px 0 0 0;
+  color: var(--text-secondary);
+}
