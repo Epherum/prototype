@@ -1,0 +1,312 @@
+/* src/components/sliders/DynamicSlider.module.css */
+
+.sliderTitle {
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  font-size: 1.1em;
+  color: var(--text-primary);
+  font-weight: 600;
+  text-align: center;
+}
+
+.swiperInstance {
+  --swiper-theme-color: var(--accent-warm);
+  --swiper-navigation-color: var(--accent-warm);
+  --swiper-navigation-size: 18px;
+  width: 100%;
+  border-radius: var(--border-radius-md);
+  overflow: hidden;
+  padding-left: 45px;
+  padding-right: 45px;
+  position: relative;
+  margin-bottom: var(--spacing-unit);
+  min-height: 100px; /* Default, can be overridden for specific sliders if needed */
+  box-sizing: border-box;
+}
+
+.swiperInstance .swiper-button-next,
+.swiperInstance .swiper-button-prev {
+  background-color: rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  top: 50%;
+  transform: translateY(-50%);
+  box-shadow: 0 3px 8px rgba(100, 80, 70, 0.18);
+  transition: background-color 0.2s ease, opacity 0.2s ease,
+    box-shadow 0.2s ease;
+  z-index: 10;
+  cursor: pointer;
+}
+.swiperInstance .swiper-button-prev {
+  left: 8px;
+}
+.swiperInstance .swiper-button-next {
+  right: 8px;
+}
+.swiperInstance .swiper-button-next:hover,
+.swiperInstance .swiper-button-prev:hover {
+  background-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 10px rgba(100, 80, 70, 0.22);
+}
+.swiperInstance .swiper-button-disabled {
+  opacity: 0.35 !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+.swiperInstance .swiper-pagination {
+  bottom: 8px !important;
+  position: absolute;
+  left: 0;
+  width: 100%;
+  text-align: center;
+}
+.swiperInstance .swiper-pagination-bullet {
+  width: 7px;
+  height: 7px;
+  background-color: var(--accent-warm-light);
+  opacity: 0.6;
+  margin: 0 4px !important;
+  transition: background-color 0.2s ease, opacity 0.2s ease, width 0.2s ease,
+    height 0.2s ease;
+  display: inline-block;
+  border-radius: 50%;
+}
+.swiperInstance .swiper-pagination-bullet-active {
+  background-color: var(--swiper-theme-color);
+  opacity: 1;
+  width: 9px;
+  height: 9px;
+}
+
+/* Swiper Locked State (used by Partner slider in Doc Creation) */
+.swiperLocked .swiper-button-next,
+.swiperLocked .swiper-button-prev,
+.swiperLocked .swiper-pagination {
+  display: none !important;
+}
+.swiperLocked .slide {
+  /* Applies to slide within a locked swiper */
+  cursor: default !important;
+  opacity: 0.7;
+}
+
+/* SLIDE CONTENT */
+.slide {
+  background-color: var(--accent-slider); /* Uses your global variable */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px; /* Default for dynamic slider, Journal may vary */
+  height: 100%;
+  border-radius: var(--border-radius-md);
+  padding: calc(var(--spacing-unit) * 1.5) var(--spacing-unit);
+  box-sizing: border-box;
+  cursor: grab;
+  overflow: hidden;
+  text-align: center;
+  position: relative; /* For selectedGoodIndicator */
+}
+
+.slideTextContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.slideTextContentWithIcon {
+  flex-direction: row;
+  justify-content: center;
+  text-align: left;
+}
+
+.slideIcon {
+  flex-shrink: 0;
+  font-size: 1.4em;
+  color: var(--accent-warm);
+  margin-right: calc(var(--spacing-unit) * 0.75);
+}
+
+.slideName {
+  font-weight: 600;
+  font-size: 1.1em;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.slideSubText {
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+/* GOODS SLIDER - Document Creation Mode Specifics */
+.slideSelectedForDocument {
+  border: 3px solid var(--accent-warm) !important;
+  box-shadow: 0 0 10px rgba(232, 159, 113, 0.7);
+  transform: scale(1.02);
+  transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.slideSelectedForDocument::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(232, 159, 113, 0.1);
+  border-radius: var(--border-radius-md);
+  pointer-events: none;
+}
+
+.selectedGoodIndicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: var(--accent-warm);
+  color: white;
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  font-size: 0.75em;
+  border-radius: var(--border-radius-sm);
+  font-weight: bold;
+  z-index: 5;
+}
+
+/* ACCORDION */
+.accordionContainer {
+  margin-top: calc(var(--spacing-unit) * 2);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.detailsButton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  font-size: 0.95em;
+  font-weight: 500;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.accordionIcon {
+  display: inline-block;
+  margin-left: var(--spacing-unit);
+  font-size: 0.8em;
+  transition: transform 0.3s ease;
+  color: var(--text-secondary);
+}
+.accordionIconOpen {
+  transform: rotate(180deg);
+}
+
+.detailsContentWrapper {
+  overflow: hidden;
+}
+
+.detailsContent {
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 0.5);
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+.detailsContent p {
+  margin: 0 0 calc(var(--spacing-unit) * 0.75) 0;
+  line-height: 1.5;
+}
+.detailsContent p:last-child {
+  margin-bottom: 0;
+}
+.detailsContent strong {
+  color: var(--text-primary);
+  margin-right: 4px;
+}
+
+/* Document Good Details in Accordion (Goods Slider) */
+.documentGoodDetails {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--border-subtle);
+}
+.documentGoodDetails h4 {
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  font-size: 1em;
+  color: var(--text-primary);
+  text-align: center;
+}
+.documentGoodDetails .formGroup {
+  margin-bottom: calc(var(--spacing-unit) * 1.25);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.documentGoodDetails .formGroup label {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  flex-basis: 40%;
+  margin-right: var(--spacing-unit);
+}
+.formInputSmall {
+  /* Reusable class for small inputs in accordion */
+  font-size: 0.95em;
+  padding: calc(var(--spacing-unit) * 0.75);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  width: auto;
+  flex-grow: 1;
+  max-width: 150px;
+}
+/* .documentGoodDetails .formInputSmall {
+  /* Specific application if needed */
+
+.addButton, /* General add button style */
+.removeButton {
+  /* General remove button style */
+  width: 100%;
+  margin-top: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+  justify-content: center;
+  font-size: 0.9em;
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  /* These will become specific to their usage context, e.g. in .modalActionButton */
+  /* Or, if always used in .documentGoodDetails, they can be scoped here */
+  display: inline-flex; /* from .modalActionButton */
+  align-items: center; /* from .modalActionButton */
+  gap: calc(var(--spacing-unit) * 0.75); /* from .modalActionButton */
+  border-radius: var(--border-radius-md); /* from .modalActionButton */
+  cursor: pointer; /* from .modalActionButton */
+  border: none; /* from .modalActionButton */
+  transition: background-color 0.2s ease, opacity 0.2s ease; /* from .modalActionButton */
+}
+.addButton svg,
+.removeButton svg {
+  /* from .modalActionButton svg */
+  font-size: 1.2em;
+}
+
+.documentGoodDetails .addButton {
+  /* Scoped to accordion */
+  background-color: #28a745; /* Green */
+  color: white;
+}
+.documentGoodDetails .addButton:hover {
+  background-color: #218838;
+}
+.documentGoodDetails .removeButton {
+  /* Scoped to accordion */
+  background-color: #dc3545; /* Red */
+  color: white;
+}
+.documentGoodDetails .removeButton:hover {
+  background-color: #c82333;
+}

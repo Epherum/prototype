@@ -1,0 +1,180 @@
+
+
+// 1. Define your datasource (PostgreSQL in this case)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// 3. Define your data models
+
+// ENUM Types
+enum PartnerType {
+  LEGAL_ENTITY
+  NATURAL_PERSON
+}
+
+// We'll define other ENUMs (like DocumentStatus, DocumentType) when we add those models.
+
+model Journal {
+  id                 String    @id @db.VarChar(100) // Natural key like "401"
+  name               String    @db.Text
+  parentId           String?   @map("parent_id") @db.VarChar(100)
+  isTerminal         Boolean   @default(false) @map("is_terminal")
+  additionalDetails  Json?     @map("additional_details") @db.JsonB
+
+  parent             Journal?  @relation("JournalHierarchy", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  children           Journal[] @relation("JournalHierarchy")
+
+  // Relations to linking tables
+  journalPartnerLinks JournalPartnerLink[]
+  journalGoodLinks    JournalGoodLink[]
+
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@map("journals") // Maps to the 'journals' table in PostgreSQL
+}
+
+model Partner {
+  id                  BigInt        @id @default(autoincrement()) @db.BigInt
+  partnerType         PartnerType   @map("partner_type")
+  name                String        @db.Text
+  notes               String?       @db.Text
+  logoUrl             String?       @map("logo_url") @db.VarChar(255)
+  photoUrl            String?       @map("photo_url") @db.VarChar(255)
+  isUs                Boolean?      @default(false) @map("is_us")
+  registrationNumber  String?       @map("registration_number") @db.VarChar(100)
+  taxId               String?       @map("tax_id") @db.VarChar(100)
+  bioFatherName       String?       @map("bio_father_name") @db.VarChar(100)
+  bioMotherName       String?       @map("bio_mother_name") @db.VarChar(100)
+  additionalDetails   Json?         @map("additional_details") @db.JsonB
+
+  // Relations to linking tables
+  journalPartnerLinks JournalPartnerLink[]
+
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@map("partners")
+}
+
+model TaxCode {
+  id          Int     @id @default(autoincrement())
+  code        String  @unique @db.VarChar(50)
+  description String? @db.Text
+  rate        Decimal @db.Decimal(5, 4) // e.g., 0.20 for 20%
+
+  // Relations
+  goodsAndServices        GoodsAndService[] // A TaxCode can be used by many GoodsAndServices (as their default tax)
+  // Corrected relation: A TaxCode can be used as a contextual tax for many JournalPartnerGoodLink entries
+  journalPartnerGoodLinks JournalPartnerGoodLink[] @relation("ContextualTaxForJPGLink")
+
+  @@map("tax_codes")
+}
+
+model UnitOfMeasure {
+  id   Int    @id @default(autoincrement())
+  code String @unique @db.VarChar(20) // e.g., "KG", "PCS", "LTR"
+  name String @db.VarChar(100)
+
+  // Relations
+  goodsAndServices GoodsAndService[]
+
+  @@map("units_of_measure")
+}
+
+model GoodsAndService {
+  id                    BigInt    @id @default(autoincrement()) @db.BigInt
+  referenceCode         String?   @unique @map("reference_code") @db.VarChar(50)
+  barcode               String?   @unique @db.VarChar(50)
+  taxCodeId             Int?      @map("tax_code_id")
+  typeCode              String?   @map("type_code") @db.VarChar(25)
+  label                 String    @db.VarChar(255)
+  description           String?   @db.Text
+  unitCodeId            Int?      @map("unit_code_id")
+  stockTrackingMethod   String?   @map("stock_tracking_method") @db.VarChar(50)
+  packagingTypeCode     String?   @map("packaging_type_code") @db.VarChar(25)
+  photoUrl              String?   @map("photo_url") @db.VarChar(255)
+  additionalDetails     Json?     @map("additional_details") @db.JsonB
+
+  // Relations
+  taxCode               TaxCode?        @relation(fields: [taxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  unitOfMeasure         UnitOfMeasure?  @relation(fields: [unitCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  journalGoodLinks        JournalGoodLink[]
+  journalPartnerGoodLinks JournalPartnerGoodLink[]
+
+
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  @@map("goods_and_services")
+}
+
+// --- Linking Tables ---
+
+model JournalPartnerLink {
+  id                  BigInt    @id @default(autoincrement()) @db.BigInt
+  journalId           String    @map("journal_id") @db.VarChar(100)
+  partnerId           BigInt    @map("partner_id") @db.BigInt
+  partnershipType     String?   @map("partnership_type") @db.VarChar(50)
+  exoneration         Boolean?  @default(false)
+  periodType          String?   @map("period_type") @db.VarChar(50)
+  dateDebut           DateTime? @map("date_debut") @db.Date
+  dateFin             DateTime? @map("date_fin") @db.Date
+  documentReference   String?   @map("document_reference") @db.VarChar(200)
+
+  // Relations
+  journal             Journal   @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  journalPartnerGoodLinks JournalPartnerGoodLink[]
+
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  // Provide a shorter custom name for the unique constraint map
+  @@unique([journalId, partnerId, partnershipType], map: "uq_journal_partner_type") // Shorter name
+  @@map("journal_partner_links")
+}
+
+model JournalGoodLink {
+  id          BigInt   @id @default(autoincrement()) @db.BigInt
+  journalId   String   @map("journal_id") @db.VarChar(100)
+  goodId      BigInt   @map("good_id") @db.BigInt
+
+  // Relations
+  journal     Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  good        GoodsAndService @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([journalId, goodId], map: "uq_journal_good")
+  @@map("journal_good_links")
+}
+
+model JournalPartnerGoodLink {
+  id                      BigInt    @id @default(autoincrement()) @db.BigInt
+  journalPartnerLinkId    BigInt    @map("journal_partner_link_id") @db.BigInt
+  goodId                  BigInt    @map("good_id") @db.BigInt
+  descriptiveText         String?   @map("descriptive_text") @db.Text
+  contextualTaxCodeId     Int?      @map("contextual_tax_code_id")
+
+  // Relations
+  journalPartnerLink      JournalPartnerLink @relation(fields: [journalPartnerLinkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  good                    GoodsAndService    @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  contextualTaxCode       TaxCode?           @relation("ContextualTaxForJPGLink", fields: [contextualTaxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade) // This side defines the relation name
+
+  createdAt               DateTime           @default(now()) @map("created_at")
+  updatedAt               DateTime           @updatedAt @map("updated_at")
+
+  @@unique([journalPartnerLinkId, goodId], map: "uq_jp_good_link_good")
+  @@map("journal_partner_good_links")
+}

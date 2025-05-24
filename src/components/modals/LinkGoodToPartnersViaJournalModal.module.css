@@ -1,0 +1,82 @@
+/* src/components/modals/MultiSelectList.module.css */
+.linkModalContentSizing {
+  max-width: 550px; /* Adjust as needed */
+  width: 90%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalBodyWithList {
+  padding: 10px 15px;
+  flex-grow: 1;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-color-light);
+  border-bottom: 1px solid var(--border-color-light);
+  margin: 15px 0;
+}
+
+.itemsList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border-color-lighter);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.item:last-child {
+  border-bottom: none;
+}
+
+.item:hover {
+  background-color: var(--background-color-hover-light);
+}
+
+.itemSelected {
+  background-color: var(
+    --primary-accent-light-color
+  ); /* A light version of your accent */
+  /* color: white; */ /* Optional: if background is dark enough */
+}
+.itemSelected:hover {
+  background-color: var(--primary-accent-color-hover);
+}
+
+.checkbox {
+  margin-right: 12px;
+  transform: scale(1.2); /* Make checkbox slightly larger */
+  accent-color: var(--primary-accent-color);
+}
+
+.itemName {
+  font-weight: 500;
+  flex-grow: 1;
+  color: var(--text-color-primary);
+}
+.itemSelected .itemName {
+  /* color: white; */ /* If needed */
+}
+
+.itemDetail {
+  font-size: 0.85em;
+  color: var(--text-color-secondary);
+  margin-left: 10px;
+}
+.itemSelected .itemDetail {
+  /* color: var(--background-color-light); */ /* Lighter color on selected bg */
+}
+
+.noItemsMessage,
+.errorMessage {
+  color: var(--text-color-secondary);
+  text-align: center;
+  padding: 20px 0;
+  font-style: italic;
+}

@@ -1,0 +1,106 @@
+/* src/components/layout/StickyHeaderControls.module.css */
+.stickyHeaderContainer {
+  position: sticky;
+  top: 0;
+  z-index: 100; /* Specific z-index */
+  background-color: var(--bg-main);
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+  margin: 0 calc(-1 * var(--spacing-unit) * 2);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); /* Could use var(--shadow-color) with adjusted alpha if desired */
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 2);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+}
+
+.dataSourceSelector {
+  /* ... uses --spacing-unit, --text-secondary, --accent-warm ... looks good */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 2);
+  flex-shrink: 0;
+}
+
+.dataSourceSelector label {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.dataSourceSelector input[type="radio"] {
+  cursor: pointer;
+  accent-color: var(--accent-warm);
+}
+
+.visibilitySwiperContainer {
+  /* ... looks good */
+  width: 100%;
+  flex-shrink: 0;
+  overflow: hidden; /* Good for containing Swiper */
+}
+
+.visibilitySwiper {
+  padding: 0 calc(var(--spacing-unit) * 0.5);
+}
+
+.visibilitySwiperSlide {
+  /* ... Swiper specific overrides ... */
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  cursor: grab;
+  user-select: none;
+  vertical-align: middle;
+  padding: 2px 0;
+}
+
+.visibilitySlideContent {
+  display: inline-flex;
+  align-items: center;
+}
+
+.visibilityButton {
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  font-size: 0.8em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--accent-warm-light);
+  border-radius: var(--border-radius-pill);
+  background-color: transparent; /* Good use of transparent */
+  color: var(--accent-warm);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  white-space: nowrap;
+  min-width: 75px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.visibilityButton.visibilityActive {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+}
+
+.visibilityButton.visibilityInactive {
+  border-color: #ddd; /* Consider var(--border-subtle) or a new --border-inactive */
+  color: #aaa; /* Consider var(--text-disabled) or a shade of --text-secondary */
+  background-color: var(--bg-secondary); /* Good use of --bg-secondary */
+}
+
+.visibilityButton:hover:not(.visibilityActive) {
+  border-color: var(--accent-warm);
+}
+.visibilityButton.visibilityActive:hover {
+  background-color: #d68f63; /* Darker accent, could be a variable */
+  border-color: #d68f63;
+}
+.visibilityButton.visibilityInactive:hover {
+  border-color: #ccc; /* Slightly darker inactive border, could be a variable */
+}

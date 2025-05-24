@@ -1,0 +1,147 @@
+/* src/app/page.module.css */
+
+.pageContainer {
+  max-width: 600px; /* This is specific, not a variable */
+  margin: 0 auto;
+  padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
+    calc(var(--spacing-unit) * 2);
+  min-height: 100vh;
+  /* box-sizing already global */
+}
+
+.title {
+  text-align: center;
+  color: var(--text-primary);
+  font-size: 1.8em; /* Specific font size */
+  font-weight: 600; /* Specific font weight */
+  margin-top: calc(var(--spacing-unit) * 3);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+}
+
+.slidersArea {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 3);
+  overflow-anchor: none;
+}
+
+.sliderWrapper {
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+  box-shadow: 0 4px 15px var(--shadow-color);
+  overflow: hidden;
+  border: 1px solid transparent; /* Could be var(--border-subtle) if it's ever visible */
+  position: relative;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-unit);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.controlButton {
+  padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.2);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+  border: none;
+  border-radius: var(--border-radius-pill);
+  transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease,
+    color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  line-height: 1;
+}
+.controlButton:hover {
+  background-color: var(--accent-warm);
+  color: var(--bg-card); /* Ensure --bg-card is white or very light */
+}
+.controlButton:active {
+  transform: scale(0.95);
+}
+.controlButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: #e0e0e0; /* Consider a variable like --bg-disabled or --border-subtle */
+  color: var(--text-secondary);
+  transform: none;
+}
+
+.editButton {
+  background-color: rgba(
+    0,
+    0,
+    0,
+    0.05
+  ); /* This is a common pattern for subtle icon buttons */
+  color: var(--text-secondary);
+  padding: calc(var(--spacing-unit) * 0.8);
+  flex-shrink: 0;
+  border-radius: 50%; /* Or var(--border-radius-pill) if you want consistency */
+}
+.editButton:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: var(--text-primary);
+}
+.editButton svg {
+  font-size: 1.2em;
+  display: block;
+}
+
+.moveButtonGroup {
+  display: flex;
+  gap: var(--spacing-unit);
+  flex-shrink: 0;
+}
+
+.createDocumentButton {
+  /* Extends .controlButton */
+  background-color: #4caf50; /* Consider making these --accent-positive, --accent-negative variables */
+  color: white; /* Could be var(--bg-card) if it's white */
+}
+.createDocumentButton:hover {
+  background-color: #45a049;
+}
+.cancelDocumentButton {
+  /* Extends .controlButton */
+  background-color: #f44336;
+  color: white; /* Could be var(--bg-card) */
+}
+.cancelDocumentButton:hover {
+  background-color: #da190b;
+}
+
+.finishDocumentContainer {
+  display: flex;
+  justify-content: center;
+  margin-top: calc(var(--spacing-unit) * 3);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  padding: var(--spacing-unit);
+}
+.finishDocumentButton {
+  /* This button is styled like a primary modal button in the original code */
+  /* It should use --accent-warm and --bg-card for colors */
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 4);
+  font-size: 1.1em;
+  font-weight: 600;
+  min-width: 280px;
+  border-radius: var(--border-radius-lg);
+  border: none; /* Ensure no default border */
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.finishDocumentButton:hover {
+  background-color: #d68f63; /* Darker shade of --accent-warm, maybe var(--accent-warm-dark) */
+}

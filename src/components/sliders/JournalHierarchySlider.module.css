@@ -1,0 +1,242 @@
+/* src/components/sliders/JournalHierarchySlider.module.css */
+
+.journalParentHeader {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  padding-bottom: calc(var(--spacing-unit) * 1);
+  min-height: 30px;
+  position: relative; /* For L1 Nav Options */
+  cursor: pointer; /* If entire area is double-clickable */
+  /* touch-action: manipulation; - Apply if needed via className in JS */
+  /* user-select: none; - Apply if needed via className in JS */
+  transition: background-color 0.2s ease;
+}
+.journalParentHeader.l1NavActive {
+  background-color: var(--accent-warm-lighter);
+}
+
+.journalParentInfo {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background-color: var(--accent-warm-light);
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  border-radius: var(--border-radius-sm);
+  margin-right: auto;
+  /* user-select: none; - Apply if needed via className in JS */
+  /* -webkit-touch-callout: none; */
+}
+
+.level2ScrollerTitle {
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: center;
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  margin-bottom: calc(var(--spacing-unit) * 0.75);
+}
+
+.level2ScrollerContainer {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.level2ScrollerSwiper {
+  padding: 0 calc(var(--spacing-unit) * 0.5);
+  --swiper-navigation-size: 16px;
+  --swiper-navigation-color: var(--text-secondary);
+}
+.level3ScrollerSwiperOverride {
+  /* For L3 Scroller specifically */
+  /* Styles for L3 Scroller, e.g. if nav buttons are different */
+}
+
+.level2ScrollerSwiper .swiper-button-next,
+.level2ScrollerSwiper .swiper-button-prev {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  background-color: rgba(230, 230, 230, 0.7);
+  border-radius: 50%;
+}
+.level2ScrollerSwiper .swiper-button-next:hover,
+.level2ScrollerSwiper .swiper-button-prev:hover {
+  background-color: rgba(220, 220, 220, 0.9);
+}
+
+.level2ScrollerSlideNoOverflow {
+  width: auto !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--spacing-unit) * 0.5);
+}
+
+.l2ButtonInteractiveWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-pill);
+  /* touch-action: manipulation; - Apply from JS */
+  /* user-select: none; - Apply from JS */
+}
+
+.level2Button {
+  padding: calc(var(--spacing-unit) * 0.65) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.8em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-pill);
+  background-color: #f8f8f8;
+  color: var(--text-secondary);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  white-space: nowrap;
+  min-width: 50px; /* Base width */
+  text-align: center;
+  position: relative;
+  z-index: 5;
+  box-sizing: border-box;
+  /* user-select: none; - Apply from JS */
+  /* -webkit-touch-callout: none; */
+  /* touch-action: manipulation; - Apply from JS */
+}
+.level2Button:hover:not(.level2ButtonActive) {
+  border-color: var(--accent-warm-light);
+  background-color: #f0f0f0;
+}
+.level2ButtonActive,
+.level2ButtonActive:hover {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+}
+.level2ButtonActive:hover {
+  background-color: #d68f63;
+  border-color: #d68f63;
+}
+
+/* Expanded L2 Button for Options */
+.l2ButtonExpandedWithOptions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  width: 180px; /* Expanded width */
+  min-height: 90px; /* Expanded height */
+  padding: var(--spacing-unit);
+  background-color: var(--bg-card);
+  border: 1px solid var(--accent-warm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: var(--border-radius-md);
+  box-sizing: border-box;
+  cursor: default;
+  /* user-select: none / -webkit-touch-callout: none; - Apply from JS */
+}
+
+.expandedButtonHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.expandedButtonHeader span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-right: var(--spacing-unit);
+}
+
+.navOptionDismissInside {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2em;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.navOptionDismissInside:hover {
+  color: var(--text-primary);
+}
+
+.navOptionsInside {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+  flex-grow: 1;
+  justify-content: center;
+}
+
+.navOptionButtonInside {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  text-align: center;
+}
+.navOptionButtonInside:hover {
+  background-color: #e0e0e0;
+  border-color: #ccc;
+}
+.navIcon {
+  font-size: 0.9em;
+}
+
+/* L1 Navigation Options Overlay */
+.l1NavOptionsOverlay {
+  position: absolute;
+  bottom: calc(100% + var(--spacing-unit));
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-card);
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+  /* user-select: none / -webkit-touch-callout: none; - Apply from JS */
+}
+
+.navOptionDismissInsideL1 {
+  /* Can reuse .navOptionDismissInside if identical */
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.25);
+  line-height: 1;
+}
+.navOptionDismissInsideL1:hover {
+  color: var(--text-primary);
+}

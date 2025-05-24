@@ -1,0 +1,157 @@
+/* src/components/modals/JournalModal.module.css */
+
+.journalModalContentSizing {
+  /* If JournalModal needs specific width/height */
+  width: 600px; /* Example */
+  max-width: 95%;
+  min-height: 400px; /* Ensure it has some min height */
+  max-height: 80vh; /* Allow internal scrolling */
+  display: flex; /* Important for flex-grow on hierarchy container */
+  flex-direction: column;
+}
+
+.noAccountsMessage {
+  text-align: center;
+  color: var(--text-secondary);
+  padding: calc(var(--spacing-unit) * 3) 0;
+}
+
+.loadingIndicator {
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 3) 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.accountHierarchyContainer {
+  flex-grow: 1; /* Allows this area to take up available vertical space */
+  overflow-y: auto; /* Enables scrolling for the tree */
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 0.5); /* Some padding around the tree */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  margin-top: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+}
+
+.accountNodeRow {
+  display: flex;
+  align-items: center;
+  padding-top: calc(var(--spacing-unit) * 0.75);
+  padding-bottom: calc(var(--spacing-unit) * 0.75);
+  padding-right: calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius-sm);
+  transition: background-color 0.15s ease;
+  cursor: pointer;
+  margin-bottom: 1px;
+  position: relative;
+}
+.accountNodeRow:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+.accountNodeRow.accountNodeSelected {
+  background-color: var(--accent-warm-lighter); /* Was --accent-slider */
+}
+
+.accountNodeToggle {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  margin-right: calc(var(--spacing-unit) * 0.5);
+}
+.accountNodeToggle svg {
+  width: 16px;
+  height: 16px;
+}
+
+.accountNodeIconPlaceholder {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-right: calc(var(--spacing-unit) * 0.5);
+}
+
+.accountNodeCode {
+  flex-shrink: 0;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.8em;
+  margin-right: calc(var(--spacing-unit) * 1);
+  min-width: 40px;
+  text-align: left;
+}
+.accountNodeSelected .accountNodeCode {
+  color: var(--accent-warm);
+}
+
+.accountNodeName {
+  font-size: 0.9em;
+  color: var(--text-primary);
+  flex-grow: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: var(--spacing-unit);
+}
+.accountNodeSelected .accountNodeName {
+  font-weight: 600;
+}
+
+.accountNodeActions {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  flex-shrink: 0;
+}
+
+.accountNodeActionButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.5);
+  font-size: 1.1em;
+  line-height: 1;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.accountNodeActionButton:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.accountNodeAddChildButton {
+  color: var(--accent-warm);
+}
+.accountNodeAddChildButton:hover {
+  color: #c77a50;
+  background-color: var(--accent-warm-light);
+}
+
+.accountNodeDeleteButton {
+  color: #cc0000;
+}
+.accountNodeDeleteButton:hover {
+  color: #a30000;
+  background-color: rgba(255, 0, 0, 0.1);
+}
+
+.accountNodeChildrenContainer {
+  position: relative;
+}
+.accountNodeChildrenMotionWrapper {
+  position: relative;
+}
+.accountNodeChildrenMotionWrapper::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: var(--border-subtle);
+}

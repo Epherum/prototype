@@ -1,0 +1,89 @@
+/* src/styles/globals.css */
+:root {
+  /* Warm Palette - KEEP AS IS */
+  --bg-main: #fdf8f2;
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a;
+  --text-secondary: #7a7a7a;
+  --accent-warm: #e89f71;
+  --accent-warm-light: #f3d4c2;
+  --accent-slider: #f5eeea; /* This is now --accent-warm-lighter in my previous suggestions, let's stick to your original */
+  --border-subtle: #eee;
+  --shadow-color: rgba(100, 100, 100, 0.1);
+
+  /* Rounding - KEEP AS IS */
+  --border-radius-lg: 16px;
+  --border-radius-md: 12px;
+  --border-radius-sm: 8px;
+  --border-radius-pill: 50px;
+
+  /* Spacing - KEEP AS IS */
+  --spacing-unit: 8px;
+
+  /* ADDED FROM MY PREVIOUS SUGGESTIONS IF YOU LIKE THEM */
+  --bg-secondary: #f9f9f9; /* For secondary buttons, light grey backgrounds */
+  --overlay-bg: rgba(0, 0, 0, 0.65); /* For modal overlays */
+}
+
+body {
+  /* Apply base font and background to body - KEEP AS IS */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  /* This is a strong reset. Usually fine, but be aware if third-party components misbehave. */
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+/* General text selection prevention (can be applied via className in JS) */
+.noSelect {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Touch action for preventing double-tap zoom (can be applied via className in JS) */
+.touchManipulation {
+  touch-action: manipulation;
+}
+
+/* Utility: No Data placeholders (These are good to keep global) */
+.noData {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100px; /* Or calc(var(--spacing-unit) * 12.5) for consistency */
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary); /* Use a variable */
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  padding: calc(var(--spacing-unit) * 2);
+  box-sizing: border-box; /* Already covered by * but good for clarity */
+  margin: var(--spacing-unit) 0;
+}
+
+.noDataSmall {
+  text-align: center;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  padding: var(--spacing-unit) 0;
+  font-style: italic;
+}
+
+/* Generic form input hint (good to keep global) */
+.inputHint {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  margin-top: calc(var(--spacing-unit) * 0.25);
+}

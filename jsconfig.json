@@ -1,7 +1,13 @@
 {
   "compilerOptions": {
+    "baseUrl": ".", // Keep baseUrl as project root
     "paths": {
-      "@/*": ["./*"]
-    }
-  }
+      "@/*": ["./src/*"] // Make @/ point to the src directory
+    },
+    "jsx": "preserve",
+    "module": "esnext",
+    "moduleResolution": "node"
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  "exclude": ["node_modules"]
 }

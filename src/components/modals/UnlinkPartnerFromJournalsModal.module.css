@@ -1,0 +1,62 @@
+/* src/components/modals/UnlinkPartnerFromJournalsModal.module.css */
+.unlinkModalContentSizing {
+  max-width: 550px;
+  width: 90%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalBody {
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 2.5);
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.loadingMessage,
+.errorMessage,
+.noLinksMessage {
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 3) 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+.errorMessage {
+  color: #f44336; /* Or your error color variable */
+}
+
+.linksList {
+  list-style: none;
+  padding: 0;
+  margin: var(--spacing-unit) 0;
+}
+
+.linkItem {
+  padding: calc(var(--spacing-unit) * 1) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.linkItem:last-child {
+  border-bottom: none;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  width: 100%;
+}
+
+.checkboxInput {
+  margin-right: var(--spacing-unit);
+  width: 18px; /* Custom checkbox size */
+  height: 18px;
+  accent-color: var(--accent-warm); /* Modern way to style checkbox color */
+}
+.checkboxInput:disabled {
+  accent-color: var(--text-secondary);
+}
+
+.linkLabel {
+  color: var(--text-primary);
+  font-size: 0.95em;
+}

@@ -1,0 +1,60 @@
+/* src/components/modals/AddEditGoodModal.module.css */
+.addEditGoodModalContent {
+  width: 550px; /* Or your preferred width */
+  /* max-width: 95%; */
+}
+
+.goodForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem 0.25rem;
+  max-height: 60vh; /* Allow form to scroll if it's very long */
+  overflow-y: auto;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.formGroup label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.formGroup input[type="text"],
+.formGroup input[type="url"],
+.formGroup input[type="number"],
+.formGroup select,
+.formGroup textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  font-size: 0.95rem;
+  background-color: var(--bg-input, white);
+  color: var(--text-primary);
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formGroup input[type="text"]:focus,
+.formGroup input[type="url"]:focus,
+.formGroup input[type="number"]:focus,
+.formGroup select:focus,
+.formGroup textarea:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-light);
+}
+
+.formGroup input:disabled,
+.formGroup select:disabled,
+.formGroup textarea:disabled {
+  background-color: var(--bg-disabled, #e9ecef);
+  color: var(--text-disabled, #6c757d);
+  cursor: not-allowed;
+}

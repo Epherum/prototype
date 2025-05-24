@@ -1,0 +1,55 @@
+/* src/components/modals/AddJournalModal.module.css */
+/* It will re-use .modalOverlay, .modalContent, .modalCloseButton, .modalActions etc. from JournalModal.module.css
+   or a shared modal CSS file if you create one. For now, assume they are available globally or via composition.
+   This file will contain styles specific to the form itself.
+*/
+
+.addJournalForm {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 1.5);
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-bottom: var(--spacing-unit);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.formGroup label {
+  font-size: 0.9em;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.formGroup input[type="text"],
+.formGroup input[type="number"] {
+  /* Added number for consistency */
+  padding: calc(var(--spacing-unit) * 1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  font-size: 1em;
+  color: var(--text-primary);
+  background-color: #fff;
+}
+.formGroup input[type="text"]:focus,
+.formGroup input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-light);
+}
+
+.formError {
+  color: #d8000c;
+  background-color: #ffd2d2;
+  border: 1px solid #d8000c;
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.85em;
+  text-align: center;
+  margin-bottom: var(--spacing-unit);
+}

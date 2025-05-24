@@ -1,0 +1,138 @@
+/* src/components/modals/ModalBase.module.css */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0; /* top: 0; right: 0; bottom: 0; left: 0; */
+  background-color: var(
+    --overlay-bg
+  ); /* Make sure --overlay-bg is defined in globals.css */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* High z-index to be on top */
+  padding: var(--spacing-unit); /* Ensure --spacing-unit is global */
+  box-sizing: border-box;
+  overflow-y: auto; /* Allow scrolling if modal content is too tall */
+}
+
+.modalContent {
+  background-color: var(--bg-card); /* Ensure --bg-card is global */
+  padding: calc(var(--spacing-unit) * 2);
+  border-radius: var(
+    --border-radius-lg
+  ); /* Ensure --border-radius-lg is global */
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  max-width: 90%;
+  width: 450px; /* Default width, can be overridden by specific modal styles if needed */
+  position: relative; /* Crucial for close button positioning */
+  color: var(--text-primary); /* Ensure --text-primary is global */
+  max-height: 85vh; /* Limit height, works with overflow-y on overlay */
+  display: flex;
+  flex-direction: column;
+  margin: auto; /* Helps with centering if overlay uses overflow */
+}
+
+.modalTitle {
+  /* Common style for modal H2 */
+  margin-top: 0;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  padding-bottom: calc(var(--spacing-unit) * 1.5);
+  border-bottom: 1px solid var(--border-subtle); /* Ensure --border-subtle is global */
+  text-align: center;
+  font-size: 1.3em;
+  font-weight: 600;
+  flex-shrink: 0; /* Prevent title from shrinking if content grows */
+}
+
+.modalCloseButton {
+  position: absolute;
+  top: calc(var(--spacing-unit) * 1);
+  right: calc(var(--spacing-unit) * 1.2);
+  background: transparent;
+  border: none;
+  font-size: 1.6em;
+  font-weight: bold;
+  color: var(--text-secondary); /* Ensure --text-secondary is global */
+  cursor: pointer;
+  line-height: 1;
+  padding: calc(var(--spacing-unit) * 0.5); /* Clickable area */
+  border-radius: 50%;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  z-index: 10; /* Above modal content's other elements */
+}
+.modalCloseButton:hover {
+  color: var(--text-primary);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.modalActions {
+  /* Container for primary/secondary action buttons at modal bottom */
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-unit);
+  margin-top: calc(var(--spacing-unit) * 2); /* Space above actions */
+  padding-top: calc(
+    var(--spacing-unit) * 2
+  ); /* Space below content before actions */
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0; /* Prevent actions from shrinking */
+}
+
+.modalActionButton {
+  /* Common style for modal action buttons */
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
+  font-size: 0.9em;
+  font-weight: 500;
+  border-radius: var(
+    --border-radius-md
+  ); /* Ensure --border-radius-md is global */
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+.modalActionButton svg {
+  font-size: 1.2em;
+}
+
+.modalButtonPrimary {
+  background-color: var(--accent-warm); /* Ensure --accent-warm is global */
+  color: var(--bg-card);
+}
+.modalButtonPrimary:hover:not(:disabled) {
+  background-color: #d68f63; /* Consider making this a variable too */
+}
+.modalButtonPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.modalButtonSecondary {
+  background-color: var(--bg-secondary); /* Ensure --bg-secondary is global */
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+.modalButtonSecondary:hover {
+  background-color: #f0f0f0; /* Consider making this a variable */
+  border-color: #ccc; /* Consider making this a variable */
+}
+
+/* In ModalBase.module.css */
+.highlight {
+  font-weight: bold;
+  color: var(--primary-accent-color); /* Or your theme's accent color */
+}
+
+/* ... existing styles ... */
+.modalButtonDanger {
+  background-color: var(
+    --danger-color,
+    #dc3545
+  ); /* Define --danger-color or use a default */
+  color: white;
+}
+.modalButtonDanger:hover:not(:disabled) {
+  background-color: var(--danger-color-hover, #c82333);
+}
