@@ -5,6 +5,7 @@ import { z } from "zod";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt"; // Our BigInt helper
 import journalGoodLinkService from "@/app/services/journalGoodLinkService"; // Import the new service
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService"; // Import the new service
+import { GoodsAndService, Prisma } from "@prisma/client"; // Added Prisma and GoodsAndService
 
 // Waiter's checklist for "Create New Good/Service"
 const createGoodsSchema = z.object({
@@ -23,58 +24,79 @@ const createGoodsSchema = z.object({
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+
+  // New filters for Journal Root -> Goods scenario
+  const filterStatus = searchParams.get("filterStatus") as
+    | "affected"
+    | "unaffected"
+    | "all"
+    | null;
+  const contextJournalIdsForFilterStatus =
+    searchParams.get("contextJournalIds");
+
+  // Existing filters
   const typeCode = searchParams.get("typeCode") || undefined;
-  const forJournalIdsParam = searchParams.get("forJournalIds");
-  const forPartnerIdStr = searchParams.get("forPartnerId");
+  const forJournalIdsParam = searchParams.get("forJournalIds"); // For J-P-G
+  const forPartnerIdStr = searchParams.get("forPartnerId"); // For J-P-G
   const includeJournalChildrenParam = searchParams.get(
     "includeJournalChildren"
-  );
-  const linkedToPartnerIdStr = searchParams.get("linkedToPartnerId");
-  // const linkedToJournalIdParam = searchParams.get("linkedToJournalId"); // Old single ID
-  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds"); // +++ NEW: Plural for J-G flow
+  ); // UI should resolve this
+  const linkedToPartnerIdStr = searchParams.get("linkedToPartnerId"); // For P-G
+  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds"); // For J-G
+
+  // Pagination
+  const limitParam = searchParams.get("limit");
+  const offsetParam = searchParams.get("offset");
+  const take = limitParam ? parseInt(limitParam, 10) : undefined;
+  const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
+
+  // Base options for goodsService.getAllGoods
+  const serviceCallOptions: {
+    typeCode?: string;
+    take?: number;
+    skip?: number;
+    where?: Prisma.GoodsAndServiceWhereInput;
+    filterByAffectedJournals?: string[];
+    filterByUnaffected?: boolean;
+  } = { typeCode, take, skip };
 
   try {
-    // Scenario: J-P-G (Journal(s) -> Partner -> Good)
+    let goodsResult: { goods: GoodsAndService[]; totalCount: number } | null =
+      null;
+
+    // Priority 1: J-P-G (Journal(s) -> Partner -> Good)
     if (forJournalIdsParam && forPartnerIdStr) {
-      // ... (this logic remains as previously updated for multi-journal)
       console.log(
-        `API /goods: Fetching goods for Journal(s) '${forJournalIdsParam}' AND Partner '${forPartnerIdStr}'.`
+        `API /goods: J-P-G flow. Journals: '${forJournalIdsParam}', Partner: '${forPartnerIdStr}'.`
       );
       const journalIds = forJournalIdsParam
         .split(",")
         .map((id) => id.trim())
-        .filter((id) => id);
+        .filter(Boolean);
       if (journalIds.length === 0)
         return NextResponse.json(
           { message: "No valid journal IDs in forJournalIds." },
           { status: 400 }
         );
+
       const partnerId = parseBigIntParam(forPartnerIdStr, "forPartnerId");
       if (partnerId === null)
         return NextResponse.json(
           { message: "Invalid forPartnerId." },
           { status: 400 }
         );
+
       const includeChildren = includeJournalChildrenParam !== "false";
       const goodsArray = await jpgLinkService.getGoodsForJournalsAndPartner(
         journalIds,
         partnerId,
         includeChildren
       );
-      return new NextResponse(
-        JSON.stringify(
-          { data: goodsArray, total: goodsArray.length },
-          jsonBigIntReplacer
-        ),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+      goodsResult = { goods: goodsArray, totalCount: goodsArray.length };
     }
-    // Scenario: Filter by Partner ID only (P-G flow, uses jpgLinkService)
+    // Priority 2: P-G (Partner -> Good)
     else if (linkedToPartnerIdStr) {
-      // ... (this logic remains)
-      console.log(
-        `API /goods: Fetching goods linked to partner '${linkedToPartnerIdStr}'.`
-      );
+      console.log(`API /goods: P-G flow. Partner: '${linkedToPartnerIdStr}'.`);
       const partnerId = parseBigIntParam(
         linkedToPartnerIdStr,
         "linkedToPartnerId"
@@ -84,72 +106,110 @@ export async function GET(request: NextRequest) {
           { message: "Invalid linkedToPartnerId." },
           { status: 400 }
         );
+
       const goodIds = await jpgLinkService.getGoodIdsForPartner(partnerId);
-      if (goodIds.length === 0)
-        return NextResponse.json({ data: [], total: 0 });
-      const { goods, totalCount } = await goodsService.getAllGoods({
-        where: { id: { in: goodIds } },
-      });
-      return new NextResponse(
-        JSON.stringify({ data: goods, total: totalCount }, jsonBigIntReplacer),
-        { status: 200, headers: { "Content-Type": "application/json" } }
-      );
+      if (goodIds.length === 0) {
+        goodsResult = { goods: [], totalCount: 0 };
+      } else {
+        serviceCallOptions.where = { id: { in: goodIds } };
+        goodsResult = await goodsService.getAllGoods(serviceCallOptions);
+      }
     }
-    // Scenario: Filter by Journal ID(s) only (J-G flow, uses journalGoodLinkService) +++ MODIFIED +++
+    // Priority 3: New Journal Root -> Goods filtering with "filterStatus"
+    else if (filterStatus) {
+      console.log(
+        `API /goods: Journal Root flow with filterStatus: '${filterStatus}'.`
+      );
+      if (filterStatus === "unaffected") {
+        serviceCallOptions.filterByUnaffected = true;
+      } else if (filterStatus === "affected") {
+        const journalIds =
+          contextJournalIdsForFilterStatus
+            ?.split(",")
+            .map((id) => id.trim())
+            .filter(Boolean) || [];
+        serviceCallOptions.filterByAffectedJournals = journalIds;
+      } else if (filterStatus === "all") {
+        // "all" means no *additional* journal link filtering from this specific mechanism.
+      } else {
+        return NextResponse.json(
+          { message: `Invalid filterStatus: ${filterStatus}` },
+          { status: 400 }
+        );
+      }
+      goodsResult = await goodsService.getAllGoods(serviceCallOptions);
+    }
+    // Priority 4: J-G (Journal(s) -> Good)
     else if (linkedToJournalIdsParam) {
       console.log(
-        `API /goods: Fetching goods linked to journal(s) '${linkedToJournalIdsParam}'.`
+        `API /goods: J-G flow. Journals: '${linkedToJournalIdsParam}'.`
       );
       const journalIds = linkedToJournalIdsParam
         .split(",")
         .map((id) => id.trim())
-        .filter((id) => id);
-      if (journalIds.length === 0) {
+        .filter(Boolean);
+      if (journalIds.length === 0)
         return NextResponse.json(
-          { message: "No valid journal IDs provided in linkedToJournalIds." },
+          { message: "No valid journal IDs in linkedToJournalIds." },
           { status: 400 }
         );
-      }
-      const includeChildren = includeJournalChildrenParam === "true"; // Default to false if not specified?
-      // Use the modified service method
+
+      const includeChildren = includeJournalChildrenParam === "true"; // UI resolves
+      // This uses the old direct service call for J-G.
+      // To integrate with the new affected/unaffected pattern for J-G as well,
+      // this block would also use goodsService.getAllGoods with filterByAffectedJournals.
+      // For now, keeping existing J-G logic that directly fetches.
+      // Consider if J-G should also use the new filterByAffectedJournals in goodsService.getAllGoods for consistency
+      // If so, it would look like:
+      // serviceCallOptions.filterByAffectedJournals = journalIds;
+      // goodsResult = await goodsService.getAllGoods(serviceCallOptions);
+      // For now, using the dedicated service as per original structure:
       const goodsArray = await journalGoodLinkService.getGoodsForJournals(
         journalIds,
         includeChildren
       );
-      const body = JSON.stringify(
-        { data: goodsArray, total: goodsArray.length },
-        jsonBigIntReplacer
-      );
-      return new NextResponse(body, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      goodsResult = { goods: goodsArray, totalCount: goodsArray.length };
     }
-    // Scenario: Get all goods with optional pagination
-    else {
-      const limitParam = searchParams.get("limit");
-      const offsetParam = searchParams.get("offset");
-      const take = limitParam ? parseInt(limitParam, 10) : undefined;
-      const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
-
+    // Priority 5: Default to "affected" if contextJournalIdsForFilterStatus provided, but no filterStatus
+    // (Handles "neither button pressed" in the Journal root scenario when journals are selected)
+    else if (contextJournalIdsForFilterStatus) {
       console.log(
-        `API /goods: Fetching all goods. Limit: ${take}, Offset: ${skip}, TypeCode: ${typeCode}`
+        `API /goods: Defaulting to 'affected' from contextJournalIds: [${contextJournalIdsForFilterStatus}].`
       );
-      const { goods, totalCount } = await goodsService.getAllGoods({
-        typeCode,
-        take,
-        skip,
-      });
-      const responsePayload = { data: goods, total: totalCount };
+      const journalIds =
+        contextJournalIdsForFilterStatus
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean) || [];
+      serviceCallOptions.filterByAffectedJournals = journalIds;
+      goodsResult = await goodsService.getAllGoods(serviceCallOptions);
+    }
+    // Priority 6: Get all goods (with pagination/typeCode)
+    else {
+      console.log(`API /goods: General goods fetch. TypeCode: ${typeCode}`);
+      goodsResult = await goodsService.getAllGoods(serviceCallOptions);
+    }
+
+    // Send response
+    if (goodsResult) {
+      const responsePayload = {
+        data: goodsResult.goods,
+        total: goodsResult.totalCount,
+      };
       const body = JSON.stringify(responsePayload, jsonBigIntReplacer);
       return new NextResponse(body, {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    } else {
+      console.error("API /goods GET Error: goodsResult was unexpectedly null.");
+      return NextResponse.json(
+        { message: "Failed to determine goods data." },
+        { status: 500 }
+      );
     }
   } catch (error) {
     const e = error as Error;
-    // Simplified error handling, more specific checks can be added
     if (
       e.message.includes("Invalid BigInt") ||
       (e.cause as any)?.message?.includes("Invalid BigInt")

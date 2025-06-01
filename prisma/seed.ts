@@ -1,191 +1,197 @@
-import { PrismaClient, PartnerType } from "@prisma/client";
+import { PrismaClient, PartnerType, Journal } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
 async function deleteAllData() {
   console.log("Deleting existing data...");
 
-  // Delete from tables that are "many" sides or have fewer dependencies first.
-  // The order here matters to avoid foreign key constraint violations.
+  // Order of deletion matters to respect foreign key constraints.
+  // Start with tables that have the most dependencies or are "many" sides of relationships.
 
-  // 1. Linking tables that depend on multiple other tables
-  // JournalPartnerGoodLink depends on JournalPartnerLink and GoodsAndService
+  // 1. JournalPartnerGoodLink (depends on JournalPartnerLink and GoodsAndService)
   await prisma.journalPartnerGoodLink.deleteMany({});
   console.log("Deleted JournalPartnerGoodLinks.");
 
-  // 2. Other linking tables
-  // JournalPartnerLink depends on Journal and Partner
+  // 2. JournalPartnerLink (depends on Journal and Partner)
   await prisma.journalPartnerLink.deleteMany({});
   console.log("Deleted JournalPartnerLinks.");
 
-  // JournalGoodLink depends on Journal and GoodsAndService
+  // 3. JournalGoodLink (depends on Journal and GoodsAndService)
   await prisma.journalGoodLink.deleteMany({});
   console.log("Deleted JournalGoodLinks.");
 
-  // 3. Tables that are referenced by the above, but might also be referenced by others.
-  // GoodsAndService is referenced by JournalGoodLink and JournalPartnerGoodLink.
-  // It also references TaxCode and UnitOfMeasure, but those relations are onDelete: SetNull,
-  // so deleting GoodsAndService first is fine.
+  // 4. GoodsAndService (referenced by JournalGoodLink, JournalPartnerGoodLink)
+  //    (Its relations to TaxCode and UnitOfMeasure are onDelete: SetNull, so this is fine)
   await prisma.goodsAndService.deleteMany({});
   console.log("Deleted GoodsAndServices.");
 
-  // Partners are referenced by JournalPartnerLink.
+  // 5. Partner (referenced by JournalPartnerLink)
   await prisma.partner.deleteMany({});
   console.log("Deleted Partners.");
 
-  // TaxCodes and UnitsOfMeasure are referenced by GoodsAndService,
-  // but with onDelete: SetNull, so their order relative to GoodsAndService deletion
-  // is flexible, but best to delete them after GoodsAndService if you want a clean slate.
+  // 6. TaxCode and UnitOfMeasure (referenced by GoodsAndService with SetNull)
   await prisma.taxCode.deleteMany({});
   console.log("Deleted TaxCodes.");
   await prisma.unitOfMeasure.deleteMany({});
   console.log("Deleted UnitsOfMeasure.");
 
-  // 4. Journals: This is tricky due to the self-referencing parentId.
-  // You need to delete children before parents if onDelete: Restrict is used.
-  // A common approach for hierarchical data is to delete in passes or use raw SQL if complex.
-  // Simplest for seeding if `onDelete: Restrict` is on `parentId`:
-  //    a. Set all parentId to null (if schema allows, yours might not directly without making it optional more broadly)
-  //    b. Then delete all journals.
-  // OR, delete by levels, starting from the most deeply nested.
-  // OR, if your database supports TRUNCATE ... CASCADE (more heavy-handed).
+  // 7. Journal (self-referencing, this is the trickiest)
+  //    The `onDelete: Restrict` for `parentId` means we must delete children before parents.
+  //    We'll delete in passes, starting with leaf nodes (journals with no children).
+  let journalsCount = await prisma.journal.count();
+  let deletedInPass = 0;
+  let pass = 0;
+  console.log(`Starting journal deletion. Initial count: ${journalsCount}`);
+  while (journalsCount > 0) {
+    pass++;
+    deletedInPass = (
+      await prisma.journal.deleteMany({
+        where: { children: { none: {} } }, // Delete journals that are not a parent to any other journal
+      })
+    ).count;
 
-  // Given your `onDelete: Restrict` on `Journal.parentId`, deleting all at once might fail
-  // if there are parent-child relationships.
-  // A safer way for Journals during seeding is to delete them carefully.
-  // However, since `journalPartnerLinks` and `journalGoodLinks` have `onDelete: Cascade`
-  // *from the linking table to the Journal*, deleting those links first (done above) helps.
-  // The main constraint is the self-referential `parentId`.
-
-  // For simplicity in a seed script where you're wiping everything,
-  // and if you don't have many levels or complex interdependencies NOT covered by cascades:
-  // Try deleting all journals. If it fails due to `parentId` constraint,
-  // you might need to delete them in an order (e.g., find all journals with no children first).
-  // For a full reset, sometimes a more direct DB command or specific order is needed.
-
-  // Attempt to delete all journals (might require multiple passes or specific order if restrictive FKs)
-  // First, remove links from children to parents to break cycles for deletion for Restrict
-  // This step is usually not needed if you delete in the correct order (leaves first)
-  // await prisma.journal.updateMany({ where: { parentId: { not: null } }, data: { parentId: null } });
-
-  // Then delete. If `onDelete: Restrict` is an issue, you might need to delete level by level.
-  // But since other tables linking to Journal have onDelete: Cascade, this should be okay
-  // after those linking tables are cleared. The self-reference is the main concern.
-  // Let's try a simple deleteMany first. The ROOT journal has no parent.
-  // Children pointing to parents with Restrict can be an issue.
-  // To handle self-referential with Restrict:
-  // 1. Find all leaf nodes (isTerminal or no children in the `children` relation). Delete them.
-  // 2. Repeat until no journals are left.
-  // This is complex for a simple seed.
-  // A simpler (but potentially slower for huge datasets) loop:
-  let count = await prisma.journal.count();
-  let previousCount = count + 1; // Ensure loop runs at least once if count > 0
-  while (count > 0 && count < previousCount) {
-    // Add check to prevent infinite loop if no progress
-    previousCount = count;
-    try {
-      const deletedJournals = await prisma.journal.deleteMany({
-        where: { children: { none: {} } }, // Delete journals that have no children
-      });
-      console.log(
-        `Deleted ${deletedJournals.count} leaf journals in this pass.`
-      );
-      if (deletedJournals.count === 0 && count > 0) {
-        const remaining = await prisma.journal.findMany({
-          select: { id: true, parentId: true, name: true },
-        });
-        console.error("Stuck deleting journals. Remaining:", remaining);
-        throw new Error(
-          "Stuck deleting journals. Manual intervention or review `onDelete` constraints needed for self-referencing table."
-        );
-      }
-      count = await prisma.journal.count();
-    } catch (e) {
-      console.error("Error during journal deletion pass:", e);
+    console.log(`Pass ${pass}: Deleted ${deletedInPass} leaf journals.`);
+    if (deletedInPass === 0 && journalsCount > 0) {
       const remaining = await prisma.journal.findMany({
-        select: { id: true, parentId: true, name: true },
+        select: { id: true, name: true, parentId: true },
       });
-      console.error("Remaining journals on error:", remaining);
-      break;
+      console.error(
+        "Could not delete all journals. Remaining journals:",
+        remaining
+      );
+      throw new Error(
+        "Stuck deleting journals. This might indicate a cycle or an issue with the `children` relation filter. Manual check required."
+      );
+    }
+    journalsCount = await prisma.journal.count();
+  }
+  console.log("All journals deleted.");
+  console.log("Finished deleting all data.");
+}
+
+// Helper function to get all parent journals for a given journal ID
+async function getJournalHierarchy(
+  journalId: string | null
+): Promise<Journal[]> {
+  if (!journalId) return [];
+  const hierarchy: Journal[] = [];
+  let currentId: string | null = journalId;
+  while (currentId) {
+    const journal = await prisma.journal.findUnique({
+      where: { id: currentId },
+    });
+    if (journal) {
+      hierarchy.push(journal);
+      currentId = journal.parentId;
+    } else {
+      currentId = null; // Should not happen if data is consistent
     }
   }
-  if (count > 0) {
-    console.warn(
-      `${count} journals could not be deleted automatically. Check constraints or remaining data.`
+  return hierarchy.reverse(); // Return from root to leaf
+}
+
+// Helper to create JournalPartnerLinks hierarchically
+async function linkPartnerToJournalWithHierarchy(
+  partnerId: bigint,
+  terminalJournalId: string,
+  partnershipType: string | null
+) {
+  const hierarchy = await getJournalHierarchy(terminalJournalId);
+  for (const journal of hierarchy) {
+    await prisma.journalPartnerLink.upsert({
+      where: {
+        journalId_partnerId_partnershipType: {
+          journalId: journal.id,
+          partnerId: partnerId,
+          partnershipType: partnershipType,
+        },
+      },
+      update: {},
+      create: {
+        journalId: journal.id,
+        partnerId: partnerId,
+        partnershipType: partnershipType,
+      },
+    });
+    console.log(
+      `Linked partner ${partnerId} to journal ${journal.id} (${journal.name})`
     );
-  } else {
-    console.log("All journals deleted.");
   }
-  console.log("Finished deleting data.");
+}
+
+// Helper to create JournalGoodLinks hierarchically
+async function linkGoodToJournalWithHierarchy(
+  goodId: bigint,
+  terminalJournalId: string
+) {
+  const hierarchy = await getJournalHierarchy(terminalJournalId);
+  for (const journal of hierarchy) {
+    await prisma.journalGoodLink.upsert({
+      where: {
+        journalId_goodId: {
+          journalId: journal.id,
+          goodId: goodId,
+        },
+      },
+      update: {},
+      create: {
+        journalId: journal.id,
+        goodId: goodId,
+      },
+    });
+    console.log(
+      `Linked good ${goodId} to journal ${journal.id} (${journal.name})`
+    );
+  }
 }
 
 async function main() {
-  await deleteAllData(); // Call the delete function first
+  await deleteAllData();
 
   console.log(`Start seeding ...`);
 
-  // L1 Journals (Categories) - parentId is null
+  // --- Create Journals (L1, L2, L3) ---
+  // L1
   const jAssets = await prisma.journal.create({
-    data: { id: "1", name: "Assets", parentId: null, isTerminal: false },
+    data: { id: "1", name: "Assets" },
   });
   const jLiabilities = await prisma.journal.create({
-    data: { id: "2", name: "Liabilities", parentId: null, isTerminal: false },
+    data: { id: "2", name: "Liabilities" },
   });
   const jEquity = await prisma.journal.create({
-    data: { id: "3", name: "Equity", parentId: null, isTerminal: true },
+    data: { id: "3", name: "Equity", isTerminal: true },
   });
   const jRevenue = await prisma.journal.create({
-    data: { id: "4", name: "Revenue", parentId: null, isTerminal: false },
+    data: { id: "4", name: "Revenue" },
   });
   const jExpenses = await prisma.journal.create({
-    data: { id: "5", name: "Expenses", parentId: null, isTerminal: false },
+    data: { id: "5", name: "Expenses" },
   });
 
-  // L2 Journals (Sub-categories / Account Groups)
-  const jCurrentAssets = await prisma.journal.upsert({
-    where: { id: "10" },
-    update: {},
-    create: {
-      id: "10",
-      name: "Current Assets",
-      parentId: jAssets.id,
-      isTerminal: false,
-    },
+  // L2 for Assets
+  const jCurrentAssets = await prisma.journal.create({
+    data: { id: "10", name: "Current Assets", parentId: jAssets.id },
   });
-  const jFixedAssets = await prisma.journal.upsert({
-    where: { id: "11" },
-    update: {},
-    create: {
+  const jFixedAssets = await prisma.journal.create({
+    data: {
       id: "11",
       name: "Fixed Assets",
       parentId: jAssets.id,
       isTerminal: true,
     },
   });
-  const jSalesRevenue = await prisma.journal.upsert({
-    where: { id: "40" },
-    update: {},
-    create: {
-      id: "40",
-      name: "Sales Revenue",
-      parentId: jRevenue.id,
-      isTerminal: false,
-    },
+
+  // L2 for Revenue
+  const jSalesRevenue = await prisma.journal.create({
+    data: { id: "40", name: "Sales Revenue", parentId: jRevenue.id },
   });
-  const jIngredientCosts = await prisma.journal.upsert({
-    where: { id: "50" },
-    update: {},
-    create: {
-      id: "50",
-      name: "Ingredient Costs",
-      parentId: jExpenses.id,
-      isTerminal: false,
-    },
+
+  // L2 for Expenses
+  const jIngredientCosts = await prisma.journal.create({
+    data: { id: "50", name: "Ingredient Costs", parentId: jExpenses.id },
   });
-  const jOperatingExpenses = await prisma.journal.upsert({
-    where: { id: "51" },
-    update: {},
-    create: {
+  const jOperatingExpenses = await prisma.journal.create({
+    data: {
       id: "51",
       name: "Operating Expenses",
       parentId: jExpenses.id,
@@ -193,61 +199,49 @@ async function main() {
     },
   });
 
-  // L3 Journals (Specific Accounts - often terminal)
-  const jCash = await prisma.journal.upsert({
-    where: { id: "1001" },
-    update: {},
-    create: {
+  // L3 (Terminal Accounts)
+  const jCash = await prisma.journal.create({
+    data: {
       id: "1001",
       name: "Cash on Hand",
       parentId: jCurrentAssets.id,
       isTerminal: true,
     },
   });
-  const jReceivables = await prisma.journal.upsert({
-    where: { id: "1002" },
-    update: {},
-    create: {
+  const jReceivables = await prisma.journal.create({
+    data: {
       id: "1002",
       name: "Accounts Receivable",
       parentId: jCurrentAssets.id,
       isTerminal: true,
     },
   });
-  const jCakeSales = await prisma.journal.upsert({
-    where: { id: "4001" },
-    update: {},
-    create: {
+  const jCakeSales = await prisma.journal.create({
+    data: {
       id: "4001",
       name: "Cake Sales",
       parentId: jSalesRevenue.id,
       isTerminal: true,
     },
   });
-  const jCookieSales = await prisma.journal.upsert({
-    where: { id: "4002" },
-    update: {},
-    create: {
+  const jCookieSales = await prisma.journal.create({
+    data: {
       id: "4002",
       name: "Cookie Sales",
       parentId: jSalesRevenue.id,
       isTerminal: true,
     },
   });
-  const jFlourCosts = await prisma.journal.upsert({
-    where: { id: "5001" },
-    update: {},
-    create: {
+  const jFlourCosts = await prisma.journal.create({
+    data: {
       id: "5001",
       name: "Flour Costs",
       parentId: jIngredientCosts.id,
       isTerminal: true,
     },
   });
-  const jSugarCosts = await prisma.journal.upsert({
-    where: { id: "5002" },
-    update: {},
-    create: {
+  const jSugarCosts = await prisma.journal.create({
+    data: {
       id: "5002",
       name: "Sugar Costs",
       parentId: jIngredientCosts.id,
@@ -262,7 +256,6 @@ async function main() {
     data: {
       name: "FlourMart Inc.",
       partnerType: PartnerType.LEGAL_ENTITY,
-      notes: "Primary flour supplier",
       taxId: "FM12345",
     },
   });
@@ -270,7 +263,6 @@ async function main() {
     data: {
       name: "Sugar & Sweet Co.",
       partnerType: PartnerType.LEGAL_ENTITY,
-      notes: "Sugar and sweeteners",
       taxId: "SS67890",
     },
   });
@@ -278,7 +270,6 @@ async function main() {
     data: {
       name: "The Cozy Cafe",
       partnerType: PartnerType.LEGAL_ENTITY,
-      notes: "Regular cake order",
       registrationNumber: "CAFEA001",
     },
   });
@@ -286,16 +277,31 @@ async function main() {
     data: {
       name: "John Baker (Caterer)",
       partnerType: PartnerType.NATURAL_PERSON,
-      notes: "Occasional large cookie orders",
-      bioFatherName: "David Baker",
     },
   });
-  const pInternalBakery = await prisma.partner.create({
-    // Our own company/bakery
+
+  // New Unlinked Partners
+  const pUnaffectedLogistics = await prisma.partner.create({
     data: {
-      name: "My Cake Factory",
+      name: "Speedy Logistics Ltd.",
       partnerType: PartnerType.LEGAL_ENTITY,
-      isUs: true,
+      notes: "Potential future logistics partner, currently unlinked.",
+      taxId: "SL99887",
+    },
+  });
+  const pUnaffectedConsultant = await prisma.partner.create({
+    data: {
+      name: "Alice Advisor",
+      partnerType: PartnerType.NATURAL_PERSON,
+      notes: "Business consultant, no direct journal links yet.",
+    },
+  });
+  const pUnaffectedHardware = await prisma.partner.create({
+    data: {
+      name: "Tech Hardware Supplies",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      notes: "Hardware store, not yet integrated.",
+      registrationNumber: "THS0023",
     },
   });
 
@@ -308,28 +314,26 @@ async function main() {
   const taxExempt = await prisma.taxCode.create({
     data: { code: "EXEMPT", description: "Tax Exempt", rate: 0.0 },
   });
-
   const uomKg = await prisma.unitOfMeasure.create({
     data: { code: "KG", name: "Kilogram" },
   });
   const uomEach = await prisma.unitOfMeasure.create({
     data: { code: "EA", name: "Each" },
-  }); // EA for Each or PCS for Pieces
+  });
   const uomBox = await prisma.unitOfMeasure.create({
     data: { code: "BOX", name: "Box" },
   });
 
   console.log("Tax Codes & UoM seeded.");
 
-  // --- Create GoodsAndServices (Ingredients & Finished Products) ---
+  // --- Create GoodsAndServices ---
   const goodFlour = await prisma.goodsAndService.create({
     data: {
       label: "Premium Baking Flour",
       referenceCode: "FLR001",
       typeCode: "INGREDIENT",
-      taxCodeId: taxExempt.id, // Ingredients might be tax-exempt for B2B
+      taxCodeId: taxExempt.id,
       unitCodeId: uomKg.id,
-      description: "High-quality all-purpose flour.",
     },
   });
   const goodSugar = await prisma.goodsAndService.create({
@@ -345,10 +349,9 @@ async function main() {
     data: {
       label: "Classic Chocolate Cake",
       referenceCode: "CAKE001",
-      typeCode: "FNGD_CAKE", // Finished Good Cake
-      taxCodeId: taxStd.id, // Finished goods are taxed
+      typeCode: "FNGD_CAKE",
+      taxCodeId: taxStd.id,
       unitCodeId: uomEach.id,
-      description: "A delicious 10-inch chocolate cake.",
     },
   });
   const goodVanillaCookies = await prisma.goodsAndService.create({
@@ -361,157 +364,183 @@ async function main() {
     },
   });
 
+  // New Unlinked Goods
+  const goodOfficeSupplies = await prisma.goodsAndService.create({
+    data: {
+      label: "A4 Printer Paper Ream",
+      referenceCode: "PAPER001",
+      typeCode: "OFFICE_SUPPLY",
+      taxCodeId: taxStd.id, // Assuming standard tax
+      unitCodeId: uomEach.id, // Assuming 'Each' for a ream
+      description: "Standard office printer paper.",
+    },
+  });
+  const goodCleaningService = await prisma.goodsAndService.create({
+    data: {
+      label: "Monthly Office Cleaning",
+      referenceCode: "CLEAN01",
+      typeCode: "SERVICE",
+      taxCodeId: taxStd.id,
+      unitCodeId: uomEach.id, // 'Each' instance of service
+      description: "Contracted monthly cleaning service.",
+    },
+  });
+
   console.log("GoodsAndServices seeded.");
 
-  // --- Create JournalPartnerLinks (JPL - 2-way) ---
-  // FlourMart is a supplier, so linked to expense/cost accounts
-  const jplFlourMartToFlourCosts = await prisma.journalPartnerLink.create({
-    data: {
-      journalId: jFlourCosts.id, // 5001 - Flour Costs
-      partnerId: pSupplierFlourMart.id,
-      partnershipType: "SUPPLIER",
-    },
-  });
-  // SugarSweet is a supplier
-  const jplSugarSweetToSugarCosts = await prisma.journalPartnerLink.create({
-    data: {
-      journalId: jSugarCosts.id, // 5002 - Sugar Costs
-      partnerId: pSupplierSugarSweet.id,
-      partnershipType: "SUPPLIER",
-    },
-  });
-  // Cozy Cafe is a customer, linked to revenue accounts
-  const jplCafeAToCakeSales = await prisma.journalPartnerLink.create({
-    data: {
-      journalId: jCakeSales.id, // 4001 - Cake Sales
-      partnerId: pCustomerCafeA.id,
-      partnershipType: "CUSTOMER",
-    },
-  });
-  const jplCafeAToCookieSales = await prisma.journalPartnerLink.create({
-    data: {
-      journalId: jCookieSales.id, // 4002 - Cookie Sales
-      partnerId: pCustomerCafeA.id,
-      partnershipType: "CUSTOMER", // Cafe A buys both cakes and cookies
-    },
-  });
-  // John Baker is a customer
-  const jplJohnBToCookieSales = await prisma.journalPartnerLink.create({
-    data: {
-      journalId: jCookieSales.id, // 4002 - Cookie Sales
-      partnerId: pCustomerJohnB.id,
-      partnershipType: "CUSTOMER",
-    },
-  });
-  // Link Cozy Cafe to Accounts Receivable as well
-  const jplCafeAToReceivables = await prisma.journalPartnerLink.create({
-    data: {
-      journalId: jReceivables.id, // 1002 - Accounts Receivable
-      partnerId: pCustomerCafeA.id,
-      partnershipType: "DEBTOR",
-    },
-  });
+  // --- Create JournalPartnerLinks (JPL - 2-way) with HIERARCHY ---
+  console.log("\nLinking Partners to Journals with Hierarchy...");
+  // FlourMart is a supplier of Flour (linked to terminal "Flour Costs" - 5001)
+  await linkPartnerToJournalWithHierarchy(
+    pSupplierFlourMart.id,
+    jFlourCosts.id,
+    "SUPPLIER"
+  );
+  // SugarSweet is a supplier of Sugar (linked to terminal "Sugar Costs" - 5002)
+  await linkPartnerToJournalWithHierarchy(
+    pSupplierSugarSweet.id,
+    jSugarCosts.id,
+    "SUPPLIER"
+  );
+  // Cozy Cafe is a customer for Cakes (linked to terminal "Cake Sales" - 4001)
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerCafeA.id,
+    jCakeSales.id,
+    "CUSTOMER"
+  );
+  // Cozy Cafe is also a customer for Cookies (linked to terminal "Cookie Sales" - 4002)
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerCafeA.id,
+    jCookieSales.id,
+    "CUSTOMER"
+  );
+  // Cozy Cafe is also a debtor (linked to terminal "Accounts Receivable" - 1002)
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerCafeA.id,
+    jReceivables.id,
+    "DEBTOR"
+  );
+  // John Baker is a customer for Cookies (linked to terminal "Cookie Sales" - 4002)
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerJohnB.id,
+    jCookieSales.id,
+    "CUSTOMER"
+  );
 
-  console.log("JournalPartnerLinks seeded.");
+  console.log("JournalPartnerLinks with hierarchy seeded.");
 
-  // --- Create JournalGoodLinks (JGL - 2-way) ---
-  // Cakes are sold, so linked to Cake Sales journal
-  const jglCakeSalesToChocCake = await prisma.journalGoodLink.create({
-    data: { journalId: jCakeSales.id, goodId: goodChocolateCake.id },
-  });
-  // Cookies are sold, linked to Cookie Sales journal
-  const jglCookieSalesToVanillaCookies = await prisma.journalGoodLink.create({
-    data: { journalId: jCookieSales.id, goodId: goodVanillaCookies.id },
-  });
-  // Flour is a cost, linked to Flour Costs journal
-  const jglFlourCostsToFlour = await prisma.journalGoodLink.create({
-    data: { journalId: jFlourCosts.id, goodId: goodFlour.id },
-  });
-  // Sugar is a cost, linked to Sugar Costs journal
-  const jglSugarCostsToSugar = await prisma.journalGoodLink.create({
-    data: { journalId: jSugarCosts.id, goodId: goodSugar.id },
-  });
+  // --- Create JournalGoodLinks (JGL - 2-way) with HIERARCHY ---
+  console.log("\nLinking Goods to Journals with Hierarchy...");
+  // Chocolate Cakes are sold (linked to terminal "Cake Sales" - 4001)
+  await linkGoodToJournalWithHierarchy(goodChocolateCake.id, jCakeSales.id);
+  // Vanilla Cookies are sold (linked to terminal "Cookie Sales" - 4002)
+  await linkGoodToJournalWithHierarchy(goodVanillaCookies.id, jCookieSales.id);
+  // Flour is a cost (linked to terminal "Flour Costs" - 5001)
+  await linkGoodToJournalWithHierarchy(goodFlour.id, jFlourCosts.id);
+  // Sugar is a cost (linked to terminal "Sugar Costs" - 5002)
+  await linkGoodToJournalWithHierarchy(goodSugar.id, jSugarCosts.id);
 
-  console.log("JournalGoodLinks seeded.");
+  console.log("JournalGoodLinks with hierarchy seeded.");
 
   // --- Create JournalPartnerGoodLinks (JPGL - 3-way) ---
-  // When Cozy Cafe buys Chocolate Cakes (links jplCafeAToCakeSales with goodChocolateCake)
-  await prisma.journalPartnerGoodLink.create({
-    data: {
-      journalPartnerLinkId: jplCafeAToCakeSales.id,
-      goodId: goodChocolateCake.id,
-      descriptiveText: "Standard order for Cozy Cafe",
-    },
-  });
-  // When Cozy Cafe buys Vanilla Cookies
-  await prisma.journalPartnerGoodLink.create({
-    data: {
-      journalPartnerLinkId: jplCafeAToCookieSales.id,
-      goodId: goodVanillaCookies.id,
-      descriptiveText: "Weekly cookie supply for Cozy Cafe",
-    },
-  });
-  // When John Baker buys Vanilla Cookies
-  await prisma.journalPartnerGoodLink.create({
-    data: {
-      journalPartnerLinkId: jplJohnBToCookieSales.id,
-      goodId: goodVanillaCookies.id,
-      descriptiveText: "Catering order for John Baker event",
-    },
-  });
-  // When FlourMart supplies Flour (links jplFlourMartToFlourCosts with goodFlour)
-  await prisma.journalPartnerGoodLink.create({
-    data: {
-      journalPartnerLinkId: jplFlourMartToFlourCosts.id,
-      goodId: goodFlour.id,
-      descriptiveText: "Regular flour supply contract",
-    },
-  });
-  // When SugarSweet supplies Sugar
-  await prisma.journalPartnerGoodLink.create({
-    data: {
-      journalPartnerLinkId: jplSugarSweetToSugarCosts.id,
-      goodId: goodSugar.id,
-    },
-  });
-  // Let's add another: FlourMart also supplies sugar sometimes (linking to Sugar Costs for FlourMart)
-  // First, ensure a JPL exists for FlourMart and Sugar Costs
-  const jplFlourMartToSugarCosts = await prisma.journalPartnerLink.upsert({
+  // These links directly use the *terminal* JournalPartnerLink.
+  // The hierarchical nature is for querying/filtering, not necessarily for the 3-way link's direct JPL reference.
+  // However, the JPL itself must exist at the terminal level for the transaction.
+  console.log("\nCreating JournalPartnerGoodLinks (3-way)...");
+
+  // Find the specific terminal JPLs to use for the 3-way links
+  const jplCafeACakeSales = await prisma.journalPartnerLink.findUniqueOrThrow({
     where: {
-      // Correct way to specify the composite unique constraint for Prisma Client
       journalId_partnerId_partnershipType: {
-        journalId: jSugarCosts.id,
-        partnerId: pSupplierFlourMart.id,
-        partnershipType: "SUPPLIER", // Ensure this matches exactly, including null if that's part of unique
+        journalId: jCakeSales.id,
+        partnerId: pCustomerCafeA.id,
+        partnershipType: "CUSTOMER",
       },
     },
-    update: {}, // What to update if found (can be empty if no changes needed on conflict)
-    create: {
-      journalId: jSugarCosts.id,
-      partnerId: pSupplierFlourMart.id,
-      partnershipType: "SUPPLIER",
-      // Add any other non-nullable fields required by JournalPartnerLink if not defaulted
-    },
   });
-  await prisma.journalPartnerGoodLink.create({
-    data: {
-      journalPartnerLinkId: jplFlourMartToSugarCosts.id,
-      goodId: goodSugar.id,
-      descriptiveText: "Occasional sugar supply from FlourMart",
-    },
+  const jplCafeACookieSales = await prisma.journalPartnerLink.findUniqueOrThrow(
+    {
+      where: {
+        journalId_partnerId_partnershipType: {
+          journalId: jCookieSales.id,
+          partnerId: pCustomerCafeA.id,
+          partnershipType: "CUSTOMER",
+        },
+      },
+    }
+  );
+  const jplJohnBCookieSales = await prisma.journalPartnerLink.findUniqueOrThrow(
+    {
+      where: {
+        journalId_partnerId_partnershipType: {
+          journalId: jCookieSales.id,
+          partnerId: pCustomerJohnB.id,
+          partnershipType: "CUSTOMER",
+        },
+      },
+    }
+  );
+  const jplFlourMartFlourCosts =
+    await prisma.journalPartnerLink.findUniqueOrThrow({
+      where: {
+        journalId_partnerId_partnershipType: {
+          journalId: jFlourCosts.id,
+          partnerId: pSupplierFlourMart.id,
+          partnershipType: "SUPPLIER",
+        },
+      },
+    });
+  const jplSugarSweetSugarCosts =
+    await prisma.journalPartnerLink.findUniqueOrThrow({
+      where: {
+        journalId_partnerId_partnershipType: {
+          journalId: jSugarCosts.id,
+          partnerId: pSupplierSugarSweet.id,
+          partnershipType: "SUPPLIER",
+        },
+      },
+    });
+
+  await prisma.journalPartnerGoodLink.createMany({
+    data: [
+      {
+        journalPartnerLinkId: jplCafeACakeSales.id,
+        goodId: goodChocolateCake.id,
+        descriptiveText: "Cozy Cafe - Choc Cake",
+      },
+      {
+        journalPartnerLinkId: jplCafeACookieSales.id,
+        goodId: goodVanillaCookies.id,
+        descriptiveText: "Cozy Cafe - Cookies",
+      },
+      {
+        journalPartnerLinkId: jplJohnBCookieSales.id,
+        goodId: goodVanillaCookies.id,
+        descriptiveText: "John Baker - Cookies",
+      },
+      {
+        journalPartnerLinkId: jplFlourMartFlourCosts.id,
+        goodId: goodFlour.id,
+        descriptiveText: "FlourMart - Flour",
+      },
+      {
+        journalPartnerLinkId: jplSugarSweetSugarCosts.id,
+        goodId: goodSugar.id,
+        descriptiveText: "SugarSweet - Sugar",
+      },
+    ],
   });
 
   console.log("JournalPartnerGoodLinks seeded.");
-
   console.log(`Seeding finished.`);
 }
 
 main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
   .catch(async (e) => {
-    console.error(e);
+    console.error("Seeding failed:", e);
     await prisma.$disconnect();
     process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
   });

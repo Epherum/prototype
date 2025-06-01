@@ -1,6 +1,6 @@
 // File: src/app/services/partnerService.ts
 import prisma from "@/app/utils/prisma"; // Storeroom Manager
-import { Partner, PartnerType } from "@prisma/client"; // Partner "dish" type and its variations
+import { Partner, PartnerType, Prisma } from "@prisma/client"; // Added Prisma for WhereInput type
 
 // --- Types for "Order Slips" (Data Transfer Objects) for Partners ---
 // ... (CreatePartnerData, UpdatePartnerData types remain the same) ...
@@ -60,35 +60,81 @@ const partnerService = {
   // MODIFIED to support pagination and return totalCount
   async getAllPartners(options?: {
     partnerType?: PartnerType;
-    where?: any; // Allows pre-existing filters
-    take?: number; // For pagination limit
-    skip?: number; // For pagination offset
+    where?: Prisma.PartnerWhereInput; // Allows pre-existing filters (e.g., for J-G-P specific partner ID list)
+    take?: number;
+    skip?: number;
+    // New filter mechanism based on Journal Root selection status
+    // `filterByAffectedJournals`: Show partners linked to AT LEAST ONE of these journal IDs.
+    // If this array is empty, it means "linked to no journals from this specific list", resulting in no partners for this condition.
+    filterByAffectedJournals?: string[];
+    // `filterByUnaffected`: Show partners NOT linked to ANY journal.
+    // If true, this takes precedence over `filterByAffectedJournals`.
+    filterByUnaffected?: boolean;
   }): Promise<{ partners: Partner[]; totalCount: number }> {
-    //MODIFIED return type
     console.log(
-      "Chef (PartnerService): Fetching partners from the guest list with options:",
+      "Chef (PartnerService): Fetching partners with options:",
       options
     );
-    const whereClause: any = { ...options?.where }; // Start with a copy of provided where
+
+    // Initialize the main where clause, incorporating any externally provided 'where' conditions
+    const prismaWhere: Prisma.PartnerWhereInput = { ...options?.where };
+    const additionalConditions: Prisma.PartnerWhereInput[] = [];
+
     if (options?.partnerType) {
-      whereClause.partnerType = options.partnerType;
+      additionalConditions.push({ partnerType: options.partnerType });
       console.log(
         "Chef (PartnerService): Filtering by partner type:",
         options.partnerType
       );
     }
 
-    // Get total count *with all filters applied* but *before pagination*
+    // Apply new journal link status filters
+    if (options?.filterByUnaffected) {
+      // Show partners not linked to any journal.
+      additionalConditions.push({ journalPartnerLinks: { none: {} } });
+      console.log(
+        "Chef (PartnerService): Filtering for unaffected partners (no journal links)."
+      );
+    } else if (options?.filterByAffectedJournals) {
+      // Show partners linked to the specified journals.
+      // If options.filterByAffectedJournals is an empty array, `journalId: { in: [] }` for `some`
+      // correctly results in no partners for this condition.
+      additionalConditions.push({
+        journalPartnerLinks: {
+          some: { journalId: { in: options.filterByAffectedJournals } },
+        },
+      });
+      console.log(
+        `Chef (PartnerService): Filtering for partners affected by journals: [${options.filterByAffectedJournals.join(
+          ", "
+        )}].`
+      );
+    }
+
+    // Combine all conditions using AND
+    if (additionalConditions.length > 0) {
+      if (prismaWhere.AND) {
+        if (Array.isArray(prismaWhere.AND)) {
+          prismaWhere.AND = [...prismaWhere.AND, ...additionalConditions];
+        } else {
+          prismaWhere.AND = [prismaWhere.AND, ...additionalConditions];
+        }
+      } else {
+        prismaWhere.AND = additionalConditions;
+      }
+    }
+
     const totalCount = await prisma.partner.count({
-      where: whereClause,
+      where: prismaWhere,
     });
 
     const partners = await prisma.partner.findMany({
-      where: whereClause,
+      where: prismaWhere,
       take: options?.take,
       skip: options?.skip,
       orderBy: { name: "asc" },
     });
+
     console.log(
       `Chef (PartnerService): Fetched ${partners.length} partners. Total matching query: ${totalCount}`
     );

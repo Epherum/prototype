@@ -1,6 +1,11 @@
 // File: src/app/services/goodsService.ts
 import prisma from "@/app/utils/prisma"; // Storeroom Manager
-import { GoodsAndService, TaxCode, UnitOfMeasure } from "@prisma/client"; // Model types
+import {
+  GoodsAndService,
+  TaxCode,
+  UnitOfMeasure,
+  Prisma,
+} from "@prisma/client"; // Added Prisma
 
 // --- Types for "Order Slips" (Data Transfer Objects) for Goods & Services ---
 
@@ -86,35 +91,80 @@ const goodsService = {
   // RECIPE 3: Get all Goods/Services (e.g., for a product list)
   async getAllGoods(options?: {
     typeCode?: string;
-    where?: any;
-    take?: number; // For pagination limit
-    skip?: number; // For pagination offset
+    where?: Prisma.GoodsAndServiceWhereInput; // Use Prisma's type for better type safety
+    take?: number;
+    skip?: number;
+    // New filters for Journal Root -> Goods scenario
+    filterByAffectedJournals?: string[]; // Goods linked to AT LEAST ONE of these journal IDs
+    filterByUnaffected?: boolean; // Goods NOT linked to ANY journal
   }): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
-    // MODIFIED return type
     console.log(
       "Chef (GoodsService): Fetching items from catalog with options:",
       options
     );
-    const whereClause: any = { ...options?.where }; // Start with a copy of provided where
+    const prismaWhere: Prisma.GoodsAndServiceWhereInput = { ...options?.where };
+    const additionalConditions: Prisma.GoodsAndServiceWhereInput[] = [];
+
     if (options?.typeCode) {
-      whereClause.typeCode = options.typeCode;
+      additionalConditions.push({ typeCode: options.typeCode });
+      console.log(
+        "Chef (GoodsService): Filtering by typeCode:",
+        options.typeCode
+      );
     }
 
-    // Get total count *with all filters applied* but *before pagination*
+    // Apply new journal link status filters for Goods
+    if (options?.filterByUnaffected) {
+      // Show goods not linked to any journal.
+      additionalConditions.push({ journalGoodLinks: { none: {} } });
+      console.log(
+        "Chef (GoodsService): Filtering for unaffected goods (no journal links)."
+      );
+    } else if (options?.filterByAffectedJournals) {
+      // Show goods linked to the specified journals.
+      // If options.filterByAffectedJournals is an empty array, `journalId: { in: [] }` for `some`
+      // correctly results in no goods for this condition.
+      additionalConditions.push({
+        journalGoodLinks: {
+          some: { journalId: { in: options.filterByAffectedJournals } },
+        },
+      });
+      console.log(
+        `Chef (GoodsService): Filtering for goods affected by journals: [${options.filterByAffectedJournals.join(
+          ", "
+        )}].`
+      );
+    }
+
+    // Combine all conditions using AND
+    if (additionalConditions.length > 0) {
+      if (prismaWhere.AND) {
+        if (Array.isArray(prismaWhere.AND)) {
+          prismaWhere.AND = [...prismaWhere.AND, ...additionalConditions];
+        } else {
+          prismaWhere.AND = [prismaWhere.AND, ...additionalConditions];
+        }
+      } else {
+        prismaWhere.AND = additionalConditions;
+      }
+    }
+    console.log(
+      "Chef (GoodsService): Final prismaWhere clause for goods:",
+      JSON.stringify(prismaWhere, null, 2)
+    );
+
     const totalCount = await prisma.goodsAndService.count({
-      where: whereClause,
+      where: prismaWhere,
     });
 
     const goods = await prisma.goodsAndService.findMany({
-      where: whereClause,
+      where: prismaWhere,
       take: options?.take,
       skip: options?.skip,
       orderBy: { label: "asc" },
-      include: {
-        taxCode: true,
-        unitOfMeasure: true,
-      },
+      include: { taxCode: true, unitOfMeasure: true },
     });
+
     console.log(
       `Chef (GoodsService): Fetched ${goods.length} items. Total matching query: ${totalCount}.`
     );

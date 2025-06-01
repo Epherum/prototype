@@ -2,19 +2,28 @@
 
 .journalParentHeader {
   display: flex;
-  justify-content: flex-start;
+  /* justify-content: flex-start; CHANGED - see below */
+  justify-content: space-between; /* CHANGED: To push filter controls to the right */
   align-items: center;
   margin-bottom: calc(var(--spacing-unit) * 1);
   padding-bottom: calc(var(--spacing-unit) * 1);
-  min-height: 30px;
+  min-height: 30px; /* Or adjust to fit content + buttons */
   position: relative; /* For L1 Nav Options */
-  cursor: pointer; /* If entire area is double-clickable */
-  /* touch-action: manipulation; - Apply if needed via className in JS */
-  /* user-select: none; - Apply if needed via className in JS */
+  /* cursor: pointer; If entire area is double-clickable - consider carefully with buttons inside */
   transition: background-color 0.2s ease;
 }
 .journalParentHeader.l1NavActive {
-  background-color: var(--accent-warm-lighter);
+  background-color: var(
+    --accent-warm-lighter
+  ); /* var(--accent-slider) in your globals */
+}
+
+.journalParentInfoAndL1Options {
+  /* NEW WRAPPER for L1 info and its potential nav options */
+  display: flex;
+  align-items: center;
+  position: relative; /* For L1 Nav Options positioning relative to this group */
+  /* margin-right: auto; REMOVED - justify-content on parent handles spacing */
 }
 
 .journalParentInfo {
@@ -24,11 +33,93 @@
   background-color: var(--accent-warm-light);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   border-radius: var(--border-radius-sm);
-  margin-right: auto;
-  /* user-select: none; - Apply if needed via className in JS */
-  /* -webkit-touch-callout: none; */
+  /* margin-right: auto; REMOVED - parent flex handles spacing */
+  cursor: pointer; /* Add if only this part is double-clickable for L1 nav */
 }
 
+/* L1 Navigation Options Overlay - Styles remain the same, but ensure its positioning
+   is relative to .journalParentInfoAndL1Options or .journalParentInfo if that's the trigger */
+.l1NavOptionsOverlay {
+  position: absolute;
+  bottom: calc(
+    100% + var(--spacing-unit)
+  ); /* Appears above its relative parent */
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: var(--bg-card);
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+}
+
+.navOptionDismissInsideL1 {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2em;
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.25);
+  line-height: 1;
+}
+.navOptionDismissInsideL1:hover {
+  color: var(--text-primary);
+}
+
+/* --- Root Filter Controls --- */
+.rootFilterControls {
+  display: flex;
+  /* justify-content: center; REMOVED - parent flex handles positioning */
+  align-items: center; /* Vertically align buttons with L1 info */
+  gap: var(--spacing-unit);
+  /* margin-top: calc(var(--spacing-unit) * 0.5); REMOVED - no longer needed */
+  /* margin-bottom: calc(var(--spacing-unit) * 1); REMOVED */
+  /* padding: calc(var(--spacing-unit) * 0.5); REMOVED or adjust if needed */
+  /* background-color: var(--bg-secondary); Optional: if you want a distinct background */
+  /* border-radius: var(--border-radius-md); Optional */
+}
+
+.filterButton {
+  padding: calc(var(--spacing-unit) * 0.6) var(--spacing-unit);
+  font-size: 0.75em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-card);
+  color: var(--text-secondary);
+  transition: background-color 0.2s ease, color 0.2s ease,
+    border-color 0.2s ease;
+  white-space: nowrap;
+}
+
+/* Use a different accent for these filter buttons if desired,
+   or use --accent-warm for consistency with L2/L3 active states.
+   The example below assumes you might have --accent-cool variables.
+   If not, replace with --accent-warm, --accent-warm-light etc. */
+
+.filterButton:hover {
+  border-color: var(--accent-warm-light); /* Using warm accent for hover */
+  background-color: #f0f0f0;
+}
+
+.filterButtonActive,
+.filterButtonActive:hover {
+  background-color: var(--accent-warm); /* Using warm accent for active */
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+}
+
+.filterButtonActive:hover {
+  background-color: #d68f63; /* Darker shade of warm accent */
+  border-color: #d68f63;
+}
+
+/* Styles for L2 and L3 remain unchanged from your provided CSS */
 .level2ScrollerTitle {
   font-size: 0.9em;
   color: var(--text-secondary);
@@ -51,10 +142,6 @@
   padding: 0 calc(var(--spacing-unit) * 0.5);
   --swiper-navigation-size: 16px;
   --swiper-navigation-color: var(--text-secondary);
-}
-.level3ScrollerSwiperOverride {
-  /* For L3 Scroller specifically */
-  /* Styles for L3 Scroller, e.g. if nav buttons are different */
 }
 
 .level2ScrollerSwiper .swiper-button-next,
@@ -85,8 +172,6 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--border-radius-pill);
-  /* touch-action: manipulation; - Apply from JS */
-  /* user-select: none; - Apply from JS */
 }
 
 .level2Button {
@@ -106,9 +191,6 @@
   position: relative;
   z-index: 5;
   box-sizing: border-box;
-  /* user-select: none; - Apply from JS */
-  /* -webkit-touch-callout: none; */
-  /* touch-action: manipulation; - Apply from JS */
 }
 .level2Button:hover:not(.level2ButtonActive) {
   border-color: var(--accent-warm-light);
@@ -126,14 +208,13 @@
   border-color: #d68f63;
 }
 
-/* Expanded L2 Button for Options */
 .l2ButtonExpandedWithOptions {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: space-between;
-  width: 180px; /* Expanded width */
-  min-height: 90px; /* Expanded height */
+  width: 180px;
+  min-height: 90px;
   padding: var(--spacing-unit);
   background-color: var(--bg-card);
   border: 1px solid var(--accent-warm);
@@ -141,7 +222,6 @@
   border-radius: var(--border-radius-md);
   box-sizing: border-box;
   cursor: default;
-  /* user-select: none / -webkit-touch-callout: none; - Apply from JS */
 }
 
 .expandedButtonHeader {
@@ -208,35 +288,4 @@
 }
 .navIcon {
   font-size: 0.9em;
-}
-
-/* L1 Navigation Options Overlay */
-.l1NavOptionsOverlay {
-  position: absolute;
-  bottom: calc(100% + var(--spacing-unit));
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--bg-card);
-  padding: var(--spacing-unit);
-  border-radius: var(--border-radius-md);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-unit);
-  /* user-select: none / -webkit-touch-callout: none; - Apply from JS */
-}
-
-.navOptionDismissInsideL1 {
-  /* Can reuse .navOptionDismissInside if identical */
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.2em;
-  cursor: pointer;
-  padding: calc(var(--spacing-unit) * 0.25);
-  line-height: 1;
-}
-.navOptionDismissInsideL1:hover {
-  color: var(--text-primary);
 }

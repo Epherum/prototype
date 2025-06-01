@@ -82,6 +82,8 @@ import type {
   CreateJournalGoodLinkClientData,
   CreateJournalPartnerGoodLinkClientData,
   JournalPartnerGoodLinkClient,
+  FetchPartnersParams, // <<< IMPORT THIS
+  FetchGoodsParams,
 } from "@/lib/types";
 
 // Components
@@ -165,6 +167,11 @@ export default function Home() {
     useState<HTMLElement | null>(null);
   const [isAddEditGoodModalOpen, setIsAddEditGoodModalOpen] = useState(false);
   const [editingGoodData, setEditingGoodData] = useState<Good | null>(null);
+
+  // ++NEW STATE for Journal Root Filter Status +++
+  const [journalRootFilterStatus, setJournalRootFilterStatus] = useState<
+    "affected" | "unaffected" | "all" | null
+  >(null); // null can mean default behavior (like 'affected' if journals selected)
 
   const [
     selectedJournalIdForPjgFiltering,
@@ -343,25 +350,18 @@ export default function Home() {
 
   const partnerQueryKeyParamsStructure = useMemo(() => {
     const orderString = sliderOrder.join("-");
-    let params: {
-      limit?: number;
-      offset?: number;
-      linkedToJournalIds?: string[];
-      includeChildren?: boolean;
-      linkedToGoodIdForJGP?: string;
-    } = {};
+    let params: FetchPartnersParams = { limit: 1000, offset: 0 }; // Type it!
+
     const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
     if (partnerIndex === 0) {
-      params = { limit: 1000, offset: 0 };
+      // Handled by default params
     } else if (
       orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER)
     ) {
       // J-P-...
-      if (effectiveSelectedJournalIds.length > 0) {
-        params.linkedToJournalIds = [...effectiveSelectedJournalIds];
-        params.includeChildren = true;
-      }
+      params.filterStatus = journalRootFilterStatus;
+      params.contextJournalIds = [...effectiveSelectedJournalIds];
     } else if (
       orderString.startsWith(
         SLIDER_TYPES.JOURNAL +
@@ -371,11 +371,13 @@ export default function Home() {
           SLIDER_TYPES.PARTNER
       )
     ) {
-      // J-G-P
+      // J-G-P (Partner is 3rd)
+      // fetchPartners should use linkedToGoodIdForJGP and linkedToJournalIdsForPartner
+      // to query via JournalPartnerGoodLink or similar 3-way mechanism.
       if (effectiveSelectedJournalIds.length > 0 && selectedGoodsId) {
-        params.linkedToJournalIds = [...effectiveSelectedJournalIds];
-        params.linkedToGoodIdForJGP = selectedGoodsId;
-        params.includeChildren = true;
+        params.linkedToJournalIds = [...effectiveSelectedJournalIds]; // Changed from linkedToJournalIdsForPartner
+        params.linkedToGoodId = selectedGoodsId; // Changed from linkedToGoodIdForJGP
+        params.includeChildren = true; // Assuming this corresponds to includeChildrenForPartner
       }
     } else if (
       orderString.startsWith(
@@ -386,101 +388,92 @@ export default function Home() {
           SLIDER_TYPES.PARTNER
       )
     ) {
-      // G-J-P
+      // G-J-P (Partner is 3rd)
       if (selectedGoodsId && selectedJournalIdForGjpFiltering) {
-        params.linkedToJournalIds = [selectedJournalIdForGjpFiltering];
-        params.linkedToGoodIdForJGP = selectedGoodsId;
+        params.linkedToJournalIds = [selectedJournalIdForGjpFiltering]; // Changed
+        params.linkedToGoodId = selectedGoodsId; // Changed
         params.includeChildren = false;
       }
     }
-    // console.log("[partnerQueryKeyParamsStructure] Generated params:", params, "for order:", orderString);
     return params;
   }, [
     sliderOrder,
     effectiveSelectedJournalIds,
     selectedGoodsId,
     selectedJournalIdForGjpFiltering,
+    journalRootFilterStatus,
   ]);
 
   const partnerQuery = useQuery<Partner[], Error>({
     queryKey: ["partners", partnerQueryKeyParamsStructure],
     queryFn: async (): Promise<Partner[]> => {
-      const {
-        linkedToJournalIds,
-        includeChildren,
-        linkedToGoodIdForJGP,
-        limit,
-        offset,
-      } = partnerQueryKeyParamsStructure;
-      const effectiveIncludeChildren =
-        includeChildren === undefined ? true : includeChildren;
+      const params = partnerQueryKeyParamsStructure; // params now has linkedToGoodId, linkedToJournalIds
       const currentOrderString = sliderOrder.join("-");
       console.log(
-        `[partnerQuery.queryFn] order: ${currentOrderString}, params:`,
-        JSON.stringify(partnerQueryKeyParamsStructure)
+        `[partnerQuery.queryFn] order: ${currentOrderString}, effective params for fetchPartners:`,
+        JSON.stringify(params)
       );
 
+      // For J-G-P:
       if (
-        linkedToJournalIds &&
-        linkedToJournalIds.length > 0 &&
-        linkedToGoodIdForJGP
-      ) {
-        // J-G-P or G-J-P
-        const type = currentOrderString.startsWith("J-G-P") ? "J-G-P" : "G-J-P";
-        console.log(
-          `  Fetching for ${type}. Journals: [${linkedToJournalIds.join(
-            ","
-          )}] & Good: ${linkedToGoodIdForJGP}`
-        );
-        return fetchPartnersLinkedToJournalsAndGood(
-          linkedToJournalIds,
-          linkedToGoodIdForJGP,
-          effectiveIncludeChildren
-        );
-      } else if (
         currentOrderString.startsWith(
-          SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER
-        )
+          SLIDER_TYPES.JOURNAL +
+            "-" +
+            SLIDER_TYPES.GOODS +
+            "-" +
+            SLIDER_TYPES.PARTNER
+        ) &&
+        (!params.linkedToGoodId || // <<< --- CORRECTED
+          !params.linkedToJournalIds ||
+          params.linkedToJournalIds.length === 0) // <<< --- CORRECTED
       ) {
-        // J-P-...
-        if (linkedToJournalIds && linkedToJournalIds.length > 0) {
-          console.log(
-            `  Fetching for J-P. Journals: [${linkedToJournalIds.join(",")}]`
-          );
-          return fetchPartnersLinkedToJournals(
-            linkedToJournalIds,
-            effectiveIncludeChildren
-          );
-        } else {
-          console.log("  J-P order, but no effective journals. Returning [].");
-          return [];
-        }
-      } else if (
-        sliderOrder.indexOf(SLIDER_TYPES.PARTNER) === 0 &&
-        limit !== undefined &&
-        offset !== undefined
-      ) {
-        // Partner is 1st
-        console.log("  Partner is 1st. Fetching all partners.");
-        const paginatedResult = await fetchPartners({ limit, offset });
-        return paginatedResult.data.map((p) => ({ ...p, id: String(p.id) }));
+        console.log(
+          "  J-G-P prerequisites for 3-way link (goodId or journalIds) not met in params. Returning []."
+        );
+        return [];
       }
-      console.log(
-        "  No specific filter conditions met or unhandled config for partners. Returning []."
-      );
-      return [];
+      // For G-J-P:
+      if (
+        currentOrderString.startsWith(
+          SLIDER_TYPES.GOODS +
+            "-" +
+            SLIDER_TYPES.JOURNAL +
+            "-" +
+            SLIDER_TYPES.PARTNER
+        ) &&
+        (!params.linkedToGoodId || // <<< --- CORRECTED
+          !params.linkedToJournalIds ||
+          params.linkedToJournalIds.length === 0) // <<< --- CORRECTED
+      ) {
+        console.log(
+          "  G-J-P prerequisites for 3-way link (goodId or journalId) not met in params. Returning []."
+        );
+        return [];
+      }
+
+      // If the checks above pass, then proceed to call fetchPartners
+      // AT THIS POINT, you MUST ensure clientPartnerService.ts -> fetchPartners
+      // correctly uses params.linkedToGoodId and params.linkedToJournalIds
+      // to build the URL for the /api/partners endpoint.
+      const result = await fetchPartners(params);
+      return result.data.map((p: any) => ({ ...p, id: String(p.id) }));
     },
     enabled: (() => {
       if (!visibility[SLIDER_TYPES.PARTNER]) return false;
+
       const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
       const orderString = sliderOrder.join("-");
+
       if (partnerIndex === 0) return true;
+
       if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER
         )
-      )
+      ) {
         return !journalHierarchyQuery.isLoading;
+      }
+
       if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL +
@@ -489,8 +482,17 @@ export default function Home() {
             "-" +
             SLIDER_TYPES.PARTNER
         )
-      )
-        return effectiveSelectedJournalIds.length > 0 && !!selectedGoodsId;
+      ) {
+        // J-G-P: Enable if Journal (1st) and Good (2nd) selections are made.
+        // Relies on effectiveSelectedJournalIds (from journalHierarchyQuery)
+        // and selectedGoodsId (which implies goodsQuery for the 2nd slider has populated it).
+        return (
+          effectiveSelectedJournalIds.length > 0 &&
+          !!selectedGoodsId && // *** CRITICAL FIX: Rely on selectedGoodsId being set ***
+          !journalHierarchyQuery.isLoading // journalHierarchyQuery must be loaded for effective IDs
+        );
+      }
+
       if (
         orderString.startsWith(
           SLIDER_TYPES.GOODS +
@@ -499,8 +501,14 @@ export default function Home() {
             "-" +
             SLIDER_TYPES.PARTNER
         )
-      )
-        return !!selectedGoodsId && !!selectedJournalIdForGjpFiltering;
+      ) {
+        // G-J-P
+        return (
+          !!selectedGoodsId && // Good (1st) selected
+          !!selectedJournalIdForGjpFiltering && // Flat Journal (2nd) selected
+          !flatJournalsQueryForGood.isLoading // Ensure flat journal data for G-J is loaded
+        );
+      }
       return false;
     })(),
   });
@@ -511,19 +519,18 @@ export default function Home() {
 
   const goodsQueryKeyParamsStructure = useMemo(() => {
     const orderString = sliderOrder.join("-");
-    let params: {
-      limit?: number;
-      offset?: number;
-      forJournalIds?: string[];
-      forPartnerId?: string;
-      linkedToPartnerIdForJPGL?: string;
-      linkedToJournalIdsForJG?: string[];
-      includeChildren?: boolean;
-    } = {};
+    let params: FetchGoodsParams = { limit: 1000, offset: 0 }; // Type it!
+
     const goodsIndex = sliderOrder.indexOf(SLIDER_TYPES.GOODS);
 
     if (goodsIndex === 0) {
-      params = { limit: 1000, offset: 0 };
+      // Handled by default params
+    } else if (
+      orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
+    ) {
+      // J-G-...
+      params.filterStatus = journalRootFilterStatus;
+      params.contextJournalIds = [...effectiveSelectedJournalIds];
     } else if (
       orderString.startsWith(
         SLIDER_TYPES.JOURNAL +
@@ -533,15 +540,19 @@ export default function Home() {
           SLIDER_TYPES.GOODS
       )
     ) {
-      // J-P-G
+      // J-P-G (Goods is 3rd)
+      // fetchGoods should use forPartnerIdViaJPG and forJournalIdsViaJPG
+      // to query via JournalPartnerGoodLink or similar 3-way mechanism.
       if (selectedPartnerId) {
+        params.forPartnerId = selectedPartnerId; // Changed from forPartnerIdViaJPG
         if (effectiveSelectedJournalIds.length > 0) {
-          params.forJournalIds = [...effectiveSelectedJournalIds];
-          params.forPartnerId = selectedPartnerId;
-          params.includeChildren = true;
-        } else {
-          params.linkedToPartnerIdForJPGL = selectedPartnerId;
+          params.forJournalIds = [...effectiveSelectedJournalIds]; // Changed from forJournalIdsViaJPG
+          params.includeJournalChildren = true; // Assuming this corresponds to includeChildrenForJPG
         }
+        // If effectiveSelectedJournalIds is empty, fetchGoods might still fetch goods
+        // for the selectedPartnerId if the backend logic allows it (e.g., all goods linked to partner
+        // via any 3-way link, or only those with a null/default journal context in the link).
+        // For stricter "must have journal", the enabled logic or queryFn would check effectiveSelectedJournalIds.length > 0.
       }
     } else if (
       orderString.startsWith(
@@ -552,102 +563,98 @@ export default function Home() {
           SLIDER_TYPES.GOODS
       )
     ) {
-      // P-J-G
+      // P-J-G (Goods is 3rd)
       if (selectedPartnerId && selectedJournalIdForPjgFiltering) {
-        params.forJournalIds = [selectedJournalIdForPjgFiltering];
-        params.forPartnerId = selectedPartnerId;
-        params.includeChildren = false;
-      }
-    } else if (
-      orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
-    ) {
-      // J-G
-      if (effectiveSelectedJournalIds.length > 0) {
-        params.linkedToJournalIdsForJG = [...effectiveSelectedJournalIds];
-        params.includeChildren = true;
+        params.forPartnerId = selectedPartnerId; // Changed
+        params.forJournalIds = [selectedJournalIdForPjgFiltering]; // Changed
+        params.includeJournalChildren = false;
       }
     }
-    // console.log("[goodsQueryKeyParamsStructure] Generated params:", params, "for order:", orderString);
     return params;
   }, [
     sliderOrder,
     effectiveSelectedJournalIds,
     selectedPartnerId,
     selectedJournalIdForPjgFiltering,
+    journalRootFilterStatus,
   ]);
 
   const goodsQuery = useQuery<Good[], Error>({
     queryKey: ["goods", goodsQueryKeyParamsStructure],
     queryFn: async (): Promise<Good[]> => {
-      const {
-        forJournalIds,
-        forPartnerId,
-        linkedToPartnerIdForJPGL,
-        linkedToJournalIdsForJG,
-        includeChildren,
-        limit,
-        offset,
-      } = goodsQueryKeyParamsStructure;
-      const effectiveIncludeChildren =
-        includeChildren === undefined ? true : includeChildren;
+      const params = goodsQueryKeyParamsStructure; // params now has forPartnerId, forJournalIds
+      const currentOrderString = sliderOrder.join("-");
       console.log(
-        `[goodsQuery.queryFn] params:`,
-        JSON.stringify(goodsQueryKeyParamsStructure)
+        `[goodsQuery.queryFn] order: ${currentOrderString}, effective params for fetchGoods:`,
+        JSON.stringify(params)
       );
 
-      if (forJournalIds && forJournalIds.length > 0 && forPartnerId) {
-        console.log(
-          `  Fetching goods for Specific Journals: [${forJournalIds.join(
-            ","
-          )}] AND Partner: ${forPartnerId}`
-        );
-        return fetchGoodsForJournalsAndPartner(
-          forJournalIds,
-          forPartnerId,
-          effectiveIncludeChildren
-        );
-      } else if (linkedToPartnerIdForJPGL) {
-        console.log(
-          `  Fetching all goods linked to Partner (via JPGL): ${linkedToPartnerIdForJPGL}`
-        );
-        return fetchGoodsLinkedToPartnerViaJPGL(linkedToPartnerIdForJPGL);
-      } else if (
-        linkedToJournalIdsForJG &&
-        linkedToJournalIdsForJG.length > 0
+      // For J-P-G:
+      if (
+        currentOrderString.startsWith(
+          SLIDER_TYPES.JOURNAL +
+            "-" +
+            SLIDER_TYPES.PARTNER +
+            "-" +
+            SLIDER_TYPES.GOODS
+        ) &&
+        (!params.forPartnerId || // <<< --- CORRECTED: Use params.forPartnerId
+          !params.forJournalIds ||
+          params.forJournalIds.length === 0) // <<< --- CORRECTED: Use params.forJournalIds
+        // You might not need the `&& effectiveSelectedJournalIds.length > 0` check here
+        // if params.forJournalIds being populated is sufficient guarantee from goodsQueryKeyParamsStructure
       ) {
         console.log(
-          `  Fetching goods linked to Journals (J-G): ${linkedToJournalIdsForJG.join(
-            ","
-          )}`
+          "  J-P-G prerequisites for 3-way link (partnerId or journalIds) not met in params. Returning []."
         );
-        return fetchGoodsLinkedToJournals(
-          linkedToJournalIdsForJG,
-          effectiveIncludeChildren
-        );
-      } else if (
-        sliderOrder.indexOf(SLIDER_TYPES.GOODS) === 0 &&
-        limit !== undefined &&
-        offset !== undefined
-      ) {
-        console.log("  Goods slider is 1st. Fetching all goods.");
-        const paginatedResult = await fetchGoods({ limit, offset });
-        return paginatedResult.data.map((g: Good) => ({
-          ...g,
-          id: String(g.id),
-          taxCodeId: g.taxCodeId ?? null,
-          unitCodeId: g.unitCodeId ?? null,
-        }));
+        return [];
       }
-      console.log(
-        "  Preceding filters for Goods not fully set or unhandled config. Returning []."
-      );
-      return [];
+
+      // For P-J-G:
+      if (
+        currentOrderString.startsWith(
+          SLIDER_TYPES.PARTNER +
+            "-" +
+            SLIDER_TYPES.JOURNAL +
+            "-" +
+            SLIDER_TYPES.GOODS
+        ) &&
+        (!params.forPartnerId || // <<< --- CORRECTED: Use params.forPartnerId
+          !params.forJournalIds ||
+          params.forJournalIds.length === 0) // <<< --- CORRECTED: Use params.forJournalIds
+      ) {
+        console.log(
+          "  P-J-G prerequisites for 3-way link (partnerId or journalId) not met in params. Returning []."
+        );
+        return [];
+      }
+
+      // If the checks above pass, then proceed to call fetchGoods
+      // AT THIS POINT, you MUST ensure clientGoodService.ts -> fetchGoods
+      // correctly uses params.forPartnerId and params.forJournalIds
+      // to build the URL for the /api/goods endpoint.
+      const result = await fetchGoods(params);
+      return result.data.map((g: any) => ({
+        ...g,
+        id: String(g.id),
+        taxCodeId: g.taxCodeId ?? null,
+        unitCodeId: g.unitCodeId ?? null,
+      }));
     },
     enabled: (() => {
       if (!visibility[SLIDER_TYPES.GOODS]) return false;
+
       const goodsIndex = sliderOrder.indexOf(SLIDER_TYPES.GOODS);
       const orderString = sliderOrder.join("-");
+
       if (goodsIndex === 0) return true;
+
+      if (
+        orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
+      ) {
+        return !journalHierarchyQuery.isLoading;
+      }
+
       if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL +
@@ -656,12 +663,16 @@ export default function Home() {
             "-" +
             SLIDER_TYPES.GOODS
         )
-      )
+      ) {
+        // J-P-G: Enable if Journal (1st) and Partner (2nd) selections are made.
         return (
-          !!selectedPartnerId &&
-          !journalHierarchyQuery.isLoading &&
-          !partnerQuery.isLoading
+          !!selectedPartnerId && // Partner (2nd) selected
+          // effectiveSelectedJournalIds.length > 0 && // Journal (1st) has selection(s) - This might be too strict if goods can be shown for partner alone
+          !journalHierarchyQuery.isLoading && // Journal hierarchy loaded
+          !partnerQuery.isLoading // Partner query (for 2nd slider) not loading
         );
+      }
+
       if (
         orderString.startsWith(
           SLIDER_TYPES.PARTNER +
@@ -670,20 +681,18 @@ export default function Home() {
             "-" +
             SLIDER_TYPES.GOODS
         )
-      )
+      ) {
+        // P-J-G
         return (
-          !!selectedPartnerId &&
-          !!selectedJournalIdForPjgFiltering &&
-          !partnerQuery.isLoading &&
-          !flatJournalsQuery.isLoading
+          !!selectedPartnerId && // Partner (1st) selected
+          !!selectedJournalIdForPjgFiltering && // Flat Journal (2nd) selected
+          !flatJournalsQuery.isLoading // Ensure flat journal data for P-J is loaded
         );
-      if (
-        orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
-      )
-        return !journalHierarchyQuery.isLoading;
+      }
       return false;
     })(),
   });
+
   const goodsForSlider = useMemo(
     () => goodsQuery.data || [],
     [goodsQuery.data]
@@ -834,6 +843,19 @@ export default function Home() {
       setSelectedJournalIdForGjpFiltering(null);
     }
   }, [selectedGoodsId, isJournalSecondAfterGood]);
+
+  useEffect(() => {
+    const journalSliderIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
+    if (journalSliderIndex === 0) {
+      // Only apply if Journal is the root/first slider
+      console.log(
+        "Journal root filter status or effective journals changed, resetting Partner and Goods selections."
+      );
+      setSelectedPartnerId(null);
+      setSelectedGoodsId(null);
+      // No need to reset PjG/GjP flat journal selections as they are not applicable when J is first.
+    }
+  }, [journalRootFilterStatus, effectiveSelectedJournalIds, sliderOrder]);
 
   // --- TanStack Mutations (Data Modification) ---
   const createJournalMutation = useMutation({
@@ -1378,6 +1400,15 @@ export default function Home() {
     }
     handleClosePartnerOptionsMenu();
   }, [selectedPartnerId, deletePartnerMutation, handleClosePartnerOptionsMenu]);
+
+  // --- Callback for Journal Root Filter Change ---
+  const handleJournalRootFilterChange = useCallback(
+    (status: "affected" | "unaffected" | "all" | null) => {
+      setJournalRootFilterStatus(status);
+      // The useEffect above will handle resetting downstream selections.
+    },
+    []
+  );
 
   // Goods Options & Modal Callbacks
   const handleOpenGoodsOptionsMenu = useCallback(
@@ -2244,6 +2275,10 @@ export default function Home() {
               onNavigateContextDown: handleNavigateContextDownWrapper,
               rootJournalIdConst: ROOT_JOURNAL_ID,
               onOpenModal: handleOpenJournalModalForNavigation,
+              // +++ NEW PROPS FOR JournalHierarchySlider +++
+              isRootView: selectedTopLevelJournalId === ROOT_JOURNAL_ID, // To show filter buttons
+              currentFilterStatus: journalRootFilterStatus,
+              onFilterStatusChange: handleJournalRootFilterChange,
             };
           }
         case SLIDER_TYPES.PARTNER:
@@ -2347,6 +2382,8 @@ export default function Home() {
       selectedLevel3JournalIds,
       handleSelectTopLevelJournalWrapper,
       handleToggleLevel2JournalIdWrapper,
+      journalRootFilterStatus, // Add new state
+      handleJournalRootFilterChange, // Add new callback
       handleToggleLevel3JournalIdWrapper,
       hookHandleL3DoubleClick,
       handleNavigateContextDownWrapper, // Use wrappers
@@ -2594,6 +2631,13 @@ export default function Home() {
                           (sliderSpecificProps as any).rootJournalIdConst
                         }
                         onOpenModal={(sliderSpecificProps as any).onOpenModal}
+                        isRootView={(sliderSpecificProps as any).isRootView}
+                        currentFilterStatus={
+                          (sliderSpecificProps as any).currentFilterStatus
+                        }
+                        onFilterStatusChange={
+                          (sliderSpecificProps as any).onFilterStatusChange
+                        }
                       />
                     )
                   ) : sliderId === SLIDER_TYPES.PARTNER ? (

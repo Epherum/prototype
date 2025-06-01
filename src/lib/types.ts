@@ -265,3 +265,29 @@ export interface JournalPartnerGoodLinkClient {
     description?: string | null;
   } | null;
 }
+
+export interface FetchPartnersParams {
+  limit?: number;
+  offset?: number;
+  partnerType?: string; // Or your PartnerType enum if you parse it client-side
+  filterStatus?: "affected" | "unaffected" | "all" | null;
+  contextJournalIds?: string[];
+  linkedToJournalIds?: string[];
+  linkedToGoodId?: string;
+  includeChildren?: boolean;
+  // any other params your fetchPartners might take
+}
+
+export interface FetchGoodsParams {
+  limit?: number;
+  offset?: number;
+  typeCode?: string;
+  filterStatus?: "affected" | "unaffected" | "all" | null;
+  contextJournalIds?: string[];
+  linkedToJournalIds?: string[];
+  linkedToPartnerId?: string;
+  forJournalIds?: string[]; // Use plural if your client service/backend expects it
+  forPartnerId?: string;
+  includeJournalChildren?: boolean;
+  // any other params
+}
