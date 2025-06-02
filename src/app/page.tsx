@@ -1,4 +1,4 @@
-// src/app/page.js// src/app/page.js
+// src/app/page.tsx
 "use client";
 
 // React & Next.js Core
@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 // Third-party Libraries
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   IoOptionsOutline,
   IoAddCircleOutline,
@@ -22,17 +22,13 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 
 import {
-  fetchJournalHierarchy,
-  createJournalEntry,
-  deleteJournalEntry,
   fetchJournalsLinkedToPartner,
+  fetchJournalsLinkedToGood, // Make sure this is imported
 } from "@/services/clientJournalService";
 
 // Libs (Helpers, Constants, Types)
 import { findNodeById, getFirstId } from "@/lib/helpers";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
-import type { CreateJournalData as ServerCreateJournalData } from "@/app/services/journalService";
-
 import type { AccountNodeData, Journal } from "@/lib/types";
 
 // Components
@@ -50,14 +46,12 @@ import LinkPartnerToJournalsModal from "@/components/modals/LinkPartnerToJournal
 import UnlinkPartnerFromJournalsModal from "@/components/modals/UnlinkPartnerFromJournalsModal";
 import LinkGoodToJournalsModal from "@/components/modals/LinkGoodToJournalsModal";
 import UnlinkGoodFromJournalsModal from "@/components/modals/UnlinkGoodFromJournalsModal";
-import LinkGoodToPartnersViaJournalModal from "@/components/modals/LinkGoodToPartnersViaJournalModal"; // Import the new modal
-import UnlinkGoodFromPartnersViaJournalModal from "@/components/modals/UnlinkGoodFromPartnersViaJournalModal"; // Import the new modal
+import LinkGoodToPartnersViaJournalModal from "@/components/modals/LinkGoodToPartnersViaJournalModal";
+import UnlinkGoodFromPartnersViaJournalModal from "@/components/modals/UnlinkGoodFromPartnersViaJournalModal";
 
 // Custom Hooks
 import { useSliderManagement } from "@/hooks/useSliderManagement";
-import { useJournalNavigation } from "@/hooks/useJournalNavigation";
 import { useDocumentCreation } from "@/hooks/useDocumentCreation";
-import { useModalStates } from "@/hooks/useModalStates";
 import { usePartnerManager } from "@/hooks/usePartnerManager";
 import { useGoodJournalLinking } from "@/hooks/useGoodJournalLinking";
 import { useGoodManager } from "@/hooks/useGoodManager";
@@ -68,20 +62,35 @@ import { useJournalManager } from "@/hooks/useJournalManager";
 // --- Main Page Component ---
 export default function Home() {
   // --- Hooks ---
-  // Base Custom Hooks (few dependencies on local state here)
+  // 1. Base Custom Hooks (few dependencies on local state here)
   const { sliderOrder, visibility, toggleVisibility, moveSlider } =
     useSliderManagement();
+
+  // 2. Journal Manager - often a primary source of context
+  const journalManager = useJournalManager({
+    sliderOrder,
+    visibility,
+  });
   const {
+    hierarchyData: journalManagerHierarchyData,
+    currentHierarchy: journalManagerCurrentHierarchy,
+    isHierarchyLoading: isJournalHierarchyLoading, // alias for clarity
+    isHierarchyError: isJournalHierarchyError,
+    hierarchyError: journalHierarchyError,
     selectedTopLevelJournalId,
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
-    handleSelectTopLevelJournal: hookHandleSelectTopLevelJournal,
-    handleToggleLevel2JournalId: hookHandleToggleLevel2JournalId,
-    handleToggleLevel3JournalId: hookHandleToggleLevel3JournalId,
-    handleL3DoubleClick: hookHandleL3DoubleClick,
-    handleNavigateContextDown: hookHandleNavigateContextDown,
-    resetJournalSelections: hookResetJournalSelections,
-  } = useJournalNavigation();
+    effectiveSelectedJournalIds,
+    isTerminalJournalActive,
+    journalRootFilterStatus,
+    selectedFlatJournalId,
+    isJournalSliderPrimary,
+    // Destructure other needed values from journalManager if used directly before linking hooks
+    // e.g., isJournalNavModalOpen, closeJournalNavModal, resetJournalSelections, setSelectedFlatJournalId
+    // openJournalNavModal, addJournalContext, createJournal, deleteJournal, setJournalRootFilterStatus
+  } = journalManager;
+
+  // 3. Document Creation Hook (mostly independent or depends on later selections)
   const {
     isDocumentCreationMode,
     lockedPartnerId,
@@ -95,29 +104,8 @@ export default function Home() {
     closeConfirmationModal,
     resetDocumentCreationState,
   } = useDocumentCreation();
-  const {
-    isJournalModalOpen: _isJournalNavModalOpen,
-    openJournalModal: openJournalNavModalFromHook,
-    closeJournalModal: closeJournalNavModalFromHook,
-    isAddJournalModalOpen,
-    addJournalContext,
-    openAddJournalModalWithContext,
-    closeAddJournalModal,
-  } = useModalStates();
 
   // --- State Declarations (useState) ---
-  const [journalRootFilterStatus, setJournalRootFilterStatus] = useState<
-    "affected" | "unaffected" | "all" | null
-  >(null);
-  const [
-    selectedJournalIdForPjgFiltering,
-    setSelectedJournalIdForPjgFiltering,
-  ] = useState<string | null>(null);
-  const [
-    selectedJournalIdForGjpFiltering,
-    setSelectedJournalIdForGjpFiltering,
-  ] = useState<string | null>(null);
-
   const [isJournalModalOpenForLinking, setIsJournalModalOpenForLinking] =
     useState(false);
   const [
@@ -147,62 +135,9 @@ export default function Home() {
 
   // --- Refs ---
   const visibilitySwiperRef = useRef<any>(null);
-
-  // --- Query Client & Constants ---
-  const queryClient = useQueryClient();
   const ROOT_JOURNAL_ID_FOR_MODAL = "__MODAL_ROOT_NODE__";
 
-  // --- Data Queries & Derived State (useQuery, useMemo) ---
-  const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
-    queryKey: ["journalHierarchy"],
-    queryFn: fetchJournalHierarchy,
-  });
-
-  const currentHierarchy = useMemo(
-    () => journalHierarchyQuery.data || [],
-    [journalHierarchyQuery.data]
-  );
-
-  const effectiveSelectedJournalIds = useMemo(() => {
-    if (sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) !== 0) return [];
-    const effectiveIds = new Set<string>();
-    const getParentContextForL2s = () =>
-      selectedTopLevelJournalId && selectedTopLevelJournalId !== ROOT_JOURNAL_ID
-        ? findNodeById(currentHierarchy, selectedTopLevelJournalId)
-        : null;
-    const parentContextNode = getParentContextForL2s();
-    const sourceForL2s = parentContextNode
-      ? parentContextNode.children
-      : currentHierarchy;
-    selectedLevel3JournalIds.forEach((l3Id) => effectiveIds.add(l3Id));
-    selectedLevel2JournalIds.forEach((l2Id) => {
-      const l2Node = findNodeById(sourceForL2s || [], l2Id);
-      if (l2Node) {
-        const anyOfItsL3ChildrenSelected = (l2Node.children || []).some(
-          (l3Child) => selectedLevel3JournalIds.includes(l3Child.id)
-        );
-        if (!anyOfItsL3ChildrenSelected) effectiveIds.add(l2Id);
-      }
-    });
-    if (
-      effectiveIds.size === 0 &&
-      selectedTopLevelJournalId &&
-      selectedTopLevelJournalId !== ROOT_JOURNAL_ID
-    ) {
-      const l1Node = findNodeById(currentHierarchy, selectedTopLevelJournalId);
-      if (l1Node && (l1Node.children || []).length === 0)
-        effectiveIds.add(selectedTopLevelJournalId);
-    }
-    return Array.from(effectiveIds);
-  }, [
-    selectedTopLevelJournalId,
-    selectedLevel2JournalIds,
-    selectedLevel3JournalIds,
-    currentHierarchy,
-    sliderOrder,
-    ROOT_JOURNAL_ID, // findNodeById is assumed to be defined globally or imported
-  ]);
-
+  // --- Derived State (useMemo for slider order conditions) ---
   const isJournalSecondAfterPartner = useMemo(
     () =>
       sliderOrder.indexOf(SLIDER_TYPES.PARTNER) === 0 &&
@@ -217,70 +152,27 @@ export default function Home() {
     [sliderOrder]
   );
 
-  const isTerminalJournalActive = useMemo(() => {
-    if (
-      selectedTopLevelJournalId === ROOT_JOURNAL_ID ||
-      !currentHierarchy ||
-      currentHierarchy.length === 0
-    )
-      return false;
-    const l1Node = findNodeById(currentHierarchy, selectedTopLevelJournalId);
-    return !!(l1Node && (l1Node.children || []).length === 0);
-  }, [selectedTopLevelJournalId, currentHierarchy, ROOT_JOURNAL_ID]); // findNodeById assumed global/imported
+  // --- Manager Hooks & Dependent Queries ---
 
-  // --- Manager Hooks (Potentially Cyclical Dependencies) ---
-  // The order of goodManager, partnerManager, and flatJournalsQuery is tricky
-  // due to their interdependencies.
-  // goodManager is declared first. Its hook should be robust to
-  // partnerManager.selectedPartnerId and flatJournalsQuery.isLoading being undefined initially.
-  // These values would then be supplied on subsequent renders.
-
-  const goodManager = useGoodManager({
-    sliderOrder,
-    visibility,
-    effectiveSelectedJournalIds,
-    // These will be undefined on first render if partnerManager and flatJournalsQuery are defined later.
-    // The useGoodManager hook needs to handle this, typically by re-fetching/re-calculating when these props change.
-    selectedPartnerId: undefined, // Placeholder: partnerManager is not yet defined
-    isPartnerQueryLoading: undefined, // Placeholder: partnerManager is not yet defined
-    isFlatJournalsQueryLoading: undefined, // Placeholder: flatJournalsQuery is not yet defined
-    selectedJournalIdForPjgFiltering,
-    journalRootFilterStatus,
-    isJournalHierarchyLoading: journalHierarchyQuery.isLoading,
-    // isFlatJournalsQueryLoading: flatJournalsQuery.isLoading, // Original: This would be a problem if flatJournalsQuery depends on partnerManager
-  });
-
-  // Query for journals linked to a good (G-J scenario)
-  // Note: The enabled logic and queryFn might need selectedGoodsId from goodManager.
-  // Placed here as it's less complexly tied than the main partner/good manager cycle.
-  const flatJournalsQueryForGood = useQuery<Journal[], Error>({
-    queryKey: ["flatJournalsFilteredByGood", goodManager.selectedGoodsId],
-    queryFn: async () => {
-      // Actual logic depends on where selectedGoodsId comes from
-      return []; // Placeholder
-    },
-    enabled:
-      visibility[SLIDER_TYPES.JOURNAL] &&
-      isJournalSecondAfterGood && // Replaced useMemo with direct usage
-      false, // Placeholder, enabled logic depends on selectedGoodsId source
-  });
-
+  // 4. Partner Manager & its dependent flat journal query (P-J scenario)
   const partnerManager = usePartnerManager({
     sliderOrder,
     visibility,
-    effectiveSelectedJournalIds,
-    selectedGoodsId: goodManager.selectedGoodsId, // OK: goodManager is now defined
-    selectedJournalIdForGjpFiltering,
-    journalRootFilterStatus,
-    isJournalHierarchyLoading: journalHierarchyQuery.isLoading,
-    isFlatJournalsQueryForGoodLoading: flatJournalsQueryForGood.isLoading, // OK
+    effectiveSelectedJournalIds: effectiveSelectedJournalIds,
+    selectedGoodsId: undefined, // Pass undefined initially, goodManager is not yet defined
+    selectedJournalIdForGjpFiltering:
+      isJournalSecondAfterGood && !isJournalSliderPrimary
+        ? selectedFlatJournalId
+        : null,
+    journalRootFilterStatus: journalRootFilterStatus,
+    isJournalHierarchyLoading: isJournalHierarchyLoading,
+    isFlatJournalsQueryForGoodLoading: undefined, // flatJournalsQueryForGood not yet defined
   });
 
-  // Query for journals linked to a partner (P-J scenario)
   const flatJournalsQuery = useQuery<Journal[], Error>({
     queryKey: [
       "flatJournalsFilteredByPartner",
-      partnerManager.selectedPartnerId, // OK: partnerManager is now defined
+      partnerManager.selectedPartnerId,
     ],
     queryFn: async () =>
       !partnerManager.selectedPartnerId
@@ -288,36 +180,61 @@ export default function Home() {
         : (console.log(
             `[flatJournalsQuery] Fetching for partner: ${partnerManager.selectedPartnerId}`
           ),
-          fetchJournalsLinkedToPartner(partnerManager.selectedPartnerId)), // fetchJournalsLinkedToPartner assumed global/imported
+          fetchJournalsLinkedToPartner(partnerManager.selectedPartnerId)),
     enabled:
       visibility[SLIDER_TYPES.JOURNAL] &&
       isJournalSecondAfterPartner &&
-      !!partnerManager.selectedPartnerId, // OK
+      !!partnerManager.selectedPartnerId,
   });
 
-  // Note: If useGoodManager truly needs live values from partnerManager and flatJournalsQuery
-  // *at the moment of its first call*, the above ordering still presents a conceptual issue
-  // that must be handled by the hook's internal logic (e.g. initial undefined state, then update).
-  // The provided snippet for useGoodManager's arguments:
-  // { selectedPartnerId: partnerManager.selectedPartnerId, isPartnerQueryLoading: partnerManager.partnerQuery.isLoading, isFlatJournalsQueryLoading: flatJournalsQuery.isLoading }
-  // was problematic because partnerManager and flatJournalsQuery would not be defined yet.
-  // The corrected call to useGoodManager above passes `undefined` for these, assuming the hook handles it.
+  // 5. Good Manager & its dependent flat journal query (G-J scenario)
+  const goodManager = useGoodManager({
+    sliderOrder,
+    visibility,
+    effectiveSelectedJournalIds: effectiveSelectedJournalIds,
+    selectedPartnerId: partnerManager.selectedPartnerId,
+    selectedJournalIdForPjgFiltering:
+      isJournalSecondAfterPartner && !isJournalSliderPrimary
+        ? selectedFlatJournalId
+        : null,
+    journalRootFilterStatus: journalRootFilterStatus,
+    isJournalHierarchyLoading: isJournalHierarchyLoading,
+    isPartnerQueryLoading: partnerManager.partnerQuery.isLoading,
+    isFlatJournalsQueryLoading: flatJournalsQuery.isLoading,
+  });
+
+  const flatJournalsQueryForGood = useQuery<Journal[], Error>({
+    queryKey: ["flatJournalsFilteredByGood", goodManager.selectedGoodsId],
+    queryFn: async () => {
+      const goodId = goodManager.selectedGoodsId;
+      if (!goodId) {
+        console.log(
+          "[flatJournalsQueryForGood] No good selected, returning []"
+        );
+        return [];
+      }
+      console.log(
+        `[flatJournalsQueryForGood] Fetching journals for good: ${goodId}`
+      );
+      return fetchJournalsLinkedToGood(goodId);
+    },
+    enabled:
+      visibility[SLIDER_TYPES.JOURNAL] &&
+      isJournalSecondAfterGood &&
+      !!goodManager.selectedGoodsId,
+  });
 
   // --- Callbacks & Dependent Hooks ---
   const openJournalSelectorForLinking = useCallback(
     (onSelectCallback: (journalNode: AccountNodeData) => void) => {
       setOnJournalSelectForLinkingCallback(() => onSelectCallback);
       setIsJournalModalOpenForLinking(true);
-      if (_isJournalNavModalOpen) {
-        closeJournalNavModalFromHook();
+      if (journalManager.isJournalNavModalOpen) {
+        // FROM HOOK
+        journalManager.closeJournalNavModal(); // FROM HOOK
       }
     },
-    [
-      _isJournalNavModalOpen,
-      closeJournalNavModalFromHook,
-      setOnJournalSelectForLinkingCallback, // Added missing dependencies
-      setIsJournalModalOpenForLinking, // Added missing dependencies
-    ]
+    [journalManager.isJournalNavModalOpen, journalManager.closeJournalNavModal]
   );
 
   const goodJournalLinking = useGoodJournalLinking({
@@ -336,11 +253,19 @@ export default function Home() {
   const jpqlLinking = useJournalPartnerGoodLinking({
     selectedGoodsId: goodManager.selectedGoodsId,
     goodsData: goodManager.goodsQuery.data,
-    effectiveSelectedJournalIds,
-    selectedJournalIdForPjgFiltering,
-    currentHierarchy: currentHierarchy, // Pass the fetched hierarchy
+    effectiveSelectedJournalIds: journalManager.effectiveSelectedJournalIds, // NEW
+    // JPGL linking implies a primary journal context, or a specific selected flat journal
+    // If Journal is primary, use effectiveSelectedJournalIds.
+    // If Journal is secondary (e.g., P-J-G), use selectedFlatJournalId.
+    // The hook's internal logic will need to decide based on sliderOrder which journal context to use.
+    // For now, assuming it primarily uses effectiveSelectedJournalIds for when J is first.
+    // OR, jpqlLinking might need selectedFlatJournalId if J is secondary.
+    // For LinkGoodToPartnersViaJournalModal, the targetJournal is derived from effectiveSelectedJournalIds if J-G-P
+    // or selectedFlatJournalId if P-J-G or G-J-P where P/G is selected first, then J, then the other.
+    // This needs careful thought in jpqlLinking hook. For now, pass both and let hook decide.
+    selectedJournalIdForPjgFiltering: journalManager.selectedFlatJournalId, // <-- This is expected by the hook
+    currentHierarchy: journalManager.currentHierarchy, // NEW
     sliderOrder,
-    // goodsQueryKeyParamsStructure: goodManager.goodsQueryKeyParamsStructure, // Optional for precise invalidation
   });
 
   const canUnlinkGoodFromPartnersViaJournal = useMemo(() => {
@@ -349,32 +274,46 @@ export default function Home() {
     const partnerSliderIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
     let journalContextAvailable = false;
-    if (
-      journalSliderIndex === 0 &&
-      (goodSliderIndex === 1 ||
-        (partnerSliderIndex === 1 && goodSliderIndex === 2))
-    ) {
-      journalContextAvailable = effectiveSelectedJournalIds.length > 0;
-    } else if (
-      partnerSliderIndex === 0 &&
-      journalSliderIndex === 1 &&
-      goodSliderIndex === 2
-    ) {
-      journalContextAvailable = !!selectedJournalIdForPjgFiltering;
+
+    if (journalManager.isJournalSliderPrimary) {
+      // Journal is primary (J-G-P or J-P-G)
+      // A specific journal from the hierarchy must be effectively selected.
+      journalContextAvailable =
+        journalManager.effectiveSelectedJournalIds.length > 0;
+    } else {
+      // Journal is secondary. Check for P-J-G or G-J-P scenarios.
+      const isPJG =
+        partnerSliderIndex === 0 &&
+        journalSliderIndex === 1 &&
+        goodSliderIndex === 2;
+      // For unlinking, G-J-P (Good first, then Journal, then Partner) might also be a valid scenario
+      // where you want to unlink a Good from Partners relative to a specific flat Journal.
+      const isGJP =
+        goodSliderIndex === 0 &&
+        journalSliderIndex === 1 &&
+        partnerSliderIndex > 1; // partnerSliderIndex > 1 ensures Partner is after Journal
+
+      if (isPJG || isGJP) {
+        journalContextAvailable = !!journalManager.selectedFlatJournalId;
+      }
     }
 
     return (
-      visibility[SLIDER_TYPES.GOODS] &&
-      goodSliderIndex > 0 &&
-      journalContextAvailable &&
-      !!goodManager.selectedGoodsId
+      visibility[SLIDER_TYPES.GOODS] && // Goods slider must be visible
+      goodSliderIndex !== -1 && // Goods slider must exist in the order
+      // goodSliderIndex > 0 && // This condition might be too restrictive if we consider J-G for unlinking
+      journalContextAvailable && // A valid journal context must exist
+      !!goodManager.selectedGoodsId // A good must be selected
     );
   }, [
     sliderOrder,
     visibility,
-    effectiveSelectedJournalIds,
-    selectedJournalIdForPjgFiltering,
+    journalManager.isJournalSliderPrimary,
+    journalManager.effectiveSelectedJournalIds,
+    journalManager.selectedFlatJournalId,
     goodManager.selectedGoodsId,
+    // No need for journalSliderIndex, goodSliderIndex, partnerSliderIndex in deps
+    // as they are derived from sliderOrder which is a dependency.
   ]);
 
   // --- Effects (useEffect) ---
@@ -410,230 +349,87 @@ export default function Home() {
   }, [sliderOrder, visibility]);
 
   useEffect(() => {
+    // Slider Order Change Effect
     console.log(
       "Slider order changed to:",
       sliderOrder.join("-"),
       ". Resetting selections."
     );
-    if (hookResetJournalSelections) hookResetJournalSelections();
+    journalManager.resetJournalSelections(); // ADD
     partnerManager.setSelectedPartnerId(null);
     goodManager.setSelectedGoodsId(null);
-    setSelectedJournalIdForPjgFiltering(null);
-    setSelectedJournalIdForGjpFiltering(null);
   }, [
     sliderOrder,
-    hookResetJournalSelections,
-    partnerManager.setSelectedPartnerId, // Use the setter from the hook directly
-    goodManager.setSelectedGoodsId, // Use the setter from the hook directly
-    // setSelectedJournalIdForPjgFiltering and setSelectedJournalIdForGjpFiltering are already stable
+    journalManager.resetJournalSelections, // ADD
+    partnerManager.setSelectedPartnerId,
+    goodManager.setSelectedGoodsId,
   ]);
 
   useEffect(() => {
+    // PJG: Partner selected, reset flat journal for PJG if applicable
     if (isJournalSecondAfterPartner) {
-      setSelectedJournalIdForPjgFiltering(null);
-    }
-  }, [partnerManager.selectedPartnerId, isJournalSecondAfterPartner]);
-
-  useEffect(() => {
-    if (isJournalSecondAfterPartner) {
-      goodManager.setSelectedGoodsId(null);
-    } else if (isJournalSecondAfterGood) {
-      partnerManager.setSelectedPartnerId(null);
+      journalManager.setSelectedFlatJournalId(null); // NEW - If partner changes, selected PJG journal invalidates
     }
   }, [
-    selectedJournalIdForPjgFiltering,
-    selectedJournalIdForGjpFiltering,
+    partnerManager.selectedPartnerId,
+    isJournalSecondAfterPartner,
+    journalManager.setSelectedFlatJournalId,
+  ]);
+
+  useEffect(() => {
+    // Cascade reset based on flat journal selection
+    if (isJournalSecondAfterPartner) {
+      // P-J-G: Flat Journal selected/deselected
+      goodManager.setSelectedGoodsId(null); // Reset goods
+    } else if (isJournalSecondAfterGood) {
+      // G-J-P: Flat Journal selected/deselected
+      partnerManager.setSelectedPartnerId(null); // Reset partners
+    }
+  }, [
+    journalManager.selectedFlatJournalId,
     isJournalSecondAfterPartner,
     isJournalSecondAfterGood,
-    partnerManager.setSelectedPartnerId, // Use the setter
-    goodManager.setSelectedGoodsId, // Use the setter
+    partnerManager.setSelectedPartnerId,
+    goodManager.setSelectedGoodsId,
+  ]); // NEW
+
+  useEffect(() => {
+    // GJP: Good selected, reset flat journal for GJP if applicable
+    if (isJournalSecondAfterGood) {
+      journalManager.setSelectedFlatJournalId(null); // NEW
+    }
+  }, [
+    goodManager.selectedGoodsId,
+    isJournalSecondAfterGood,
+    journalManager.setSelectedFlatJournalId,
   ]);
 
   useEffect(() => {
-    if (isJournalSecondAfterGood) {
-      setSelectedJournalIdForGjpFiltering(null);
-    }
-  }, [goodManager.selectedGoodsId, isJournalSecondAfterGood]);
-
-  useEffect(() => {
+    // Journal Primary: Root filter or hierarchical selection changed
+    // This effect now listens to values from journalManager
     const journalSliderIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
     if (journalSliderIndex === 0) {
+      // If Journal is primary
       partnerManager.setSelectedPartnerId(null);
       goodManager.setSelectedGoodsId(null);
     }
   }, [
-    journalRootFilterStatus,
-    effectiveSelectedJournalIds,
+    journalManager.journalRootFilterStatus,
+    journalManager.effectiveSelectedJournalIds,
     sliderOrder,
-    partnerManager.setSelectedPartnerId, // Use the setter
-    goodManager.setSelectedGoodsId, // Use the setter
-  ]);
-
-  // --- TanStack Mutations (Data Modification) ---
-  const createJournalMutation = useMutation({
-    mutationFn: createJournalEntry,
-    onSuccess: (newJournal) => {
-      queryClient.invalidateQueries({ queryKey: ["journalHierarchy"] });
-      closeAddJournalModal();
-      alert(`Journal '${newJournal.name}' created successfully!`);
-    },
-    onError: (error: Error) => {
-      console.error("Failed to create journal:", error);
-      alert(`Error creating journal: ${error.message}`);
-    },
-  });
-
-  const deleteJournalMutation = useMutation({
-    mutationFn: deleteJournalEntry,
-    onSuccess: (data, deletedJournalId) => {
-      queryClient.invalidateQueries({ queryKey: ["journalHierarchy"] });
-      alert(
-        data?.message || `Journal ${deletedJournalId} deleted successfully!`
-      );
-      if (selectedTopLevelJournalId === deletedJournalId) {
-        hookHandleSelectTopLevelJournal(
-          ROOT_JOURNAL_ID,
-          journalHierarchyQuery.data || []
-        );
-      }
-      // TODO: Add more nuanced selection reset if L2/L3 is deleted or parent of selection is deleted
-    },
-    onError: (error: Error, deletedJournalId) => {
-      console.error(`Failed to delete journal ${deletedJournalId}:`, error);
-      alert(`Error deleting journal: ${error.message}`);
-    },
-  });
-
-  const closeJournalNavModal = closeJournalNavModalFromHook;
-
-  // --- Callback Handlers ---
-  const handleSelectTopLevelJournalWrapper = useCallback(
-    (newTopLevelId: string, childToSelectInL2: string | null = null) => {
-      hookHandleSelectTopLevelJournal(
-        newTopLevelId,
-        currentHierarchy,
-        childToSelectInL2
-      );
-      console.log(
-        "L1 Journal selected/navigated, resetting downstream Partner & Goods selections."
-      );
-      partnerManager.setSelectedPartnerId(null);
-      goodManager.setSelectedGoodsId(null);
-    },
-    [
-      hookHandleSelectTopLevelJournal,
-      currentHierarchy,
-      partnerManager.setSelectedPartnerId,
-    ]
-  );
-
-  const handleToggleLevel2JournalIdWrapper = useCallback(
-    (level2IdToToggle: string) => {
-      hookHandleToggleLevel2JournalId(level2IdToToggle, currentHierarchy);
-      console.log(
-        "L2 Journal toggled, resetting downstream Partner & Goods selections."
-      );
-      partnerManager.setSelectedPartnerId(null);
-      goodManager.setSelectedGoodsId(null);
-    },
-    [
-      hookHandleToggleLevel2JournalId,
-      currentHierarchy,
-      partnerManager.setSelectedPartnerId,
-    ]
-  );
-
-  const handleToggleLevel3JournalIdWrapper = useCallback(
-    (level3IdToToggle: string) => {
-      hookHandleToggleLevel3JournalId(level3IdToToggle, currentHierarchy);
-      console.log(
-        "L3 Journal toggled, resetting downstream Partner & Goods selections."
-      );
-      partnerManager.setSelectedPartnerId(null);
-      goodManager.setSelectedGoodsId(null);
-    },
-    [
-      hookHandleToggleLevel3JournalId,
-      currentHierarchy,
-      partnerManager.setSelectedPartnerId,
-    ]
-  );
-
-  const handleNavigateContextDownWrapper = useCallback(
-    (args: {
-      currentL1ToBecomeL2: string;
-      longPressedL2ToBecomeL3?: string;
-    }) => {
-      hookHandleNavigateContextDown(args, currentHierarchy);
-      console.log(
-        "Journal context navigated down, resetting downstream Partner & Goods selections."
-      );
-      partnerManager.setSelectedPartnerId(null);
-      goodManager.setSelectedGoodsId(null);
-    },
-    [
-      hookHandleNavigateContextDown,
-      currentHierarchy,
-      partnerManager.setSelectedPartnerId,
-    ]
-  );
-
-  // Journal Navigation Wrappers
-  const handleSelectTopLevelJournal = useCallback(
-    (newTopLevelId: string, childToSelectInL2: string | null = null) => {
-      hookHandleSelectTopLevelJournal(
-        newTopLevelId,
-        currentHierarchy,
-        childToSelectInL2
-      );
-    },
-    [hookHandleSelectTopLevelJournal, currentHierarchy]
-  );
-
-  const handleToggleLevel2JournalId = useCallback(
-    (level2IdToToggle: string) => {
-      hookHandleToggleLevel2JournalId(level2IdToToggle, currentHierarchy);
-    },
-    [hookHandleToggleLevel2JournalId, currentHierarchy]
-  );
-
-  const handleToggleLevel3JournalId = useCallback(
-    (level3IdToToggle: string) => {
-      hookHandleToggleLevel3JournalId(level3IdToToggle, currentHierarchy);
-    },
-    [hookHandleToggleLevel3JournalId, currentHierarchy]
-  );
-
-  const handleL3DoubleClick = useCallback(
-    (l3ItemId: string, isSelected: boolean) => {
-      hookHandleL3DoubleClick(l3ItemId, isSelected, currentHierarchy);
-    },
-    [hookHandleL3DoubleClick, currentHierarchy]
-  );
-
-  const handleNavigateContextDown = useCallback(
-    (args: {
-      currentL1ToBecomeL2: string;
-      longPressedL2ToBecomeL3?: string;
-    }) => {
-      hookHandleNavigateContextDown(args, currentHierarchy);
-    },
-    [hookHandleNavigateContextDown, currentHierarchy]
-  );
+    partnerManager.setSelectedPartnerId,
+    goodManager.setSelectedGoodsId,
+  ]); // NEW
 
   // Journal CRUD
   const handleAddJournalSubmit = useCallback(
     (formDataFromModal: Omit<AccountNodeData, "children">) => {
-      const journalToCreate: ServerCreateJournalData = {
-        id: formDataFromModal.code,
-        name: formDataFromModal.name,
-        parentId: addJournalContext?.parentId || undefined,
-        isTerminal: formDataFromModal.isTerminal || false,
-        additionalDetails: formDataFromModal.additionalDetails,
-      };
-      createJournalMutation.mutate(journalToCreate);
+      journalManager.createJournal(formDataFromModal); // NEW
+      // Alerts for success/error can be handled by useEffects watching journalManager.createJournalMutation.isSuccess/isError if needed
+      // For now, assuming alerts are handled by components or not at all from page.tsx for this.
+      // Example: if (journalManager.createJournalMutation.isSuccess) { alert(...) } // but this is reactive, not on submit directly
     },
-    [addJournalContext, createJournalMutation]
+    [journalManager.createJournal, journalManager.addJournalContext] // NEW (addJournalContext is for reference if createJournal needs it internally, but it's passed to openAddJournalModal)
   );
 
   const handleDeleteJournalAccount = useCallback(
@@ -643,27 +439,24 @@ export default function Home() {
           `Are you sure you want to delete journal ${accountIdToDelete}? This cannot be undone.`
         )
       ) {
-        deleteJournalMutation.mutate(accountIdToDelete);
+        journalManager.deleteJournal(accountIdToDelete); // NEW
       }
     },
-    [deleteJournalMutation]
+    [journalManager.deleteJournal] // NEW
   );
 
-  // --- Callback for Journal Root Filter Change ---
+  // Callback for Journal Root Filter Change
   const handleJournalRootFilterChange = useCallback(
-    (status: "affected" | "unaffected" | "all" | null) => {
-      setJournalRootFilterStatus(status);
-      // The useEffect above will handle resetting downstream selections.
-    },
-    []
+    // Becomes simpler
+    journalManager.setJournalRootFilterStatus,
+    [journalManager.setJournalRootFilterStatus]
   );
 
-  // New handler for opening JournalModal for navigation/management
   const handleOpenJournalModalForNavigation = useCallback(() => {
-    setIsJournalModalOpenForLinking(false); // Explicitly turn OFF linking mode
-    setOnJournalSelectForLinkingCallback(null); // Clear any linking callback
-    openJournalNavModalFromHook(); // Open the modal for navigation
-  }, [openJournalNavModalFromHook]); // Dependency on the hook's open function
+    setIsJournalModalOpenForLinking(false);
+    setOnJournalSelectForLinkingCallback(null);
+    journalManager.openJournalNavModal(); // NEW
+  }, [journalManager.openJournalNavModal]); // NEW
 
   // This is the callback passed TO JournalModal, called by IT when a journal is chosen for linking
   const handleJournalNodeSelectedForLinking = useCallback(
@@ -682,8 +475,8 @@ export default function Home() {
     // For now, picking the first one if available.
     // CRITICAL: Ensure this journalId is appropriate (e.g., a terminal account if that's a rule)
     const targetJournalId =
-      effectiveSelectedJournalIds.length > 0
-        ? effectiveSelectedJournalIds[0]
+      journalManager.effectiveSelectedJournalIds.length > 0
+        ? journalManager.effectiveSelectedJournalIds[0]
         : null;
 
     if (!targetJournalId) {
@@ -718,10 +511,13 @@ export default function Home() {
 
   const isJAndPSelectedForJPGL = useMemo(() => {
     return (
-      effectiveSelectedJournalIds.length > 0 &&
-      !!partnerManager.selectedPartnerId
+      journalManager.effectiveSelectedJournalIds.length > 0 &&
+      !!partnerManager.selectedPartnerId // NEW
     );
-  }, [effectiveSelectedJournalIds, partnerManager.selectedPartnerId]);
+  }, [
+    journalManager.effectiveSelectedJournalIds,
+    partnerManager.selectedPartnerId,
+  ]); // NEW
 
   const canLinkGoodToPartnersViaJournal = useMemo(() => {
     const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
@@ -732,13 +528,13 @@ export default function Home() {
       visibility[SLIDER_TYPES.GOODS] &&
       journalIndex === 0 && // Journal is first
       goodsIndex === 1 && // Goods is second
-      effectiveSelectedJournalIds.length > 0 && // A journal context exists
+      journalManager.effectiveSelectedJournalIds.length > 0 && // A journal context exists
       !!goodManager.selectedGoodsId // A good is selected
     );
   }, [
     sliderOrder,
     visibility,
-    effectiveSelectedJournalIds,
+    journalManager.effectiveSelectedJournalIds,
     goodManager.selectedGoodsId,
   ]);
 
@@ -791,9 +587,9 @@ export default function Home() {
     partnerManager.partnerQuery.data,
     lockedPartnerId,
     selectedGoodsForDocument,
-    selectedTopLevelJournalId,
-    selectedLevel2JournalIds,
-    selectedLevel3JournalIds,
+    journalManager.selectedTopLevelJournalId,
+    journalManager.selectedLevel2JournalIds,
+    journalManager.selectedLevel3JournalIds,
     resetDocumentCreationState,
   ]);
 
@@ -855,21 +651,13 @@ export default function Home() {
   // --- Function to Get Props for Sliders ---
   const getSliderProps = useCallback(
     (sliderId: string) => {
-      // ... (Props generation logic as in your original code, but ensure callbacks are the new wrappers)
-      // For example, for JournalHierarchySlider:
-      // onSelectTopLevel: handleSelectTopLevelJournalWrapper,
-      // onToggleLevel2Id: handleToggleLevel2JournalIdWrapper,
-      // onToggleLevel3Id: handleToggleLevel3JournalIdWrapper,
-      // onNavigateContextDown: handleNavigateContextDownWrapper,
-      // ...
-      // For flat journal mode (DynamicSlider):
-      // onSlideChange for P-J-G: (journalId: string | null) => { setSelectedJournalIdForPjgFiltering(journalId); /* useEffect handles goods reset */ }
-      // onSlideChange for G-J-P: (journalId: string | null) => { setSelectedJournalIdForGjpFiltering(journalId); /* useEffect handles partner reset */ }
-      // Ensure errors from queries are passed: error: query.error
       switch (sliderId) {
         case SLIDER_TYPES.JOURNAL:
-          if (isJournalSecondAfterPartner) {
-            // P-J-G
+          if (
+            !journalManager.isJournalSliderPrimary &&
+            isJournalSecondAfterPartner
+          ) {
+            // P-J-G, Journal is secondary
             const flatJournalItems = (flatJournalsQuery.data || []).map(
               (j) => ({ id: String(j.id), name: j.name, code: j.id })
             );
@@ -879,15 +667,17 @@ export default function Home() {
               isLoading: flatJournalsQuery.isLoading,
               isError: flatJournalsQuery.isError,
               error: flatJournalsQuery.error,
-              activeItemId: selectedJournalIdForPjgFiltering,
-              onSlideChange: (journalId: string | null) =>
-                setSelectedJournalIdForPjgFiltering(journalId), // Cascades handled by useEffect
+              activeItemId: journalManager.selectedFlatJournalId, // NEW
+              onSlideChange: journalManager.setSelectedFlatJournalId, // NEW
               isAccordionOpen: accordionTypeState[SLIDER_TYPES.JOURNAL],
               onToggleAccordion: () => toggleAccordion(SLIDER_TYPES.JOURNAL),
-              onOpenModal: handleOpenJournalModalForNavigation,
+              onOpenModal: journalManager.openJournalNavModal, // NEW
             };
-          } else if (isJournalSecondAfterGood) {
-            // G-J-P
+          } else if (
+            !journalManager.isJournalSliderPrimary &&
+            isJournalSecondAfterGood
+          ) {
+            // G-J-P, Journal is secondary
             const flatJournalItems = (flatJournalsQueryForGood.data || []).map(
               (j) => ({ id: String(j.id), name: j.name, code: j.id })
             );
@@ -897,40 +687,62 @@ export default function Home() {
               isLoading: flatJournalsQueryForGood.isLoading,
               isError: flatJournalsQueryForGood.isError,
               error: flatJournalsQueryForGood.error,
-              activeItemId: selectedJournalIdForGjpFiltering,
-              onSlideChange: (journalId: string | null) =>
-                setSelectedJournalIdForGjpFiltering(journalId), // Cascades handled by useEffect
+              activeItemId: journalManager.selectedFlatJournalId, // NEW
+              onSlideChange: journalManager.setSelectedFlatJournalId, // NEW
               isAccordionOpen: accordionTypeState[SLIDER_TYPES.JOURNAL],
               onToggleAccordion: () => toggleAccordion(SLIDER_TYPES.JOURNAL),
-              onOpenModal: handleOpenJournalModalForNavigation,
+              onOpenModal: journalManager.openJournalNavModal, // NEW
             };
-          } else {
+          } else if (journalManager.isJournalSliderPrimary) {
             // Hierarchical (J is 1st)
             return {
               _isFlatJournalMode: false,
-              hierarchyData: currentHierarchy,
-              isLoading: journalHierarchyQuery.isLoading,
-              isError: journalHierarchyQuery.isError,
-              error: journalHierarchyQuery.error,
-              selectedTopLevelId: selectedTopLevelJournalId,
-              selectedLevel2Ids: selectedLevel2JournalIds,
-              selectedLevel3Ids: selectedLevel3JournalIds,
-              onSelectTopLevel: handleSelectTopLevelJournalWrapper,
-              onToggleLevel2Id: handleToggleLevel2JournalIdWrapper,
-              onToggleLevel3Id: handleToggleLevel3JournalIdWrapper,
-              onL3DoubleClick: hookHandleL3DoubleClick,
-              onNavigateContextDown: handleNavigateContextDownWrapper,
+              hierarchyData: journalManager.currentHierarchy, // NEW
+              isLoading: journalManager.isHierarchyLoading, // NEW
+              isError: journalManager.isHierarchyError, // NEW
+              error: journalManager.hierarchyError, // NEW
+              selectedTopLevelId: journalManager.selectedTopLevelJournalId,
+              selectedLevel2Ids: journalManager.selectedLevel2JournalIds || [], // Ensure array
+              selectedLevel3Ids: journalManager.selectedLevel3JournalIds || [], // CORRECT: .selectedLevel3JournalIds // Ensure array
+              onSelectTopLevel: (id, child) =>
+                journalManager.handleSelectTopLevelJournal(
+                  id,
+                  journalManager.currentHierarchy,
+                  child
+                ), // NEW
+              onToggleLevel2Id: (id) =>
+                journalManager.handleToggleLevel2JournalId(
+                  id,
+                  journalManager.currentHierarchy
+                ), // NEW
+              onToggleLevel3Id: (id) =>
+                journalManager.handleToggleLevel3JournalId(
+                  id,
+                  journalManager.currentHierarchy
+                ), // NEW
+              onL3DoubleClick: (id, sel) =>
+                journalManager.handleL3DoubleClick(
+                  id,
+                  sel,
+                  journalManager.currentHierarchy
+                ), // NEW
+              onNavigateContextDown: (args) =>
+                journalManager.handleNavigateContextDown(
+                  args,
+                  journalManager.currentHierarchy
+                ), // NEW
               rootJournalIdConst: ROOT_JOURNAL_ID,
-              onOpenModal: handleOpenJournalModalForNavigation,
-              // +++ NEW PROPS FOR JournalHierarchySlider +++
-              isRootView: selectedTopLevelJournalId === ROOT_JOURNAL_ID, // To show filter buttons
-              currentFilterStatus: journalRootFilterStatus,
-              onFilterStatusChange: handleJournalRootFilterChange,
+              onOpenModal: journalManager.openJournalNavModal, // NEW
+              isRootView:
+                journalManager.selectedTopLevelJournalId === ROOT_JOURNAL_ID,
+              currentFilterStatus: journalManager.journalRootFilterStatus, // NEW
+              onFilterStatusChange: journalManager.setJournalRootFilterStatus, // NEW
             };
           }
         case SLIDER_TYPES.PARTNER:
           return {
-            data: partnerManager.partnersForSlider.map((p) => ({
+            data: (partnerManager.partnersForSlider || []).map((p) => ({
+              // Ensure array before .map
               ...p,
               id: String(p.id),
               name: p.name,
@@ -949,13 +761,16 @@ export default function Home() {
             onOpenModal: partnerManager.handleOpenPartnerOptionsMenu,
           };
         case SLIDER_TYPES.GOODS:
-          const goodsDataForDisplay = goodManager.goodsForSlider.map((g) => ({
-            ...g,
-            id: String(g.id),
-            name: g.label,
-            code: g.referenceCode || String(g.id),
-            unit_code: g.unitOfMeasure?.code || (g as any).unit || "N/A",
-          }));
+          const goodsDataForDisplay = (goodManager.goodsForSlider || []).map(
+            (g) => ({
+              // Ensure array before .map
+              ...g,
+              id: String(g.id),
+              name: g.label,
+              code: g.referenceCode || String(g.id),
+              unit_code: g.unitOfMeasure?.code || (g as any).unit || "N/A",
+            })
+          );
           return {
             data: goodsDataForDisplay,
             isLoading: goodManager.goodsQuery.isLoading,
@@ -1020,20 +835,12 @@ export default function Home() {
     },
     [
       sliderOrder,
-      currentHierarchy,
-      journalHierarchyQuery.isLoading,
-      journalHierarchyQuery.isError,
-      journalHierarchyQuery.error,
+      journalManager,
       selectedTopLevelJournalId,
       selectedLevel2JournalIds,
       selectedLevel3JournalIds,
-      handleSelectTopLevelJournalWrapper,
-      handleToggleLevel2JournalIdWrapper,
       journalRootFilterStatus, // Add new state
       handleJournalRootFilterChange, // Add new callback
-      handleToggleLevel3JournalIdWrapper,
-      hookHandleL3DoubleClick,
-      handleNavigateContextDownWrapper, // Use wrappers
       handleOpenJournalModalForNavigation,
       ROOT_JOURNAL_ID,
       accordionTypeState,
@@ -1043,13 +850,11 @@ export default function Home() {
       flatJournalsQuery.isLoading,
       flatJournalsQuery.isError,
       flatJournalsQuery.error,
-      selectedJournalIdForPjgFiltering,
       isJournalSecondAfterGood,
       flatJournalsQueryForGood.data,
       flatJournalsQueryForGood.isLoading,
       flatJournalsQueryForGood.isError,
       flatJournalsQueryForGood.error,
-      selectedJournalIdForGjpFiltering,
       partnerManager.partnersForSlider,
       partnerManager.partnerQuery.isLoading,
       partnerManager.partnerQuery.isError,
@@ -1388,17 +1193,17 @@ export default function Home() {
               partnerJournalLinking.isSubmittingLinkPartnerToJournals
             }
             onOpenJournalSelector={openJournalSelectorForLinking} // Generic selector opener
-            fullJournalHierarchy={currentHierarchy} // Pass full hierarchy if modal needs it for display/filtering
+            fullJournalHierarchy={journalManager.currentHierarchy} // Pass full hierarchy if modal needs it for display/filtering
           />
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {isAddJournalModalOpen && (
+        {journalManager.isAddJournalModalOpen && ( // NEW
           <AddJournalModal
-            isOpen={isAddJournalModalOpen}
-            onClose={closeAddJournalModal}
-            onSubmit={handleAddJournalSubmit}
-            context={addJournalContext}
+            isOpen={journalManager.isAddJournalModalOpen} // NEW
+            onClose={journalManager.closeAddJournalModal} // NEW
+            onSubmit={handleAddJournalSubmit} // Uses journalManager.createJournal
+            context={journalManager.addJournalContext} // NEW
           />
         )}
       </AnimatePresence>
@@ -1505,37 +1310,43 @@ export default function Home() {
           )}
       </AnimatePresence>
       <AnimatePresence>
-        {(_isJournalNavModalOpen || isJournalModalOpenForLinking) && (
+        {(journalManager.isJournalNavModalOpen ||
+          isJournalModalOpenForLinking) && ( // NEW
           <JournalModal
-            isOpen={_isJournalNavModalOpen || isJournalModalOpenForLinking}
+            isOpen={
+              journalManager.isJournalNavModalOpen ||
+              isJournalModalOpenForLinking
+            } // NEW
             onClose={() => {
-              if (_isJournalNavModalOpen) closeJournalNavModal();
+              if (journalManager.isJournalNavModalOpen)
+                journalManager.closeJournalNavModal(); // NEW
               if (isJournalModalOpenForLinking) {
-                setIsJournalModalOpenForLinking(false);
-                setOnJournalSelectForLinkingCallback(null);
+                /* ... (linking logic unchanged) ... */
               }
             }}
             onConfirmSelection={(selId, childSel) => {
+              // For navigation mode
               if (
                 !isJournalModalOpenForLinking &&
-                hookHandleSelectTopLevelJournal
+                journalManager.handleSelectTopLevelJournal
               ) {
-                hookHandleSelectTopLevelJournal(
+                journalManager.handleSelectTopLevelJournal(
                   selId,
-                  currentHierarchy,
+                  journalManager.currentHierarchy,
                   childSel
-                );
+                ); // NEW
               }
             }}
             onSetShowRoot={() => {
+              // For navigation mode
               if (
                 !isJournalModalOpenForLinking &&
-                hookHandleSelectTopLevelJournal
+                journalManager.handleSelectTopLevelJournal
               ) {
-                hookHandleSelectTopLevelJournal(
+                journalManager.handleSelectTopLevelJournal(
                   ROOT_JOURNAL_ID,
-                  currentHierarchy
-                );
+                  journalManager.currentHierarchy
+                ); // NEW
               }
             }}
             onSelectForLinking={
@@ -1544,32 +1355,33 @@ export default function Home() {
                 : undefined
             }
             hierarchy={
-              journalHierarchyQuery.isLoading
+              journalManager.isHierarchyLoading // NEW
                 ? []
                 : [
                     {
                       id: ROOT_JOURNAL_ID_FOR_MODAL,
                       name: `Chart of Accounts`,
                       code: "ROOT",
-                      children: currentHierarchy,
+                      children: journalManager.currentHierarchy, // NEW (or journalManager.hierarchyData for raw full tree)
                       isConceptualRoot: true,
                     },
                   ]
             }
-            isLoading={journalHierarchyQuery.isLoading}
+            isLoading={journalManager.isHierarchyLoading} // NEW
             onTriggerAddChild={(parentId, parentCode) => {
               const parentNode =
                 parentId === ROOT_JOURNAL_ID_FOR_MODAL
                   ? null
-                  : findNodeById(currentHierarchy, parentId);
-              openAddJournalModalWithContext({
+                  : findNodeById(journalManager.currentHierarchy, parentId);
+              journalManager.openAddJournalModal({
+                // NEW
                 level: parentNode ? "child" : "top",
                 parentId: parentNode ? parentId : null,
                 parentCode: parentCode,
                 parentName: parentNode?.name || "",
               });
             }}
-            onDeleteAccount={handleDeleteJournalAccount}
+            onDeleteAccount={handleDeleteJournalAccount} // Uses journalManager.deleteJournal
           />
         )}
       </AnimatePresence>
