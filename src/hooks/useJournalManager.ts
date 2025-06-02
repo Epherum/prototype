@@ -78,6 +78,13 @@ export interface UseJournalManagerReturn {
     level3IdToToggle: string,
     currentHierarchyData: AccountNodeData[]
   ) => void;
+
+  handleL2DoubleClick: (
+    l2ItemId: string,
+    isL2Selected: boolean,
+    currentHierarchyData: AccountNodeData[]
+  ) => void;
+
   handleL3DoubleClick: (
     l3ItemId: string,
     isSelected: boolean,
@@ -112,9 +119,45 @@ export const useJournalManager = ({
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  const { data: hierarchyDataFromQuery } = journalHierarchyQuery; // Renamed for clarity
+
   const internalCurrentHierarchy = useMemo(
-    () => journalHierarchyQuery.data || [],
-    [journalHierarchyQuery.data]
+    () => hierarchyDataFromQuery || [],
+    [hierarchyDataFromQuery]
+  );
+
+  //helper
+  const findNodeWithPath = useCallback(
+    (
+      nodeId: string,
+      currentFullHierarchy: AccountNodeData[]
+    ): {
+      node: AccountNodeData | null;
+      l1ParentId?: string; // ID of the L1 parent (if node is L2 or L3)
+      l2ParentId?: string; // ID of the L2 parent (if node is L3)
+    } => {
+      for (const l1Node of currentFullHierarchy) {
+        if (l1Node.id === nodeId) return { node: l1Node };
+        if (l1Node.children) {
+          for (const l2Node of l1Node.children) {
+            if (l2Node.id === nodeId)
+              return { node: l2Node, l1ParentId: l1Node.id };
+            if (l2Node.children) {
+              for (const l3Node of l2Node.children) {
+                if (l3Node.id === nodeId)
+                  return {
+                    node: l3Node,
+                    l1ParentId: l1Node.id,
+                    l2ParentId: l2Node.id,
+                  };
+              }
+            }
+          }
+        }
+      }
+      return { node: null };
+    },
+    []
   );
 
   const [selectedTopLevelJournalId, setSelectedTopLevelJournalId] =
@@ -397,82 +440,183 @@ export const useJournalManager = ({
     []
   );
 
-  const handleL3DoubleClick = useCallback(
+  // Handle double click logic
+  const handleL2DoubleClick = useCallback(
     (
-      l3ItemId: string,
-      isSelected: boolean,
-      currentHierarchyData: AccountNodeData[]
+      l2ItemId: string,
+      isL2Selected: boolean, // The selection state *of this L2 item*
+      // currentHierarchyData is the *currently displayed* hierarchy in the slider (could be root or L1's children)
+      // We also need the full hierarchy to find the L2's original L1 parent if we navigate "up".
+      currentFullHierarchy: AccountNodeData[]
     ) => {
-      // Find the L3 node and its L2 parent, then L1 parent
-      let l1ParentId: string | null = null;
-      let l2ParentId: string | null = null;
-
-      const findParents = (
-        nodes: AccountNodeData[],
-        targetId: string,
-        currentL1: string | null,
-        currentL2: string | null
-      ): boolean => {
-        for (const node of nodes) {
-          if (node.id === targetId) {
-            if (currentL2) {
-              // Target is L3, currentL2 is its parent
-              l2ParentId = currentL2;
-              l1ParentId = currentL1;
-            } else if (currentL1) {
-              // Target is L2, currentL1 is its parent
-              l2ParentId = targetId;
-              l1ParentId = currentL1;
-            } else {
-              // Target is L1
-              l1ParentId = targetId;
-            }
-            return true;
-          }
-          if (node.children) {
-            if (
-              findParents(
-                node.children,
-                targetId,
-                currentL1 || node.id,
-                currentL2 || (currentL1 ? node.id : null)
-              )
-            )
-              return true;
-          }
-        }
-        return false;
-      };
-
-      findParents(
-        currentHierarchyData,
-        l3ItemId,
-        selectedTopLevelJournalId === ROOT_JOURNAL_ID
-          ? null
-          : selectedTopLevelJournalId,
-        null
+      console.log(
+        `L2 Double Click: ID=${l2ItemId}, Selected=${isL2Selected}, CurrentL1=${selectedTopLevelJournalId}`
       );
 
-      // Re-evaluate: Simplified logic from useJournalNavigation (original hook) was:
-      const l3Node = findNodeById(currentHierarchyData, l3ItemId);
-      if (l3Node && l3Node.parentId) {
-        const l2NodeId = l3Node.parentId;
-        const l2Node = findNodeById(currentHierarchyData, l2NodeId); // Search from root
-        if (l2Node && l2Node.parentId) {
-          // L2 has L1 parent
-          setSelectedTopLevelJournalId(l2Node.parentId);
-          setSelectedLevel2JournalIds([l2NodeId]);
-          setSelectedLevel3JournalIds([l3ItemId]);
-        } else if (l2Node) {
-          // L2Node is actually an L1, and l3Node is an L2
-          setSelectedTopLevelJournalId(l2NodeId); // l2NodeId is L1
-          setSelectedLevel2JournalIds([l3ItemId]); // l3ItemId is L2
-          setSelectedLevel3JournalIds([]);
+      if (isL2Selected) {
+        // L2 is selected: "Promote" L2 to L1 view.
+        // The L2 item clicked becomes the new selectedTopLevelJournalId.
+        // Its children (L3s) will now be displayed as L2s.
+        const { node: l2Node } = findNodeWithPath(
+          l2ItemId,
+          currentFullHierarchy
+        );
+        if (l2Node) {
+          // Ensure node exists
+          setSelectedTopLevelJournalId(l2ItemId);
+          setSelectedLevel2JournalIds([]); // Clear L2 selections as they are now L1's children
+          setSelectedLevel3JournalIds([]); // Clear L3 selections
+          console.log(`  Promoted L2 ${l2ItemId} to L1 view.`);
+        } else {
+          console.warn(
+            `  L2 node ${l2ItemId} not found in full hierarchy for promotion.`
+          );
+        }
+      } else {
+        // L2 is NOT selected: "Go back a level."
+        // The current L1 (selectedTopLevelJournalId) becomes an L2.
+        // The parent of the current L1 becomes the new L1.
+        // This only works if the current L1 is NOT the ROOT_JOURNAL_ID.
+        if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
+          console.log("  Cannot go back from root L1.");
+          return; // Cannot go back further
+        }
+
+        // Find the parent of the current selectedTopLevelJournalId from the full hierarchy
+        const { node: currentL1Node, l1ParentId: grandParentL1Id } =
+          findNodeWithPath(selectedTopLevelJournalId, currentFullHierarchy);
+
+        if (currentL1Node) {
+          if (grandParentL1Id) {
+            // currentL1Node has an L1 parent (it was an L2 itself)
+            setSelectedTopLevelJournalId(grandParentL1Id);
+            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // The old L1 is now selected as L2
+            setSelectedLevel3JournalIds([]);
+            console.log(
+              `  Navigated up. New L1: ${grandParentL1Id}, New L2 (selected): ${selectedTopLevelJournalId}`
+            );
+          } else {
+            // currentL1Node is a true L1 (its parent was root)
+            setSelectedTopLevelJournalId(ROOT_JOURNAL_ID); // Go back to root
+            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // The old L1 is now selected as L2 under root
+            setSelectedLevel3JournalIds([]);
+            console.log(
+              `  Navigated up to ROOT. New L2 (selected): ${selectedTopLevelJournalId}`
+            );
+          }
+        } else {
+          console.warn(
+            `  Current L1 node ${selectedTopLevelJournalId} not found for 'go back' navigation.`
+          );
         }
       }
       setSelectedFlatJournalIdState(null);
     },
-    [selectedTopLevelJournalId]
+    [
+      selectedTopLevelJournalId,
+      setSelectedTopLevelJournalId,
+      setSelectedLevel2JournalIds,
+      setSelectedLevel3JournalIds,
+      findNodeWithPath,
+      internalCurrentHierarchy /* Add internalCurrentHierarchy if findNodeWithPath uses it by default*/,
+    ]
+  );
+
+  const handleL3DoubleClick = useCallback(
+    (
+      l3ItemId: string,
+      isL3Selected: boolean, // The selection state *of this L3 item*
+      currentFullHierarchy: AccountNodeData[]
+    ) => {
+      console.log(`L3 Double Click: ID=${l3ItemId}, Selected=${isL3Selected}`);
+      const {
+        node: l3Node,
+        l1ParentId: originalL1Id,
+        l2ParentId: originalL2Id,
+      } = findNodeWithPath(l3ItemId, currentFullHierarchy);
+
+      if (!l3Node || !originalL2Id) {
+        // L3 must exist and have an L2 parent
+        console.warn(`  L3 node ${l3ItemId} or its L2 parent not found.`);
+        return;
+      }
+
+      if (isL3Selected) {
+        // L3 is selected: "Promote" L3's parent (originalL2Id) to L1, and L3 (l3ItemId) to L2.
+        // The original L1 (originalL1Id) is now the parent of the new L1, or it's root.
+        // The new L1 is originalL2Id.
+        // The new L2 selected is l3ItemId.
+        if (originalL1Id) {
+          // originalL2Id has an L1 parent
+          setSelectedTopLevelJournalId(originalL1Id); // Keep the original L1 as the top level context for the new L1
+          setSelectedLevel2JournalIds([originalL2Id]); // The L3's original L2 parent becomes the selected L2
+          setSelectedLevel3JournalIds([l3ItemId]); // The L3 item becomes the selected L3
+          // This effectively makes L3's parent (original L2) the new "focused L1" for the view
+          // Wait, the requirement is "l3 becomes in l2 and its parent becomes in l1"
+          setSelectedTopLevelJournalId(originalL2Id); // L3's parent (originalL2Id) becomes the new L1
+          setSelectedLevel2JournalIds([l3ItemId]); // L3 item (l3ItemId) becomes the selected L2
+          setSelectedLevel3JournalIds([]); // No L3s selected in this new view
+          console.log(
+            `  Promoted. New L1: ${originalL2Id}, New L2 (selected): ${l3ItemId}`
+          );
+        } else {
+          // originalL2Id was a top-level node (child of ROOT)
+          setSelectedTopLevelJournalId(originalL2Id); // L3's parent (originalL2Id) becomes new L1
+          setSelectedLevel2JournalIds([l3ItemId]); // L3 item (l3ItemId) becomes selected L2
+          setSelectedLevel3JournalIds([]);
+          console.log(
+            `  Promoted (from root context). New L1: ${originalL2Id}, New L2 (selected): ${l3ItemId}`
+          );
+        }
+      } else {
+        // L3 is NOT selected: "Go back a level" (current L1 becomes L2).
+        // This is the same behavior as L2 NOT selected double click.
+        // The selectedTopLevelJournalId determines the current L1.
+        if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
+          console.log(
+            "  Cannot go back from root L1 (triggered by L3 non-selected)."
+          );
+          return;
+        }
+
+        const {
+          node: currentL1NodeInfo,
+          l1ParentId: grandParentL1IdForCurrentL1,
+        } = findNodeWithPath(selectedTopLevelJournalId, currentFullHierarchy);
+        if (currentL1NodeInfo) {
+          if (grandParentL1IdForCurrentL1) {
+            // currentL1 has a parent
+            setSelectedTopLevelJournalId(grandParentL1IdForCurrentL1);
+            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // old L1 becomes selected L2
+            setSelectedLevel3JournalIds([]); // Clear L3s
+            console.log(
+              `  Navigated up (from L3 non-selected). New L1: ${grandParentL1IdForCurrentL1}, New L2 (selected): ${selectedTopLevelJournalId}`
+            );
+          } else {
+            // currentL1 is a child of ROOT
+            setSelectedTopLevelJournalId(ROOT_JOURNAL_ID);
+            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // old L1 becomes selected L2
+            setSelectedLevel3JournalIds([]);
+            console.log(
+              `  Navigated up to ROOT (from L3 non-selected). New L2 (selected): ${selectedTopLevelJournalId}`
+            );
+          }
+        } else {
+          console.warn(
+            ` Current L1 node ${selectedTopLevelJournalId} not found for 'go back' (L3 non-selected).`
+          );
+        }
+      }
+      setSelectedFlatJournalIdState(null);
+    },
+    [
+      selectedTopLevelJournalId,
+      setSelectedTopLevelJournalId,
+      setSelectedLevel2JournalIds,
+      setSelectedLevel3JournalIds,
+      findNodeWithPath,
+      internalCurrentHierarchy /* Add internalCurrentHierarchy if findNodeWithPath uses it by default*/,
+    ]
   );
 
   const handleNavigateContextDown = useCallback(
@@ -598,6 +742,9 @@ export const useJournalManager = ({
     selectedLevel3JournalIds,
     selectedFlatJournalId,
 
+    handleL2DoubleClick,
+    handleL3DoubleClick,
+
     effectiveSelectedJournalIds,
     isTerminalJournalActive,
     isJournalSliderPrimary,
@@ -618,7 +765,6 @@ export const useJournalManager = ({
     handleSelectTopLevelJournal,
     handleToggleLevel2JournalId,
     handleToggleLevel3JournalId,
-    handleL3DoubleClick,
     handleNavigateContextDown,
     resetJournalSelections,
     setSelectedFlatJournalId,

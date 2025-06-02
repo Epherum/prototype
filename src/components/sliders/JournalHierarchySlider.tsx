@@ -6,6 +6,8 @@ import styles from "./JournalHierarchySlider.module.css";
 import { findNodeById, findParentOfNode } from "@/lib/helpers"; // Assuming AccountNodeData is also in helpers or types
 import type { AccountNodeData } from "@/lib/types"; // Import AccountNodeData
 
+const DOUBLE_CLICK_DELAY = 200; // milliseconds
+
 // Make sure the props match what page.tsx provides
 interface JournalHierarchySliderProps {
   sliderId: string; // Added, as it's used in keys
@@ -16,7 +18,16 @@ interface JournalHierarchySliderProps {
   onSelectTopLevel: (id: string, childToSelect?: string | null) => void;
   onToggleLevel2Id: (id: string) => void;
   onToggleLevel3Id: (id: string) => void;
-  onL3DoubleClick?: (id: string, isSelected: boolean) => void;
+  onL2DoubleClick?: (
+    itemId: string,
+    isSelected: boolean,
+    fullHierarchy: AccountNodeData[]
+  ) => void; // NEW PROP
+  onL3DoubleClick?: (
+    itemId: string,
+    isSelected: boolean,
+    fullHierarchy: AccountNodeData[]
+  ) => void; // MODIFIED signature
   rootJournalIdConst: string;
   onNavigateContextDown?: (args: {
     currentL1ToBecomeL2: string;
@@ -31,6 +42,7 @@ interface JournalHierarchySliderProps {
     status: "affected" | "unaffected" | "all" | null
   ) => void;
   isL1NavMenuOpen?: boolean; // Kept as per your snippet, though not used in this simplified version
+  fullHierarchyData: AccountNodeData[]; // NEW PROP
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
@@ -42,7 +54,8 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   onSelectTopLevel,
   onToggleLevel2Id,
   onToggleLevel3Id,
-  onL3DoubleClick,
+  onL2DoubleClick, // NEW
+  onL3DoubleClick, // MODIFIED
   rootJournalIdConst,
   onNavigateContextDown,
   isLoading, // Added back
@@ -51,39 +64,67 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   isRootView,
   currentFilterStatus,
   onFilterStatusChange,
-  isL1NavMenuOpen, // Prop received
+  isL1NavMenuOpen,
+  fullHierarchyData, // NEW
 }) => {
   const l3ScrollerSwiperInstanceRef = useRef<any>(null);
   const level2ScrollerSwiperInstanceRef = useRef<any>(null);
 
+  // Refs for L2 click handling
   const l2ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const l2LastClickItemIdRef = useRef<string | null>(null);
+  const l2ClickCountRef = useRef<number>(0);
 
+  // Refs for L3 click handling
   const l3ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const l3LastClickItemIdRef = useRef<string | null>(null);
+  const l3ClickCountRef = useRef<number>(0);
 
-  const handleL2ItemInteraction = (itemId: string) => {
-    if (l2LastClickItemIdRef.current === itemId && l2ClickTimeoutRef.current) {
-      clearTimeout(l2ClickTimeoutRef.current);
-      l2LastClickItemIdRef.current = null;
-      l2ClickTimeoutRef.current = null;
-      console.log(
-        `%cL2 BUTTON (${itemId}): Manual Double-Click Detected!`,
-        "color: purple; font-weight: bold;"
-      );
-      handleL2ItemDoubleClick(itemId);
-    } else {
-      l2LastClickItemIdRef.current = itemId;
-      if (l2ClickTimeoutRef.current) clearTimeout(l2ClickTimeoutRef.current);
+  const handleL2ItemClick = (l2ItemId: string) => {
+    l2ClickCountRef.current += 1;
+
+    if (l2ClickCountRef.current === 1) {
+      // Start a timer for single click
       l2ClickTimeoutRef.current = setTimeout(() => {
-        console.log(
-          `%cL2 BUTTON (${itemId}): Manual Single Click Detected (Toggle).`,
-          "color: orange;"
-        );
-        onToggleLevel2Id(itemId);
-        l2LastClickItemIdRef.current = null;
-        l2ClickTimeoutRef.current = null;
-      }, 250);
+        // Timer expired, perform single click action (toggle selection)
+        console.log(`L2 Item SINGLE Click: ${l2ItemId} (Toggle Selection)`);
+        onToggleLevel2Id(l2ItemId);
+        l2ClickCountRef.current = 0; // Reset count
+      }, DOUBLE_CLICK_DELAY);
+    } else if (l2ClickCountRef.current === 2) {
+      // Double click detected
+      if (l2ClickTimeoutRef.current) {
+        clearTimeout(l2ClickTimeoutRef.current); // Cancel single click timer
+      }
+      console.log(`L2 Item DOUBLE Click: ${l2ItemId} (Navigation)`);
+      if (onL2DoubleClick) {
+        // For double-click navigation, the 'isSelected' often refers to the state *before* any potential single click.
+        // However, since we are bypassing the single click's selection toggle,
+        // the 'isSelected' state for the double-click action should be the current selection state.
+        const isSelected = selectedLevel2Ids.includes(l2ItemId);
+        onL2DoubleClick(l2ItemId, isSelected, fullHierarchyData);
+      }
+      l2ClickCountRef.current = 0; // Reset count
+    }
+  };
+
+  const handleL3ItemClick = (l3ItemId: string) => {
+    l3ClickCountRef.current += 1;
+
+    if (l3ClickCountRef.current === 1) {
+      l3ClickTimeoutRef.current = setTimeout(() => {
+        console.log(`L3 Item SINGLE Click: ${l3ItemId} (Toggle Selection)`);
+        onToggleLevel3Id(l3ItemId);
+        l3ClickCountRef.current = 0;
+      }, DOUBLE_CLICK_DELAY);
+    } else if (l3ClickCountRef.current === 2) {
+      if (l3ClickTimeoutRef.current) {
+        clearTimeout(l3ClickTimeoutRef.current);
+      }
+      console.log(`L3 Item DOUBLE Click: ${l3ItemId} (Navigation)`);
+      if (onL3DoubleClick) {
+        const isSelected = selectedLevel3Ids.includes(l3ItemId);
+        onL3DoubleClick(l3ItemId, isSelected, fullHierarchyData);
+      }
+      l3ClickCountRef.current = 0;
     }
   };
 
@@ -178,31 +219,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     level3NodesForScroller.length,
   ]);
 
-  const handleL2ItemDoubleClick = (l2ItemId: string) => {
-    const isItemSelected = selectedLevel2Ids.includes(l2ItemId);
-    console.log(
-      `L2 Item Double Click: ${l2ItemId}, Is Selected: ${isItemSelected}`
-    );
-
-    if (isItemSelected) {
-      console.log(`  Action: Go Up - ${l2ItemId} becomes new L1 context.`);
-      if (onSelectTopLevel) {
-        onSelectTopLevel(l2ItemId); // L2 becomes the new L1
-      }
-    } else {
-      // If not selected, a double click could mean "select this L2 and navigate into it"
-      // This implies L2 becomes new L1, and L2 selections are cleared.
-      console.log(
-        `  Action: Select and Go Up - ${l2ItemId} becomes new L1 context.`
-      );
-      if (onSelectTopLevel) {
-        onSelectTopLevel(l2ItemId); // L2 becomes new L1
-      }
-      // The onNavigateContextDown for L2 was more for long-press in original design
-      // Double click on L2 usually promotes it to L1 context if it has children
-    }
-  };
-
   const handleL1ContextDoubleClick = () => {
     console.log(`L1 Context Double Click: Current L1 is ${selectedTopLevelId}`);
     if (selectedTopLevelId === rootJournalIdConst || !selectedTopLevelId) {
@@ -241,46 +257,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     // }
     // Or toggle an L1 options menu:
     // setIsL1NavMenuOpen(prev => !prev); // This would require isL1NavMenuOpen state
-  };
-
-  const handleL3ItemInteraction = (itemId: string) => {
-    if (l3LastClickItemIdRef.current === itemId && l3ClickTimeoutRef.current) {
-      clearTimeout(l3ClickTimeoutRef.current);
-      l3LastClickItemIdRef.current = null;
-      l3ClickTimeoutRef.current = null;
-      console.log(
-        `%cL3 BUTTON (${itemId}): Manual Double-Click Detected!`,
-        "color: green; font-weight: bold;"
-      );
-      handleL3ItemDoubleClick(itemId);
-    } else {
-      l3LastClickItemIdRef.current = itemId;
-      if (l3ClickTimeoutRef.current) clearTimeout(l3ClickTimeoutRef.current);
-      l3ClickTimeoutRef.current = setTimeout(() => {
-        console.log(
-          `%cL3 BUTTON (${itemId}): Manual Single Click Detected (Toggle).`,
-          "color: blue;"
-        );
-        onToggleLevel3Id(itemId);
-        l3LastClickItemIdRef.current = null;
-        l3ClickTimeoutRef.current = null;
-      }, 250);
-    }
-  };
-
-  const handleL3ItemDoubleClick = (l3ItemId: string) => {
-    const isItemSelected = selectedLevel3Ids.includes(l3ItemId);
-    console.log(
-      `L3 Item Double Click: ${l3ItemId}, Is Selected: ${isItemSelected}`
-    );
-    if (onL3DoubleClick) {
-      onL3DoubleClick(l3ItemId, isItemSelected); // Propagate to parent for custom actions
-    } else {
-      // Default L3 double click: maybe toggle selection again or do nothing further
-      console.log(
-        "Default L3 double click: No specific action, selection was toggled by single click logic if not cleared."
-      );
-    }
   };
 
   const getNodeCodesFromIds = (
@@ -416,7 +392,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                   className={`${styles.l2ButtonInteractiveWrapper} noSelect touchManipulation`}
                 >
                   <button
-                    onClick={() => handleL2ItemInteraction(l2ContextNode.id)}
+                    onClick={() => handleL2ItemClick(l2ContextNode.id)}
                     onContextMenu={(e) => e.preventDefault()}
                     className={`${styles.level2Button} ${
                       selectedLevel2Ids.includes(l2ContextNode.id)
@@ -488,7 +464,19 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                   className={`${styles.l2ButtonInteractiveWrapper} noSelect touchManipulation`}
                 >
                   <button
-                    onClick={() => handleL3ItemInteraction(l3Node.id)}
+                    onClick={() => handleL3ItemClick(l3Node.id)}
+                    onDoubleClick={() => {
+                      if (onL3DoubleClick) {
+                        const isSelected = selectedLevel3Ids.includes(
+                          l3Node.id
+                        );
+                        onL3DoubleClick(
+                          l3Node.id,
+                          isSelected,
+                          fullHierarchyData
+                        );
+                      }
+                    }}
                     onContextMenu={(e) => e.preventDefault()}
                     className={`${styles.level2Button} ${
                       selectedLevel3Ids.includes(l3Node.id)

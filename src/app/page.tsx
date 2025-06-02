@@ -697,35 +697,48 @@ export default function Home() {
             // Hierarchical (J is 1st)
             return {
               _isFlatJournalMode: false,
-              hierarchyData: journalManager.currentHierarchy, // NEW
-              isLoading: journalManager.isHierarchyLoading, // NEW
-              isError: journalManager.isHierarchyError, // NEW
-              error: journalManager.hierarchyError, // NEW
+              hierarchyData: journalManager.currentHierarchy, // This is the *displayed* hierarchy
+              fullHierarchyData: journalManager.hierarchyData, // This is the *complete raw* hierarchy
+              isLoading: journalManager.isHierarchyLoading,
+              isError: journalManager.isHierarchyError,
+              error: journalManager.hierarchyError,
               selectedTopLevelId: journalManager.selectedTopLevelJournalId,
-              selectedLevel2Ids: journalManager.selectedLevel2JournalIds || [], // Ensure array
-              selectedLevel3Ids: journalManager.selectedLevel3JournalIds || [], // CORRECT: .selectedLevel3JournalIds // Ensure array
+              selectedLevel2Ids: journalManager.selectedLevel2JournalIds || [],
+              selectedLevel3Ids: journalManager.selectedLevel3JournalIds || [],
               onSelectTopLevel: (id, child) =>
                 journalManager.handleSelectTopLevelJournal(
                   id,
-                  journalManager.currentHierarchy,
+                  journalManager.currentHierarchy, // Pass displayed hierarchy
                   child
-                ), // NEW
+                ),
               onToggleLevel2Id: (id) =>
                 journalManager.handleToggleLevel2JournalId(
                   id,
-                  journalManager.currentHierarchy
-                ), // NEW
+                  journalManager.currentHierarchy // Pass displayed hierarchy
+                ),
               onToggleLevel3Id: (id) =>
                 journalManager.handleToggleLevel3JournalId(
                   id,
-                  journalManager.currentHierarchy
-                ), // NEW
-              onL3DoubleClick: (id, sel) =>
+                  journalManager.currentHierarchy // Pass displayed hierarchy
+                ),
+              onL2DoubleClick: (
+                id,
+                isSelected // NEW
+              ) =>
+                journalManager.handleL2DoubleClick(
+                  id,
+                  isSelected,
+                  journalManager.hierarchyData // Pass FULL hierarchy
+                ),
+              onL3DoubleClick: (
+                id,
+                isSelected // MODIFIED
+              ) =>
                 journalManager.handleL3DoubleClick(
                   id,
-                  sel,
-                  journalManager.currentHierarchy
-                ), // NEW
+                  isSelected,
+                  journalManager.hierarchyData // Pass FULL hierarchy
+                ),
               onNavigateContextDown: (args) =>
                 journalManager.handleNavigateContextDown(
                   args,
@@ -1090,6 +1103,12 @@ export default function Home() {
                         onFilterStatusChange={
                           (sliderSpecificProps as any).onFilterStatusChange
                         }
+                        onL2DoubleClick={
+                          (sliderSpecificProps as any).onL2DoubleClick
+                        }
+                        fullHierarchyData={
+                          (sliderSpecificProps as any).fullHierarchyData
+                        } // Pass full hierarchy for double-click actions
                       />
                     )
                   ) : sliderId === SLIDER_TYPES.PARTNER ? (
