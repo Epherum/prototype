@@ -30,6 +30,7 @@ function JournalModal({
   onTriggerAddChild,
   isLoading,
   onSelectForLinking, // New prop
+  modalTitle,
 }) {
   const [openNodes, setOpenNodes] = useState({});
   const [selectedAccountId, setSelectedAccountId] = useState(null);
@@ -109,50 +110,78 @@ function JournalModal({
   );
 
   // New handler for the main action button
-  const handleConfirmOrAddToList = () => {
-    if (!selectedAccountId) {
-      // No node is actively selected by single click
-      if (onSelectForLinking) {
-        alert("Please select a journal account to add to the list.");
-      } else {
-        // If not linking, and nothing is selected, maybe select ROOT (if that's desired UX)
-        // Or simply do nothing / disable button. For now, let's assume selecting ROOT_JOURNAL_ID
-        if (onConfirmSelection) onConfirmSelection(ROOT_JOURNAL_ID);
-        onClose();
-      }
-      return;
-    }
-
-    // Find the full node object for the selectedAccountId
-    // We need to search within the actual children of the conceptual root
-    const actualHierarchy = hierarchy[0]?.isConceptualRoot
-      ? hierarchy[0].children
-      : hierarchy;
-    const selectedNode = findNodeById(actualHierarchy || [], selectedAccountId);
-
-    if (!selectedNode) {
-      console.error(
-        "Selected node not found in hierarchy for ID:",
-        selectedAccountId
-      );
-      return;
-    }
-
-    if (selectedNode.isConceptualRoot) {
-      // Should not happen if handleSelectNode prevents it
-      return;
-    }
-
+  const handleConfirmOrAddToList = useCallback(() => {
+    // Scenario 1: Linking mode (`onSelectForLinking` is provided)
     if (onSelectForLinking) {
-      onSelectForLinking(selectedNode);
-      setSelectedAccountId(null); // Clear selection for next pick
-      // Do NOT close the JournalModal, LinkPartnerToJournalsModal will handle that via its own "Done" button or this modal's main close.
-    } else {
-      // Original navigation behavior
-      onConfirmSelection(selectedAccountId);
-      onClose();
+      if (selectedAccountId) {
+        // An item is actively selected via single-click
+        const actualHierarchy = hierarchy[0]?.isConceptualRoot
+          ? hierarchy[0].children
+          : hierarchy;
+        const selectedNode = findNodeById(
+          actualHierarchy || [],
+          selectedAccountId
+        );
+
+        if (selectedNode && !selectedNode.isConceptualRoot) {
+          onSelectForLinking(selectedNode); // Pass the full node object
+          setSelectedAccountId(null); // Clear internal selection for next potential pick
+          // Modal closure is handled by the component calling onSelectForLinking
+          // (e.g., page.tsx for GPG, or Link...Modals)
+          return; // Action handled, exit function
+        } else {
+          // Selected item was conceptual root or not found (should be prevented by handleSelectNode)
+          alert("Please select a valid journal account.");
+          return; // Prevent further action
+        }
+      } else {
+        // `onSelectForLinking` is active, but no item is currently single-clicked selected.
+        // The "Add/Use Selected Journal" button might be disabled, or we can alert.
+        alert(
+          "Please click on a journal account in the list first to select it."
+        );
+        return; // Prevent further action
+      }
     }
-  };
+
+    // Scenario 2: Navigation mode (`onSelectForLinking` is NOT provided)
+    // This button acts as "Confirm Selection" for navigation.
+    if (onConfirmSelection) {
+      if (selectedAccountId) {
+        // If a specific node was single-clicked, confirm that one.
+        const actualHierarchy = hierarchy[0]?.isConceptualRoot
+          ? hierarchy[0].children
+          : hierarchy;
+        const selectedNode = findNodeById(
+          actualHierarchy || [],
+          selectedAccountId
+        );
+        if (selectedNode && !selectedNode.isConceptualRoot) {
+          onConfirmSelection(selectedAccountId, null); // Second arg for childToSelectInL2, null here
+        } else {
+          // Fallback or if conceptual root was somehow selected for navigation (unlikely path)
+          // Decide what ROOT_JOURNAL_ID means in your context if it's not part of hierarchyData
+          // For safety, confirm the selectedTopLevelJournalId from journalManager if no specific node chosen
+          // However, onConfirmSelection typically expects a node ID.
+          // If `page.tsx` passes ROOT_JOURNAL_ID, that's what it'll use.
+          onConfirmSelection(ROOT_JOURNAL_ID, null); // Default to root if no valid selection
+        }
+      } else {
+        // No specific node single-clicked, confirm the "current view" or root.
+        // The parent component (page.tsx's journalManager) usually handles what this means.
+        // Often, it means confirming the current top-level selection or ROOT_JOURNAL_ID.
+        onConfirmSelection(ROOT_JOURNAL_ID, null); // Default to root or current top-level view
+      }
+    }
+    onClose(); // Close the modal in navigation mode after confirming
+  }, [
+    selectedAccountId,
+    onSelectForLinking,
+    onConfirmSelection,
+    onClose,
+    hierarchy,
+    // ROOT_JOURNAL_ID, // If used as a fallback
+  ]);
 
   if (!isOpen) return null;
 
@@ -184,7 +213,10 @@ function JournalModal({
           ×
         </button>
         <h2 className={baseStyles.modalTitle}>
-          {onSelectForLinking
+          {/* Use custom title if provided, else default based on mode */}
+          {modalTitle
+            ? modalTitle
+            : onSelectForLinking
             ? "Select Journal(s) to Link"
             : "Manage & Select Journals"}
         </h2>
@@ -233,7 +265,7 @@ function JournalModal({
           <div className={baseStyles.modalActions}>
             <button
               type="button"
-              onClick={onClose}
+              onClick={onClose} // This button now consistently means "Cancel" or "Done with this modal view"
               className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
             >
               {onSelectForLinking ? "Done Selecting" : "Cancel"}
@@ -242,18 +274,11 @@ function JournalModal({
               type="button"
               onClick={handleConfirmOrAddToList}
               className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
-              // Corrected disabled logic:
-              disabled={
-                onSelectForLinking
-                  ? !selectedAccountId // In linking mode, disable if nothing is selected
-                  : false // In navigation mode, this button ("Confirm Selection") is generally always enabled,
-                // or relies on selectedAccountId for its action if nothing is selected (e.g. confirming root).
-                // If you want it disabled in nav mode when nothing is selected, use: !selectedAccountId
-              }
+              disabled={onSelectForLinking ? !selectedAccountId : false}
             >
               {onSelectForLinking
                 ? selectedAccountId
-                  ? "Add Selected Journal"
+                  ? "Add/Use Selected Journal"
                   : "Select an Item"
                 : "Confirm Selection"}
             </button>

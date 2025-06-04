@@ -26,6 +26,10 @@ export interface UsePartnerManagerProps {
   journalRootFilterStatus: "affected" | "unaffected" | "all" | null;
   isJournalHierarchyLoading: boolean;
   isFlatJournalsQueryForGoodLoading: boolean;
+
+  // +++ GPG Specific Props +++
+  isGPGOrderActive?: boolean;
+  gpgContextJournalId?: string | null;
 }
 
 export const usePartnerManager = (props: UsePartnerManagerProps) => {
@@ -38,6 +42,9 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     journalRootFilterStatus,
     isJournalHierarchyLoading,
     isFlatJournalsQueryForGoodLoading,
+    // +++ Destructure GPG props +++
+    isGPGOrderActive,
+    gpgContextJournalId,
   } = props;
 
   const queryClient = useQueryClient();
@@ -60,8 +67,20 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     let params: FetchPartnersParams = { limit: 1000, offset: 0 };
     const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
-    if (partnerIndex === 0) {
-      // Default params
+    // +++ GPG Order Logic (Slider 2: Partners filtered by gpgContextJournalId) +++
+    if (isGPGOrderActive && partnerIndex === 1) {
+      if (gpgContextJournalId) {
+        params.linkedToJournalIds = [gpgContextJournalId]; // Filter by the GPG context journal
+        params.includeChildren = false; // Typically, direct links for this context
+      } else {
+        // If GPG is active but no context journal, Slider 2 (Partners) should be empty
+        // The enabled condition will handle this, but params should reflect an impossible fetch
+        params.linkedToJournalIds = ["__NO_GPG_CONTEXT_JOURNAL__"]; // Ensures no data fetched
+      }
+    }
+    // --- Existing Logic (adjust if GPG handled it) ---
+    else if (partnerIndex === 0) {
+      // Default params when Partner is first
     } else if (
       orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER)
     ) {
@@ -103,6 +122,9 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     selectedGoodsId,
     selectedJournalIdForGjpFiltering,
     journalRootFilterStatus,
+    // +++ Add GPG props to dependency array +++
+    isGPGOrderActive,
+    gpgContextJournalId,
   ]);
 
   // Expose the query key for external invalidations
@@ -112,15 +134,19 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
   );
 
   const partnerQuery = useQuery<Partner[], Error>({
-    queryKey: partnerQueryKey, // Use the memoized key
+    queryKey: partnerQueryKey,
     queryFn: async (): Promise<Partner[]> => {
       const params = partnerQueryKeyParamsStructure;
       const currentOrderString = sliderOrder.join("-");
-      // console.log(
-      //   `[partnerQuery.queryFn in usePartnerManager] order: ${currentOrderString}, params:`,
-      //   JSON.stringify(params)
-      // );
+      const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
+      // Check for impossible conditions based on params structure
+      if (params.linkedToJournalIds?.includes("__NO_GPG_CONTEXT_JOURNAL__")) {
+        console.log(
+          "[partnerQuery.queryFn] GPG active, but no context journal. Returning []."
+        );
+        return [];
+      }
       if (
         currentOrderString.startsWith(
           SLIDER_TYPES.JOURNAL +
@@ -133,6 +159,9 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           !params.linkedToJournalIds ||
           params.linkedToJournalIds.length === 0)
       ) {
+        console.log(
+          "[partnerQuery.queryFn] J-G-P, but missing good or journal. Returning []."
+        );
         return [];
       }
       if (
@@ -147,16 +176,37 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           !params.linkedToJournalIds ||
           params.linkedToJournalIds.length === 0)
       ) {
+        console.log(
+          "[partnerQuery.queryFn] G-J-P, but missing good or journal. Returning []."
+        );
         return [];
       }
+
+      // GPG Specific condition for queryFn (redundant if params.linkedToJournalIds already has __NO_GPG_CONTEXT_JOURNAL__)
+      // if (isGPGOrderActive && partnerIndex === 1 && !gpgContextJournalId) {
+      //   console.log("[partnerQuery.queryFn] GPG order, Slider 2 (Partners), but no context journal. Returning [].");
+      //   return [];
+      // }
+
+      console.log(
+        `[partnerQuery.queryFn in usePartnerManager] order: ${currentOrderString}, params:`,
+        JSON.stringify(params)
+      );
       const result = await fetchPartners(params);
       return result.data.map((p: any) => ({ ...p, id: String(p.id) }));
     },
     enabled: (() => {
       if (!visibility[SLIDER_TYPES.PARTNER]) return false;
+
       const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
       const orderString = sliderOrder.join("-");
 
+      // +++ GPG Order Logic (Slider 2: Partners) +++
+      if (isGPGOrderActive && partnerIndex === 1) {
+        return !!gpgContextJournalId; // Enable only if GPG context journal is selected
+      }
+
+      // --- Existing Logic ---
       if (partnerIndex === 0) return true;
       if (
         orderString.startsWith(
@@ -177,7 +227,7 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
         return (
           effectiveSelectedJournalIds.length > 0 &&
           !!selectedGoodsId &&
-          !isJournalHierarchyLoading
+          !isJournalHierarchyLoading // Also ensure good query isn't loading if it's a pre-filter
         );
       }
       if (
@@ -195,7 +245,7 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           !isFlatJournalsQueryForGoodLoading
         );
       }
-      return false;
+      return false; // Default to false if no condition met
     })(),
   });
 
@@ -261,6 +311,18 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     }
   );
 
+  // Effect to reset selected partner if GPG context changes or GPG mode activates/deactivates
+  useEffect(() => {
+    if (isGPGOrderActive) {
+      // If GPG is active, and context journal changes, or if it just became active,
+      // partner selection should be reset. This is implicitly handled by page.tsx
+      // calling setSelectedPartnerId(null) when GPG context journal changes or is cleared.
+      // The data will refetch based on the new context.
+      // If data becomes empty, the other useEffect will set selectedPartnerId to null.
+    }
+  }, [isGPGOrderActive, gpgContextJournalId, partnerQuery.data]); // Watch gpgContextJournalId and data
+
+  // Auto-select first partner or clear selection
   useEffect(() => {
     if (partnerQuery.isSuccess && partnerQuery.data) {
       const fetchedPartners = partnerQuery.data;
@@ -288,7 +350,7 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     partnerQuery.isLoading,
     partnerQuery.isFetching,
     partnerQuery.isError,
-    selectedPartnerId,
+    selectedPartnerId, // Keep as dependency
   ]);
 
   const handleOpenPartnerOptionsMenu = useCallback(
@@ -393,8 +455,8 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     isAddEditPartnerModalOpen,
     editingPartnerData,
     partnersForSlider,
-    partnerQuery,
-    partnerQueryKey, // Expose this
+    partnerQuery, // Expose whole query
+    partnerQueryKey, // Expose for invalidation if needed by other hooks
     createPartnerMutation,
     updatePartnerMutation,
     deletePartnerMutation,

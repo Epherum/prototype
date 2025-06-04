@@ -8,15 +8,17 @@ import {
   createGood,
   updateGood,
   deleteGood,
-  // fetchGoodsForJournalsAndPartner, // Keep in page.tsx or move to linking hook
-  // fetchGoodsLinkedToJournals,     // Keep in page.tsx or move to linking hook
-  // fetchGoodsLinkedToPartnerViaJPGL, // Keep in page.tsx or move to linking hook
 } from "@/services/clientGoodService";
+// GPG S3 related imports are no longer needed here
+// import { fetchJplByContext } from "@/services/clientJournalPartnerLinkService";
+// import { fetchJpgLinksForJpl } from "@/services/clientJournalPartnerGoodLinkService";
 import type {
   Good,
   CreateGoodClientData,
   UpdateGoodClientData,
   FetchGoodsParams,
+  // JournalPartnerLinkClient, // No longer needed
+  // JournalPartnerGoodLinkClient, // No longer needed
 } from "@/lib/types";
 import { getFirstId } from "@/lib/helpers";
 import { SLIDER_TYPES } from "@/lib/constants";
@@ -24,15 +26,18 @@ import { SLIDER_TYPES } from "@/lib/constants";
 export interface UseGoodManagerProps {
   sliderOrder: string[];
   visibility: { [key: string]: boolean };
-  // Filters from other sliders:
-  effectiveSelectedJournalIds: string[]; // From Journal domain
-  selectedPartnerId: string | null; // From Partner domain
-  selectedJournalIdForPjgFiltering: string | null; // From Journal (flat list) for P-J-G
-  journalRootFilterStatus: "affected" | "unaffected" | "all" | null; // From Journal domain
-  // Query loading states from other domains if goodsQuery.enabled depends on them
+  effectiveSelectedJournalIds: string[];
+  selectedPartnerId: string | null;
+  selectedJournalIdForPjgFiltering: string | null;
+  journalRootFilterStatus: "affected" | "unaffected" | "all" | null;
   isJournalHierarchyLoading: boolean;
-  isPartnerQueryLoading: boolean; // Loading state from usePartnerManager's partnerQuery
-  isFlatJournalsQueryLoading: boolean; // For P-J-G, from flatJournalsQuery
+  isPartnerQueryLoading: boolean;
+  isFlatJournalsQueryLoading: boolean;
+
+  // Renamed and simplified GPG/GP context props
+  isGPContextActive?: boolean; // True if slider order is G-P-...
+  gpgContextJournalId?: string | null; // Journal ID for filtering in GP context
+  // gpgSelectedPartnerIdForSlider3 is removed as S3 display is out
 }
 
 export const useGoodManager = (props: UseGoodManagerProps) => {
@@ -46,11 +51,12 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     isJournalHierarchyLoading,
     isPartnerQueryLoading,
     isFlatJournalsQueryLoading,
+    isGPContextActive, // Use this new prop
+    gpgContextJournalId,
   } = props;
 
   const queryClient = useQueryClient();
 
-  // --- State ---
   const [selectedGoodsId, setSelectedGoodsId] = useState<string | null>(null);
   const [isGoodsOptionsMenuOpen, setIsGoodsOptionsMenuOpen] = useState(false);
   const [goodsOptionsMenuAnchorEl, setGoodsOptionsMenuAnchorEl] =
@@ -58,29 +64,54 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
   const [isAddEditGoodModalOpen, setIsAddEditGoodModalOpen] = useState(false);
   const [editingGoodData, setEditingGoodData] = useState<Good | null>(null);
 
-  // --- TanStack Queries ---
-  const goodsQueryKeyParamsStructure = useMemo((): FetchGoodsParams => {
-    const orderString = sliderOrder.join("-");
+  // Determine if this Goods slider is the first in a GP context
+  // This hook instance is always for "the" Goods slider that page.tsx decides to render.
+  // We only care if that slider should be context-filtered.
+  const shouldFilterByGpgContextJournal = useMemo(
+    () => isGPContextActive && !!gpgContextJournalId,
+    [isGPContextActive, gpgContextJournalId]
+  );
+
+  // The goodsSliderIndex is still relevant for non-GP context filtering
+  const goodsSliderIndex = useMemo(
+    () => sliderOrder.indexOf(SLIDER_TYPES.GOODS),
+    [sliderOrder]
+  );
+
+  // --- Main Goods Query (for GP context Slider 1 or non-GP scenarios) ---
+  const mainGoodsQueryKeyParams = useMemo((): FetchGoodsParams => {
     let params: FetchGoodsParams = { limit: 1000, offset: 0 };
 
-    const goodsIndex = sliderOrder.indexOf(SLIDER_TYPES.GOODS);
-
-    if (goodsIndex === 0) {
-      // Default params
+    if (isGPContextActive && goodsSliderIndex === 0) {
+      // Check if this instance is the first slider
+      if (gpgContextJournalId) {
+        // Filter if context journal is selected
+        params.linkedToJournalIds = [gpgContextJournalId];
+        params.includeJournalChildren = false;
+      }
+      // If isGPContextActive but no gpgContextJournalId, it means show all goods (default params)
+      // This is because the "Filter by Journal" button would be active.
+    } else if (goodsSliderIndex === 0) {
+      // Goods is 1st, but NOT GP context (e.g., G-J-P or just G)
+      // Default params (all goods)
     } else if (
-      orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
+      sliderOrder
+        .join("-")
+        .startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
     ) {
-      // J-G-...
+      // J-G
       params.filterStatus = journalRootFilterStatus;
       params.contextJournalIds = [...effectiveSelectedJournalIds];
     } else if (
-      orderString.startsWith(
-        SLIDER_TYPES.JOURNAL +
-          "-" +
-          SLIDER_TYPES.PARTNER +
-          "-" +
-          SLIDER_TYPES.GOODS
-      )
+      sliderOrder
+        .join("-")
+        .startsWith(
+          SLIDER_TYPES.JOURNAL +
+            "-" +
+            SLIDER_TYPES.PARTNER +
+            "-" +
+            SLIDER_TYPES.GOODS
+        )
     ) {
       // J-P-G
       if (selectedPartnerId) {
@@ -89,71 +120,46 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
           params.forJournalIds = [...effectiveSelectedJournalIds];
           params.includeJournalChildren = true;
         }
+      } else {
+        params.forPartnerId = "__IMPOSSIBLE__";
       }
     } else if (
-      orderString.startsWith(
-        SLIDER_TYPES.PARTNER +
-          "-" +
-          SLIDER_TYPES.JOURNAL +
-          "-" +
-          SLIDER_TYPES.GOODS
-      )
+      sliderOrder
+        .join("-")
+        .startsWith(
+          SLIDER_TYPES.PARTNER +
+            "-" +
+            SLIDER_TYPES.JOURNAL +
+            "-" +
+            SLIDER_TYPES.GOODS
+        )
     ) {
       // P-J-G
       if (selectedPartnerId && selectedJournalIdForPjgFiltering) {
         params.forPartnerId = selectedPartnerId;
         params.forJournalIds = [selectedJournalIdForPjgFiltering];
         params.includeJournalChildren = false;
+      } else {
+        params.forPartnerId = "__IMPOSSIBLE__";
       }
     }
     return params;
   }, [
     sliderOrder,
+    goodsSliderIndex, // Still needed for general positioning
+    isGPContextActive, // Use new prop
+    gpgContextJournalId,
+    journalRootFilterStatus,
     effectiveSelectedJournalIds,
     selectedPartnerId,
     selectedJournalIdForPjgFiltering,
-    journalRootFilterStatus,
   ]);
 
-  const goodsQuery = useQuery<Good[], Error>({
-    queryKey: ["goods", goodsQueryKeyParamsStructure],
-    queryFn: async (): Promise<Good[]> => {
-      const params = goodsQueryKeyParamsStructure;
-      const currentOrderString = sliderOrder.join("-");
-      console.log(
-        `[goodsQuery.queryFn in useGoodManager] order: ${currentOrderString}, params:`,
-        JSON.stringify(params)
-      );
-
-      if (
-        currentOrderString.startsWith(
-          SLIDER_TYPES.JOURNAL +
-            "-" +
-            SLIDER_TYPES.PARTNER +
-            "-" +
-            SLIDER_TYPES.GOODS
-        ) &&
-        (!params.forPartnerId ||
-          !params.forJournalIds ||
-          params.forJournalIds.length === 0)
-      ) {
-        return [];
-      }
-      if (
-        currentOrderString.startsWith(
-          SLIDER_TYPES.PARTNER +
-            "-" +
-            SLIDER_TYPES.JOURNAL +
-            "-" +
-            SLIDER_TYPES.GOODS
-        ) &&
-        (!params.forPartnerId ||
-          !params.forJournalIds ||
-          params.forJournalIds.length === 0)
-      ) {
-        return [];
-      }
-      const result = await fetchGoods(params);
+  const mainGoodsQuery = useQuery<Good[], Error>({
+    queryKey: ["mainGoods", mainGoodsQueryKeyParams],
+    queryFn: async () => {
+      if (mainGoodsQueryKeyParams.forPartnerId === "__IMPOSSIBLE__") return [];
+      const result = await fetchGoods(mainGoodsQueryKeyParams);
       return result.data.map((g: any) => ({
         ...g,
         id: String(g.id),
@@ -162,19 +168,20 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       }));
     },
     enabled: (() => {
+      // Visibility check is fundamental
       if (!visibility[SLIDER_TYPES.GOODS]) return false;
 
-      const goodsIndex = sliderOrder.indexOf(SLIDER_TYPES.GOODS);
+      // If it's the first slider (index 0), it's always enabled.
+      // The filtering (GP context or not) is handled by mainGoodsQueryKeyParams.
+      if (goodsSliderIndex === 0) return true;
+
+      // Logic for when Goods slider is not first
       const orderString = sliderOrder.join("-");
-
-      if (goodsIndex === 0) return true;
-
       if (
         orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
       ) {
         return !isJournalHierarchyLoading;
       }
-
       if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL +
@@ -187,10 +194,9 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
         return (
           !!selectedPartnerId &&
           !isJournalHierarchyLoading &&
-          !isPartnerQueryLoading // Partner query for 2nd slider should not be loading
+          !isPartnerQueryLoading
         );
       }
-
       if (
         orderString.startsWith(
           SLIDER_TYPES.PARTNER +
@@ -203,29 +209,39 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
         return (
           !!selectedPartnerId &&
           !!selectedJournalIdForPjgFiltering &&
-          !isFlatJournalsQueryLoading // Flat journal data for P-J should be loaded
+          !isFlatJournalsQueryLoading
         );
       }
-      return false;
+      return false; // Default to false if no enabling condition met
     })(),
   });
 
-  const goodsForSlider = useMemo(
-    () => goodsQuery.data || [],
-    [goodsQuery.data]
-  );
+  // --- Determine final goods data and loading/error states (now only from mainGoodsQuery) ---
+  const goodsForSlider = useMemo(() => {
+    return mainGoodsQuery.data || [];
+  }, [mainGoodsQuery.data]);
 
-  // --- TanStack Mutations ---
+  const isLoadingCurrentGoods = useMemo(() => {
+    return mainGoodsQuery.isLoading;
+  }, [mainGoodsQuery.isLoading]);
+
+  const isErrorCurrentGoods = useMemo(() => {
+    return mainGoodsQuery.isError;
+  }, [mainGoodsQuery.isError]);
+
+  const currentGoodsError = useMemo(() => {
+    return mainGoodsQuery.error;
+  }, [mainGoodsQuery.error]);
+
+  // --- Mutations ---
   const createGoodMutation = useMutation({
     mutationFn: createGood,
     onSuccess: (newGood) => {
-      queryClient.invalidateQueries({
-        queryKey: ["goods", goodsQueryKeyParamsStructure],
-      });
+      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${newGood.label}' created successfully!`);
-      setSelectedGoodsId(String(newGood.id));
+      setSelectedGoodsId(String(newGood.id)); // Select the new good
     },
     onError: (error: Error) => {
       console.error("Failed to create good/service:", error);
@@ -237,10 +253,8 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     mutationFn: (variables: { id: string; data: UpdateGoodClientData }) =>
       updateGood(variables.id, variables.data),
     onSuccess: (updatedGood) => {
-      queryClient.invalidateQueries({
-        queryKey: ["goods", goodsQueryKeyParamsStructure],
-      });
-      // queryClient.invalidateQueries({ queryKey: ["goods", String(updatedGood.id)] });
+      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      // No longer need to invalidate gpgSlider3RawData
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${updatedGood.label}' updated successfully!`);
@@ -254,9 +268,8 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
   const deleteGoodMutation = useMutation({
     mutationFn: deleteGood,
     onSuccess: (response, deletedGoodId) => {
-      queryClient.invalidateQueries({
-        queryKey: ["goods", goodsQueryKeyParamsStructure],
-      });
+      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      // No longer need to invalidate gpgSlider3RawData
       alert(
         response.message ||
           `Good/Service ${deletedGoodId} deleted successfully!`
@@ -271,37 +284,38 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     },
   });
 
-  // --- useEffects ---
+  // --- useEffect for selectedGoodsId (simplified) ---
   useEffect(() => {
-    if (goodsQuery.isSuccess && goodsQuery.data) {
-      const fetchedGoods = goodsQuery.data;
+    // This effect now always applies to the data from mainGoodsQuery
+    const currentData = mainGoodsQuery.data;
+    if (mainGoodsQuery.isSuccess && currentData) {
       const currentSelectionInList =
-        selectedGoodsId && fetchedGoods.some((g) => g.id === selectedGoodsId);
-      if (fetchedGoods.length > 0 && !currentSelectionInList) {
-        setSelectedGoodsId(getFirstId(fetchedGoods));
-      } else if (fetchedGoods.length === 0 && selectedGoodsId !== null) {
+        selectedGoodsId && currentData.some((g) => g.id === selectedGoodsId);
+      if (currentData.length > 0 && !currentSelectionInList) {
+        setSelectedGoodsId(getFirstId(currentData));
+      } else if (currentData.length === 0 && selectedGoodsId !== null) {
         setSelectedGoodsId(null);
       }
     } else if (
-      !goodsQuery.isLoading &&
-      !goodsQuery.isFetching &&
-      !goodsQuery.isError &&
+      !mainGoodsQuery.isLoading &&
+      !mainGoodsQuery.isFetching &&
+      !mainGoodsQuery.isError &&
       selectedGoodsId !== null
     ) {
-      if (!goodsQuery.data || goodsQuery.data.length === 0) {
+      if (!currentData || currentData.length === 0) {
         setSelectedGoodsId(null);
       }
     }
   }, [
-    goodsQuery.data,
-    goodsQuery.isSuccess,
-    goodsQuery.isLoading,
-    goodsQuery.isFetching,
-    goodsQuery.isError,
+    mainGoodsQuery.data,
+    mainGoodsQuery.isSuccess,
+    mainGoodsQuery.isLoading,
+    mainGoodsQuery.isFetching,
+    mainGoodsQuery.isError,
     selectedGoodsId,
   ]);
 
-  // --- Callback Handlers ---
+  // --- Callback Handlers (largely unchanged, but sourceData for edit simplifies) ---
   const handleOpenGoodsOptionsMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       setGoodsOptionsMenuAnchorEl(event.currentTarget);
@@ -322,17 +336,18 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
   }, [handleCloseGoodsOptionsMenu]);
 
   const handleOpenEditGoodModal = useCallback(() => {
-    if (selectedGoodsId && goodsQuery.data) {
-      const goodToEdit = goodsQuery.data.find((g) => g.id === selectedGoodsId);
+    const sourceData = mainGoodsQuery.data; // Always use mainGoodsQuery data now
+    if (selectedGoodsId && sourceData) {
+      const goodToEdit = sourceData.find((g) => g.id === selectedGoodsId);
       if (goodToEdit) {
         setEditingGoodData(goodToEdit);
         setIsAddEditGoodModalOpen(true);
       } else {
-        alert("Selected good/service data not found.");
+        alert("Selected good/service data not found for editing.");
       }
     }
     handleCloseGoodsOptionsMenu();
-  }, [selectedGoodsId, goodsQuery.data, handleCloseGoodsOptionsMenu]);
+  }, [selectedGoodsId, mainGoodsQuery.data, handleCloseGoodsOptionsMenu]);
 
   const handleCloseAddEditGoodModal = useCallback(() => {
     setIsAddEditGoodModalOpen(false);
@@ -347,6 +362,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       if (goodIdToUpdate && editingGoodData) {
         const payloadForUpdate: UpdateGoodClientData = {
           label: dataFromModal.label,
+          // ... (rest of the fields remain the same)
           taxCodeId: (dataFromModal as any).taxCodeId,
           typeCode: (dataFromModal as any).typeCode,
           description: (dataFromModal as any).description,
@@ -393,23 +409,28 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     handleCloseGoodsOptionsMenu();
   }, [selectedGoodsId, deleteGoodMutation, handleCloseGoodsOptionsMenu]);
 
-  // --- Return Value ---
   return {
-    // State
     selectedGoodsId,
-    setSelectedGoodsId, // Expose setter
+    setSelectedGoodsId,
     isGoodsOptionsMenuOpen,
     goodsOptionsMenuAnchorEl,
     isAddEditGoodModalOpen,
     editingGoodData,
-    // Data & Query Status
-    goodsForSlider,
-    goodsQuery, // Expose whole query object
-    // Mutations
+    goodsForSlider, // Now always from mainGoodsQuery
+    goodsQueryState: {
+      // Now always reflects mainGoodsQuery
+      isLoading: isLoadingCurrentGoods,
+      isError: isErrorCurrentGoods,
+      error: currentGoodsError,
+      data: goodsForSlider,
+      refetch: () => {
+        mainGoodsQuery.refetch(); // Always refetch main query
+      },
+      isFetching: mainGoodsQuery.isFetching, // Always from main query
+    },
     createGoodMutation,
     updateGoodMutation,
     deleteGoodMutation,
-    // Callbacks
     handleOpenGoodsOptionsMenu,
     handleCloseGoodsOptionsMenu,
     handleOpenAddGoodModal,

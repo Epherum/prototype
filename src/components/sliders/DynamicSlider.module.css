@@ -310,3 +310,139 @@
 .documentGoodDetails .removeButton:hover {
   background-color: #c82333;
 }
+
+.gpgFilterButton {
+  background-color: #4a90e2; /* A distinct color */
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9em;
+  transition: background-color 0.2s ease;
+}
+
+.gpgFilterButton:hover {
+  background-color: #357abd;
+}
+
+.gpgContextDisplay {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background-color: #f0f4f8; /* Light background for the display */
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 0.9em;
+}
+
+.gpgContextDisplay span strong {
+  color: #333;
+}
+
+.gpgClearButton {
+  background: none;
+  border: none;
+  color: #d9534f; /* A "danger" or "remove" color */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px; /* Small padding */
+}
+
+.gpgClearButton:hover {
+  color: #c9302c;
+  text-decoration: underline;
+}
+
+.gpgFilterButton {
+  display: flex; /* Already good */
+  align-items: center; /* Already good */
+  gap: var(--spacing-unit); /* Use variable */
+  width: 100%; /* Make it full width for better presence below title */
+  justify-content: center;
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Consistent spacing */
+  font-size: 0.9em;
+  font-weight: 500; /* Give it a bit of emphasis */
+  color: var(--accent-warm); /* Use warm accent for text */
+  background-color: var(--bg-card); /* Use card background */
+  border: 1px solid var(--accent-warm-light); /* Subtle warm border */
+  border-radius: var(--border-radius-sm); /* Consistent radius */
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease;
+  box-shadow: 0 2px 4px var(--shadow-color); /* Subtle shadow */
+}
+
+.gpgFilterButton:hover {
+  background-color: var(--accent-slider); /* Lighter warm accent on hover */
+  border-color: var(--accent-warm); /* Stronger border on hover */
+  color: var(--text-primary); /* Darker text on hover */
+}
+
+.gpgFilterButton svg {
+  /* Style for the icon inside the button */
+  font-size: 1.2em; /* Make icon slightly larger */
+  /* color will inherit from button's color */
+}
+
+.gpgContextDisplay {
+  display: flex; /* Already good */
+  justify-content: space-between; /* Already good */
+  align-items: center; /* Already good */
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  background-color: var(
+    --accent-slider
+  ); /* Use a light warm accent for the display */
+  border: 1px solid var(--accent-warm-light); /* Subtle border */
+  border-radius: var(--border-radius-sm); /* Consistent radius */
+  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Consistent spacing */
+  font-size: 0.85em; /* Slightly smaller than the button */
+  color: var(--text-secondary); /* Secondary text for general info */
+}
+
+.gpgContextDisplay span strong {
+  color: var(--text-primary); /* Primary text for the journal name */
+  font-weight: 600; /* Make it stand out */
+}
+
+.gpgClearButton {
+  display: flex; /* Already good */
+  align-items: center; /* Already good */
+  gap: calc(var(--spacing-unit) * 0.5); /* Use variable */
+  background: none;
+  border: none;
+  color: var(
+    --accent-warm
+  ); /* Use warm accent, can be made more "danger" like if needed */
+  cursor: pointer;
+  padding: calc(var(--spacing-unit) * 0.5);
+  margin-left: var(--spacing-unit); /* Add some space from the text */
+  font-size: 0.9em; /* Match text size */
+  font-weight: 500;
+  border-radius: var(
+    --border-radius-pill
+  ); /* Make it a small pill / circle for icon */
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.gpgClearButton:hover {
+  color: var(--text-primary);
+  background-color: var(--accent-warm-light); /* Subtle hover background */
+}
+.gpgClearButton svg {
+  font-size: 1.1em; /* Adjust icon size if needed */
+}
+
+/* Ensure the noData message has some top margin if GPG controls are present */
+.noData {
+  /* (your existing .noData styles) */
+  /* Add this if it's not already spaced well after the GPG controls */
+  margin-top: calc(var(--spacing-unit) * 1.5);
+}

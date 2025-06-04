@@ -1,18 +1,30 @@
 // src/components/sliders/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
-import { IoTrashBinOutline, IoAddCircleOutline } from "react-icons/io5";
+import {
+  IoTrashBinOutline,
+  IoAddCircleOutline,
+  IoFilterCircleOutline,
+  IoCloseCircleOutline,
+} from "react-icons/io5"; // Added icons
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./DynamicSlider.module.css";
-import { SLIDER_TYPES, JOURNAL_ICONS } from "@/lib/constants"; // Ensure JOURNAL_ICONS is relevant or remove if not used for all dynamic sliders
+import { SLIDER_TYPES } from "@/lib/constants";
 
 interface DynamicSliderItem {
-  // Or whatever your item type is
   id: string;
-  name: string; // Or label
-  code?: string; // Or referenceCode
-  // ... any other fields displayed in the item
+  name: string;
+  code?: string;
   unit_code?: string;
+  // Allow any other properties that might come from different data sources
+  [key: string]: any;
+}
+
+// Type for GPG Context Journal Info passed from page.tsx
+interface GPGContextJournalInfo {
+  id: string;
+  name: string | undefined; // Name might be undefined if still fetching
+  onClear: () => void;
 }
 
 interface DynamicSliderProps {
@@ -26,24 +38,28 @@ interface DynamicSliderProps {
   isLoading?: boolean;
   isError?: boolean;
   error?: Error | null;
-  onOpenModal?: () => void;
+  onOpenModal?: () => void; // For entity options menu
 
   // Props primarily for Partner Slider
   isLocked?: boolean;
 
-  // +++ Make these props optional, as they are specific to Goods slider usage +++
+  // Props for Goods slider in Document Creation mode
   isDocumentCreationMode?: boolean;
   selectedGoodsForDoc?: Array<
-    DynamicSliderItem & {
-      quantity?: number;
-      price?: number /* other doc details */;
-    }
+    DynamicSliderItem & { quantity?: number; price?: number }
   >;
   onToggleGoodForDoc?: (item: DynamicSliderItem) => void;
   onUpdateGoodDetailForDoc?: (
     itemId: string,
     detail: { quantity?: number; price?: number }
   ) => void;
+
+  // +++ New Props for GPG Context Journal Filtering (for GPG Slider 1) +++
+  showContextJournalFilterButton?: boolean; // True if GPG S1 and no context journal selected
+  onOpenContextJournalFilterModal?: () => void; // Callback to open the journal selector modal
+  gpgContextJournalInfo?: GPGContextJournalInfo | null; // Info about the selected GPG context journal
+
+  placeholderMessage?: string; // New prop
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -56,35 +72,49 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   onToggleAccordion,
   isLoading,
   isError,
-  error,
-  onOpenModal,
+  // error, // error prop not explicitly used in JSX, but good to have for debugging
+  // onOpenModal, // This is handled by page.tsx controls, not directly by slider content typically
   isLocked,
-  // Destructure the optional props
   isDocumentCreationMode,
-  selectedGoodsForDoc,
+  selectedGoodsForDoc = [], // Default to empty array
   onToggleGoodForDoc,
   onUpdateGoodDetailForDoc,
+  // +++ Destructure GPG props +++
+  showContextJournalFilterButton,
+  onOpenContextJournalFilterModal,
+  gpgContextJournalInfo,
+  placeholderMessage, // Default placeholder message
 }) => {
+  // +++ DEBUG LOG +++
+  if (sliderId === SLIDER_TYPES.GOODS) {
+    // Or just log for all DynamicSliders initially
+    console.log(
+      `DynamicSlider (${title} - ${sliderId}) PROPS:`,
+      "showContextJournalFilterButton:",
+      showContextJournalFilterButton,
+      "onOpenContextJournalFilterModal exists:",
+      !!onOpenContextJournalFilterModal,
+      "gpgContextJournalInfo:",
+      gpgContextJournalInfo
+    );
+  }
+  // +++ END DEBUG LOG +++
+
   const initialSlideIndex = Math.max(
     0,
     data.findIndex((item) => item?.id === activeItemId)
   );
 
-  const handleSwiperChange = (swiper) => {
+  const handleSwiperChange = (swiper: any) => {
+    // Added type for swiper
     if (isLocked) return;
-
     const currentRealIndex = swiper.activeIndex;
     if (data && data.length > currentRealIndex && data[currentRealIndex]) {
       onSlideChange(data[currentRealIndex].id);
-    } else {
-      console.warn(
-        `DynamicSlider (${sliderId}): Swipe Change - Invalid index (${currentRealIndex}) or data. Len: ${data?.length}`
-      );
     }
   };
 
-  // currentItemForAccordion should be derived from non-loading, non-error data
-  let currentItemForAccordion;
+  let currentItemForAccordion: DynamicSliderItem | undefined;
   if (!isLoading && !isError && data.length > 0) {
     currentItemForAccordion = data.find((item) => item?.id === activeItemId);
     if (
@@ -96,14 +126,15 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
     }
   }
 
-  const swiperKey = `${sliderId}-len${data.length}-active${activeItemId}-locked${isLocked}-load${isLoading}-err${isError}`;
+  const swiperKey = `${sliderId}-len${data.length}-active${activeItemId}-locked${isLocked}-load${isLoading}-err${isError}-gpgCtx${gpgContextJournalInfo?.id}`;
 
   const currentGoodInDocument =
     isDocumentCreationMode &&
     sliderId === SLIDER_TYPES.GOODS &&
     activeItemId &&
     !isLoading &&
-    !isError
+    !isError &&
+    selectedGoodsForDoc // Ensure selectedGoodsForDoc is defined
       ? selectedGoodsForDoc.find((g) => g.id === activeItemId)
       : null;
 
@@ -111,16 +142,46 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
     <>
       <h2 className={styles.sliderTitle}>{title}</h2>
 
+      {showContextJournalFilterButton && onOpenContextJournalFilterModal && (
+        <button
+          onClick={onOpenContextJournalFilterModal}
+          className={styles.gpgFilterButton} // Uses the class
+          title="Filter goods by a specific journal context for G-P-G view"
+        >
+          <IoFilterCircleOutline /> Filter by Journal for G-P{" "}
+          {/* Updated text slightly */}
+        </button>
+      )}
+      {gpgContextJournalInfo && (
+        <div className={styles.gpgContextDisplay}>
+          {" "}
+          {/* Uses the class */}
+          <span>
+            Filtered by:{" "}
+            <strong>
+              {gpgContextJournalInfo.name ||
+                `Journal ID: ${gpgContextJournalInfo.id}`}
+            </strong>
+          </span>
+          <button
+            onClick={gpgContextJournalInfo.onClear}
+            title="Clear G-P journal filter"
+            className={styles.gpgClearButton} // Uses the class
+          >
+            <IoCloseCircleOutline /> Clear
+          </button>
+        </div>
+      )}
+
       {isLoading && (
         <div className={styles.loadingState}>Loading {title}...</div>
       )}
       {isError && (
         <div className={styles.errorState}>Error loading {title}.</div>
       )}
-
       {!isLoading && !isError && data.length === 0 && (
         <div className={styles.noData}>
-          No {title.toLowerCase()} match criteria.
+          {placeholderMessage || `No ${title.toLowerCase()} match criteria.`}
         </div>
       )}
 
@@ -146,7 +207,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
         >
           {data.map((item) => {
             if (!item) return null;
-            // const IconComponent = sliderId === SLIDER_TYPES.JOURNAL && JOURNAL_ICONS[item.id] ? JOURNAL_ICONS[item.id] : null; // JOURNAL_ICONS might not be relevant for all dynamic sliders
             const isSelectedForDocument =
               isDocumentCreationMode &&
               sliderId === SLIDER_TYPES.GOODS &&
@@ -160,12 +220,9 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                 }`}
               >
                 <div className={styles.slideTextContent}>
-                  {" "}
-                  {/* Removed IconComponent logic for generic slider */}
                   <span className={styles.slideName}>
                     {item.name || item.id || "Unnamed Item"}
                   </span>
-                  {/* Display 'code' or 'unit_code' if they exist on item and are relevant for this slider type */}
                   {(item.code || item.unit_code) && (
                     <span className={styles.slideSubText}>
                       {item.code || item.unit_code}
@@ -183,7 +240,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
         </Swiper>
       )}
 
-      {/* Accordion: Only show if not loading, not error, and item exists */}
       {!isLoading &&
         !isError &&
         currentItemForAccordion &&
@@ -222,7 +278,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                   className={styles.detailsContentWrapper}
                 >
                   <div className={styles.detailsContent}>
-                    {/* Common item details */}
                     {currentItemForAccordion.name && (
                       <p>
                         <strong>Name:</strong> {currentItemForAccordion.name}
@@ -233,52 +288,42 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                         <strong>ID:</strong> {currentItemForAccordion.id}
                       </p>
                     )}
-                    {currentItemForAccordion.notes && (
-                      <p>
-                        <strong>Notes:</strong> {currentItemForAccordion.notes}
-                      </p>
-                    )}
-                    {/* Partner specific details */}
-                    {sliderId === SLIDER_TYPES.PARTNER && (
-                      <>
-                        {currentItemForAccordion.partnerType && (
-                          <p>
-                            <strong>Type:</strong>{" "}
-                            {currentItemForAccordion.partnerType}
+                    {/* Displaying other known common fields dynamically for flexibility */}
+                    {Object.entries(currentItemForAccordion).map(
+                      ([key, value]) => {
+                        if (
+                          [
+                            "id",
+                            "name",
+                            "children",
+                            "code",
+                            "unit_code",
+                          ].includes(key) ||
+                          value === null ||
+                          typeof value === "object"
+                        )
+                          return null;
+                        return (
+                          <p key={key}>
+                            <strong>
+                              {key.charAt(0).toUpperCase() +
+                                key.slice(1).replace(/([A-Z])/g, " $1")}
+                              :
+                            </strong>{" "}
+                            {String(value)}
                           </p>
-                        )}
-                        {currentItemForAccordion.taxId && (
-                          <p>
-                            <strong>Tax ID:</strong>{" "}
-                            {currentItemForAccordion.taxId}
-                          </p>
-                        )}
-                        {currentItemForAccordion.registrationNumber && (
-                          <p>
-                            <strong>Reg No:</strong>{" "}
-                            {currentItemForAccordion.registrationNumber}
-                          </p>
-                        )}
-                      </>
-                    )}
-                    {/* Goods specific details */}
-                    {currentItemForAccordion.description && (
-                      <p>
-                        {" "}
-                        <strong>Description:</strong>{" "}
-                        {currentItemForAccordion.description}{" "}
-                      </p>
+                        );
+                      }
                     )}
 
-                    {/* Document creation specific UI for Goods slider */}
                     {isDocumentCreationMode &&
-                      sliderId === SLIDER_TYPES.GOODS && (
+                      sliderId === SLIDER_TYPES.GOODS &&
+                      onToggleGoodForDoc &&
+                      onUpdateGoodDetailForDoc && (
                         <div className={styles.documentGoodDetails}>
-                          {/* ... (form for quantity, price as before) ... */}
                           <h4>
-                            {" "}
                             Document Specifics for{" "}
-                            {currentItemForAccordion.name}:{" "}
+                            {currentItemForAccordion.name}:
                           </h4>
                           <button
                             onClick={() =>
@@ -305,8 +350,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                 <label
                                   htmlFor={`qty-${currentItemForAccordion.id}`}
                                 >
-                                  {" "}
-                                  Quantity:{" "}
+                                  Quantity:
                                 </label>
                                 <input
                                   type="number"
@@ -329,8 +373,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                 <label
                                   htmlFor={`price-${currentItemForAccordion.id}`}
                                 >
-                                  {" "}
-                                  Price per unit:{" "}
+                                  Price per unit:
                                 </label>
                                 <input
                                   type="number"
@@ -351,8 +394,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                 <label
                                   htmlFor={`amount-${currentItemForAccordion.id}`}
                                 >
-                                  {" "}
-                                  Total Amount:{" "}
+                                  Total Amount:
                                 </label>
                                 <input
                                   type="number"

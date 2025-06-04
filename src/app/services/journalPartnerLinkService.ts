@@ -261,6 +261,36 @@ const journalPartnerLinkService = {
       orderBy: { partner: { name: "asc" } },
     });
   },
+
+  // RECIPE 10: Find a specific link by Journal ID and Partner ID
+  async findByJournalAndPartner(
+    journalId: string,
+    partnerId: bigint
+  ): Promise<JournalPartnerLink | null> {
+    // Assuming your Journal ID in JournalPartnerLink is also a string that might need conversion
+    // or that journalId on JournalPartnerLink is also BigInt if it's a direct FK to a BigInt Journal ID.
+    // For consistency, let's assume Journal.id is string and JournalPartnerLink.journalId is string.
+    console.log(
+      `JPL Service: Finding link for Journal ${journalId} and Partner ${partnerId}`
+    );
+    return prisma.journalPartnerLink.findUnique({
+      where: {
+        // This assumes you have a unique constraint on (journalId, partnerId)
+        // If your schema names it differently, adjust:
+        // journalId_partnerId: { journalId: journalId, partnerId: partnerId }
+        // OR if journalId on JPL is also BigInt:
+        // journalId_partnerId: { journalId: BigInt(journalId), partnerId: partnerId }
+
+        // Let's assume journalId on JournalPartnerLink is string (matching Journal.id)
+        // and you have a composite unique index: @@unique([journalId, partnerId])
+        journalId_partnerId: {
+          // This is the conventional name for the constraint
+          journalId: journalId,
+          partnerId: partnerId,
+        },
+      },
+    });
+  },
 };
 
 export default journalPartnerLinkService;

@@ -116,3 +116,19 @@ export async function fetchJpgLinksForJournalPartnerLink(
   const responseText = await response.text();
   return JSONbigParse(responseText) as JournalPartnerGoodLinkClient[];
 }
+
+export const fetchJpgLinksForJpl = async (
+  jplId: string
+): Promise<JournalPartnerGoodLinkClient[]> => {
+  const response = await fetch(
+    `/api/journal-partner-good-links?journalPartnerLinkId=${encodeURIComponent(
+      jplId
+    )}`
+  );
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch JPGLs for JPL ${jplId}: ${response.statusText}`
+    );
+  }
+  return response.json();
+};

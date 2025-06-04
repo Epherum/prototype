@@ -75,15 +75,14 @@ UseJournalPartnerGoodLinkingProps) => {
   >({
     mutationFn: createJournalPartnerGoodLink,
     onSuccess: (newLink) => {
-      queryClient.invalidateQueries({ queryKey: ["goods"] }); // Broad for now
-      // Potentially a specific query for JPGLs if you display them directly
+      queryClient.invalidateQueries({ queryKey: ["goods"] }); // Broad for now (e.g., for main goods list if it changes)
+
       if (newLink.journalPartnerLinkId) {
-        // This structure might vary
         queryClient.invalidateQueries({
           queryKey: ["jpgLinks", newLink.journalPartnerLinkId],
         });
       }
-      // alert(`3-way link created successfully!`);
+      // alert(`3-way link created successfully!`); // Alert moved to createSimpleJPGLHandler
     },
     onError: (error: Error) => {
       console.error("Failed to create 3-way link:", error);

@@ -74,3 +74,19 @@ export async function fetchJournalLinksForPartner(
   // No complex client-side mapping should be needed if the backend does its job.
   return links;
 }
+
+export const fetchJplByContext = async (
+  journalId: string,
+  partnerId: string
+): Promise<JournalPartnerLinkClient | null> => {
+  const response = await fetch(
+    `/api/journal-partner-links/findByContext?journalId=${encodeURIComponent(
+      journalId
+    )}&partnerId=${encodeURIComponent(partnerId)}`
+  );
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`Failed to fetch JPL by context: ${response.statusText}`);
+  }
+  return response.json();
+};
