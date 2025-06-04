@@ -75,7 +75,15 @@ const PartnerOptionsMenu: React.FC<PartnerOptionsMenuProps> = ({
     <AnimatePresence>
       {isOpen && anchorEl && (
         <>
-          <motion.div /* Overlay */ />
+          <motion.div
+            key="goods-options-overlay"
+            className={styles.optionsOverlay}
+            onClick={onClose}
+            variants={overlayVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          />
           <motion.div
             key="options-menu"
             className={styles.optionsMenu}

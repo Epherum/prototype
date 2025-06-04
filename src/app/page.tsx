@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 // Third-party Libraries
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   IoOptionsOutline,
   IoAddCircleOutline,
@@ -33,8 +33,6 @@ import type {
   AccountNodeData,
   CreateJournalPartnerGoodLinkClientData,
   Journal,
-  Partner, // For GPG Link creation callback type hint
-  Good, // For GPG Link creation callback type hint
 } from "@/lib/types";
 
 // Components
@@ -1512,38 +1510,53 @@ export default function Home() {
             isOpen={
               journalManager.isJournalNavModalOpen ||
               isJournalModalOpenForLinking
-            } // NEW
+            }
             onClose={() => {
-              if (journalManager.isJournalNavModalOpen)
-                journalManager.closeJournalNavModal(); // NEW
+              if (journalManager.isJournalNavModalOpen) {
+                journalManager.closeJournalNavModal();
+              }
+              // VITAL FIX: If it was open for linking, set that state to false
               if (isJournalModalOpenForLinking) {
-                /* ... (linking logic unchanged) ... */
+                setIsJournalModalOpenForLinking(false);
+                setOnJournalSelectForLinkingCallback(null); // Also clear the callback
               }
             }}
-            modalTitle="Select Context Journal for G-P View"
+            modalTitle={
+              // Adjust title based on which mode it's in
+              isJournalModalOpenForLinking
+                ? "Select Journal(s) to Link"
+                : "Manage & Select Journals" // Or journalManager's preferred title
+            }
             onConfirmSelection={(selId, childSel) => {
-              // For navigation mode
+              // Only for navigation mode
               if (
-                !isJournalModalOpenForLinking &&
-                journalManager.handleSelectTopLevelJournal
+                journalManager.isJournalNavModalOpen &&
+                !isJournalModalOpenForLinking
               ) {
+                // Ensure it's truly nav mode
                 journalManager.handleSelectTopLevelJournal(
                   selId,
                   journalManager.currentHierarchy,
                   childSel
-                ); // NEW
+                );
+                // Navigation confirm typically closes the modal via its own mechanism or the button also calls onClose
+                // If JournalModal's confirm button doesn't call onClose, you might need to add:
+                // journalManager.closeJournalNavModal();
               }
             }}
             onSetShowRoot={() => {
-              // For navigation mode
+              // Only for navigation mode
               if (
-                !isJournalModalOpenForLinking &&
-                journalManager.handleSelectTopLevelJournal
+                journalManager.isJournalNavModalOpen &&
+                !isJournalModalOpenForLinking
               ) {
+                // Ensure it's truly nav mode
                 journalManager.handleSelectTopLevelJournal(
                   ROOT_JOURNAL_ID,
                   journalManager.currentHierarchy
-                ); // NEW
+                );
+                // Navigation confirm typically closes the modal
+                // journalManager.closeJournalNavModal();
               }
             }}
             onSelectForLinking={
@@ -1552,33 +1565,32 @@ export default function Home() {
                 : undefined
             }
             hierarchy={
-              journalManager.isHierarchyLoading // NEW
+              journalManager.isHierarchyLoading
                 ? []
                 : [
                     {
                       id: ROOT_JOURNAL_ID_FOR_MODAL,
                       name: `Chart of Accounts`,
                       code: "ROOT",
-                      children: journalManager.currentHierarchy, // NEW (or journalManager.hierarchyData for raw full tree)
+                      children: journalManager.currentHierarchy,
                       isConceptualRoot: true,
                     },
                   ]
             }
-            isLoading={journalManager.isHierarchyLoading} // NEW
+            isLoading={journalManager.isHierarchyLoading}
             onTriggerAddChild={(parentId, parentCode) => {
               const parentNode =
                 parentId === ROOT_JOURNAL_ID_FOR_MODAL
                   ? null
                   : findNodeById(journalManager.currentHierarchy, parentId);
               journalManager.openAddJournalModal({
-                // NEW
                 level: parentNode ? "child" : "top",
                 parentId: parentNode ? parentId : null,
                 parentCode: parentCode,
                 parentName: parentNode?.name || "",
               });
             }}
-            onDeleteAccount={handleDeleteJournalAccount} // Uses journalManager.deleteJournal
+            onDeleteAccount={handleDeleteJournalAccount}
           />
         )}
       </AnimatePresence>
