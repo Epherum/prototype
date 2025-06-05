@@ -9,16 +9,11 @@ import {
   updateGood,
   deleteGood,
 } from "@/services/clientGoodService";
-// GPG S3 related imports are no longer needed here
-// import { fetchJplByContext } from "@/services/clientJournalPartnerLinkService";
-// import { fetchJpgLinksForJpl } from "@/services/clientJournalPartnerGoodLinkService";
 import type {
   Good,
   CreateGoodClientData,
   UpdateGoodClientData,
   FetchGoodsParams,
-  // JournalPartnerLinkClient, // No longer needed
-  // JournalPartnerGoodLinkClient, // No longer needed
 } from "@/lib/types";
 import { getFirstId } from "@/lib/helpers";
 import { SLIDER_TYPES } from "@/lib/constants";
@@ -27,17 +22,14 @@ export interface UseGoodManagerProps {
   sliderOrder: string[];
   visibility: { [key: string]: boolean };
   effectiveSelectedJournalIds: string[];
-  selectedPartnerId: string | null;
+  selectedPartnerId: string | null; // This is crossFilterSelectedPartnerId from page.tsx
   selectedJournalIdForPjgFiltering: string | null;
   journalRootFilterStatus: "affected" | "unaffected" | "all" | null;
   isJournalHierarchyLoading: boolean;
-  isPartnerQueryLoading: boolean;
+  isPartnerQueryLoading: boolean; // This is isPartnerDataLoading from page.tsx
   isFlatJournalsQueryLoading: boolean;
-
-  // Renamed and simplified GPG/GP context props
-  isGPContextActive?: boolean; // True if slider order is G-P-...
-  gpgContextJournalId?: string | null; // Journal ID for filtering in GP context
-  // gpgSelectedPartnerIdForSlider3 is removed as S3 display is out
+  isGPContextActive?: boolean;
+  gpgContextJournalId?: string | null;
 }
 
 export const useGoodManager = (props: UseGoodManagerProps) => {
@@ -45,121 +37,136 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     sliderOrder,
     visibility,
     effectiveSelectedJournalIds,
-    selectedPartnerId,
-    selectedJournalIdForPjgFiltering,
+    selectedPartnerId, // Used for J-P-G (S3)
+    selectedJournalIdForPjgFiltering, // Used for P-J-G (S3)
     journalRootFilterStatus,
-    isJournalHierarchyLoading,
-    isPartnerQueryLoading,
-    isFlatJournalsQueryLoading,
-    isGPContextActive, // Use this new prop
+    isJournalHierarchyLoading, // S1 Journal loading state
+    isPartnerQueryLoading, // S2 Partner loading state (for J-P-G)
+    isFlatJournalsQueryLoading, // S2 Journal loading state (for P-J-G)
+    isGPContextActive,
     gpgContextJournalId,
   } = props;
 
   const queryClient = useQueryClient();
 
   const [selectedGoodsId, setSelectedGoodsId] = useState<string | null>(null);
+  // ... (other state variables remain the same)
   const [isGoodsOptionsMenuOpen, setIsGoodsOptionsMenuOpen] = useState(false);
   const [goodsOptionsMenuAnchorEl, setGoodsOptionsMenuAnchorEl] =
     useState<HTMLElement | null>(null);
   const [isAddEditGoodModalOpen, setIsAddEditGoodModalOpen] = useState(false);
   const [editingGoodData, setEditingGoodData] = useState<Good | null>(null);
 
-  // Determine if this Goods slider is the first in a GP context
-  // This hook instance is always for "the" Goods slider that page.tsx decides to render.
-  // We only care if that slider should be context-filtered.
-  const shouldFilterByGpgContextJournal = useMemo(
-    () => isGPContextActive && !!gpgContextJournalId,
-    [isGPContextActive, gpgContextJournalId]
-  );
-
-  // The goodsSliderIndex is still relevant for non-GP context filtering
   const goodsSliderIndex = useMemo(
     () => sliderOrder.indexOf(SLIDER_TYPES.GOODS),
     [sliderOrder]
   );
 
-  // --- Main Goods Query (for GP context Slider 1 or non-GP scenarios) ---
   const mainGoodsQueryKeyParams = useMemo((): FetchGoodsParams => {
     let params: FetchGoodsParams = { limit: 1000, offset: 0 };
+    const currentOrderString = sliderOrder.join("-");
+
+    console.log(
+      `[useGoodManager] Recalculating mainGoodsQueryKeyParams. Order: ${currentOrderString}, Journal IDs: ${effectiveSelectedJournalIds.join(
+        ","
+      )}, Partner ID: ${selectedPartnerId}, PJG Journal ID: ${selectedJournalIdForPjgFiltering}`
+    );
 
     if (isGPContextActive && goodsSliderIndex === 0) {
-      // Check if this instance is the first slider
       if (gpgContextJournalId) {
-        // Filter if context journal is selected
         params.linkedToJournalIds = [gpgContextJournalId];
         params.includeJournalChildren = false;
       }
-      // If isGPContextActive but no gpgContextJournalId, it means show all goods (default params)
-      // This is because the "Filter by Journal" button would be active.
     } else if (goodsSliderIndex === 0) {
-      // Goods is 1st, but NOT GP context (e.g., G-J-P or just G)
+      // Goods is 1st, not GP context (e.g., G-J-P or just G)
       // Default params (all goods)
     } else if (
-      sliderOrder
-        .join("-")
-        .startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
+      currentOrderString.startsWith(
+        SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS
+      ) // J-G (Goods S2)
     ) {
-      // J-G
       params.filterStatus = journalRootFilterStatus;
       params.contextJournalIds = [...effectiveSelectedJournalIds];
     } else if (
-      sliderOrder
-        .join("-")
-        .startsWith(
-          SLIDER_TYPES.JOURNAL +
-            "-" +
-            SLIDER_TYPES.PARTNER +
-            "-" +
-            SLIDER_TYPES.GOODS
-        )
+      currentOrderString.startsWith(
+        SLIDER_TYPES.JOURNAL +
+          "-" +
+          SLIDER_TYPES.PARTNER +
+          "-" +
+          SLIDER_TYPES.GOODS // J-P-G (Goods S3)
+      )
     ) {
-      // J-P-G
-      if (selectedPartnerId) {
+      if (selectedPartnerId && effectiveSelectedJournalIds.length > 0) {
         params.forPartnerId = selectedPartnerId;
-        if (effectiveSelectedJournalIds.length > 0) {
-          params.forJournalIds = [...effectiveSelectedJournalIds];
-          params.includeJournalChildren = true;
-        }
+        params.forJournalIds = [...effectiveSelectedJournalIds];
+        params.includeJournalChildren = true; // Journal is primary, so include children context
+        console.log(
+          `[useGoodManager] J-P-G params: forPartnerId=${selectedPartnerId}, forJournalIds=${effectiveSelectedJournalIds.join(
+            ","
+          )}`
+        );
       } else {
-        params.forPartnerId = "__IMPOSSIBLE__";
+        // Critical context missing for J-P-G
+        params.forPartnerId = "__IMPOSSIBLE_JPGL_CONTEXT__";
+        console.log(
+          `[useGoodManager] J-P-G context missing. Params set to impossible.`
+        );
       }
     } else if (
-      sliderOrder
-        .join("-")
-        .startsWith(
-          SLIDER_TYPES.PARTNER +
-            "-" +
-            SLIDER_TYPES.JOURNAL +
-            "-" +
-            SLIDER_TYPES.GOODS
-        )
+      currentOrderString.startsWith(
+        SLIDER_TYPES.PARTNER +
+          "-" +
+          SLIDER_TYPES.JOURNAL +
+          "-" +
+          SLIDER_TYPES.GOODS // P-J-G (Goods S3)
+      )
     ) {
-      // P-J-G
       if (selectedPartnerId && selectedJournalIdForPjgFiltering) {
         params.forPartnerId = selectedPartnerId;
         params.forJournalIds = [selectedJournalIdForPjgFiltering];
-        params.includeJournalChildren = false;
+        params.includeJournalChildren = false; // Journal is secondary, flat list
+        console.log(
+          `[useGoodManager] P-J-G params: forPartnerId=${selectedPartnerId}, forJournalIds=${selectedJournalIdForPjgFiltering}`
+        );
       } else {
-        params.forPartnerId = "__IMPOSSIBLE__";
+        // Critical context missing for P-J-G
+        params.forPartnerId = "__IMPOSSIBLE_PJGL_CONTEXT__";
+        console.log(
+          `[useGoodManager] P-J-G context missing. Params set to impossible.`
+        );
       }
     }
     return params;
   }, [
     sliderOrder,
-    goodsSliderIndex, // Still needed for general positioning
-    isGPContextActive, // Use new prop
+    goodsSliderIndex,
+    isGPContextActive,
     gpgContextJournalId,
     journalRootFilterStatus,
     effectiveSelectedJournalIds,
-    selectedPartnerId,
-    selectedJournalIdForPjgFiltering,
+    selectedPartnerId, // Key for J-P-G
+    selectedJournalIdForPjgFiltering, // Key for P-J-G
   ]);
 
   const mainGoodsQuery = useQuery<Good[], Error>({
     queryKey: ["mainGoods", mainGoodsQueryKeyParams],
     queryFn: async () => {
-      if (mainGoodsQueryKeyParams.forPartnerId === "__IMPOSSIBLE__") return [];
+      console.log(
+        `[useGoodManager mainGoodsQuery.queryFn] Attempting to fetch with params:`,
+        JSON.stringify(mainGoodsQueryKeyParams)
+      );
+      if (mainGoodsQueryKeyParams.forPartnerId?.startsWith("__IMPOSSIBLE")) {
+        console.log(
+          `[useGoodManager mainGoodsQuery.queryFn] Impossible condition detected with forPartnerId: ${mainGoodsQueryKeyParams.forPartnerId}. Returning [].`
+        );
+        return [];
+      }
+      // Add other __IMPOSSIBLE__ checks if you introduce more specific markers
+
       const result = await fetchGoods(mainGoodsQueryKeyParams);
+      console.log(
+        `[useGoodManager mainGoodsQuery.queryFn] Fetched ${result.data.length} goods.`
+      );
       return result.data.map((g: any) => ({
         ...g,
         id: String(g.id),
@@ -168,21 +175,26 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       }));
     },
     enabled: (() => {
-      // Visibility check is fundamental
-      if (!visibility[SLIDER_TYPES.GOODS]) return false;
+      if (!visibility[SLIDER_TYPES.GOODS]) {
+        // console.log("[useGoodManager enabled] Goods slider not visible. Query disabled.");
+        return false;
+      }
 
-      // If it's the first slider (index 0), it's always enabled.
-      // The filtering (GP context or not) is handled by mainGoodsQueryKeyParams.
-      if (goodsSliderIndex === 0) return true;
-
-      // Logic for when Goods slider is not first
       const orderString = sliderOrder.join("-");
-      if (
+      let enableQuery = false;
+      let reason = "";
+
+      if (goodsSliderIndex === 0) {
+        // G, G-P, G-J
+        enableQuery = true;
+        reason = "Goods is S1";
+      } else if (
         orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS)
       ) {
-        return !isJournalHierarchyLoading;
-      }
-      if (
+        // J-G (Goods S2)
+        enableQuery = !isJournalHierarchyLoading;
+        reason = `J-G: S1 Journal Loading: ${isJournalHierarchyLoading}`;
+      } else if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL +
             "-" +
@@ -191,13 +203,16 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
             SLIDER_TYPES.GOODS
         )
       ) {
-        return (
-          !!selectedPartnerId &&
-          !isJournalHierarchyLoading &&
-          !isPartnerQueryLoading
-        );
-      }
-      if (
+        // J-P-G (Goods S3)
+        enableQuery =
+          !!selectedPartnerId && // S2 Partner is selected
+          effectiveSelectedJournalIds.length > 0 && // S1 Journal is selected
+          !isJournalHierarchyLoading && // S1 Journal is not loading
+          !isPartnerQueryLoading; // S2 Partner is not loading
+        reason = `J-P-G: S2 Partner Selected: ${!!selectedPartnerId}, S1 Journal Selected: ${
+          effectiveSelectedJournalIds.length > 0
+        }, S1 Loading: ${isJournalHierarchyLoading}, S2 Loading: ${isPartnerQueryLoading}`;
+      } else if (
         orderString.startsWith(
           SLIDER_TYPES.PARTNER +
             "-" +
@@ -206,17 +221,25 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
             SLIDER_TYPES.GOODS
         )
       ) {
-        return (
-          !!selectedPartnerId &&
-          !!selectedJournalIdForPjgFiltering &&
-          !isFlatJournalsQueryLoading
-        );
+        // P-J-G (Goods S3)
+        enableQuery =
+          !!selectedPartnerId && // S1 Partner is selected
+          !!selectedJournalIdForPjgFiltering && // S2 Journal is selected
+          !isPartnerQueryLoading && // S1 Partner is not loading (assuming isPartnerQueryLoading covers S1 partner if P is first)
+          !isFlatJournalsQueryLoading; // S2 Journal is not loading
+        reason = `P-J-G: S1 Partner Selected: ${!!selectedPartnerId}, S2 Journal Selected: ${!!selectedJournalIdForPjgFiltering}, S1 Loading: ${isPartnerQueryLoading}, S2 Loading: ${isFlatJournalsQueryLoading}`;
+      } else {
+        reason = "Order not matched for enabling goods query";
       }
-      return false; // Default to false if no enabling condition met
+
+      // console.log(`[useGoodManager enabled] Evaluation for order "${orderString}": ${enableQuery}. Reason: ${reason}`);
+      return enableQuery;
     })(),
   });
 
-  // --- Determine final goods data and loading/error states (now only from mainGoodsQuery) ---
+  // ... (rest of the hook: useMemo for goodsForSlider, isLoadingCurrentGoods, etc., mutations, useEffect, callbacks)
+  // Ensure they use mainGoodsQuery.
+
   const goodsForSlider = useMemo(() => {
     return mainGoodsQuery.data || [];
   }, [mainGoodsQuery.data]);
@@ -241,7 +264,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${newGood.label}' created successfully!`);
-      setSelectedGoodsId(String(newGood.id)); // Select the new good
+      setSelectedGoodsId(String(newGood.id));
     },
     onError: (error: Error) => {
       console.error("Failed to create good/service:", error);
@@ -254,7 +277,6 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       updateGood(variables.id, variables.data),
     onSuccess: (updatedGood) => {
       queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
-      // No longer need to invalidate gpgSlider3RawData
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${updatedGood.label}' updated successfully!`);
@@ -269,7 +291,6 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     mutationFn: deleteGood,
     onSuccess: (response, deletedGoodId) => {
       queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
-      // No longer need to invalidate gpgSlider3RawData
       alert(
         response.message ||
           `Good/Service ${deletedGoodId} deleted successfully!`
@@ -284,9 +305,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     },
   });
 
-  // --- useEffect for selectedGoodsId (simplified) ---
   useEffect(() => {
-    // This effect now always applies to the data from mainGoodsQuery
     const currentData = mainGoodsQuery.data;
     if (mainGoodsQuery.isSuccess && currentData) {
       const currentSelectionInList =
@@ -315,7 +334,6 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     selectedGoodsId,
   ]);
 
-  // --- Callback Handlers (largely unchanged, but sourceData for edit simplifies) ---
   const handleOpenGoodsOptionsMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       setGoodsOptionsMenuAnchorEl(event.currentTarget);
@@ -336,7 +354,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
   }, [handleCloseGoodsOptionsMenu]);
 
   const handleOpenEditGoodModal = useCallback(() => {
-    const sourceData = mainGoodsQuery.data; // Always use mainGoodsQuery data now
+    const sourceData = mainGoodsQuery.data;
     if (selectedGoodsId && sourceData) {
       const goodToEdit = sourceData.find((g) => g.id === selectedGoodsId);
       if (goodToEdit) {
@@ -362,7 +380,6 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       if (goodIdToUpdate && editingGoodData) {
         const payloadForUpdate: UpdateGoodClientData = {
           label: dataFromModal.label,
-          // ... (rest of the fields remain the same)
           taxCodeId: (dataFromModal as any).taxCodeId,
           typeCode: (dataFromModal as any).typeCode,
           description: (dataFromModal as any).description,
@@ -416,17 +433,16 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     goodsOptionsMenuAnchorEl,
     isAddEditGoodModalOpen,
     editingGoodData,
-    goodsForSlider, // Now always from mainGoodsQuery
+    goodsForSlider,
     goodsQueryState: {
-      // Now always reflects mainGoodsQuery
       isLoading: isLoadingCurrentGoods,
       isError: isErrorCurrentGoods,
       error: currentGoodsError,
       data: goodsForSlider,
       refetch: () => {
-        mainGoodsQuery.refetch(); // Always refetch main query
+        mainGoodsQuery.refetch();
       },
-      isFetching: mainGoodsQuery.isFetching, // Always from main query
+      isFetching: mainGoodsQuery.isFetching,
     },
     createGoodMutation,
     updateGoodMutation,

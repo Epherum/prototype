@@ -85,21 +85,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   gpgContextJournalInfo,
   placeholderMessage, // Default placeholder message
 }) => {
-  // +++ DEBUG LOG +++
-  if (sliderId === SLIDER_TYPES.GOODS) {
-    // Or just log for all DynamicSliders initially
-    console.log(
-      `DynamicSlider (${title} - ${sliderId}) PROPS:`,
-      "showContextJournalFilterButton:",
-      showContextJournalFilterButton,
-      "onOpenContextJournalFilterModal exists:",
-      !!onOpenContextJournalFilterModal,
-      "gpgContextJournalInfo:",
-      gpgContextJournalInfo
-    );
-  }
-  // +++ END DEBUG LOG +++
-
   const initialSlideIndex = Math.max(
     0,
     data.findIndex((item) => item?.id === activeItemId)

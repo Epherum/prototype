@@ -1,3 +1,4 @@
+// src/hooks/usePartnerManager.ts
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -21,13 +22,11 @@ export interface UsePartnerManagerProps {
   sliderOrder: string[];
   visibility: { [key: string]: boolean };
   effectiveSelectedJournalIds: string[];
-  selectedGoodsId: string | null;
+  selectedGoodsId: string | null; // This is crossFilterSelectedGoodsId from page.tsx
   selectedJournalIdForGjpFiltering: string | null;
   journalRootFilterStatus: "affected" | "unaffected" | "all" | null;
   isJournalHierarchyLoading: boolean;
-  isFlatJournalsQueryForGoodLoading: boolean;
-
-  // +++ GPG Specific Props +++
+  isFlatJournalsQueryForGoodLoading: boolean; // This is isGoodsDataLoading from page.tsx
   isGPGOrderActive?: boolean;
   gpgContextJournalId?: string | null;
 }
@@ -37,18 +36,17 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     sliderOrder,
     visibility,
     effectiveSelectedJournalIds,
-    selectedGoodsId,
-    selectedJournalIdForGjpFiltering,
+    selectedGoodsId, // Used for J-G-P (S3)
+    selectedJournalIdForGjpFiltering, // Used for G-J-P (S3)
     journalRootFilterStatus,
-    isJournalHierarchyLoading,
-    isFlatJournalsQueryForGoodLoading,
-    // +++ Destructure GPG props +++
+    isJournalHierarchyLoading, // S1 Journal loading state
+    isFlatJournalsQueryForGoodLoading, // S2 Good loading state (for J-G-P) / S2 Journal loading state (for G-J-P)
     isGPGOrderActive,
     gpgContextJournalId,
   } = props;
 
   const queryClient = useQueryClient();
-
+  // ... (other state variables remain the same)
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(
     null
   );
@@ -67,22 +65,23 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     let params: FetchPartnersParams = { limit: 1000, offset: 0 };
     const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
-    // +++ GPG Order Logic (Slider 2: Partners filtered by gpgContextJournalId) +++
+    console.log(
+      `[usePartnerManager] Recalculating partnerQueryKeyParams. Order: ${orderString}, Journal IDs: ${effectiveSelectedJournalIds.join(
+        ","
+      )}, Good ID: ${selectedGoodsId}, GJP Journal ID: ${selectedJournalIdForGjpFiltering}`
+    );
+
     if (isGPGOrderActive && partnerIndex === 1) {
       if (gpgContextJournalId) {
-        params.linkedToJournalIds = [gpgContextJournalId]; // Filter by the GPG context journal
-        params.includeChildren = false; // Typically, direct links for this context
+        params.linkedToJournalIds = [gpgContextJournalId];
+        params.includeChildren = false;
       } else {
-        // If GPG is active but no context journal, Slider 2 (Partners) should be empty
-        // The enabled condition will handle this, but params should reflect an impossible fetch
-        params.linkedToJournalIds = ["__NO_GPG_CONTEXT_JOURNAL__"]; // Ensures no data fetched
+        params.linkedToJournalIds = ["__NO_GPG_CONTEXT_JOURNAL__"];
       }
-    }
-    // --- Existing Logic (adjust if GPG handled it) ---
-    else if (partnerIndex === 0) {
+    } else if (partnerIndex === 0) {
       // Default params when Partner is first
     } else if (
-      orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER)
+      orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER) // J-P (Partner S2)
     ) {
       params.filterStatus = journalRootFilterStatus;
       params.contextJournalIds = [...effectiveSelectedJournalIds];
@@ -92,13 +91,23 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           "-" +
           SLIDER_TYPES.GOODS +
           "-" +
-          SLIDER_TYPES.PARTNER
+          SLIDER_TYPES.PARTNER // J-G-P (Partner S3)
       )
     ) {
       if (effectiveSelectedJournalIds.length > 0 && selectedGoodsId) {
         params.linkedToJournalIds = [...effectiveSelectedJournalIds];
         params.linkedToGoodId = selectedGoodsId;
-        params.includeChildren = true;
+        params.includeChildren = true; // Journal is primary
+        console.log(
+          `[usePartnerManager] J-G-P params: linkedToJournalIds=${effectiveSelectedJournalIds.join(
+            ","
+          )}, linkedToGoodId=${selectedGoodsId}`
+        );
+      } else {
+        console.log(
+          `[usePartnerManager] J-G-P context missing. Params will lead to empty queryFn result.`
+        );
+        // queryFn will handle this by checking if params are incomplete
       }
     } else if (
       orderString.startsWith(
@@ -106,28 +115,34 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           "-" +
           SLIDER_TYPES.JOURNAL +
           "-" +
-          SLIDER_TYPES.PARTNER
+          SLIDER_TYPES.PARTNER // G-J-P (Partner S3)
       )
     ) {
       if (selectedGoodsId && selectedJournalIdForGjpFiltering) {
         params.linkedToJournalIds = [selectedJournalIdForGjpFiltering];
         params.linkedToGoodId = selectedGoodsId;
-        params.includeChildren = false;
+        params.includeChildren = false; // Journal is secondary
+        console.log(
+          `[usePartnerManager] G-J-P params: linkedToJournalIds=${selectedJournalIdForGjpFiltering}, linkedToGoodId=${selectedGoodsId}`
+        );
+      } else {
+        console.log(
+          `[usePartnerManager] G-J-P context missing. Params will lead to empty queryFn result.`
+        );
+        // queryFn will handle this
       }
     }
     return params;
   }, [
     sliderOrder,
     effectiveSelectedJournalIds,
-    selectedGoodsId,
-    selectedJournalIdForGjpFiltering,
+    selectedGoodsId, // Key for J-G-P
+    selectedJournalIdForGjpFiltering, // Key for G-J-P
     journalRootFilterStatus,
-    // +++ Add GPG props to dependency array +++
     isGPGOrderActive,
     gpgContextJournalId,
   ]);
 
-  // Expose the query key for external invalidations
   const partnerQueryKey = useMemo(
     () => ["partners", partnerQueryKeyParamsStructure],
     [partnerQueryKeyParamsStructure]
@@ -136,17 +151,20 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
   const partnerQuery = useQuery<Partner[], Error>({
     queryKey: partnerQueryKey,
     queryFn: async (): Promise<Partner[]> => {
-      const params = partnerQueryKeyParamsStructure;
+      const params = partnerQueryKeyParamsStructure; // Already calculated
       const currentOrderString = sliderOrder.join("-");
-      const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
+      console.log(
+        `[usePartnerManager partnerQuery.queryFn] Attempting to fetch. Order: ${currentOrderString}, Params:`,
+        JSON.stringify(params)
+      );
 
-      // Check for impossible conditions based on params structure
       if (params.linkedToJournalIds?.includes("__NO_GPG_CONTEXT_JOURNAL__")) {
         console.log(
-          "[partnerQuery.queryFn] GPG active, but no context journal. Returning []."
+          "[usePartnerManager partnerQuery.queryFn] GPG active, but no context journal. Returning []."
         );
         return [];
       }
+      // Check for J-G-P incomplete context
       if (
         currentOrderString.startsWith(
           SLIDER_TYPES.JOURNAL +
@@ -160,10 +178,11 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           params.linkedToJournalIds.length === 0)
       ) {
         console.log(
-          "[partnerQuery.queryFn] J-G-P, but missing good or journal. Returning []."
+          "[usePartnerManager partnerQuery.queryFn] J-G-P, but missing good or journal in params. Returning []."
         );
         return [];
       }
+      // Check for G-J-P incomplete context
       if (
         currentOrderString.startsWith(
           SLIDER_TYPES.GOODS +
@@ -177,45 +196,45 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
           params.linkedToJournalIds.length === 0)
       ) {
         console.log(
-          "[partnerQuery.queryFn] G-J-P, but missing good or journal. Returning []."
+          "[usePartnerManager partnerQuery.queryFn] G-J-P, but missing good or journal in params. Returning []."
         );
         return [];
       }
 
-      // GPG Specific condition for queryFn (redundant if params.linkedToJournalIds already has __NO_GPG_CONTEXT_JOURNAL__)
-      // if (isGPGOrderActive && partnerIndex === 1 && !gpgContextJournalId) {
-      //   console.log("[partnerQuery.queryFn] GPG order, Slider 2 (Partners), but no context journal. Returning [].");
-      //   return [];
-      // }
-
-      console.log(
-        `[partnerQuery.queryFn in usePartnerManager] order: ${currentOrderString}, params:`,
-        JSON.stringify(params)
-      );
       const result = await fetchPartners(params);
+      console.log(
+        `[usePartnerManager partnerQuery.queryFn] Fetched ${result.data.length} partners.`
+      );
       return result.data.map((p: any) => ({ ...p, id: String(p.id) }));
     },
     enabled: (() => {
-      if (!visibility[SLIDER_TYPES.PARTNER]) return false;
+      if (!visibility[SLIDER_TYPES.PARTNER]) {
+        // console.log("[usePartnerManager enabled] Partner slider not visible. Query disabled.");
+        return false;
+      }
 
       const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
       const orderString = sliderOrder.join("-");
+      let enableQuery = false;
+      let reason = "";
 
-      // +++ GPG Order Logic (Slider 2: Partners) +++
       if (isGPGOrderActive && partnerIndex === 1) {
-        return !!gpgContextJournalId; // Enable only if GPG context journal is selected
-      }
-
-      // --- Existing Logic ---
-      if (partnerIndex === 0) return true;
-      if (
+        // G-P context (Partner S2)
+        enableQuery = !!gpgContextJournalId;
+        reason = `G-P (S2): GPG Context Journal Selected: ${!!gpgContextJournalId}`;
+      } else if (partnerIndex === 0) {
+        // P, P-J, P-G
+        enableQuery = true;
+        reason = "Partner is S1";
+      } else if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER
         )
       ) {
-        return !isJournalHierarchyLoading;
-      }
-      if (
+        // J-P (Partner S2)
+        enableQuery = !isJournalHierarchyLoading;
+        reason = `J-P (S2): S1 Journal Loading: ${isJournalHierarchyLoading}`;
+      } else if (
         orderString.startsWith(
           SLIDER_TYPES.JOURNAL +
             "-" +
@@ -224,13 +243,16 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
             SLIDER_TYPES.PARTNER
         )
       ) {
-        return (
-          effectiveSelectedJournalIds.length > 0 &&
-          !!selectedGoodsId &&
-          !isJournalHierarchyLoading // Also ensure good query isn't loading if it's a pre-filter
-        );
-      }
-      if (
+        // J-G-P (Partner S3)
+        enableQuery =
+          effectiveSelectedJournalIds.length > 0 && // S1 Journal selected
+          !!selectedGoodsId && // S2 Good selected
+          !isJournalHierarchyLoading && // S1 not loading
+          !isFlatJournalsQueryForGoodLoading; // S2 Good is not loading (prop holds good's loading state)
+        reason = `J-G-P (S3): S1 Journal Sel: ${
+          effectiveSelectedJournalIds.length > 0
+        }, S2 Good Sel: ${!!selectedGoodsId}, S1 Load: ${isJournalHierarchyLoading}, S2 Load: ${isFlatJournalsQueryForGoodLoading}`;
+      } else if (
         orderString.startsWith(
           SLIDER_TYPES.GOODS +
             "-" +
@@ -239,15 +261,28 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
             SLIDER_TYPES.PARTNER
         )
       ) {
-        return (
-          !!selectedGoodsId &&
-          !!selectedJournalIdForGjpFiltering &&
-          !isFlatJournalsQueryForGoodLoading
-        );
+        // G-J-P (Partner S3)
+        enableQuery =
+          !!selectedGoodsId && // S1 Good selected
+          !!selectedJournalIdForGjpFiltering && // S2 Journal selected
+          !isFlatJournalsQueryForGoodLoading && // S1 Good not loading (isFlatJournalsQueryForGoodLoading holds S1 good loading if G is first)
+          // AND S2 Journal not loading. This prop name is overloaded.
+          // For G-J-P, isFlatJournalsQueryForGoodLoading is isGoodsDataLoading.
+          // We also need S2 Journal loading state (isFlatJournalsQueryLoading in page.tsx for this specific case?)
+          // The `isFlatJournalsQueryForGoodLoading` passed to usePartnerManager is indeed `isGoodsDataLoading`.
+          // For S2 Journal loading in G-J-P, that's `flatJournalsQueryForGood.isLoading` in page.tsx, which is passed as `isFlatJournalsQueryForGoodLoading` to THIS hook. This is okay.
+          !props.isFlatJournalsQueryForGoodLoading; // This is correct based on page.tsx prop mapping for isGoodsDataLoading
+        reason = `G-J-P (S3): S1 Good Sel: ${!!selectedGoodsId}, S2 Journal Sel: ${!!selectedJournalIdForGjpFiltering}, S1/S2 Load check via isFlatJournalsQueryForGoodLoading: ${isFlatJournalsQueryForGoodLoading}`;
+      } else {
+        reason = "Order not matched for enabling partner query";
       }
-      return false; // Default to false if no condition met
+
+      // console.log(`[usePartnerManager enabled] Evaluation for order "${orderString}": ${enableQuery}. Reason: ${reason}`);
+      return enableQuery;
     })(),
   });
+  // ... (rest of the hook: useMemo for partnersForSlider, mutations, useEffect, callbacks)
+  // Ensure they use partnerQuery.
 
   const partnersForSlider = useMemo(
     () => partnerQuery.data || [],
@@ -311,18 +346,12 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     }
   );
 
-  // Effect to reset selected partner if GPG context changes or GPG mode activates/deactivates
   useEffect(() => {
     if (isGPGOrderActive) {
-      // If GPG is active, and context journal changes, or if it just became active,
-      // partner selection should be reset. This is implicitly handled by page.tsx
-      // calling setSelectedPartnerId(null) when GPG context journal changes or is cleared.
-      // The data will refetch based on the new context.
-      // If data becomes empty, the other useEffect will set selectedPartnerId to null.
+      // Handled by page.tsx and subsequent data refetch/auto-selection
     }
-  }, [isGPGOrderActive, gpgContextJournalId, partnerQuery.data]); // Watch gpgContextJournalId and data
+  }, [isGPGOrderActive, gpgContextJournalId, partnerQuery.data]);
 
-  // Auto-select first partner or clear selection
   useEffect(() => {
     if (partnerQuery.isSuccess && partnerQuery.data) {
       const fetchedPartners = partnerQuery.data;
@@ -350,7 +379,7 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     partnerQuery.isLoading,
     partnerQuery.isFetching,
     partnerQuery.isError,
-    selectedPartnerId, // Keep as dependency
+    selectedPartnerId,
   ]);
 
   const handleOpenPartnerOptionsMenu = useCallback(
@@ -374,7 +403,6 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
 
   const handleOpenEditPartnerModal = useCallback(() => {
     if (selectedPartnerId && partnerQuery.data) {
-      // Use partnerQuery.data here for source of truth
       const partnerToEdit = partnerQuery.data.find(
         (p) => p.id === selectedPartnerId
       );
@@ -455,8 +483,8 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     isAddEditPartnerModalOpen,
     editingPartnerData,
     partnersForSlider,
-    partnerQuery, // Expose whole query
-    partnerQueryKey, // Expose for invalidation if needed by other hooks
+    partnerQuery,
+    partnerQueryKey,
     createPartnerMutation,
     updatePartnerMutation,
     deletePartnerMutation,
