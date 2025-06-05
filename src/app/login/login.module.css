@@ -1,0 +1,107 @@
+/* src/app/login/login.module.css */
+.loginContainer {
+  display: flex;
+  flex-direction: column; /* To stack title and form */
+  justify-content: center;
+  align-items: center;
+  min-height: 90vh; /* Use more of the viewport */
+  padding: calc(var(--spacing-unit) * 3);
+  background-color: var(--bg-main); /* Use main background */
+}
+
+.appTitle {
+  /* Added for a title above the form */
+  font-size: 2.5em; /* Larger title */
+  font-weight: 300; /* Lighter font weight for modern feel */
+  color: var(--accent-warm); /* Use accent color */
+  margin-bottom: calc(var(--spacing-unit) * 4);
+  text-align: center;
+}
+
+.loginForm {
+  background-color: var(--bg-card); /* Use card background */
+  padding: calc(var(--spacing-unit) * 4) calc(var(--spacing-unit) * 3);
+  border-radius: var(--border-radius-lg); /* Larger border radius */
+  box-shadow: 0 6px 12px var(--shadow-color); /* Use shadow variable */
+  width: 100%;
+  max-width: 420px; /* Slightly wider */
+  border: 1px solid var(--border-subtle); /* Subtle border */
+}
+
+.loginForm h2 {
+  text-align: center;
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  color: var(--text-primary);
+  font-weight: 600; /* Bolder heading for the form itself */
+  font-size: 1.8em;
+}
+
+.inputGroup {
+  margin-bottom: calc(var(--spacing-unit) * 2.5);
+}
+
+.inputGroup label {
+  display: block;
+  margin-bottom: var(--spacing-unit);
+  color: var(--text-secondary);
+  font-weight: 500; /* Slightly bolder label */
+  font-size: 0.9em;
+}
+
+.inputGroup input {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 1.5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  box-sizing: border-box;
+  background-color: var(
+    --bg-main
+  ); /* Slightly different background for input */
+  color: var(--text-primary);
+  font-size: 1em;
+}
+
+.inputGroup input:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-light);
+}
+
+.loginButton {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 1.75);
+  background-color: var(--accent-warm);
+  color: var(--bg-card); /* Text color for button */
+  border: none;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  font-size: 1.1em;
+  font-weight: 600;
+  transition: background-color 0.2s ease-in-out, transform 0.1s ease;
+  margin-top: var(--spacing-unit); /* Add some space above the button */
+}
+
+.loginButton:hover {
+  background-color: #d68f63; /* Darken the accent color on hover */
+}
+
+.loginButton:active {
+  transform: scale(0.98);
+}
+
+.loginButton:disabled {
+  background-color: var(--accent-warm-light); /* Lighter accent when disabled */
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.error {
+  color: #c0392b; /* A stronger red */
+  background-color: #fdecea;
+  border: 1px solid #c0392b;
+  padding: var(--spacing-unit) * 1.5;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-unit) * 2;
+  text-align: center;
+  font-size: 0.9em;
+}

@@ -27,7 +27,7 @@ import {
 } from "@/services/clientJournalService";
 
 // Libs (Helpers, Constants, Types)
-import { findNodeById, getFirstId } from "@/lib/helpers";
+import { findNodeById } from "@/lib/helpers";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
 import type {
   AccountNodeData,
@@ -62,6 +62,8 @@ import { useGoodManager } from "@/hooks/useGoodManager";
 import { usePartnerJournalLinking } from "@/hooks/usePartnerJournalLinking";
 import { useJournalPartnerGoodLinking } from "@/hooks/useJournalPartnerGoodLinking";
 import { useJournalManager } from "@/hooks/useJournalManager";
+
+import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
 
 // --- Main Page Component ---
 export default function Home() {
@@ -1070,6 +1072,7 @@ export default function Home() {
   return (
     <div className={styles.pageContainer}>
       <h1 className={styles.title}>ERP Application Interface</h1>
+      <UserAuthDisplay />
       <StickyHeaderControls
         visibility={visibility}
         onToggleVisibility={toggleVisibility}

@@ -11,40 +11,152 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 3. Define your data models
-
-// ENUM Types
+// --- ENUM Types ---
 enum PartnerType {
   LEGAL_ENTITY
   NATURAL_PERSON
 }
 
-// We'll define other ENUMs (like DocumentStatus, DocumentType) when we add those models.
+// --- Core Auth & Multi-tenancy Models ---
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String   @db.Text
+  // isSystemCompany Boolean @default(false) // Optional: Consider if needed
+
+  users             User[]
+  roles             Role[]
+  journals          Journal[]
+  partners          Partner[]
+  taxCodes          TaxCode[]
+  unitsOfMeasure    UnitOfMeasure[]
+  goodsAndServices  GoodsAndService[]
+
+  journalPartnerLinks     JournalPartnerLink[]     // For robust FKs on linking tables
+  journalGoodLinks        JournalGoodLink[]        // For robust FKs on linking tables
+  journalPartnerGoodLinks JournalPartnerGoodLink[] // For robust FKs on linking tables
+
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("companies")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String
+  isActive      Boolean   @default(true)
+  companyId     String    @map("company_id")
+
+  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userRoles     UserRole[]
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Role {
+  id          String    @id @default(cuid())
+  name        String
+  description String?   @db.Text
+  companyId   String    @map("company_id")
+
+  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  userRoles     UserRole[]
+  permissions   RolePermission[]
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([name, companyId], map: "uq_role_name_company")
+  @@map("roles")
+}
+
+model UserRole {
+  userId                       String  @map("user_id")
+  roleId                       String  @map("role_id")
+  restrictedTopLevelJournalId  String? @map("restricted_top_level_journal_id") // This journalId refers to Journal.id (natural key part)
+  // We need companyId here to fully qualify the restrictedTopLevelJournalId
+  restrictedTopLevelJournalCompanyId String? @map("restricted_top_level_journal_company_id")
+
+  user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role                       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  restrictedTopLevelJournal  Journal?  @relation("UserRoleRestrictedJournal", fields: [restrictedTopLevelJournalId, restrictedTopLevelJournalCompanyId], references: [id, companyId], onDelete: SetNull, onUpdate: Cascade)
+
+  assignedAt                 DateTime  @default(now()) @map("assigned_at")
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  action      String   // e.g., "CREATE", "READ", "UPDATE", "DELETE"
+  resource    String   // e.g., "JOURNAL", "PARTNER", "GOODS"
+  description String?  @db.Text
+
+  rolePermissions RolePermission[]
+
+  // Permissions are global and not company-specific by default.
+  // If you need company-specific permissions, you'd add companyId here.
+  // For now, keeping them global for simplicity.
+  @@unique([action, resource], map: "uq_permission_action_resource")
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id")
+  permissionId String     @map("permission_id")
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  assignedAt   DateTime   @default(now()) @map("assigned_at")
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+
+// --- Core Business Entity Models (Now with Company Scope) ---
 
 model Journal {
-  id                 String    @id @db.VarChar(100) // Natural key like "401"
+  id                 String     @db.VarChar(100) // Natural key part 1
+  companyId          String    @map("company_id")   // Natural key part 2 & FK
   name               String    @db.Text
-  parentId           String?   @map("parent_id") @db.VarChar(100)
+  parentId           String?   @map("parent_id") @db.VarChar(100) // Refers to Journal.id of parent
+  // parentCompanyId is implicitly the same as this journal's companyId for self-hierarchy
   isTerminal         Boolean   @default(false) @map("is_terminal")
   additionalDetails  Json?     @map("additional_details") @db.JsonB
 
-  parent             Journal?  @relation("JournalHierarchy", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // For parent, we need to ensure it's within the same company.
+  // The foreign key fields for parent will be (parentId, companyId).
+  parent             Journal?  @relation("JournalHierarchy", fields: [parentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Cascade, map: "fk_journal_parent")
   children           Journal[] @relation("JournalHierarchy")
 
-  // Relations to linking tables
-  journalPartnerLinks JournalPartnerLink[]
-  journalGoodLinks    JournalGoodLink[]
+  journalPartnerLinks  JournalPartnerLink[]
+  journalGoodLinks     JournalGoodLink[]
+  userRoleRestrictions UserRole[]         @relation("UserRoleRestrictedJournal")
 
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  @@map("journals") // Maps to the 'journals' table in PostgreSQL
+  @@id([id, companyId]) // Composite primary key
+  @@map("journals")
 }
 
 model Partner {
-  id                  BigInt        @id @default(autoincrement()) @db.BigInt
+  id                  BigInt        @id @default(autoincrement()) @db.BigInt // Surrogate PK
+  companyId           String        @map("company_id")
   partnerType         PartnerType   @map("partner_type")
   name                String        @db.Text
+  // ... (other fields as before) ...
   notes               String?       @db.Text
   logoUrl             String?       @map("logo_url") @db.VarChar(255)
   photoUrl            String?       @map("photo_url") @db.VarChar(255)
@@ -55,74 +167,84 @@ model Partner {
   bioMotherName       String?       @map("bio_mother_name") @db.VarChar(100)
   additionalDetails   Json?         @map("additional_details") @db.JsonB
 
-  // Relations to linking tables
+  company             Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   journalPartnerLinks JournalPartnerLink[]
 
   createdAt           DateTime      @default(now()) @map("created_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
+  // Unique constraints might need to be company-scoped if applicable
+  // e.g., @@unique([taxId, companyId], map: "uq_partner_taxid_company") if taxId should be unique per company
   @@map("partners")
 }
 
 model TaxCode {
-  id          Int     @id @default(autoincrement())
-  code        String  @unique @db.VarChar(50)
+  id          Int     @id @default(autoincrement()) // Surrogate PK
+  companyId   String  @map("company_id")
+  code        String  @db.VarChar(50)
   description String? @db.Text
-  rate        Decimal @db.Decimal(5, 4) // e.g., 0.20 for 20%
+  rate        Decimal @db.Decimal(5, 4)
 
-  // Relations
-  goodsAndServices        GoodsAndService[] // A TaxCode can be used by many GoodsAndServices (as their default tax)
-  // Corrected relation: A TaxCode can be used as a contextual tax for many JournalPartnerGoodLink entries
+  company                 Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  goodsAndServices        GoodsAndService[]
   journalPartnerGoodLinks JournalPartnerGoodLink[] @relation("ContextualTaxForJPGLink")
 
+  @@unique([code, companyId], map: "uq_taxcode_code_company")
   @@map("tax_codes")
 }
 
 model UnitOfMeasure {
-  id   Int    @id @default(autoincrement())
-  code String @unique @db.VarChar(20) // e.g., "KG", "PCS", "LTR"
-  name String @db.VarChar(100)
+  id        Int     @id @default(autoincrement()) // Surrogate PK
+  companyId String  @map("company_id")
+  code      String  @db.VarChar(20)
+  name      String  @db.VarChar(100)
 
-  // Relations
+  company          Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   goodsAndServices GoodsAndService[]
 
+  @@unique([code, companyId], map: "uq_uom_code_company")
   @@map("units_of_measure")
 }
 
 model GoodsAndService {
-  id                    BigInt    @id @default(autoincrement()) @db.BigInt
-  referenceCode         String?   @unique @map("reference_code") @db.VarChar(50)
-  barcode               String?   @unique @db.VarChar(50)
-  taxCodeId             Int?      @map("tax_code_id")
+  id                    BigInt    @id @default(autoincrement()) @db.BigInt // Surrogate PK
+  companyId             String    @map("company_id")
+  referenceCode         String?   @map("reference_code") @db.VarChar(50)
+  barcode               String?   @db.VarChar(50)
+  taxCodeId             Int?      @map("tax_code_id") // Refers to TaxCode.id (surrogate)
   typeCode              String?   @map("type_code") @db.VarChar(25)
   label                 String    @db.VarChar(255)
   description           String?   @db.Text
-  unitCodeId            Int?      @map("unit_code_id")
+  unitCodeId            Int?      @map("unit_code_id") // Refers to UnitOfMeasure.id (surrogate)
+  // ... (other fields as before) ...
   stockTrackingMethod   String?   @map("stock_tracking_method") @db.VarChar(50)
   packagingTypeCode     String?   @map("packaging_type_code") @db.VarChar(25)
   photoUrl              String?   @map("photo_url") @db.VarChar(255)
   additionalDetails     Json?     @map("additional_details") @db.JsonB
 
-  // Relations
-  taxCode               TaxCode?        @relation(fields: [taxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  unitOfMeasure         UnitOfMeasure?  @relation(fields: [unitCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  company               Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taxCode               TaxCode?        @relation(fields: [taxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade) // TaxCode must be from the same company (enforced by app logic)
+  unitOfMeasure         UnitOfMeasure?  @relation(fields: [unitCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade) // UoM must be from the same company (enforced by app logic)
 
   journalGoodLinks        JournalGoodLink[]
   journalPartnerGoodLinks JournalPartnerGoodLink[]
 
-
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
 
+  // @@unique([referenceCode, companyId], map: "uq_good_refcode_company") // If ref code unique per company
+  // @@unique([barcode, companyId], map: "uq_good_barcode_company")     // If barcode unique per company
   @@map("goods_and_services")
 }
 
-// --- Linking Tables ---
+
+// --- Linking Tables (Now with explicit Company Scope for integrity) ---
 
 model JournalPartnerLink {
-  id                  BigInt    @id @default(autoincrement()) @db.BigInt
-  journalId           String    @map("journal_id") @db.VarChar(100)
-  partnerId           BigInt    @map("partner_id") @db.BigInt
+  id                  BigInt    @id @default(autoincrement()) @db.BigInt // Surrogate PK
+  companyId           String    @map("company_id")
+  journalId           String    @map("journal_id") @db.VarChar(100) // Refers to Journal.id (natural key part)
+  partnerId           BigInt    @map("partner_id") @db.BigInt       // Refers to Partner.id (surrogate PK)
   partnershipType     String?   @map("partnership_type") @db.VarChar(50)
   exoneration         Boolean?  @default(false)
   periodType          String?   @map("period_type") @db.VarChar(50)
@@ -130,51 +252,55 @@ model JournalPartnerLink {
   dateFin             DateTime? @map("date_fin") @db.Date
   documentReference   String?   @map("document_reference") @db.VarChar(200)
 
-  // Relations
-  journal             Journal   @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade) // Main company context for the link
+  journal             Journal   @relation(fields: [journalId, companyId], references: [id, companyId], onDelete: Cascade, onUpdate: Cascade)
+  partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Partner must belong to the same company (enforced by app logic when creating)
+                                                                                                                          // Could add partnerCompanyId and make a composite FK if strict db enforcement desired.
 
   journalPartnerGoodLinks JournalPartnerGoodLink[]
 
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  // Provide a shorter custom name for the unique constraint map
-  @@unique([journalId, partnerId, partnershipType], map: "uq_journal_partner_type") // Shorter name
+  @@unique([companyId, journalId, partnerId, partnershipType], map: "uq_comp_journal_partner_type")
   @@map("journal_partner_links")
 }
 
 model JournalGoodLink {
-  id          BigInt   @id @default(autoincrement()) @db.BigInt
-  journalId   String   @map("journal_id") @db.VarChar(100)
-  goodId      BigInt   @map("good_id") @db.BigInt
+  id          BigInt   @id @default(autoincrement()) @db.BigInt // Surrogate PK
+  companyId   String   @map("company_id")
+  journalId   String   @map("journal_id") @db.VarChar(100) // Refers to Journal.id (natural key part)
+  goodId      BigInt   @map("good_id") @db.BigInt          // Refers to GoodsAndService.id (surrogate PK)
 
-  // Relations
-  journal     Journal  @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  good        GoodsAndService @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  journal     Journal         @relation(fields: [journalId, companyId], references: [id, companyId], onDelete: Cascade, onUpdate: Cascade)
+  good        GoodsAndService @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Good must be from same company (app logic)
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([journalId, goodId], map: "uq_journal_good")
+  @@unique([companyId, journalId, goodId], map: "uq_comp_journal_good")
   @@map("journal_good_links")
 }
 
 model JournalPartnerGoodLink {
-  id                      BigInt    @id @default(autoincrement()) @db.BigInt
-  journalPartnerLinkId    BigInt    @map("journal_partner_link_id") @db.BigInt
-  goodId                  BigInt    @map("good_id") @db.BigInt
+  id                      BigInt    @id @default(autoincrement()) @db.BigInt // Surrogate PK
+  companyId               String    @map("company_id")
+  journalPartnerLinkId    BigInt    @map("journal_partner_link_id") @db.BigInt // Refers to JournalPartnerLink.id (surrogate)
+  goodId                  BigInt    @map("good_id") @db.BigInt                // Refers to GoodsAndService.id (surrogate)
   descriptiveText         String?   @map("descriptive_text") @db.Text
-  contextualTaxCodeId     Int?      @map("contextual_tax_code_id")
+  contextualTaxCodeId     Int?      @map("contextual_tax_code_id")           // Refers to TaxCode.id (surrogate)
 
-  // Relations
-  journalPartnerLink      JournalPartnerLink @relation(fields: [journalPartnerLinkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  good                    GoodsAndService    @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  contextualTaxCode       TaxCode?           @relation("ContextualTaxForJPGLink", fields: [contextualTaxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade) // This side defines the relation name
+  company                 Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  journalPartnerLink      JournalPartnerLink @relation(fields: [journalPartnerLinkId], references: [id], onDelete: Cascade, onUpdate: Cascade) // JPL must be from same company (app logic)
+  good                    GoodsAndService    @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade) // Good must be from same company (app logic)
+  contextualTaxCode       TaxCode?           @relation("ContextualTaxForJPGLink", fields: [contextualTaxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade) // TaxCode must be from same company (app logic)
 
   createdAt               DateTime           @default(now()) @map("created_at")
   updatedAt               DateTime           @updatedAt @map("updated_at")
 
-  @@unique([journalPartnerLinkId, goodId], map: "uq_jp_good_link_good")
+  @@unique([journalPartnerLinkId, goodId], map: "uq_jp_link_good") // JPL ID is already globally unique, so companyId implicitly covered.
   @@map("journal_partner_good_links")
 }
+
+
