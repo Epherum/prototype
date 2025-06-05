@@ -278,7 +278,7 @@ function JournalModal({
             >
               {onSelectForLinking
                 ? selectedAccountId
-                  ? "Add/Use Selected Journal"
+                  ? "Use Selected Journal"
                   : "Select an Item"
                 : "Confirm Selection"}
             </button>

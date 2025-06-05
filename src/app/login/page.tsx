@@ -1,14 +1,15 @@
 // src/app/login/page.tsx
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, Suspense } from "react"; // Import Suspense
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import styles from "./login.module.css";
 
-export default function LoginPage() {
+// This component uses useSearchParams, so it needs to be inside Suspense
+function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const searchParams = useSearchParams(); // This hook triggers the need for Suspense
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,10 +18,10 @@ export default function LoginPage() {
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const handleSubmit = async (event: FormEvent) => {
+    // ... (handleSubmit logic as before) ...
     event.preventDefault();
     setError(null);
     setIsLoading(true);
-
     try {
       const result = await signIn("credentials", {
         redirect: false,
@@ -47,44 +48,49 @@ export default function LoginPage() {
   };
 
   return (
-    <div className={styles.loginContainer}>
-      <h1 className={styles.appTitle}>ERP Application Interface</h1>{" "}
-      {/* Added App Title */}
-      <form onSubmit={handleSubmit} className={styles.loginForm}>
-        <h2>Login</h2>
-        {error && <p className={styles.error}>{error}</p>}
-        <div className={styles.inputGroup}>
-          <label htmlFor="email">Email</label>
-          <input
-            type="email"
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            disabled={isLoading}
-            autoComplete="email"
-          />
-        </div>
-        <div className={styles.inputGroup}>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            disabled={isLoading}
-            autoComplete="current-password"
-          />
-        </div>
-        <button
-          type="submit"
+    <form onSubmit={handleSubmit} className={styles.loginForm}>
+      <h2>Login</h2>
+      {error && <p className={styles.error}>{error}</p>}
+      <div className={styles.inputGroup}>
+        <label htmlFor="email">Email</label>
+        <input
+          type="email"
+          id="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
           disabled={isLoading}
-          className={styles.loginButton}
-        >
-          {isLoading ? "Logging in..." : "Login"}
-        </button>
-      </form>
+          autoComplete="email"
+        />
+      </div>
+      <div className={styles.inputGroup}>
+        <label htmlFor="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          disabled={isLoading}
+          autoComplete="current-password"
+        />
+      </div>
+      <button type="submit" disabled={isLoading} className={styles.loginButton}>
+        {isLoading ? "Logging in..." : "Login"}
+      </button>
+    </form>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <div className={styles.loginContainer}>
+      <h1 className={styles.appTitle}>ERP Application Interface</h1>
+      <Suspense
+        fallback={<div className={styles.loadingForm}>Loading form...</div>}
+      >
+        <LoginContent />
+      </Suspense>
     </div>
   );
 }
