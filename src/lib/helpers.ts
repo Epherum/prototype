@@ -1,7 +1,18 @@
+// File: src/lib/helpers.ts
 import { AccountNodeData } from "@/lib/types";
 
+import type { JournalForAdminSelection as BackendJournalForAdminSelection } from "@/app/services/journalService"; // Or from clientJournalService
+
+export type JournalForAdminSelection = BackendJournalForAdminSelection;
+
+export interface JournalWithDisplayPath extends JournalForAdminSelection {
+  displayPath: string;
+}
+
+interface JournalMapEntry extends JournalForAdminSelection {}
+
 // --- Helper: Find Node in Hierarchy ---
-export const findNodeById = (nodes, nodeId) => {
+export const findNodeById = (nodes: AccountNodeData[], nodeId: string) => {
   if (!nodes || !nodeId) return null;
   for (const node of nodes) {
     if (node.id === nodeId) {
@@ -115,4 +126,84 @@ export const getParentPathIds = (
     return fullPathToNode.slice(0, -1); // Return all IDs in the path *except* the nodeId itself
   }
   return []; // No parents if it's a root node or not found
+};
+
+// Interface for journals after processing for display (with full path)
+export interface JournalWithDisplayPath extends JournalForAdminSelection {
+  displayPath: string;
+}
+
+// Internal helper to create a lookup map for efficient path building
+interface JournalMapEntry extends JournalForAdminSelection {}
+type JournalMap = Record<string, JournalMapEntry>;
+
+const createJournalLookup = (
+  journals: JournalForAdminSelection[]
+): JournalMap => {
+  const map: JournalMap = {};
+  journals.forEach((j) => {
+    map[j.id] = { ...j };
+  });
+  return map;
+};
+
+// Generates a display path for a single journal ID given a flat list and its map
+// This could be used if you need to look up a path on demand for a single item.
+export const getJournalDisplayPath = (
+  journalId: string,
+  allJournalsFlat: JournalForAdminSelection[],
+  journalMap?: JournalMap // Optional: pass precomputed map for efficiency
+): string => {
+  const map = journalMap || createJournalLookup(allJournalsFlat);
+  let current = map[journalId];
+  if (!current) return "Unknown Journal";
+
+  const path: string[] = [];
+  while (current) {
+    path.unshift(current.name); // Add name to the beginning of the path
+    if (!current.parentId) break; // Reached a root node
+    current = map[current.parentId];
+    if (!current) break; // Parent not found (should not happen in a consistent dataset)
+  }
+  return path.join(" > ");
+};
+
+// Pre-calculates display paths for all journals and sorts them
+export const generateJournalDisplayPaths = (
+  journals: JournalForAdminSelection[]
+): JournalWithDisplayPath[] => {
+  if (!journals || journals.length === 0) return [];
+
+  const journalMap = createJournalLookup(journals);
+  const journalsWithPaths: JournalWithDisplayPath[] = [];
+
+  const buildPath = (journalId: string): string => {
+    let current = journalMap[journalId];
+    const path: string[] = [];
+    let depth = 0; // To prevent infinite loops in case of cyclic data (defensive)
+    while (current && depth < 20) {
+      // Max depth of 20
+      path.unshift(current.name);
+      if (!current.parentId) break;
+      current = journalMap[current.parentId];
+      if (!current) break;
+      depth++;
+    }
+    if (depth >= 20)
+      console.warn(
+        `Max depth reached for journal ${journalId}. Path might be incomplete.`
+      );
+    return path.join(" > ");
+  };
+
+  journals.forEach((j) => {
+    journalsWithPaths.push({
+      ...j,
+      displayPath: buildPath(j.id),
+    });
+  });
+
+  // Sort by the display path for a more organized dropdown
+  journalsWithPaths.sort((a, b) => a.displayPath.localeCompare(b.displayPath));
+  return journalsWithPaths;
 };

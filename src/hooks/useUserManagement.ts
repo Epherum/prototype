@@ -4,19 +4,30 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createUser,
   CreateUserClientPayload,
-} from "@/services/clientUserService"; // Adjust path
-import { fetchCompanyRoles } from "@/services/clientRoleService"; // Adjust path
+} from "@/services/clientUserService";
+import { fetchCompanyRoles } from "@/services/clientRoleService";
+import type { Role } from "@prisma/client";
+import { fetchAllJournalsForAdminRestriction } from "@/services/clientJournalService";
+// THIS IMPORT IS CRUCIAL
 import {
-  fetchTopLevelJournalsForAdmin,
-  TopLevelJournalAdminSelection,
-} from "@/services/clientJournalService"; // Adjust path
-import type { Role } from "@prisma/client"; // Or your client-side Role type
-// No need for CreateUserPayloadRoleAssignment from backend service here, as we manage form state directly
+  generateJournalDisplayPaths,
+  JournalWithDisplayPath,
+} from "@/lib/helpers"; // Ensure path is correct and function name matches export
+
+// IMPORTANT: The `CreateUserClientPayload` type (likely defined in or used by `clientUserService.ts`)
+// needs to be updated. Its `roleAssignments` array elements should now expect:
+// interface CreateUserClientPayloadRoleAssignment {
+//   roleId: string;
+//   restrictedTopLevelJournalId: string | null;
+//   restrictedTopLevelJournalCompanyId: string | null; // <-- THIS IS NEW
+// }
+// Make sure `clientUserService.createUser` is adapted to receive and use this.
 
 interface RoleAssignmentFormState {
   roleId: string;
-  roleName?: string; // For display purposes in the form
+  roleName?: string;
   restrictedTopLevelJournalId?: string | null;
+  restrictedTopLevelJournalCompanyId?: string | null; // NEW: To store the companyId of the restricted journal
 }
 
 export interface UserManagementFormState {
@@ -30,7 +41,7 @@ const initialFormState: UserManagementFormState = {
   name: "",
   email: "",
   password: "",
-  roleAssignments: [], // Start with no roles assigned
+  roleAssignments: [],
 };
 
 export function useUserManagement() {
@@ -39,8 +50,6 @@ export function useUserManagement() {
     useState<UserManagementFormState>(initialFormState);
   const [showPassword, setShowPassword] = useState(false);
 
-  // --- TanStack Query: Data Fetching ---
-
   const {
     data: companyRoles,
     isLoading: isLoadingRoles,
@@ -48,37 +57,31 @@ export function useUserManagement() {
   } = useQuery<Role[], Error>({
     queryKey: ["companyRoles"],
     queryFn: fetchCompanyRoles,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 5 * 60 * 1000,
   });
 
+  // UPDATED: Fetch all journals for the company for restriction selection
   const {
-    data: topLevelJournals,
+    data: allCompanyJournalsData, // RENAMED from topLevelJournals
     isLoading: isLoadingJournals,
     error: errorJournals,
-  } = useQuery<TopLevelJournalAdminSelection[], Error>({
-    queryKey: ["topLevelJournalsForAdmin"],
-    queryFn: fetchTopLevelJournalsForAdmin,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  } = useQuery<any, Error>({
+    // Type updated
+    queryKey: ["allCompanyJournalsForRestriction"], // RENAMED queryKey
+    queryFn: fetchAllJournalsForAdminRestriction, // UPDATED function call
+    staleTime: 5 * 60 * 1000,
   });
-
-  // --- TanStack Query: Mutation for User Creation ---
 
   const createUserMutation = useMutation({
     mutationFn: (userData: CreateUserClientPayload) => createUser(userData),
     onSuccess: (data) => {
       console.log("User created successfully:", data);
-      // Optionally invalidate queries that should refetch after user creation
-      // e.g., if you have a user list: queryClient.invalidateQueries(['users']);
-      queryClient.invalidateQueries({ queryKey: ["users"] }); // Example
-      // Reset form or close modal - to be handled by the component using this hook
+      queryClient.invalidateQueries({ queryKey: ["users"] });
     },
     onError: (error: Error) => {
       console.error("Error creating user:", error.message);
-      // Error will be available in mutation.error, can be shown in UI
     },
   });
-
-  // --- Form State Management Callbacks ---
 
   const handleInputChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -93,7 +96,6 @@ export function useUserManagement() {
       setFormState((prev) => {
         const newAssignments: RoleAssignmentFormState[] = selectedRoleIds.map(
           (roleId) => {
-            // Try to find existing assignment to preserve journal restriction
             const existingAssignment = prev.roleAssignments.find(
               (ra) => ra.roleId === roleId
             );
@@ -103,6 +105,9 @@ export function useUserManagement() {
               roleName: role?.name || "Unknown Role",
               restrictedTopLevelJournalId:
                 existingAssignment?.restrictedTopLevelJournalId || null,
+              // Preserve companyId too
+              restrictedTopLevelJournalCompanyId:
+                existingAssignment?.restrictedTopLevelJournalCompanyId || null,
             };
           }
         );
@@ -116,34 +121,47 @@ export function useUserManagement() {
     (roleId: string, journalId: string | null) => {
       setFormState((prev) => ({
         ...prev,
-        roleAssignments: prev.roleAssignments.map((assignment) =>
-          assignment.roleId === roleId
-            ? { ...assignment, restrictedTopLevelJournalId: journalId }
-            : assignment
-        ),
+        roleAssignments: prev.roleAssignments.map((assignment) => {
+          if (assignment.roleId === roleId) {
+            if (journalId && allCompanyJournalsData) {
+              // Find the selected journal to get its companyId
+              const selectedJournal = allCompanyJournalsData.find(
+                (j) => j.id === journalId
+              );
+              return {
+                ...assignment,
+                restrictedTopLevelJournalId: journalId,
+                restrictedTopLevelJournalCompanyId:
+                  selectedJournal?.companyId || null,
+              };
+            }
+            // Clearing restriction
+            return {
+              ...assignment,
+              restrictedTopLevelJournalId: null,
+              restrictedTopLevelJournalCompanyId: null,
+            };
+          }
+          return assignment;
+        }),
       }));
     },
-    []
+    [allCompanyJournalsData] // Add dependency
   );
 
   const resetForm = useCallback(() => {
     setFormState(initialFormState);
     setShowPassword(false);
-    // Note: createUserMutation.reset() might also be needed if you want to clear its status
-  }, []);
-
-  // --- Submission Handler ---
+    createUserMutation.reset();
+  }, [createUserMutation]);
 
   const handleSubmit = useCallback(
     async (event?: React.FormEvent<HTMLFormElement>) => {
       if (event) event.preventDefault();
 
       if (formState.roleAssignments.length === 0) {
-        // alert("Please assign at least one role."); // Or set an error state
         console.error("Attempted to submit with no roles assigned.");
-        // Expose an error state for the UI
         createUserMutation.reset(); // Reset to clear any previous error from mutation
-        // You might want to set a specific form error here
         return;
       }
 
@@ -153,21 +171,21 @@ export function useUserManagement() {
         password: formState.password,
         roleAssignments: formState.roleAssignments.map((ra) => ({
           roleId: ra.roleId,
-          // Ensure null is sent if undefined, or backend handles undefined as null
           restrictedTopLevelJournalId: ra.restrictedTopLevelJournalId || null,
+          restrictedTopLevelJournalCompanyId:
+            ra.restrictedTopLevelJournalCompanyId || null, // NEW
         })),
       };
-      // START OF ADDED LOGGING
-      console.log("--- CLIENT SIDE PAYLOAD ---");
-      console.log("Payload:", JSON.stringify(payload, null, 2));
-      console.log("--- END CLIENT SIDE PAYLOAD ---");
-      // END OF ADDED LOGGING
+      console.log("--- CLIENT SIDE PAYLOAD (useUserManagement) ---");
+      console.log(
+        "Payload to be sent to clientUserService.createUser:",
+        JSON.stringify(payload, null, 2)
+      );
       await createUserMutation.mutateAsync(payload);
     },
     [formState, createUserMutation]
   );
 
-  // --- Derived State & Utilities ---
   const isLoading =
     isLoadingRoles || isLoadingJournals || createUserMutation.isPending;
 
@@ -175,15 +193,30 @@ export function useUserManagement() {
     return companyRoles || [];
   }, [companyRoles]);
 
-  const availableJournalsForRestriction = useMemo(() => {
-    // Add a "None" option for clearing restriction
-    const noneOption = { id: "", name: "None (No Restriction)", companyId: "" }; // companyId might not be strictly needed here
-    return topLevelJournals ? [noneOption, ...topLevelJournals] : [noneOption];
-  }, [topLevelJournals]);
+  // UPDATED: Generate display paths for all journals for the dropdown
+  const availableJournalsForRestriction =
+    useMemo((): JournalWithDisplayPath[] => {
+      const noneOption: JournalWithDisplayPath = {
+        id: "", // Represents 'None'
+        name: "None (No Restriction)",
+        parentId: null,
+        companyId: "", // Ensure companyId is part of the type, can be empty for "None"
+        displayPath: "None (No Restriction)",
+      };
+
+      if (!allCompanyJournalsData || allCompanyJournalsData.length === 0) {
+        return [noneOption];
+      }
+
+      const processedJournals = generateJournalDisplayPaths(
+        allCompanyJournalsData
+      );
+      return [noneOption, ...processedJournals];
+    }, [allCompanyJournalsData]);
 
   return {
     formState,
-    setFormState, // Expose if direct manipulation is needed, though handlers are preferred
+    setFormState,
     handleInputChange,
     handleRoleSelectionChange,
     handleJournalRestrictionChange,
@@ -191,15 +224,15 @@ export function useUserManagement() {
     resetForm,
 
     companyRoles: availableRolesForSelection,
-    topLevelJournals: availableJournalsForRestriction,
+    availableJournalsForRestriction, // RENAMED from topLevelJournals and REPURPOSED
 
     isLoadingRoles,
     errorRoles,
     isLoadingJournals,
     errorJournals,
 
-    createUserMutation, // Expose the whole mutation object for status (isPending, isSuccess, isError, error)
-    isLoading, // Combined loading state
+    createUserMutation,
+    isLoading,
 
     showPassword,
     setShowPassword,

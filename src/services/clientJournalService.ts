@@ -1,6 +1,7 @@
 // src/services/clientJournalService.ts
 import type { AccountNodeData, Journal } from "@/lib/types";
 import type { Journal as PrismaJournal } from "@prisma/client";
+import { JournalForAdminSelection } from "@/lib/helpers";
 
 // ... (buildTree function remains the same) ...
 function buildTree(journals: Journal[]): AccountNodeData[] {
@@ -211,4 +212,46 @@ export async function fetchTopLevelJournalsForAdmin(): Promise<
     );
   }
   return response.json();
+}
+
+// It calls the new API endpoint /api/journals/all-for-admin-selection
+export async function fetchAllJournalsForAdminRestriction(): Promise<
+  JournalForAdminSelection[]
+> {
+  console.log(
+    "[clientJournalService] Calling API: /api/journals/all-for-admin-selection"
+  ); // Added log
+  const response = await fetch("/api/journals/all-for-admin-selection", {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    let errorData;
+    try {
+      errorData = await response.json();
+    } catch (e) {
+      // If parsing JSON fails, or if it's a non-JSON error
+      errorData = {
+        message: `Failed to fetch all journals for admin: ${response.statusText} (${response.status}) (No JSON error body or parse failed)`,
+      };
+    }
+    console.error(
+      "[clientJournalService] Error fetching all journals for admin restriction:",
+      errorData
+    ); // Updated log
+    throw new Error(
+      errorData?.message ||
+        `Failed to fetch all journals for admin: ${response.statusText}`
+    );
+  }
+  const data = await response.json();
+  console.log(
+    "[clientJournalService] Successfully fetched all journals for admin restriction:",
+    data.length,
+    "journals"
+  ); // Added log
+  return data;
 }

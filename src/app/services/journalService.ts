@@ -1,38 +1,36 @@
 // File: src/app/services/journalService.ts
-// (Keep your existing prisma import and Journal type import)
 import { PrismaClient, Journal } from "@prisma/client"; // Assuming PrismaClient is the actual type of your prisma instance
 import prisma from "@/app/utils/prisma"; // Your existing Prisma client instance
 
 // --- Session User Type (for context) ---
-// This should align with the session data you have available in API routes
 interface AuthenticatedUserContext {
   companyId: string;
   // userId?: string; // If needed for audit logs, etc.
-  // roles/permissions if service functions need to do their own permission checks
 }
 
-// --- Types for our "Order Slips" (Data Transfer Objects) ---
-// Order slip for creating a new journal dish (now needs company context)
+// --- Types for "Order Slips" (Data Transfer Objects) ---
 export type CreateJournalData = {
-  id: string; // The customer (or admin) decides the ID/number of the new dish
+  id: string;
   name: string;
-  parentId?: string | null; // Which main dish is this a side for? (optional)
-  isTerminal?: boolean; // Is this the final part of a combo meal?
-  additionalDetails?: any; // Any special cooking instructions?
-  // companyId will be provided by the service layer from the user's session
+  parentId?: string | null;
+  isTerminal?: boolean;
+  additionalDetails?: any;
 };
 
-// Order slip for changing an existing journal dish
 export type UpdateJournalData = {
-  name?: string; // New name for the dish?
-  isTerminal?: boolean; // Is it now the final part of a combo?
-  additionalDetails?: any; // Any updated special instructions?
-  // companyId and id are used for lookup
+  name?: string;
+  isTerminal?: boolean;
+  additionalDetails?: any;
 };
+
+// --- Type for Admin Journal Selection ---
+export type JournalForAdminSelection = Pick<
+  Journal,
+  "id" | "name" | "parentId" | "companyId"
+>;
 
 // --- Chef's Recipes (Service Functions - Updated for Multi-Tenancy) ---
 
-// RECIPE 1: Get all root-level journal dishes for a specific company
 async function getRootJournals(
   context: AuthenticatedUserContext
 ): Promise<Journal[]> {
@@ -41,7 +39,7 @@ async function getRootJournals(
   );
   const rootJournals = await prisma.journal.findMany({
     where: {
-      companyId: context.companyId, // <<< COMPANY SCOPE
+      companyId: context.companyId,
       parentId: null,
     },
     orderBy: {
@@ -56,7 +54,6 @@ async function getRootJournals(
   return rootJournals;
 }
 
-// RECIPE 2: Get all side dishes for a specific main journal dish within a company
 async function getJournalsByParentId(
   parentId: string,
   context: AuthenticatedUserContext
@@ -66,7 +63,7 @@ async function getJournalsByParentId(
   );
   const childJournals = await prisma.journal.findMany({
     where: {
-      companyId: context.companyId, // <<< COMPANY SCOPE
+      companyId: context.companyId,
       parentId: parentId,
     },
     orderBy: {
@@ -81,7 +78,6 @@ async function getJournalsByParentId(
   return childJournals;
 }
 
-// RECIPE 3: Get a specific journal dish by its ID and companyId
 async function getJournalById(
   id: string,
   context: AuthenticatedUserContext
@@ -92,7 +88,6 @@ async function getJournalById(
   const journal = await prisma.journal.findUnique({
     where: {
       id_companyId: {
-        // <<< Use composite key
         id: id,
         companyId: context.companyId,
       },
@@ -111,18 +106,17 @@ async function getJournalById(
   return journal;
 }
 
-// RECIPE 4: Get ALL journal dishes on the entire menu for a specific company
 async function getAllJournals(
   context: AuthenticatedUserContext,
-  options?: { where?: any } // 'where' here should be additive to companyId
+  options?: { where?: any }
 ): Promise<Journal[]> {
   console.log(
     `Chef (Service - Company ${context.companyId}): Preparing a list of ALL dishes with options:`,
     options
   );
   const whereClause = {
-    companyId: context.companyId, // <<< COMPANY SCOPE
-    ...options?.where, // Merge with other filters
+    companyId: context.companyId,
+    ...options?.where,
   };
   const allJournals = await prisma.journal.findMany({
     where: whereClause,
@@ -136,7 +130,6 @@ async function getAllJournals(
   return allJournals;
 }
 
-// RECIPE 5: Add a new journal dish to the menu for a specific company
 async function createJournal(
   data: CreateJournalData,
   context: AuthenticatedUserContext
@@ -148,7 +141,7 @@ async function createJournal(
   const { companyId } = context;
 
   const existingDish = await prisma.journal.findUnique({
-    where: { id_companyId: { id: data.id, companyId } }, // <<< Use composite key
+    where: { id_companyId: { id: data.id, companyId } },
   });
   if (existingDish) {
     console.error(
@@ -161,7 +154,7 @@ async function createJournal(
 
   if (data.parentId) {
     const parentDish = await prisma.journal.findUnique({
-      where: { id_companyId: { id: data.parentId, companyId } }, // <<< Parent must also be in same company
+      where: { id_companyId: { id: data.parentId, companyId } },
     });
     if (!parentDish) {
       console.error(
@@ -176,7 +169,7 @@ async function createJournal(
   const newDish = await prisma.journal.create({
     data: {
       ...data,
-      companyId: companyId, // <<< Assign companyId
+      companyId: companyId,
     },
   });
   console.log(
@@ -185,7 +178,6 @@ async function createJournal(
   return newDish;
 }
 
-// RECIPE 6: Update an existing journal dish on the menu for a specific company
 async function updateJournal(
   id: string,
   data: UpdateJournalData,
@@ -197,9 +189,8 @@ async function updateJournal(
   );
   const { companyId } = context;
 
-  // Ensure the dish exists in the company before updating
   const dishToUpdate = await prisma.journal.findUnique({
-    where: { id_companyId: { id, companyId } }, // <<< Use composite key
+    where: { id_companyId: { id, companyId } },
   });
   if (!dishToUpdate) {
     console.warn(
@@ -209,7 +200,7 @@ async function updateJournal(
   }
 
   const updatedDish = await prisma.journal.update({
-    where: { id_companyId: { id, companyId } }, // <<< Use composite key
+    where: { id_companyId: { id, companyId } },
     data: data,
   });
   console.log(
@@ -218,7 +209,6 @@ async function updateJournal(
   return updatedDish;
 }
 
-// RECIPE 7: Remove a journal dish from the menu for a specific company
 async function deleteJournal(
   id: string,
   context: AuthenticatedUserContext
@@ -229,10 +219,10 @@ async function deleteJournal(
   const { companyId } = context;
 
   const dishToDelete = await prisma.journal.findUnique({
-    where: { id_companyId: { id, companyId } }, // <<< Use composite key
+    where: { id_companyId: { id, companyId } },
     include: {
       children: {
-        where: { companyId }, // Ensure children are also checked within the same company
+        where: { companyId },
         select: { id: true },
         take: 1,
       },
@@ -257,7 +247,6 @@ async function deleteJournal(
     );
   }
 
-  // Also check UserRole restrictions before deleting
   const userRoleRestrictions = await prisma.userRole.findFirst({
     where: {
       restrictedTopLevelJournalId: id,
@@ -275,7 +264,7 @@ async function deleteJournal(
   }
 
   const deletedDish = await prisma.journal.delete({
-    where: { id_companyId: { id, companyId } }, // <<< Use composite key
+    where: { id_companyId: { id, companyId } },
   });
   console.log(
     `Chef (Service - Company ${companyId}): Dish '${deletedDish.id} - ${deletedDish.name}' successfully removed.`
@@ -283,28 +272,24 @@ async function deleteJournal(
   return deletedDish;
 }
 
-// --- NEW RECIPE for User Management ---
-// RECIPE 8: Get all TOP-LEVEL journal dishes for a specific company (for admin selection)
 async function getTopLevelJournalsByCompany(
   context: AuthenticatedUserContext
 ): Promise<Pick<Journal, "id" | "name" | "companyId">[]> {
-  // Return only necessary fields
   console.log(
     `Chef (Service - Company ${context.companyId}): Order received for all TOP-LEVEL dishes for admin selection.`
   );
   const topLevelJournals = await prisma.journal.findMany({
     where: {
-      companyId: context.companyId, // <<< COMPANY SCOPE
-      parentId: null, // <<< TOP-LEVEL journals only
+      companyId: context.companyId,
+      parentId: null,
     },
     select: {
-      // Select only the fields needed for the dropdown
       id: true,
       name: true,
-      companyId: true, // companyId is part of the composite key, good to have for clarity if used downstream
+      companyId: true,
     },
     orderBy: {
-      id: "asc", // Or name: 'asc'
+      id: "asc",
     },
   });
   console.log(
@@ -324,9 +309,6 @@ async function getJournalSubHierarchy(
     `[journalService] Fetching sub-hierarchy for rootJournalId: ${rootJournalId}, companyId: ${companyId}`
   );
 
-  // For debugging, construct the query string to log it.
-  // IMPORTANT: For actual execution, use parameterized queries as you were to prevent SQL injection.
-  // This is only for seeing the query.
   const queryStringForLog = `
     WITH RECURSIVE "SubTree" AS (
       SELECT *, 0 AS level
@@ -352,7 +334,7 @@ async function getJournalSubHierarchy(
   try {
     const result = await prisma.$queryRaw<Journal[]>`
       WITH RECURSIVE "SubTree" AS (
-        SELECT *, 0 AS "level" -- Added level for debugging and ensuring column name is quoted if needed
+        SELECT *, 0 AS "level"
         FROM "journals"
         WHERE "id" = ${rootJournalId} AND "company_id" = ${companyId}
         UNION ALL
@@ -363,11 +345,11 @@ async function getJournalSubHierarchy(
       )
       SELECT "id", "company_id" AS "companyId", "name", "parent_id" AS "parentId", "is_terminal" AS "isTerminal", "additional_details" AS "additionalDetails", "created_at" AS "createdAt", "updated_at" AS "updatedAt"
       FROM "SubTree" ORDER BY "level" ASC, "id" ASC;
-    `; // Explicitly select columns and alias them to match Prisma model for safety with $queryRaw
+    `;
 
     console.log(
       `[journalService] Raw query result for sub-hierarchy (count: ${result.length}):`,
-      JSON.stringify(result, null, 2) // Pretty print the result
+      JSON.stringify(result, null, 2)
     );
 
     if (result.length === 0 && rootJournalId) {
@@ -389,13 +371,39 @@ async function getJournalSubHierarchy(
     return result;
   } catch (error) {
     console.error("[journalService] ERROR in getJournalSubHierarchy:", error);
-    // Log the actual error object from Prisma if it's a PrismaClientKnownRequestError
     if (error instanceof prisma.PrismaClientKnownRequestError) {
       console.error("[journalService] Prisma Error Code:", error.code);
       console.error("[journalService] Prisma Error Meta:", error.meta);
     }
     throw error;
   }
+}
+
+// NEW RECIPE for Admin User Management - Fetch ALL journals for restriction selection
+async function getAllJournalsForAdminSelection(
+  context: AuthenticatedUserContext
+): Promise<JournalForAdminSelection[]> {
+  console.log(
+    `Chef (Service - Company ${context.companyId}): Order received for ALL dishes for admin journal restriction selection.`
+  );
+  const allJournalsInCompany = await prisma.journal.findMany({
+    where: {
+      companyId: context.companyId,
+    },
+    select: {
+      id: true,
+      name: true,
+      parentId: true,
+      companyId: true, // Important for UserRole.restrictedTopLevelJournalCompanyId
+    },
+    orderBy: [{ parentId: "asc" }, { id: "asc" }],
+  });
+  console.log(
+    `Chef (Service - Company ${context.companyId}): All dishes for admin selection ready!`,
+    allJournalsInCompany.length,
+    "dishes prepared."
+  );
+  return allJournalsInCompany;
 }
 
 export const journalService = {
@@ -406,6 +414,7 @@ export const journalService = {
   createJournal,
   updateJournal,
   deleteJournal,
-  getTopLevelJournalsByCompany,
+  getTopLevelJournalsByCompany, // Keep if used elsewhere
   getJournalSubHierarchy,
+  getAllJournalsForAdminSelection, // Add new function
 };
