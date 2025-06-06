@@ -18,6 +18,7 @@ export type CreatePartnerData = {
   bioFatherName?: string | null;
   bioMotherName?: string | null;
   additionalDetails?: any; // Or a more specific Zod schema
+  companyId: string;
 };
 
 export type UpdatePartnerData = Partial<Omit<CreatePartnerData, "partnerType">>;

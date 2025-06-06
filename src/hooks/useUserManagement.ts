@@ -8,26 +8,14 @@ import {
 import { fetchCompanyRoles } from "@/services/clientRoleService";
 import type { Role } from "@prisma/client";
 import { fetchAllJournalsForAdminRestriction } from "@/services/clientJournalService";
-// THIS IMPORT IS CRUCIAL
-import {
-  generateJournalDisplayPaths,
-  JournalWithDisplayPath,
-} from "@/lib/helpers"; // Ensure path is correct and function name matches export
-
-// IMPORTANT: The `CreateUserClientPayload` type (likely defined in or used by `clientUserService.ts`)
-// needs to be updated. Its `roleAssignments` array elements should now expect:
-// interface CreateUserClientPayloadRoleAssignment {
-//   roleId: string;
-//   restrictedTopLevelJournalId: string | null;
-//   restrictedTopLevelJournalCompanyId: string | null; // <-- THIS IS NEW
-// }
-// Make sure `clientUserService.createUser` is adapted to receive and use this.
+import { JournalForAdminSelection } from "@/lib/helpers";
 
 interface RoleAssignmentFormState {
   roleId: string;
   roleName?: string;
   restrictedTopLevelJournalId?: string | null;
   restrictedTopLevelJournalCompanyId?: string | null; // NEW: To store the companyId of the restricted journal
+  restrictedJournalDisplayName?: string | null; // NEW: To store the display name of the restricted journal
 }
 
 export interface UserManagementFormState {
@@ -62,13 +50,13 @@ export function useUserManagement() {
 
   // UPDATED: Fetch all journals for the company for restriction selection
   const {
-    data: allCompanyJournalsData, // RENAMED from topLevelJournals
+    data: allCompanyJournalsData,
     isLoading: isLoadingJournals,
     error: errorJournals,
-  } = useQuery<any, Error>({
-    // Type updated
-    queryKey: ["allCompanyJournalsForRestriction"], // RENAMED queryKey
-    queryFn: fetchAllJournalsForAdminRestriction, // UPDATED function call
+  } = useQuery<JournalForAdminSelection[], Error>({
+    // Use the specific type here
+    queryKey: ["allCompanyJournalsForRestriction"],
+    queryFn: fetchAllJournalsForAdminRestriction,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -105,9 +93,11 @@ export function useUserManagement() {
               roleName: role?.name || "Unknown Role",
               restrictedTopLevelJournalId:
                 existingAssignment?.restrictedTopLevelJournalId || null,
-              // Preserve companyId too
               restrictedTopLevelJournalCompanyId:
                 existingAssignment?.restrictedTopLevelJournalCompanyId || null,
+              // Preserve or initialize display name
+              restrictedJournalDisplayName:
+                existingAssignment?.restrictedJournalDisplayName || null,
             };
           }
         );
@@ -117,36 +107,30 @@ export function useUserManagement() {
     [companyRoles]
   );
 
+  // MODIFIED: Now also takes displayName for UI update in the CreateUserModal
   const handleJournalRestrictionChange = useCallback(
-    (roleId: string, journalId: string | null) => {
+    (
+      roleId: string,
+      journalId: string | null,
+      journalCompanyId: string | null,
+      journalDisplayName: string | null
+    ) => {
       setFormState((prev) => ({
         ...prev,
         roleAssignments: prev.roleAssignments.map((assignment) => {
           if (assignment.roleId === roleId) {
-            if (journalId && allCompanyJournalsData) {
-              // Find the selected journal to get its companyId
-              const selectedJournal = allCompanyJournalsData.find(
-                (j) => j.id === journalId
-              );
-              return {
-                ...assignment,
-                restrictedTopLevelJournalId: journalId,
-                restrictedTopLevelJournalCompanyId:
-                  selectedJournal?.companyId || null,
-              };
-            }
-            // Clearing restriction
             return {
               ...assignment,
-              restrictedTopLevelJournalId: null,
-              restrictedTopLevelJournalCompanyId: null,
+              restrictedTopLevelJournalId: journalId,
+              restrictedTopLevelJournalCompanyId: journalCompanyId,
+              restrictedJournalDisplayName: journalDisplayName,
             };
           }
           return assignment;
         }),
       }));
     },
-    [allCompanyJournalsData] // Add dependency
+    [] // No dependency on allCompanyJournalsData here, as details are passed in
   );
 
   const resetForm = useCallback(() => {
@@ -193,27 +177,6 @@ export function useUserManagement() {
     return companyRoles || [];
   }, [companyRoles]);
 
-  // UPDATED: Generate display paths for all journals for the dropdown
-  const availableJournalsForRestriction =
-    useMemo((): JournalWithDisplayPath[] => {
-      const noneOption: JournalWithDisplayPath = {
-        id: "", // Represents 'None'
-        name: "None (No Restriction)",
-        parentId: null,
-        companyId: "", // Ensure companyId is part of the type, can be empty for "None"
-        displayPath: "None (No Restriction)",
-      };
-
-      if (!allCompanyJournalsData || allCompanyJournalsData.length === 0) {
-        return [noneOption];
-      }
-
-      const processedJournals = generateJournalDisplayPaths(
-        allCompanyJournalsData
-      );
-      return [noneOption, ...processedJournals];
-    }, [allCompanyJournalsData]);
-
   return {
     formState,
     setFormState,
@@ -223,8 +186,9 @@ export function useUserManagement() {
     handleSubmit,
     resetForm,
 
-    companyRoles: availableRolesForSelection,
-    availableJournalsForRestriction, // RENAMED from topLevelJournals and REPURPOSED
+    companyRoles: companyRoles || [], // Return companyRoles, ensure it's an array
+
+    allCompanyJournalsData: allCompanyJournalsData, // <<<<------ ADD THIS LINE
 
     isLoadingRoles,
     errorRoles,

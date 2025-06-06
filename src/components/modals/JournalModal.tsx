@@ -184,6 +184,10 @@ function JournalModal({
   ]);
 
   if (!isOpen) return null;
+  console.log(
+    "[JournalModal] Rendering because isOpen is true. Hierarchy length:",
+    hierarchy?.length
+  ); // <<< ADD LOG
 
   return (
     <motion.div

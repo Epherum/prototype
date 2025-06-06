@@ -1,5 +1,5 @@
 // File: src/lib/helpers.ts
-import { AccountNodeData } from "@/lib/types";
+import { AccountNodeData, Journal } from "@/lib/types";
 
 import type { JournalForAdminSelection as BackendJournalForAdminSelection } from "@/app/services/journalService"; // Or from clientJournalService
 
@@ -11,6 +11,46 @@ export interface JournalWithDisplayPath extends JournalForAdminSelection {
 
 interface JournalMapEntry extends JournalForAdminSelection {}
 
+export function buildTree(journals: Journal[]): AccountNodeData[] {
+  const journalMap: Record<
+    string,
+    AccountNodeData & { childrenFromApi?: Journal[] }
+  > = {};
+  const tree: AccountNodeData[] = [];
+
+  journals.forEach((journal) => {
+    journalMap[journal.id] = {
+      ...journal,
+      name: journal.name,
+      code: journal.id, // Assuming 'id' is used as 'code' if no separate code field
+      children: [],
+    };
+  });
+
+  journals.forEach((journal) => {
+    if (journal.parentId && journalMap[journal.parentId]) {
+      if (!journalMap[journal.parentId].children) {
+        journalMap[journal.parentId].children = [];
+      }
+      journalMap[journal.parentId].children?.push(journalMap[journal.id]);
+    } else {
+      // This node is a root (either a true root or the root of a sub-hierarchy)
+      tree.push(journalMap[journal.id]);
+    }
+  });
+
+  const sortChildren = (nodes: AccountNodeData[]) => {
+    nodes.sort((a, b) => (a.code || "").localeCompare(b.code || ""));
+    nodes.forEach((node) => {
+      if (node.children && node.children.length > 0) {
+        sortChildren(node.children);
+      }
+    });
+  };
+  sortChildren(tree);
+
+  return tree;
+}
 // --- Helper: Find Node in Hierarchy ---
 export const findNodeById = (nodes: AccountNodeData[], nodeId: string) => {
   if (!nodes || !nodeId) return null;

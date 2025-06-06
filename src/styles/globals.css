@@ -11,6 +11,12 @@
   --border-subtle: #eee;
   --shadow-color: rgba(100, 100, 100, 0.1);
 
+  /* ADDED DANGER COLORS */
+  --danger-color: #dc3545; /* A common bootstrap danger red */
+  --danger-color-hover: #c82333; /* Darker red for hover */
+  --danger-color-light-bg: #f8d7da; /* Light red background for less prominent danger items */
+  --text-on-danger: #ffffff; /* White text for dark danger backgrounds */
+
   /* Rounding - KEEP AS IS */
   --border-radius-lg: 16px;
   --border-radius-md: 12px;

@@ -1,8 +1,8 @@
 /* src/components/modals/CreateUserModal.module.css */
 
 .createUserModalContent {
-  width: 550px; /* Adjust as needed, might be wider due to more fields */
-  max-height: 90vh; /* Ensure it doesn't overflow viewport height */
+  width: 550px;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
 }
@@ -10,21 +10,25 @@
 .createUserForm {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem; /* Slightly less gap if many fields */
-  padding: 0.5rem 0.1rem; /* Smaller horizontal padding */
-  overflow-y: auto; /* Allow form content to scroll if it exceeds modal height */
-  flex-grow: 1; /* Make form take available space */
-  margin-bottom: 1rem; /* Space before modal actions */
+  gap: calc(
+    var(--spacing-unit) * 1.25
+  ); /* 0.9rem is ~10px if 1rem=16px, so ~1.25 * 8px */
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.25);
+  overflow-y: auto;
+  flex-grow: 1;
+  margin-bottom: var(
+    --spacing-unit
+  ); /* 1rem is often 16px, var(--spacing-unit) * 2 is 16px */
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: calc(var(--spacing-unit) * 0.5); /* 0.3rem is ~5px */
 }
 
 .formGroup label {
-  font-size: 0.875rem;
+  font-size: 0.875em; /* Relative to parent */
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -33,11 +37,12 @@
 .formGroup input[type="email"],
 .formGroup input[type="password"],
 .formGroup select {
-  padding: 0.6rem 0.75rem;
+  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit); /* ~0.6rem & ~0.75rem */
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-md);
-  font-size: 0.95rem;
-  background-color: var(--bg-input, white);
+  font-size: 0.95em; /* Relative to parent */
+  /* background-color: var(--bg-input, white); --bg-input not in your globals, default to var(--bg-card) or white */
+  background-color: var(--bg-card);
   color: var(--text-primary);
   width: 100%;
   box-sizing: border-box;
@@ -57,10 +62,13 @@
 .formGroup input[type="email"]:disabled,
 .formGroup input[type="password"]:disabled,
 .formGroup select:disabled {
-  background-color: var(--bg-disabled, #e9ecef);
-  color: var(--text-disabled, #6c757d);
+  /* --bg-disabled, --text-disabled, --border-disabled not in your globals.
+     Using existing vars for a disabled look. */
+  background-color: var(--bg-secondary); /* Lighter grey */
+  color: var(--text-secondary); /* More muted text */
   cursor: not-allowed;
-  border-color: var(--border-disabled, #ced4da);
+  border-color: var(--border-subtle);
+  opacity: 0.7; /* Add opacity for disabled feel */
 }
 
 .passwordInputContainer {
@@ -71,21 +79,20 @@
 
 .passwordInputContainer input[type="password"],
 .passwordInputContainer input[type="text"] {
-  /* When type is toggled */
-  padding-right: 2.5rem; /* Space for the toggle icon */
+  padding-right: calc(var(--spacing-unit) * 3.5); /* ~2.5rem */
 }
 
 .passwordToggle {
   position: absolute;
-  right: 0.75rem;
+  right: var(--spacing-unit); /* ~0.75rem */
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   cursor: pointer;
   color: var(--text-secondary);
-  font-size: 1.2rem; /* Adjust icon size */
-  padding: 0.25rem;
+  font-size: 1.2em; /* Relative to parent */
+  padding: calc(var(--spacing-unit) * 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -93,59 +100,55 @@
 
 .roleAssignmentsSection {
   border-top: 1px solid var(--border-subtle);
-  padding-top: 0.8rem;
-  margin-top: 0.5rem;
+  padding-top: var(--spacing-unit); /* ~0.8rem */
+  margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
 .roleAssignmentsSection h3 {
-  font-size: 1rem;
+  font-size: 1em; /* Relative to parent, typically 16px */
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 0.6rem;
+  margin-bottom: calc(var(--spacing-unit) * 0.75); /* ~0.6rem */
 }
 
-/* For multi-select, assuming you might use a library or a custom one.
-   If using a simple select with multiple attribute, it might need different styling.
-   This is a placeholder for a more robust role selection UI.
-*/
 .rolesSelect {
-  min-height: 80px; /* Example for a multiple select */
+  min-height: calc(var(--spacing-unit) * 10); /* 80px */
+  /* Inherits .formGroup select styles, so this is for height primarily */
 }
 
 .assignedRoleItem {
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-sm);
-  padding: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: var(--spacing-unit); /* ~0.75rem */
+  margin-bottom: var(--spacing-unit); /* ~0.75rem */
   background-color: var(--bg-secondary);
 }
 
 .assignedRoleHeader {
   font-weight: 500;
-  margin-bottom: 0.5rem;
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
   color: var(--text-primary);
 }
 
 .errorMessage {
+  /* --accent-danger not in your globals. Using --accent-warm for now, or you can hardcode red. */
   color: var(
-    --accent-danger,
-    red
-  ); /* Define --accent-danger in globals.css if you don't have it */
-  font-size: 0.875rem;
-  margin-top: 0.25rem;
-  text-align: center; /* Center error message */
+    --accent-warm
+  ); /* This will be orange, not ideal for errors but uses existing var */
+  /* or color: #D32F2F; /* A generic red for errors */
+  font-size: 0.875em;
+  margin-top: calc(var(--spacing-unit) * 0.25);
+  text-align: center;
 }
 
-/* Consider adding loading spinner styles if not globally available */
 .loadingSpinner {
-  /* Basic spinner, replace with your preferred one */
   border: 4px solid var(--bg-secondary);
   border-top: 4px solid var(--accent-warm);
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  border-radius: 50%; /* Or var(--border-radius-pill) if you want to use it */
+  width: calc(var(--spacing-unit) * 3); /* 24px */
+  height: calc(var(--spacing-unit) * 3); /* 24px */
   animation: spin 1s linear infinite;
-  margin: 1rem auto; /* Center it */
+  margin: calc(var(--spacing-unit) * 2) auto; /* ~1rem */
 }
 
 @keyframes spin {
@@ -155,4 +158,93 @@
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* --- Button Styles --- */
+/* Base style for these specific action buttons */
+.actionButtonBase {
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1.5);
+  border: none;
+  border-radius: var(--border-radius-sm); /* Updated to use global var */
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500; /* Added for better readability */
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+    opacity 0.2s ease;
+  margin-top: var(--spacing-unit); /* Updated to use global var */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none; /* Ensure no underlines */
+}
+
+/* For "Set Journal Restriction" and "Change" buttons */
+.selectJournalButton,
+.changeButton {
+  background-color: var(--accent-warm);
+  color: white; /* As requested, but BE AWARE of low contrast */
+  /* To slightly improve perceived contrast of white on --accent-warm: */
+  /* text-shadow: 0 0 1px rgba(0, 0, 0, 0.3); /* Subtle shadow behind text */
+}
+
+.selectJournalButton:hover,
+.changeButton:hover {
+  background-color: var(--accent-warm-light);
+  /* color: var(--text-primary); Would be better for contrast on light bg */
+  color: white; /* Sticking to white text requirement */
+  box-shadow: 0 1px 3px var(--shadow-color);
+}
+
+/* For "Clear" button */
+.clearButton {
+  /* Styling for a "clear" or "secondary destructive" action using existing vars */
+  background-color: var(--bg-card); /* White background */
+  color: var(
+    --text-secondary
+  ); /* Using text-secondary for a less prominent "danger" feel */
+  border: 1px solid var(--border-subtle); /* Subtle border */
+}
+
+.clearButton:hover {
+  background-color: var(--bg-secondary); /* Light grey on hover */
+  color: var(
+    --accent-warm
+  ); /* Use accent color for text on hover for a hint of "warning" */
+  border-color: var(--accent-warm-light);
+  box-shadow: 0 1px 3px var(--shadow-color);
+}
+
+/* Disabled state for all these buttons */
+.selectJournalButton:disabled,
+.changeButton:disabled,
+.clearButton:disabled {
+  background-color: var(--border-subtle);
+  color: var(--text-secondary); /* Lighter text for disabled state */
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.6;
+  border: none; /* Ensure no border for consistency on disabled */
+}
+/* If .clearButton has a border in normal state, specify disabled border too */
+.clearButton:disabled {
+  border: 1px solid var(--border-subtle);
+}
+
+.restrictionDisplay {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit); /* Use global var */
+  margin-top: var(--spacing-unit);
+  padding: var(--spacing-unit);
+  /* --background-alt not in your globals, using --bg-secondary */
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm); /* Use global var */
+  border: 1px solid var(--border-subtle); /* Added border for definition */
+  font-size: 0.9em;
+}
+
+.restrictionDisplay span {
+  flex-grow: 1;
+  color: var(--text-primary);
 }

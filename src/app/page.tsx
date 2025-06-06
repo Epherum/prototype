@@ -952,7 +952,7 @@ export default function Home() {
               onSelectTopLevel: (id: string, childId?: string | null) =>
                 journalManager.handleSelectTopLevelJournal(
                   id,
-                  journalManager.currentHierarchy,
+                  journalManager.hierarchyData,
                   childId
                 ),
               onToggleLevel2Id: (id: string) =>
@@ -965,26 +965,8 @@ export default function Home() {
                   id,
                   journalManager.currentHierarchy
                 ),
-              onL2DoubleClick: (itemId: string, isSelected: boolean) =>
-                journalManager.handleL2DoubleClick(
-                  itemId,
-                  isSelected,
-                  journalManager.hierarchyData
-                ), // Pass fullHierarchyData
-              onL3DoubleClick: (itemId: string, isSelected: boolean) =>
-                journalManager.handleL3DoubleClick(
-                  itemId,
-                  isSelected,
-                  journalManager.hierarchyData
-                ), // Pass fullHierarchyData
-              onNavigateContextDown: (args: any) =>
-                journalManager.handleNavigateContextDown(
-                  args,
-                  journalManager.currentHierarchy
-                ),
               rootJournalIdConst: ROOT_JOURNAL_ID,
               restrictedJournalId: effectiveRestrictedJournalId, // <<<< Pass restriction ID
-              onOpenModal: journalManager.openJournalNavModal,
               isRootView: isHierarchicalSliderRootView,
               currentFilterStatus: journalManager.journalRootFilterStatus,
               onFilterStatusChange: journalManager.setJournalRootFilterStatus,
@@ -1143,9 +1125,6 @@ export default function Home() {
       journalManager.handleSelectTopLevelJournal,
       journalManager.handleToggleLevel2JournalId,
       journalManager.handleToggleLevel3JournalId,
-      journalManager.handleL2DoubleClick,
-      journalManager.handleL3DoubleClick,
-      journalManager.handleNavigateContextDown,
       journalManager.journalRootFilterStatus,
       journalManager.setJournalRootFilterStatus,
       effectiveRestrictedJournalId, // <<<< Added for isHierarchicalSliderRootView and restrictedJournalId prop
@@ -1336,24 +1315,27 @@ export default function Home() {
                         selectedLevel3Ids={
                           (sliderSpecificProps as any).selectedLevel3Ids
                         }
-                        onSelectTopLevel={
-                          (sliderSpecificProps as any).onSelectTopLevel
+                        onSelectTopLevel={(
+                          id: string,
+                          childId?: string | null
+                        ) =>
+                          journalManager.handleSelectTopLevelJournal(
+                            id,
+                            journalManager.hierarchyData,
+                            childId
+                          )
                         }
-                        onToggleLevel2Id={
-                          (sliderSpecificProps as any).onToggleLevel2Id
+                        onToggleLevel2Id={(id: string) =>
+                          journalManager.handleToggleLevel2JournalId(
+                            id,
+                            journalManager.currentHierarchy
+                          )
                         }
-                        onToggleLevel3Id={
-                          (sliderSpecificProps as any).onToggleLevel3Id
-                        }
-                        onL2DoubleClick={
-                          // Added L2 double click handler
-                          (sliderSpecificProps as any).onL2DoubleClick
-                        }
-                        onL3DoubleClick={
-                          (sliderSpecificProps as any).onL3DoubleClick
-                        }
-                        onNavigateContextDown={
-                          (sliderSpecificProps as any).onNavigateContextDown
+                        onToggleLevel3Id={(id: string) =>
+                          journalManager.handleToggleLevel3JournalId(
+                            id,
+                            journalManager.currentHierarchy
+                          )
                         }
                         rootJournalIdConst={
                           // This is the true ROOT_JOURNAL_ID
@@ -1363,7 +1345,6 @@ export default function Home() {
                           // Pass the actual restriction ID
                           (sliderSpecificProps as any).restrictedJournalId
                         }
-                        onOpenModal={(sliderSpecificProps as any).onOpenModal}
                         isRootView={(sliderSpecificProps as any).isRootView}
                         currentFilterStatus={
                           (sliderSpecificProps as any).currentFilterStatus

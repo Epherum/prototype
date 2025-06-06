@@ -17,9 +17,7 @@ const hasPermission = (
   const MANAGE_USERS_PERMISSION = "MANAGE_USERS";
   return session.user.roles.some((role) =>
     role.permissions?.some(
-      (p) =>
-        `${p.action}_${p.resource}` === MANAGE_USERS_PERMISSION ||
-        p.id === MANAGE_USERS_PERMISSION
+      (p) => `${p.action}_${p.resource}` === MANAGE_USERS_PERMISSION
     )
   );
 };

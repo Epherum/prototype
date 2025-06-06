@@ -35,11 +35,10 @@ function hasApiPermission(
   return sessionUser.roles.some((role) =>
     role.permissions.some(
       (p) =>
-        p.id === permissionIdentifier || // Check by permission ID (if you use unique IDs for permissions)
-        (p.action &&
-          p.resource &&
-          `${p.action.toUpperCase()}_${p.resource.toUpperCase()}` ===
-            permissionIdentifier.toUpperCase()) // Check by ACTION_RESOURCE
+        p.action &&
+        p.resource &&
+        `${p.action.toUpperCase()}_${p.resource.toUpperCase()}` ===
+          permissionIdentifier.toUpperCase()
     )
   );
 }
@@ -78,8 +77,6 @@ export async function POST(request: NextRequest) {
     id: session.user.id,
     companyId: session.user.companyId,
     roles: session.user.roles.map((role) => ({
-      // Ensure this structure matches AdminSessionUser in userService
-      id: role.id, // Assuming role object in session has 'id'
       name: role.name, // Assuming role object in session has 'name'
       permissions: role.permissions || [], // Assuming permissions is an array on each role object
     })),

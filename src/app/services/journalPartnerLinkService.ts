@@ -11,6 +11,7 @@ export type CreateJournalPartnerLinkData = {
   dateDebut?: Date | string | null; // Allow string for API input, convert to Date
   dateFin?: Date | string | null; // Allow string for API input, convert to Date
   documentReference?: string | null;
+  companyId: string;
 };
 
 const journalPartnerLinkService = {
@@ -24,7 +25,9 @@ const journalPartnerLinkService = {
 
     // Validation: Check if Journal exists
     const journalExists = await prisma.journal.findUnique({
-      where: { id: data.journalId },
+      where: {
+        id_companyId: { id: data.journalId, companyId: data.companyId },
+      },
     });
     if (!journalExists) {
       throw new Error(`Journal with ID '${data.journalId}' not found.`);

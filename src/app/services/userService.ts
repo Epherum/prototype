@@ -7,12 +7,10 @@ import prismaInstance from "@/app/utils/prisma"; // Assuming your prisma instanc
 interface AdminSessionUser {
   id: string;
   companyId: string;
-  // Assuming roles and permissions are available for permission checks
   // The structure should match what your authOptions provide in the session
   roles: Array<{
-    id: string; // Role ID
     name: string; // Role name
-    permissions: Array<{ id: string; action: string; resource: string }>; // Permission details
+    permissions: Array<{ action: string; resource: string }>; // Permission details
   }>;
 }
 
@@ -24,12 +22,10 @@ function hasGlobalPermission(
   if (!sessionUser || !sessionUser.roles) {
     return false;
   }
-  // This checks if any of the user's roles have a permission whose ID or concatenated action_resource matches
+  // This checks if any of the user's roles have a permission whose concatenated action_resource matches
   return sessionUser.roles.some((role) =>
     role.permissions.some(
-      (p) =>
-        p.id === permissionIdentifier ||
-        `${p.action}_${p.resource}` === permissionIdentifier
+      (p) => `${p.action}_${p.resource}` === permissionIdentifier
     )
   );
 }

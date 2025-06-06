@@ -8,6 +8,8 @@ import { Partner, PartnerType, Prisma } from "@prisma/client"; // Added Prisma
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import journalPartnerLinkService from "@/app/services/journalPartnerLinkService"; // For specific scenarios if needed
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
+import { getServerSession } from "next-auth/next";
+import { authOptions, ExtendedSession } from "@/lib/authOptions";
 
 const createPartnerSchema = z.object({
   name: z.string().min(1, "Partner name is required").max(255),
@@ -231,6 +233,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log("Waiter (API /partners): Customer wants to add a new partner.");
   try {
+    // --- AUTH ---
+    const session = (await getServerSession(
+      authOptions
+    )) as ExtendedSession | null;
+    if (!session?.user?.id || !session?.user?.companyId) {
+      return NextResponse.json(
+        { message: "Unauthorized: Session or user details missing" },
+        { status: 401 }
+      );
+    }
+    // --- END AUTH ---
+
     const rawOrder = await request.json();
     console.log(
       "Waiter (API /partners): Customer's raw order for new partner:",
@@ -252,7 +266,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validOrderData = validation.data as CreatePartnerData;
+    // Add companyId from session and ensure required fields are present
+    const {
+      name,
+      partnerType,
+      notes,
+      logoUrl,
+      photoUrl,
+      isUs,
+      registrationNumber,
+      taxId,
+      bioFatherName,
+      bioMotherName,
+      additionalDetails,
+    } = validation.data;
+    const validOrderData: CreatePartnerData = {
+      name,
+      partnerType,
+      notes: notes ?? null,
+      logoUrl: logoUrl ?? null,
+      photoUrl: photoUrl ?? null,
+      isUs: isUs ?? null,
+      registrationNumber: registrationNumber ?? null,
+      taxId: taxId ?? null,
+      bioFatherName: bioFatherName ?? null,
+      bioMotherName: bioMotherName ?? null,
+      additionalDetails: additionalDetails ?? null,
+      companyId: session.user.companyId,
+    };
     console.log(
       "Waiter (API /partners): Order for new partner is clear. Passing to Chef."
     );

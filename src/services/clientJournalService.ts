@@ -1,49 +1,7 @@
 // src/services/clientJournalService.ts
 import type { AccountNodeData, Journal } from "@/lib/types";
 import type { Journal as PrismaJournal } from "@prisma/client";
-import { JournalForAdminSelection } from "@/lib/helpers";
-
-// ... (buildTree function remains the same) ...
-function buildTree(journals: Journal[]): AccountNodeData[] {
-  const journalMap: Record<
-    string,
-    AccountNodeData & { childrenFromApi?: Journal[] }
-  > = {};
-  const tree: AccountNodeData[] = [];
-
-  journals.forEach((journal) => {
-    journalMap[journal.id] = {
-      ...journal,
-      name: journal.name,
-      code: journal.id, // Assuming 'id' is used as 'code' if no separate code field
-      children: [],
-    };
-  });
-
-  journals.forEach((journal) => {
-    if (journal.parentId && journalMap[journal.parentId]) {
-      if (!journalMap[journal.parentId].children) {
-        journalMap[journal.parentId].children = [];
-      }
-      journalMap[journal.parentId].children?.push(journalMap[journal.id]);
-    } else {
-      // This node is a root (either a true root or the root of a sub-hierarchy)
-      tree.push(journalMap[journal.id]);
-    }
-  });
-
-  const sortChildren = (nodes: AccountNodeData[]) => {
-    nodes.sort((a, b) => (a.code || "").localeCompare(b.code || ""));
-    nodes.forEach((node) => {
-      if (node.children && node.children.length > 0) {
-        sortChildren(node.children);
-      }
-    });
-  };
-  sortChildren(tree);
-
-  return tree;
-}
+import { JournalForAdminSelection, buildTree } from "@/lib/helpers";
 
 export async function fetchJournalHierarchy(
   restrictedTopLevelJournalId?: string | null
@@ -215,43 +173,58 @@ export async function fetchTopLevelJournalsForAdmin(): Promise<
 }
 
 // It calls the new API endpoint /api/journals/all-for-admin-selection
+// src/services/clientJournalService.ts
 export async function fetchAllJournalsForAdminRestriction(): Promise<
   JournalForAdminSelection[]
 > {
-  console.log(
-    "[clientJournalService] Calling API: /api/journals/all-for-admin-selection"
-  ); // Added log
-  const response = await fetch("/api/journals/all-for-admin-selection", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    let errorData;
-    try {
-      errorData = await response.json();
-    } catch (e) {
-      // If parsing JSON fails, or if it's a non-JSON error
-      errorData = {
-        message: `Failed to fetch all journals for admin: ${response.statusText} (${response.status}) (No JSON error body or parse failed)`,
-      };
-    }
-    console.error(
-      "[clientJournalService] Error fetching all journals for admin restriction:",
-      errorData
-    ); // Updated log
-    throw new Error(
-      errorData?.message ||
-        `Failed to fetch all journals for admin: ${response.statusText}`
+  const apiUrl = "/api/journals/all-for-admin-selection";
+  console.log(`[clientJournalService] Attempting to fetch: ${apiUrl}`);
+  try {
+    const response = await fetch(apiUrl, {
+      /* ... headers ... */
+    });
+    console.log(
+      `[clientJournalService] Response status for ${apiUrl}: ${response.status}`
     );
+
+    if (!response.ok) {
+      let errorData = {
+        message: `Request failed with status ${response.status} ${response.statusText}`,
+      };
+      try {
+        const textError = await response.text(); // Try to get raw text
+        console.error(
+          `[clientJournalService] Raw error response text for ${apiUrl}:`,
+          textError
+        );
+        errorData = JSON.parse(textError); // Then try to parse if it might be JSON
+      } catch (e) {
+        console.error(
+          `[clientJournalService] Could not parse error response as JSON for ${apiUrl}, or response was not JSON.`,
+          e
+        );
+        // errorData.message remains the status text
+      }
+      console.error(
+        "[clientJournalService] Error fetching all journals for admin restriction (non-ok response):",
+        errorData
+      );
+      throw new Error(
+        errorData?.message || `Failed to fetch: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    console.log(
+      "[clientJournalService] Successfully fetched all journals for admin restriction, count:",
+      data.length
+    );
+    return data;
+  } catch (error) {
+    console.error(
+      `[clientJournalService] Network or other error in fetchAllJournalsForAdminRestriction for ${apiUrl}:`,
+      error
+    );
+    throw error; // Re-throw to be caught by TanStack Query
   }
-  const data = await response.json();
-  console.log(
-    "[clientJournalService] Successfully fetched all journals for admin restriction:",
-    data.length,
-    "journals"
-  ); // Added log
-  return data;
 }

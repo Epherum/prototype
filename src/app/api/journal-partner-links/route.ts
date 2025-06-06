@@ -5,6 +5,8 @@ import journalPartnerLinkService, {
 } from "@/app/services/journalPartnerLinkService";
 import { z } from "zod";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
+import { getServerSession } from "next-auth/next";
+import { authOptions, ExtendedSession } from "@/lib/authOptions";
 
 const createLinkSchema = z.object({
   journalId: z.string().min(1),
@@ -37,6 +39,18 @@ export async function POST(request: NextRequest) {
     "Waiter (API /journal-partner-links): Customer wants to link a journal and partner."
   );
   try {
+    // --- AUTH ---
+    const session = (await getServerSession(
+      authOptions
+    )) as ExtendedSession | null;
+    if (!session?.user?.id || !session?.user?.companyId) {
+      return NextResponse.json(
+        { message: "Unauthorized: Session or user details missing" },
+        { status: 401 }
+      );
+    }
+    // --- END AUTH ---
+
     const rawOrder = await request.json();
     const validation = createLinkSchema.safeParse(rawOrder);
 
@@ -50,14 +64,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validOrderData = validation.data as CreateJournalPartnerLinkData; // Zod's output should match after transform
     // Ensure BigInt conversion for partnerId if not handled by Zod preprocess perfectly
-    if (
-      typeof validOrderData.partnerId === "string" ||
-      typeof validOrderData.partnerId === "number"
-    ) {
-      validOrderData.partnerId = BigInt(validOrderData.partnerId);
+    let {
+      journalId,
+      partnerId,
+      partnershipType,
+      exoneration,
+      periodType,
+      dateDebut,
+      dateFin,
+      documentReference,
+    } = validation.data;
+    if (typeof partnerId === "string" || typeof partnerId === "number") {
+      partnerId = BigInt(partnerId);
     }
+    const validOrderData = {
+      journalId,
+      partnerId,
+      partnershipType: partnershipType ?? null,
+      exoneration: exoneration ?? null,
+      periodType: periodType ?? null,
+      dateDebut: dateDebut ?? null,
+      dateFin: dateFin ?? null,
+      documentReference: documentReference ?? null,
+      companyId: session.user.companyId,
+    };
 
     const newLink = await journalPartnerLinkService.createLink(validOrderData);
     const body = JSON.stringify(newLink, jsonBigIntReplacer);
