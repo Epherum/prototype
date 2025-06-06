@@ -116,8 +116,8 @@ export default function Home() {
   const journalManager = useJournalManager({
     sliderOrder,
     visibility,
-    restrictedJournalId: effectiveRestrictedJournalId,
-    restrictedJournalCompanyId: effectiveRestrictedJournalCompanyId,
+    restrictedJournalId: effectiveRestrictedJournalId, // <<<< Pass determined restriction
+    restrictedJournalCompanyId: effectiveRestrictedJournalCompanyId, // <<<< Pass determined restriction company
   });
 
   const {
@@ -643,7 +643,7 @@ export default function Home() {
     (formDataFromModal: Omit<AccountNodeData, "children">) => {
       journalManager.createJournal(formDataFromModal);
     },
-    [journalManager.createJournal, journalManager.addJournalContext]
+    [journalManager.createJournal, journalManager.addJournalContext] // journalManager.addJournalContext was listed as dependency, keep if intended.
   );
 
   const handleDeleteJournalAccount = useCallback(
@@ -706,7 +706,7 @@ export default function Home() {
     };
     jpqlLinking.createSimpleJPGLHandler(linkDataForSimpleButton);
   }, [
-    effectiveSelectedJournalIds, // This comes from journalManager, ensure it's in page scope
+    journalManager.effectiveSelectedJournalIds, // Now directly from journalManager destructuring
     partnerManager.selectedPartnerId,
     goodManager.selectedGoodsId,
     jpqlLinking.createSimpleJPGLHandler,
@@ -778,9 +778,9 @@ export default function Home() {
     console.log("--- DOCUMENT VALIDATED (SIMULATED) ---");
     console.log(
       "Journal Context (L1, L2, L3):",
-      selectedTopLevelJournalId,
-      selectedLevel2JournalIds,
-      selectedLevel3JournalIds
+      selectedTopLevelJournalId, // from journalManager
+      selectedLevel2JournalIds, // from journalManager
+      selectedLevel3JournalIds // from journalManager
     );
     console.log("Partner:", partnerDetails);
     console.log("Goods for Document:", selectedGoodsForDocument);
@@ -790,9 +790,9 @@ export default function Home() {
     partnerManager.partnerQuery.data,
     lockedPartnerId,
     selectedGoodsForDocument,
-    journalManager.selectedTopLevelJournalId,
-    journalManager.selectedLevel2JournalIds,
-    journalManager.selectedLevel3JournalIds,
+    selectedTopLevelJournalId, // from journalManager
+    selectedLevel2JournalIds, // from journalManager
+    selectedLevel3JournalIds, // from journalManager
     resetDocumentCreationState,
   ]);
 
@@ -819,8 +819,8 @@ export default function Home() {
     [
       isDocumentCreationMode,
       lockedPartnerId,
-      partnerManager.setSelectedPartnerId,
-      goodManager.setSelectedGoodsId,
+      partnerManager.setSelectedPartnerId, // from partnerManager
+      goodManager.setSelectedGoodsId, // from goodManager
     ]
   );
 
@@ -931,26 +931,61 @@ export default function Home() {
               onOpenModal: journalManager.openJournalNavModal,
             };
           } else if (journalManager.isJournalSliderPrimary) {
+            // Determine isRootView for the hierarchical slider
+            const isHierarchicalSliderRootView =
+              (journalManager.selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+                !effectiveRestrictedJournalId) ||
+              (effectiveRestrictedJournalId &&
+                journalManager.selectedTopLevelJournalId ===
+                  effectiveRestrictedJournalId);
+
             return {
               _isFlatJournalMode: false,
               hierarchyData: journalManager.currentHierarchy,
-              fullHierarchyData: journalManager.hierarchyData,
+              fullHierarchyData: journalManager.hierarchyData, // Pass the potentially fuller data for findParentOfNode
               isLoading: journalManager.isHierarchyLoading,
               isError: journalManager.isHierarchyError,
               error: journalManager.hierarchyError,
               selectedTopLevelId: journalManager.selectedTopLevelJournalId,
               selectedLevel2Ids: journalManager.selectedLevel2JournalIds || [],
               selectedLevel3Ids: journalManager.selectedLevel3JournalIds || [],
-              onSelectTopLevel: journalManager.handleSelectTopLevelJournal,
-              onToggleLevel2Id: journalManager.handleToggleLevel2JournalId,
-              onToggleLevel3Id: journalManager.handleToggleLevel3JournalId,
-              onL2DoubleClick: journalManager.handleL2DoubleClick,
-              onL3DoubleClick: journalManager.handleL3DoubleClick,
-              onNavigateContextDown: journalManager.handleNavigateContextDown,
+              onSelectTopLevel: (id: string, childId?: string | null) =>
+                journalManager.handleSelectTopLevelJournal(
+                  id,
+                  journalManager.currentHierarchy,
+                  childId
+                ),
+              onToggleLevel2Id: (id: string) =>
+                journalManager.handleToggleLevel2JournalId(
+                  id,
+                  journalManager.currentHierarchy
+                ),
+              onToggleLevel3Id: (id: string) =>
+                journalManager.handleToggleLevel3JournalId(
+                  id,
+                  journalManager.currentHierarchy
+                ),
+              onL2DoubleClick: (itemId: string, isSelected: boolean) =>
+                journalManager.handleL2DoubleClick(
+                  itemId,
+                  isSelected,
+                  journalManager.hierarchyData
+                ), // Pass fullHierarchyData
+              onL3DoubleClick: (itemId: string, isSelected: boolean) =>
+                journalManager.handleL3DoubleClick(
+                  itemId,
+                  isSelected,
+                  journalManager.hierarchyData
+                ), // Pass fullHierarchyData
+              onNavigateContextDown: (args: any) =>
+                journalManager.handleNavigateContextDown(
+                  args,
+                  journalManager.currentHierarchy
+                ),
               rootJournalIdConst: ROOT_JOURNAL_ID,
+              restrictedJournalId: effectiveRestrictedJournalId, // <<<< Pass restriction ID
               onOpenModal: journalManager.openJournalNavModal,
-              isRootView:
-                journalManager.selectedTopLevelJournalId === ROOT_JOURNAL_ID,
+              isRootView: isHierarchicalSliderRootView,
               currentFilterStatus: journalManager.journalRootFilterStatus,
               onFilterStatusChange: journalManager.setJournalRootFilterStatus,
             };
@@ -1076,7 +1111,7 @@ export default function Home() {
       visibility,
       isGPStartOrder,
       selectedContextJournalIdForGPG,
-      journalManager.hierarchyData,
+      // journalManager.hierarchyData, // Now using journalManager.currentHierarchy or journalManager.hierarchyData explicitly in props below
       goodManager.goodsQueryState,
       goodManager.selectedGoodsId,
       goodManager.setSelectedGoodsId,
@@ -1098,6 +1133,7 @@ export default function Home() {
       journalManager.isJournalSliderPrimary, // Determines which journal view
       // journalManager props for hierarchical view
       journalManager.currentHierarchy,
+      journalManager.hierarchyData, // Specifically for fullHierarchyData prop
       journalManager.isHierarchyLoading,
       journalManager.isHierarchyError,
       journalManager.hierarchyError,
@@ -1112,6 +1148,7 @@ export default function Home() {
       journalManager.handleNavigateContextDown,
       journalManager.journalRootFilterStatus,
       journalManager.setJournalRootFilterStatus,
+      effectiveRestrictedJournalId, // <<<< Added for isHierarchicalSliderRootView and restrictedJournalId prop
       // partnerManager props for PARTNER case
       partnerManager.partnersForSlider, // Data source for partner slider
       partnerManager.partnerQuery, // Contains isLoading, isError for partner slider
@@ -1281,7 +1318,12 @@ export default function Home() {
                       <JournalHierarchySlider
                         sliderId={sliderId}
                         hierarchyData={
+                          // This is currentHierarchy from journalManager
                           (sliderSpecificProps as any).hierarchyData
+                        }
+                        fullHierarchyData={
+                          // This is hierarchyData (raw from query) from journalManager
+                          (sliderSpecificProps as any).fullHierarchyData
                         }
                         isLoading={(sliderSpecificProps as any).isLoading}
                         isError={(sliderSpecificProps as any).isError}
@@ -1303,6 +1345,10 @@ export default function Home() {
                         onToggleLevel3Id={
                           (sliderSpecificProps as any).onToggleLevel3Id
                         }
+                        onL2DoubleClick={
+                          // Added L2 double click handler
+                          (sliderSpecificProps as any).onL2DoubleClick
+                        }
                         onL3DoubleClick={
                           (sliderSpecificProps as any).onL3DoubleClick
                         }
@@ -1310,7 +1356,12 @@ export default function Home() {
                           (sliderSpecificProps as any).onNavigateContextDown
                         }
                         rootJournalIdConst={
+                          // This is the true ROOT_JOURNAL_ID
                           (sliderSpecificProps as any).rootJournalIdConst
+                        }
+                        restrictedJournalId={
+                          // Pass the actual restriction ID
+                          (sliderSpecificProps as any).restrictedJournalId
                         }
                         onOpenModal={(sliderSpecificProps as any).onOpenModal}
                         isRootView={(sliderSpecificProps as any).isRootView}
@@ -1319,12 +1370,6 @@ export default function Home() {
                         }
                         onFilterStatusChange={
                           (sliderSpecificProps as any).onFilterStatusChange
-                        }
-                        onL2DoubleClick={
-                          (sliderSpecificProps as any).onL2DoubleClick
-                        }
-                        fullHierarchyData={
-                          (sliderSpecificProps as any).fullHierarchyData
                         }
                       />
                     )
@@ -1488,7 +1533,7 @@ export default function Home() {
               onSubmitLinks={goodJournalLinking.submitLinkGoodToJournalsHandler}
               goodToLink={goodJournalLinking.goodForLinking}
               isSubmitting={goodJournalLinking.isSubmittingLinkGoodToJournals}
-              onOpenJournalSelector={goodJournalLinking.onOpenJournalSelector}
+              onOpenJournalSelector={goodJournalLinking.onOpenJournalSelector} // This was already correct
             />
           )}
       </AnimatePresence>
@@ -1555,8 +1600,8 @@ export default function Home() {
                 !isJournalModalOpenForLinking
               ) {
                 journalManager.handleSelectTopLevelJournal(
-                  ROOT_JOURNAL_ID,
-                  journalManager.currentHierarchy
+                  ROOT_JOURNAL_ID, // This should navigate to the effective root (considering restriction)
+                  journalManager.currentHierarchy // or journalManager.hierarchyData if true root is always intended here
                 );
               }
             }}
@@ -1573,7 +1618,7 @@ export default function Home() {
                       id: ROOT_JOURNAL_ID_FOR_MODAL,
                       name: `Chart of Accounts`,
                       code: "ROOT",
-                      children: journalManager.currentHierarchy,
+                      children: journalManager.currentHierarchy, // This is already the restricted view if applicable
                       isConceptualRoot: true,
                     },
                   ]
@@ -1583,8 +1628,9 @@ export default function Home() {
               const parentNode =
                 parentId === ROOT_JOURNAL_ID_FOR_MODAL
                   ? null
-                  : findNodeById(journalManager.currentHierarchy, parentId);
+                  : findNodeById(journalManager.currentHierarchy, parentId); // Search within current (potentially restricted) hierarchy
               journalManager.openAddJournalModal({
+                // This uses the hook's openAddJournalModal method
                 level: parentNode ? "child" : "top",
                 parentId: parentNode ? parentId : null,
                 parentCode: parentCode,
@@ -1601,13 +1647,15 @@ export default function Home() {
             isOpen={isJournalModalOpenForGPGContext}
             onClose={() => setIsJournalModalOpenForGPGContext(false)}
             onConfirmSelection={(selectedNodeId) => {
+              // This callback is for navigation, ensure it respects hierarchy
               let nodeToPass: AccountNodeData | null = null;
               if (
                 selectedNodeId &&
                 selectedNodeId !== ROOT_JOURNAL_ID_FOR_MODAL
               ) {
                 nodeToPass = findNodeById(
-                  journalManager.hierarchyData || [],
+                  // Search within the *full* hierarchyData for context selection
+                  journalManager.hierarchyData || [], // Use hierarchyData (potentially unfiltered) if selecting outside current view context
                   selectedNodeId
                 );
               }
@@ -1615,7 +1663,7 @@ export default function Home() {
                 handleGPGContextJournalSelected(nodeToPass);
               }
             }}
-            onSelectForLinking={handleGPGContextJournalSelected}
+            onSelectForLinking={handleGPGContextJournalSelected} // This is for selecting the GPG context
             modalTitle="Select Context Journal for G-P-G View"
             hierarchy={
               journalManager.isHierarchyLoading
@@ -1625,7 +1673,7 @@ export default function Home() {
                       id: ROOT_JOURNAL_ID_FOR_MODAL,
                       name: `Chart of Accounts (Select Context Journal)`,
                       code: "ROOT",
-                      children: journalManager.currentHierarchy,
+                      children: journalManager.currentHierarchy, // Show current restricted view for selection
                       isConceptualRoot: true,
                     },
                   ]
@@ -1637,6 +1685,7 @@ export default function Home() {
                   ? null
                   : findNodeById(journalManager.currentHierarchy, parentId);
               journalManager.openAddJournalModal({
+                // Hook's method
                 level: parentNode ? "child" : "top",
                 parentId: parentNode ? parentId : null,
                 parentCode,
@@ -1645,11 +1694,13 @@ export default function Home() {
             }}
             onDeleteAccount={handleDeleteJournalAccount}
             onSetShowRoot={() => {
+              // This is effectively "clear selection" or "select conceptual root" for linking
               handleGPGContextJournalSelected({
-                id: ROOT_JOURNAL_ID_FOR_MODAL,
+                id: ROOT_JOURNAL_ID_FOR_MODAL, // This might need to be a true null or a specific "no context" state
                 name: "Chart of Accounts",
                 code: "ROOT",
-              });
+                isConceptualRoot: true, // Add this to signify it's not a real journal
+              } as AccountNodeData);
             }}
           />
         )}

@@ -1,23 +1,20 @@
-// File: app/api/journals/route.ts
+// src/app/api/journals/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions, ExtendedSession } from "@/lib/authOptions";
 import {
   journalService,
   CreateJournalData,
-  // AuthenticatedUserContext, // No longer needed here if we construct it from session
 } from "@/app/services/journalService";
 import { z } from "zod";
 import journalPartnerLinkService from "@/app/services/journalPartnerLinkService";
 import journalGoodLinkService from "@/app/services/journalGoodLinkService";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
-import { parseBigIntParam } from "@/app/utils/jsonBigInt"; // Assuming this handles BigInt conversion for query params
+import { parseBigIntParam } from "@/app/utils/jsonBigInt";
 
-// Define AuthenticatedUserContext for service calls
 interface AuthenticatedUserContext {
   companyId: string;
-  userId: string; // Good to have for logging/auditing
-  // Include roles/permissions if your service layer needs fine-grained checks beyond just companyId
+  userId: string;
 }
 
 const createJournalSchema = z.object({
@@ -34,7 +31,7 @@ const createJournalSchema = z.object({
 export async function GET(request: NextRequest) {
   const session = (await getServerSession(
     authOptions
-  )) as ExtendedSession | null; // Cast to your ExtendedSession
+  )) as ExtendedSession | null;
 
   if (!session?.user?.id || !session?.user?.companyId) {
     return NextResponse.json(
@@ -50,19 +47,23 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const parentIdParam = searchParams.get("parentId");
-  const fetchRootParam = searchParams.get("root");
+  const fetchRootParam = searchParams.get("root"); // For unrestricted users fetching top-level
   const linkedToPartnerIdStr = searchParams.get("linkedToPartnerId");
   const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
-  // For restricted journal access
-  const restrictedTopLevelJournalId = searchParams.get(
+
+  // Parameter for fetching a sub-hierarchy for a restricted user
+  const restrictedTopLevelJournalIdQueryParam = searchParams.get(
     "restrictedTopLevelJournalId"
   );
+  // This flag will clarify intent: are we fetching the sub-tree from restrictedTopLevelJournalId?
+  const fetchSubtreeFlag = searchParams.get("fetchSubtree");
 
   console.log(
-    `API /journals GET (User: ${userContext.userId}, Company: ${userContext.companyId}): parentId="${parentIdParam}", root="${fetchRootParam}", partnerId="${linkedToPartnerIdStr}", goodId="${linkedToGoodIdStr}", restrictedJournal="${restrictedTopLevelJournalId}"`
+    `API /journals GET (User: ${userContext.userId}, Company: ${userContext.companyId}): parentId="${parentIdParam}", root="${fetchRootParam}", partnerId="${linkedToPartnerIdStr}", goodId="${linkedToGoodIdStr}", restrictedJournalQuery="${restrictedTopLevelJournalIdQueryParam}", fetchSubtree="${fetchSubtreeFlag}"`
   );
 
   try {
+    // ... (partnerIdForFilter, goodIdForFilter parsing logic remains the same) ...
     let partnerIdForFilter: bigint | null = null;
     let goodIdForFilter: bigint | null = null;
     let errorMessages: string[] = [];
@@ -94,18 +95,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // --- New Filtering Scenarios (Now with userContext for company scoping) ---
-    // Note: jpgLinkService, journalPartnerLinkService, journalGoodLinkService
-    // will also need to be updated to accept and use userContext (companyId) in their queries.
-    // For now, I'll assume they are, or their internal queries are already company-scoped.
-    // If not, they would need similar refactoring as journalService.
-
-    // Scenario A: Filter by Partner AND Good
+    // --- Linkage-based Filtering (Partner/Good) ---
+    // These should come first as they are specific overrides.
+    // (Assuming these services are also company-scoped internally or accept userContext)
     if (partnerIdForFilter !== null && goodIdForFilter !== null) {
-      // Only pass the two required arguments
       const journalIds = await jpgLinkService.getJournalIdsForPartnerAndGood(
         partnerIdForFilter,
         goodIdForFilter
+        // Consider passing userContext if service needs it
       );
       if (journalIds.length === 0)
         return NextResponse.json([], { status: 200 });
@@ -114,95 +111,41 @@ export async function GET(request: NextRequest) {
       });
       return NextResponse.json(journals);
     }
-
-    // Scenario B: Filter by Partner ID only
     if (partnerIdForFilter !== null) {
-      // Only pass the required argument
       const journals = await journalPartnerLinkService.getJournalsForPartner(
         partnerIdForFilter
+        // Consider passing userContext
       );
       return NextResponse.json(journals);
     }
-
-    // Scenario C: Filter by Good ID only
     if (goodIdForFilter !== null) {
-      // Only pass the required argument
       const journals = await journalGoodLinkService.getJournalsForGood(
         goodIdForFilter
+        // Consider passing userContext
       );
       return NextResponse.json(journals);
     }
 
-    // --- Existing Hierarchy-based Scenarios (Now with userContext) ---
-    // Handle journal restriction from user's session
-    // This part is crucial for respecting user's restrictedTopLevelJournalId
-    // The client should pass the user's restrictedTopLevelJournalId if applicable
-    let baseQueryOptions: { where?: any } = {};
-
-    if (restrictedTopLevelJournalId) {
-      // This is for users who have a specific top-level journal restriction.
-      // We need to fetch this journal and all its descendants.
-      // This might require a recursive fetch or a specific service method in journalService.
-      // For simplicity here, let's assume getAllJournals can be modified or a new service method
-      // like `getJournalHierarchyFrom` is used.
-      // E.g., const journals = await journalService.getJournalHierarchyFrom(restrictedTopLevelJournalId, userContext);
-
-      // A simpler approach for now, if client handles hierarchy building:
-      // Fetch the restricted top-level journal itself
-      const topRestricted = await journalService.getJournalById(
-        restrictedTopLevelJournalId,
+    // --- Journal Restriction Logic ---
+    // If restrictedTopLevelJournalIdQueryParam is provided AND fetchSubtree is true,
+    // fetch that specific journal and its descendants. This is the primary path for restricted users.
+    if (restrictedTopLevelJournalIdQueryParam && fetchSubtreeFlag === "true") {
+      console.log(
+        `API /journals GET: Fetching sub-hierarchy for restricted journal ID: ${restrictedTopLevelJournalIdQueryParam}`
+      );
+      const journals = await journalService.getJournalSubHierarchy(
+        restrictedTopLevelJournalIdQueryParam,
         userContext
       );
-      if (!topRestricted) {
-        return NextResponse.json(
-          { message: "Restricted journal not found or not accessible." },
-          { status: 404 }
-        );
-      }
-      // If only fetching children of a specific parent *within* the restriction,
-      // the parentIdParam check below will handle it, scoped by company.
-      // If fetching the "root" of their view, it's the `restrictedTopLevelJournalId` itself.
-
-      if (fetchRootParam === "true") {
-        // The "root" for this user IS their restrictedTopLevelJournalId
-        const rootJournal = await journalService.getJournalById(
-          restrictedTopLevelJournalId,
-          userContext
-        );
-        return NextResponse.json(rootJournal ? [rootJournal] : []); // Return as array for consistency
-      }
-      if (typeof parentIdParam === "string" && parentIdParam.length > 0) {
-        // Ensure parentIdParam is a descendant of or is restrictedTopLevelJournalId
-        // This logic can get complex and might be better handled in the service layer or by client.
-        // For now, assuming parentIdParam is valid within the user's scope.
-        const journals = await journalService.getJournalsByParentId(
-          parentIdParam,
-          userContext
-        );
-        return NextResponse.json(journals);
-      }
-      // If no specific parent, and not fetching root, and restricted, default to showing their restricted root.
-      // This case might need refinement based on exact UI needs for restricted users.
-      // Typically, client fetches root, then children as needed.
-      const journals = await journalService.getAllJournals(userContext, {
-        // This might need a more specific query to get the hierarchy from restrictedTopLevelJournalId
-        where: {
-          OR: [
-            { id: restrictedTopLevelJournalId },
-            {
-              parentId: restrictedTopLevelJournalId,
-            } /* ... more for deeper levels or use recursive CTE in DB */,
-          ],
-        },
-      });
-      console.warn(
-        "API /journals GET: Fallback for restricted user. Review if this gives the correct hierarchy start."
-      );
       return NextResponse.json(journals);
     }
 
-    // Scenario 1 (Original, now scoped): Fetch children of a specific parent
+    // --- Standard Hierarchy Fetching (for unrestricted users or specific parent lookups) ---
+    // Fetch children of a specific parent (applies to both restricted/unrestricted, always company-scoped)
     if (typeof parentIdParam === "string" && parentIdParam.length > 0) {
+      console.log(
+        `API /journals GET: Fetching children for parentId: ${parentIdParam}`
+      );
       const journals = await journalService.getJournalsByParentId(
         parentIdParam,
         userContext
@@ -210,13 +153,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(journals);
     }
 
-    // Scenario 2 (Original, now scoped): Fetch root journals (for users not restricted)
+    // Fetch root journals (typically for unrestricted users initializing their view)
     if (fetchRootParam === "true") {
+      console.log("API /journals GET: Fetching root journals.");
       const journals = await journalService.getRootJournals(userContext);
       return NextResponse.json(journals);
     }
 
-    // Scenario 3 (Original, now scoped): Default to fetching all journals for the company
+    // Default: Fetch all journals for the company (for unrestricted users, or if no other criteria match)
+    // This could be the fallback if clientJournalService calls /api/journals without params for unrestricted full load.
+    console.log("API /journals GET: Fetching all journals for company.");
     const journals = await journalService.getAllJournals(userContext);
     return NextResponse.json(journals);
   } catch (error) {
@@ -233,6 +179,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ... (POST function remains the same) ...
 export async function POST(request: NextRequest) {
   const session = (await getServerSession(
     authOptions

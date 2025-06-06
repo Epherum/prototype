@@ -14,14 +14,15 @@ import type { AccountNodeData } from "@/lib/types";
 export interface UseJournalManagerProps {
   sliderOrder: string[];
   visibility: Record<string, boolean>;
-  restrictedJournalId?: string | null; // <<<< NEW PROP
-  restrictedJournalCompanyId?: string | null; // <<<< NEW PROP
+  restrictedJournalId?: string | null;
+  restrictedJournalCompanyId?: string | null;
 }
 
+// ... (UseJournalManagerReturn interface remains the same) ...
 export interface UseJournalManagerReturn {
   // Data & Queries
-  hierarchyData: AccountNodeData[]; // Raw data from query, for external use (e.g. linking modals)
-  currentHierarchy: AccountNodeData[]; // Memoized hierarchyData for slider and internal logic
+  hierarchyData: AccountNodeData[];
+  currentHierarchy: AccountNodeData[];
   isHierarchyLoading: boolean;
   isHierarchyError: boolean;
   hierarchyError: Error | null;
@@ -36,7 +37,7 @@ export interface UseJournalManagerReturn {
 
   // Derived State
   effectiveSelectedJournalIds: string[];
-  isTerminalJournalActive: boolean; // True if a terminal journal account is effectively selected
+  isTerminalJournalActive: boolean;
   isJournalSliderPrimary: boolean;
 
   // CRUD State & Operations
@@ -66,35 +67,35 @@ export interface UseJournalManagerReturn {
   openJournalNavModal: () => void;
   closeJournalNavModal: () => void;
 
-  // Handlers (these now take currentHierarchyData as an argument from page.tsx)
+  // Handlers
   handleSelectTopLevelJournal: (
     newTopLevelId: string,
-    currentHierarchyData: AccountNodeData[],
+    currentHierarchyData: AccountNodeData[], // This param seems unused within the function, can be removed if so
     childToSelectInL2?: string | null
   ) => void;
   handleToggleLevel2JournalId: (
     level2IdToToggle: string,
-    currentHierarchyData: AccountNodeData[]
+    currentHierarchyData: AccountNodeData[] // This param seems unused within the function, can be removed if so
   ) => void;
   handleToggleLevel3JournalId: (
     level3IdToToggle: string,
-    currentHierarchyData: AccountNodeData[]
+    currentHierarchyData: AccountNodeData[] // This param seems unused within the function, can be removed if so
   ) => void;
 
   handleL2DoubleClick: (
     l2ItemId: string,
     isL2Selected: boolean,
-    currentHierarchyData: AccountNodeData[]
+    currentHierarchyData: AccountNodeData[] // This is the full hierarchy (potentially restricted sub-tree)
   ) => void;
 
   handleL3DoubleClick: (
     l3ItemId: string,
     isSelected: boolean,
-    currentHierarchyData: AccountNodeData[]
+    currentHierarchyData: AccountNodeData[] // This is the full hierarchy (potentially restricted sub-tree)
   ) => void;
   handleNavigateContextDown: (
     args: { currentL1ToBecomeL2: string; longPressedL2ToBecomeL3?: string },
-    currentHierarchyData: AccountNodeData[]
+    currentHierarchyData: AccountNodeData[] // This param seems unused, can be removed
   ) => void;
   resetJournalSelections: (options?: { keepRootFilter?: boolean }) => void;
   setSelectedFlatJournalId: (id: string | null) => void;
@@ -112,8 +113,8 @@ const MAX_L3_SELECTIONS = 20;
 export const useJournalManager = ({
   sliderOrder,
   visibility,
-  restrictedJournalId, // <<<< Destructure the new prop
-  restrictedJournalCompanyId, // <<<< Destructure the new prop
+  restrictedJournalId,
+  restrictedJournalCompanyId,
 }: UseJournalManagerProps): UseJournalManagerReturn => {
   const queryClient = useQueryClient();
 
@@ -121,41 +122,52 @@ export const useJournalManager = ({
     console.log("[useJournalManager] Props received:", {
       restrictedJournalId,
       restrictedJournalCompanyId,
+      sliderOrder,
+      visibility,
     });
-  }, [restrictedJournalId, restrictedJournalCompanyId]);
+  }, [
+    restrictedJournalId,
+    restrictedJournalCompanyId,
+    sliderOrder,
+    visibility,
+  ]);
 
-  // THIS IS THE KEY AREA
   const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
-    // Query key MUST include restrictedJournalId to refetch when it changes
-    queryKey: ["journalHierarchy", restrictedJournalId], // Use the actual string ID or null
+    queryKey: [
+      "journalHierarchy",
+      restrictedJournalId,
+      restrictedJournalCompanyId,
+    ], // Add companyId if it influences the fetch directly from client
     queryFn: () => {
-      // Pass the string ID or null to fetchJournalHierarchy
       console.log(
         "[useJournalManager] Fetching hierarchy. Restriction ID from prop:",
         restrictedJournalId
       );
-      return fetchJournalHierarchy(restrictedJournalId); // fetchJournalHierarchy expects string | null
+      // fetchJournalHierarchy now correctly passes restrictedJournalId (or null)
+      // and expects the API to return the appropriate sub-tree or full tree.
+      return fetchJournalHierarchy(restrictedJournalId);
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    // Enable the query based on visibility AND if it's not explicitly disabled by lack of necessary IDs for other modes
-    enabled: visibility[SLIDER_TYPES.JOURNAL], // Basic enablement
+    staleTime: 5 * 60 * 1000,
+    enabled: visibility[SLIDER_TYPES.JOURNAL],
   });
-  const { data: hierarchyDataFromQuery } = journalHierarchyQuery; // Renamed for clarity
+
+  const { data: hierarchyDataFromQuery } = journalHierarchyQuery;
 
   const internalCurrentHierarchy = useMemo(
+    // This will be the restricted sub-tree if restrictedJournalId is active
     () => hierarchyDataFromQuery || [],
     [hierarchyDataFromQuery]
   );
 
-  //helper
+  // Helper: findNodeWithPath - unchanged but crucial for navigation within internalCurrentHierarchy
   const findNodeWithPath = useCallback(
     (
       nodeId: string,
-      currentFullHierarchy: AccountNodeData[]
+      currentFullHierarchy: AccountNodeData[] // This will be internalCurrentHierarchy
     ): {
       node: AccountNodeData | null;
-      l1ParentId?: string; // ID of the L1 parent (if node is L2 or L3)
-      l2ParentId?: string; // ID of the L2 parent (if node is L3)
+      l1ParentId?: string;
+      l2ParentId?: string;
     } => {
       for (const l1Node of currentFullHierarchy) {
         if (l1Node.id === nodeId) return { node: l1Node };
@@ -178,16 +190,24 @@ export const useJournalManager = ({
       }
       return { node: null };
     },
-    []
+    [] // No dependencies, relies on args
   );
 
-  // Ensure all dependent states are initialized correctly, especially those derived from hierarchyDataFromQuery
+  const isJournalSliderPrimary = useMemo(
+    () =>
+      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
+      visibility[SLIDER_TYPES.JOURNAL],
+    [sliderOrder, visibility]
+  );
+
+  // Initialize selectedTopLevelJournalId:
+  // If restricted, this will be the restrictedJournalId. Otherwise, ROOT_JOURNAL_ID.
   const [selectedTopLevelJournalId, setSelectedTopLevelJournalId] =
     useState<string>(() => {
-      // Initialize based on restriction if available and primary
-      const isPrimary =
-        sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
-        visibility[SLIDER_TYPES.JOURNAL];
+      const isPrimary = isJournalSliderPrimary; // Use the memoized value if available at init
+      console.log(
+        `[useJournalManager] Initializing selectedTopLevelJournalId. isPrimary: ${isPrimary}, restrictedJournalId: ${restrictedJournalId}`
+      );
       return isPrimary && restrictedJournalId
         ? restrictedJournalId
         : ROOT_JOURNAL_ID;
@@ -211,38 +231,49 @@ export const useJournalManager = ({
     useState<UseJournalManagerReturn["addJournalContext"]>(null);
   const [isJournalNavModalOpen, setIsJournalNavModalOpen] = useState(false);
 
-  const isJournalSliderPrimary = useMemo(
-    () =>
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
-      visibility[SLIDER_TYPES.JOURNAL],
-    [sliderOrder, visibility]
-  );
-  // Effect to reset selections if restrictedJournalId changes and manager is primary
+  // Effect to reset selections if restrictedJournalId changes OR if primary status changes
   useEffect(() => {
-    const isPrimary =
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
-      visibility[SLIDER_TYPES.JOURNAL];
-    if (isPrimary) {
+    // This effect ensures that if a restriction is applied (or removed),
+    // or if the journal slider's primary status changes,
+    // the top-level selection is correctly set.
+    if (isJournalSliderPrimary) {
       console.log(
-        "[useJournalManager] Restriction or primary status changed. New restriction ID:",
-        restrictedJournalId
+        `[useJournalManager] useEffect[restrictedJournalId, isJournalSliderPrimary]: Updating top level. restrictedId: ${restrictedJournalId}, currentTop: ${selectedTopLevelJournalId}`
       );
-      setSelectedTopLevelJournalId(restrictedJournalId || ROOT_JOURNAL_ID);
-      setSelectedLevel2JournalIds([]);
-      setSelectedLevel3JournalIds([]);
-      // Potentially reset flat journal ID too if it's managed here
-      // setSelectedFlatJournalIdState(null);
+      // If primary and restricted, set to restrictedId. If primary and NOT restricted, set to ROOT.
+      const newTopLevel = restrictedJournalId || ROOT_JOURNAL_ID;
+      if (selectedTopLevelJournalId !== newTopLevel) {
+        setSelectedTopLevelJournalId(newTopLevel);
+        setSelectedLevel2JournalIds([]);
+        setSelectedLevel3JournalIds([]);
+        // setSelectedFlatJournalIdState(null); // Flat selection is usually cleared if hierarchy is active
+      }
+    } else {
+      // If not primary, selections should be cleared or managed by flat selection
+      // This part of logic seems okay from provided code.
     }
-  }, [restrictedJournalId, isJournalSliderPrimary, visibility, sliderOrder]);
+  }, [restrictedJournalId, isJournalSliderPrimary, selectedTopLevelJournalId]); // Add selectedTopLevelJournalId to prevent potential loops if not careful
+
+  // ... (effectiveSelectedJournalIds, isTerminalJournalActive, CRUD mutations, etc. largely remain the same)
+  // The key is that they operate on `internalCurrentHierarchy` which is already the (potentially) restricted sub-tree.
+  // And `selectedTopLevelJournalId` is correctly initialized.
 
   const effectiveSelectedJournalIds = useMemo(() => {
+    // This logic should work correctly as long as internalCurrentHierarchy and selected IDs are right
     if (!isJournalSliderPrimary) return [];
-
     const effectiveIds = new Set<string>();
-    // Helper to get the correct list of children for L2 selection (either root or L1's children)
+
     const getSourceForL2s = () => {
-      if (selectedTopLevelJournalId === ROOT_JOURNAL_ID)
-        return internalCurrentHierarchy;
+      // If selectedTopLevelJournalId is the restricted ID (e.g. "51"), findNodeById will get it from internalCurrentHierarchy
+      // and its children will be correctly used.
+      // If selectedTopLevelJournalId is ROOT_JOURNAL_ID (unrestricted view), internalCurrentHierarchy is the full list of L1s.
+      if (
+        selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+        (!restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID)
+      ) {
+        // Check if we are truly at root
+        return internalCurrentHierarchy; // These are the actual L1s
+      }
       const l1Node = findNodeById(
         internalCurrentHierarchy,
         selectedTopLevelJournalId
@@ -254,7 +285,7 @@ export const useJournalManager = ({
     selectedLevel3JournalIds.forEach((l3Id) => effectiveIds.add(l3Id));
 
     selectedLevel2JournalIds.forEach((l2Id) => {
-      const l2Node = findNodeById(sourceForL2s, l2Id); // Search within the correct context
+      const l2Node = findNodeById(sourceForL2s, l2Id);
       if (l2Node) {
         const anyOfItsL3ChildrenSelected = (l2Node.children || []).some(
           (l3Child) => selectedLevel3JournalIds.includes(l3Child.id)
@@ -263,6 +294,9 @@ export const useJournalManager = ({
       }
     });
 
+    // If nothing is selected at L2/L3, then L1 itself is effective,
+    // but only if L1 is not the ROOT_JOURNAL_ID (unless ROOT_JOURNAL_ID is the restricted one, edge case).
+    // Or if L1 is the restrictedJournalId and it's terminal.
     if (
       effectiveIds.size === 0 &&
       selectedTopLevelJournalId &&
@@ -272,7 +306,6 @@ export const useJournalManager = ({
         internalCurrentHierarchy,
         selectedTopLevelJournalId
       );
-      // If L1 is selected, and it has no children (is terminal), OR no L2s are selected from it, then L1 itself is "effective"
       if (
         l1Node &&
         ((l1Node.children || []).length === 0 ||
@@ -280,8 +313,23 @@ export const useJournalManager = ({
       ) {
         effectiveIds.add(selectedTopLevelJournalId);
       }
+    } else if (
+      effectiveIds.size === 0 &&
+      selectedTopLevelJournalId &&
+      selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+      restrictedJournalId &&
+      restrictedJournalId === ROOT_JOURNAL_ID
+    ) {
+      // Handles a rare case where ROOT_JOURNAL_ID itself is the restriction point.
+      const rootNode = findNodeById(internalCurrentHierarchy, ROOT_JOURNAL_ID);
+      if (
+        rootNode &&
+        ((rootNode.children || []).length === 0 ||
+          selectedLevel2JournalIds.length === 0)
+      ) {
+        effectiveIds.add(ROOT_JOURNAL_ID);
+      }
     }
-
     return Array.from(effectiveIds);
   }, [
     isJournalSliderPrimary,
@@ -289,9 +337,11 @@ export const useJournalManager = ({
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
     internalCurrentHierarchy,
+    restrictedJournalId, // Added dependency
   ]);
 
   const isTerminalJournalActive = useMemo(() => {
+    // This logic also depends on the correctness of internalCurrentHierarchy and selected IDs
     if (
       !isJournalSliderPrimary ||
       !internalCurrentHierarchy ||
@@ -300,59 +350,50 @@ export const useJournalManager = ({
       return false;
 
     let terminalNodeIdToCheck: string | null = null;
-    let nodeSource = internalCurrentHierarchy; // Default source
+    let nodeSourceForFind = internalCurrentHierarchy; // Start with the full (potentially restricted) hierarchy
 
     if (selectedLevel3JournalIds.length > 0) {
-      terminalNodeIdToCheck = selectedLevel3JournalIds[0]; // Check first L3
-      // Find L3's parent L2 to correctly locate L3 node
-      for (const l1 of internalCurrentHierarchy) {
-        if (
-          l1.id === selectedTopLevelJournalId ||
-          selectedTopLevelJournalId === ROOT_JOURNAL_ID
-        ) {
-          const l1Children =
-            selectedTopLevelJournalId === ROOT_JOURNAL_ID
-              ? internalCurrentHierarchy
-              : l1.children || [];
-          for (const l2 of l1Children) {
-            if (selectedLevel2JournalIds.includes(l2.id)) {
-              if (
-                (l2.children || []).find(
-                  (l3) => l3.id === terminalNodeIdToCheck
-                )
-              ) {
-                nodeSource = l2.children || [];
-                break;
-              }
-            }
-          }
-        }
-        if (
-          nodeSource !== internalCurrentHierarchy &&
-          nodeSource.find((n) => n.id === terminalNodeIdToCheck)
-        )
+      terminalNodeIdToCheck = selectedLevel3JournalIds[0];
+      // To find L3, we need its L2 parent from selectedLevel2JournalIds, and L2's L1 parent (selectedTopLevelJournalId)
+      const l1Context = findNodeById(
+        internalCurrentHierarchy,
+        selectedTopLevelJournalId
+      );
+      const l2ContextCandidates =
+        selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+        (!restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID)
+          ? internalCurrentHierarchy
+          : l1Context?.children || [];
+
+      for (const l2Id of selectedLevel2JournalIds) {
+        const l2Node = findNodeById(l2ContextCandidates, l2Id);
+        if (l2Node?.children?.find((c) => c.id === terminalNodeIdToCheck)) {
+          nodeSourceForFind = l2Node.children;
           break;
-        else nodeSource = internalCurrentHierarchy; // reset if not found in specific L2
+        }
       }
     } else if (selectedLevel2JournalIds.length > 0) {
-      terminalNodeIdToCheck = selectedLevel2JournalIds[0]; // Check first L2
-      if (selectedTopLevelJournalId !== ROOT_JOURNAL_ID) {
-        const l1Node = findNodeById(
-          internalCurrentHierarchy,
-          selectedTopLevelJournalId
-        );
-        nodeSource = l1Node?.children || [];
-      }
+      terminalNodeIdToCheck = selectedLevel2JournalIds[0];
+      const l1Context = findNodeById(
+        internalCurrentHierarchy,
+        selectedTopLevelJournalId
+      );
+      nodeSourceForFind =
+        selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+        (!restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID)
+          ? internalCurrentHierarchy
+          : l1Context?.children || [];
     } else if (
       selectedTopLevelJournalId &&
-      selectedTopLevelJournalId !== ROOT_JOURNAL_ID
+      (selectedTopLevelJournalId !== ROOT_JOURNAL_ID ||
+        (restrictedJournalId && restrictedJournalId === ROOT_JOURNAL_ID))
     ) {
-      terminalNodeIdToCheck = selectedTopLevelJournalId; // Check L1
+      terminalNodeIdToCheck = selectedTopLevelJournalId;
+      // nodeSourceForFind remains internalCurrentHierarchy as we are checking a top-level item
     }
 
     if (!terminalNodeIdToCheck) return false;
-
-    const node = findNodeById(nodeSource, terminalNodeIdToCheck);
+    const node = findNodeById(nodeSourceForFind, terminalNodeIdToCheck);
     return !!(
       node &&
       node.isTerminal &&
@@ -364,37 +405,52 @@ export const useJournalManager = ({
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
     internalCurrentHierarchy,
+    restrictedJournalId, // Added dependency
   ]);
 
   const createJournalMutation = useMutation({
     mutationFn: (data: ServerCreateJournalData) =>
       serverCreateJournalEntry(data),
     onSuccess: (newJournal) => {
-      queryClient.invalidateQueries({ queryKey: ["journalHierarchy"] });
+      // Invalidate with the specific restrictedJournalId if it's set, otherwise general invalidation
+      queryClient.invalidateQueries({
+        queryKey: [
+          "journalHierarchy",
+          restrictedJournalId,
+          restrictedJournalCompanyId,
+        ],
+      });
       closeAddJournalModal();
-      // Alert can be handled in page.tsx using mutation.isSuccess
     },
-    // onError handled in page.tsx or by component using the mutation status
   });
 
   const deleteJournalMutation = useMutation({
     mutationFn: (journalId: string) => serverDeleteJournalEntry(journalId),
     onSuccess: (data, deletedJournalId) => {
-      queryClient.invalidateQueries({ queryKey: ["journalHierarchy"] });
-      // Reset selections if the deleted journal was part of the active selection path
+      queryClient.invalidateQueries({
+        queryKey: [
+          "journalHierarchy",
+          restrictedJournalId,
+          restrictedJournalCompanyId,
+        ],
+      });
+
+      const actualRootForReset = restrictedJournalId || ROOT_JOURNAL_ID;
+
       if (selectedTopLevelJournalId === deletedJournalId) {
-        setSelectedTopLevelJournalId(ROOT_JOURNAL_ID);
+        setSelectedTopLevelJournalId(actualRootForReset); // Reset to restricted root or actual root
         setSelectedLevel2JournalIds([]);
         setSelectedLevel3JournalIds([]);
       } else if (selectedLevel2JournalIds.includes(deletedJournalId)) {
         setSelectedLevel2JournalIds((ids) =>
           ids.filter((id) => id !== deletedJournalId)
         );
-        // Also remove any L3 children of the deleted L2
-        const deletedL2Node = findNodeById(
-          internalCurrentHierarchy,
-          deletedJournalId
-        ); // Search full hierarchy
+        // findNodeById needs the correct hierarchy to search in.
+        // internalCurrentHierarchy is the full (potentially restricted) tree.
+        const { node: deletedL2Node } = findNodeWithPath(
+          deletedJournalId,
+          internalCurrentHierarchy
+        );
         if (deletedL2Node?.children) {
           const childL3Ids = deletedL2Node.children.map((c) => c.id);
           setSelectedLevel3JournalIds((l3s) =>
@@ -406,13 +462,13 @@ export const useJournalManager = ({
           ids.filter((id) => id !== deletedJournalId)
         );
       }
-      // Alert can be handled in page.tsx
     },
   });
 
   const resetJournalSelections = useCallback(
     (options?: { keepRootFilter?: boolean }) => {
-      setSelectedTopLevelJournalId(ROOT_JOURNAL_ID);
+      // When resetting, the top level should become the restrictedJournalId if set, otherwise the true ROOT_JOURNAL_ID.
+      setSelectedTopLevelJournalId(restrictedJournalId || ROOT_JOURNAL_ID);
       setSelectedLevel2JournalIds([]);
       setSelectedLevel3JournalIds([]);
       setSelectedFlatJournalIdState(null);
@@ -420,30 +476,41 @@ export const useJournalManager = ({
         setJournalRootFilterStatusState("affected");
       }
     },
-    []
+    [restrictedJournalId] // Add dependency
   );
 
   const handleSelectTopLevelJournal = useCallback(
     (
       newTopLevelId: string,
-      currentHierarchyData: AccountNodeData[],
+      _currentHierarchyData?: AccountNodeData[], // Mark as unused if not needed
       childToSelectInL2: string | null = null
     ) => {
+      // This function is called by the slider, e.g., when L1 context is double-clicked to go "up".
+      // It should respect the restrictedJournalId as the ultimate ceiling.
+      // However, the slider itself (JournalHierarchySlider) will be modified to prevent calling this
+      // in a way that would go above restrictedJournalId.
+      // So, this function can assume newTopLevelId is valid.
       setSelectedTopLevelJournalId(newTopLevelId);
       setSelectedLevel2JournalIds(childToSelectInL2 ? [childToSelectInL2] : []);
       setSelectedLevel3JournalIds([]);
-      setSelectedFlatJournalIdState(null); // Hierarchical selection implies not using flat ID
+      setSelectedFlatJournalIdState(null);
     },
-    []
+    [] // No relevant dependencies here, relies on args
   );
 
   const handleToggleLevel2JournalId = useCallback(
-    (level2IdToToggle: string, currentHierarchyData: AccountNodeData[]) => {
+    (level2IdToToggle: string, _currentHierarchyData?: AccountNodeData[]) => {
       const getSourceL2 = () => {
-        if (selectedTopLevelJournalId === ROOT_JOURNAL_ID)
-          return currentHierarchyData;
+        // If selectedTopLevelJournalId is restricted, findNodeById gets it from internalCurrentHierarchy.
+        // If selectedTopLevelJournalId is ROOT_JOURNAL_ID (unrestricted), internalCurrentHierarchy is the list of L1s.
+        if (
+          selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+          (!restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID)
+        ) {
+          return internalCurrentHierarchy;
+        }
         const l1 = findNodeById(
-          currentHierarchyData,
+          internalCurrentHierarchy,
           selectedTopLevelJournalId
         );
         return l1?.children || [];
@@ -468,18 +535,16 @@ export const useJournalManager = ({
       });
       setSelectedFlatJournalIdState(null);
     },
-    [selectedTopLevelJournalId]
+    [selectedTopLevelJournalId, internalCurrentHierarchy, restrictedJournalId] // Added dependencies
   );
 
   const handleToggleLevel3JournalId = useCallback(
-    (level3IdToToggle: string, currentHierarchyData: AccountNodeData[]) => {
+    (level3IdToToggle: string, _currentHierarchyData?: AccountNodeData[]) => {
       setSelectedLevel3JournalIds((prevL3s) => {
         const alreadySelected = prevL3s.includes(level3IdToToggle);
         if (alreadySelected) {
           return prevL3s.filter((id) => id !== level3IdToToggle);
         } else {
-          // Logic to ensure parent L2 is selected could be added here if needed,
-          // but typically UI handles selection flow.
           return [...prevL3s, level3IdToToggle].slice(-MAX_L3_SELECTIONS);
         }
       });
@@ -488,189 +553,148 @@ export const useJournalManager = ({
     []
   );
 
-  // Handle double click logic
+  // Double click handlers:
+  // These use `findNodeWithPath` with `currentFullHierarchy` which will be `internalCurrentHierarchy`.
+  // This means all path finding is already within the restricted sub-tree if a restriction is active.
+  // The logic for "going up" needs to ensure it doesn't try to go above the restricted root.
+
   const handleL2DoubleClick = useCallback(
     (
       l2ItemId: string,
-      isL2Selected: boolean, // The selection state *of this L2 item*
-      // currentHierarchyData is the *currently displayed* hierarchy in the slider (could be root or L1's children)
-      // We also need the full hierarchy to find the L2's original L1 parent if we navigate "up".
-      currentFullHierarchy: AccountNodeData[]
+      isL2Selected: boolean,
+      currentFullHierarchy: AccountNodeData[] // This is internalCurrentHierarchy from the hook's scope
     ) => {
-      console.log(
-        `L2 Double Click: ID=${l2ItemId}, Selected=${isL2Selected}, CurrentL1=${selectedTopLevelJournalId}`
-      );
+      // currentFullHierarchy is internalCurrentHierarchy, already restricted if applicable.
+      // Promoting L2 to L1 view: setSelectedTopLevelJournalId(l2ItemId) is fine, stays within sub-tree.
+      // Going back a level:
+      //   `const { node: currentL1Node, l1ParentId: grandParentL1Id } = findNodeWithPath(selectedTopLevelJournalId, currentFullHierarchy);`
+      //   If `selectedTopLevelJournalId` is the `restrictedJournalId`, then `grandParentL1Id` will be undefined
+      //   because `restrictedJournalId` is the root of `currentFullHierarchy`.
+      //   Then `setSelectedTopLevelJournalId(ROOT_JOURNAL_ID)` would be called. This needs to be changed.
+      //   If `selectedTopLevelJournalId` is the `restrictedJournalId`, we should not go further up.
 
       if (isL2Selected) {
-        // L2 is selected: "Promote" L2 to L1 view.
-        // The L2 item clicked becomes the new selectedTopLevelJournalId.
-        // Its children (L3s) will now be displayed as L2s.
+        // Promote L2 to L1 view
         const { node: l2Node } = findNodeWithPath(
           l2ItemId,
           currentFullHierarchy
         );
         if (l2Node) {
-          // Ensure node exists
           setSelectedTopLevelJournalId(l2ItemId);
-          setSelectedLevel2JournalIds([]); // Clear L2 selections as they are now L1's children
-          setSelectedLevel3JournalIds([]); // Clear L3 selections
-          console.log(`  Promoted L2 ${l2ItemId} to L1 view.`);
-        } else {
-          console.warn(
-            `  L2 node ${l2ItemId} not found in full hierarchy for promotion.`
-          );
+          setSelectedLevel2JournalIds([]);
+          setSelectedLevel3JournalIds([]);
         }
       } else {
-        // L2 is NOT selected: "Go back a level."
-        // The current L1 (selectedTopLevelJournalId) becomes an L2.
-        // The parent of the current L1 becomes the new L1.
-        // This only works if the current L1 is NOT the ROOT_JOURNAL_ID.
+        // Go back a level (L1 becomes L2)
+        if (
+          selectedTopLevelJournalId === restrictedJournalId &&
+          restrictedJournalId !== ROOT_JOURNAL_ID
+        ) {
+          // If current L1 is the restricted root, cannot go up further
+          console.log(
+            `[useJournalManager] L2DoubleClick: At restricted root (${restrictedJournalId}), cannot go up.`
+          );
+          return;
+        }
         if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
-          console.log("  Cannot go back from root L1.");
-          return; // Cannot go back further
+          // Already at true root
+          console.log(
+            "[useJournalManager] L2DoubleClick: At ROOT, cannot go up via L2 non-selected double click."
+          );
+          return;
         }
 
-        // Find the parent of the current selectedTopLevelJournalId from the full hierarchy
         const { node: currentL1Node, l1ParentId: grandParentL1Id } =
           findNodeWithPath(selectedTopLevelJournalId, currentFullHierarchy);
 
         if (currentL1Node) {
-          if (grandParentL1Id) {
-            // currentL1Node has an L1 parent (it was an L2 itself)
-            setSelectedTopLevelJournalId(grandParentL1Id);
-            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // The old L1 is now selected as L2
-            setSelectedLevel3JournalIds([]);
-            console.log(
-              `  Navigated up. New L1: ${grandParentL1Id}, New L2 (selected): ${selectedTopLevelJournalId}`
-            );
-          } else {
-            // currentL1Node is a true L1 (its parent was root)
-            setSelectedTopLevelJournalId(ROOT_JOURNAL_ID); // Go back to root
-            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // The old L1 is now selected as L2 under root
-            setSelectedLevel3JournalIds([]);
-            console.log(
-              `  Navigated up to ROOT. New L2 (selected): ${selectedTopLevelJournalId}`
-            );
-          }
-        } else {
-          console.warn(
-            `  Current L1 node ${selectedTopLevelJournalId} not found for 'go back' navigation.`
-          );
+          // If grandParentL1Id is found, it becomes the new L1.
+          // If not (i.e., currentL1Node was a child of the effective root of currentFullHierarchy),
+          // then the new L1 becomes that effective root (which is restrictedJournalId or ROOT_JOURNAL_ID).
+          const newL1 =
+            grandParentL1Id || restrictedJournalId || ROOT_JOURNAL_ID;
+          setSelectedTopLevelJournalId(newL1);
+          setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // Old L1 becomes selected L2
+          setSelectedLevel3JournalIds([]);
         }
       }
       setSelectedFlatJournalIdState(null);
     },
     [
       selectedTopLevelJournalId,
-      setSelectedTopLevelJournalId,
-      setSelectedLevel2JournalIds,
-      setSelectedLevel3JournalIds,
       findNodeWithPath,
-      internalCurrentHierarchy /* Add internalCurrentHierarchy if findNodeWithPath uses it by default*/,
+      restrictedJournalId,
+      internalCurrentHierarchy /* ensure this is stable or included */,
     ]
   );
 
   const handleL3DoubleClick = useCallback(
     (
       l3ItemId: string,
-      isL3Selected: boolean, // The selection state *of this L3 item*
-      currentFullHierarchy: AccountNodeData[]
+      isL3Selected: boolean,
+      currentFullHierarchy: AccountNodeData[] // This is internalCurrentHierarchy
     ) => {
-      console.log(`L3 Double Click: ID=${l3ItemId}, Selected=${isL3Selected}`);
+      // Similar logic to L2 double click for "going up".
       const {
         node: l3Node,
         l1ParentId: originalL1Id,
         l2ParentId: originalL2Id,
       } = findNodeWithPath(l3ItemId, currentFullHierarchy);
 
-      if (!l3Node || !originalL2Id) {
-        // L3 must exist and have an L2 parent
-        console.warn(`  L3 node ${l3ItemId} or its L2 parent not found.`);
-        return;
-      }
+      if (!l3Node || !originalL2Id) return;
 
       if (isL3Selected) {
-        // L3 is selected: "Promote" L3's parent (originalL2Id) to L1, and L3 (l3ItemId) to L2.
-        // The original L1 (originalL1Id) is now the parent of the new L1, or it's root.
-        // The new L1 is originalL2Id.
-        // The new L2 selected is l3ItemId.
-        if (originalL1Id) {
-          // originalL2Id has an L1 parent
-          setSelectedTopLevelJournalId(originalL1Id); // Keep the original L1 as the top level context for the new L1
-          setSelectedLevel2JournalIds([originalL2Id]); // The L3's original L2 parent becomes the selected L2
-          setSelectedLevel3JournalIds([l3ItemId]); // The L3 item becomes the selected L3
-          // This effectively makes L3's parent (original L2) the new "focused L1" for the view
-          // Wait, the requirement is "l3 becomes in l2 and its parent becomes in l1"
-          setSelectedTopLevelJournalId(originalL2Id); // L3's parent (originalL2Id) becomes the new L1
-          setSelectedLevel2JournalIds([l3ItemId]); // L3 item (l3ItemId) becomes the selected L2
-          setSelectedLevel3JournalIds([]); // No L3s selected in this new view
-          console.log(
-            `  Promoted. New L1: ${originalL2Id}, New L2 (selected): ${l3ItemId}`
-          );
-        } else {
-          // originalL2Id was a top-level node (child of ROOT)
-          setSelectedTopLevelJournalId(originalL2Id); // L3's parent (originalL2Id) becomes new L1
-          setSelectedLevel2JournalIds([l3ItemId]); // L3 item (l3ItemId) becomes selected L2
-          setSelectedLevel3JournalIds([]);
-          console.log(
-            `  Promoted (from root context). New L1: ${originalL2Id}, New L2 (selected): ${l3ItemId}`
-          );
-        }
+        // Promote L3's context (L2 becomes L1, L3 becomes L2)
+        setSelectedTopLevelJournalId(originalL2Id);
+        setSelectedLevel2JournalIds([l3ItemId]);
+        setSelectedLevel3JournalIds([]);
       } else {
-        // L3 is NOT selected: "Go back a level" (current L1 becomes L2).
-        // This is the same behavior as L2 NOT selected double click.
-        // The selectedTopLevelJournalId determines the current L1.
-        if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
+        // Go back a level (current L1 becomes L2)
+        if (
+          selectedTopLevelJournalId === restrictedJournalId &&
+          restrictedJournalId !== ROOT_JOURNAL_ID
+        ) {
           console.log(
-            "  Cannot go back from root L1 (triggered by L3 non-selected)."
+            `[useJournalManager] L3DoubleClick: At restricted root (${restrictedJournalId}), cannot go up.`
           );
           return;
         }
-
+        if (selectedTopLevelJournalId === ROOT_JOURNAL_ID) {
+          console.log(
+            "[useJournalManager] L3DoubleClick: At ROOT, cannot go up."
+          );
+          return;
+        }
         const {
           node: currentL1NodeInfo,
           l1ParentId: grandParentL1IdForCurrentL1,
         } = findNodeWithPath(selectedTopLevelJournalId, currentFullHierarchy);
+
         if (currentL1NodeInfo) {
-          if (grandParentL1IdForCurrentL1) {
-            // currentL1 has a parent
-            setSelectedTopLevelJournalId(grandParentL1IdForCurrentL1);
-            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // old L1 becomes selected L2
-            setSelectedLevel3JournalIds([]); // Clear L3s
-            console.log(
-              `  Navigated up (from L3 non-selected). New L1: ${grandParentL1IdForCurrentL1}, New L2 (selected): ${selectedTopLevelJournalId}`
-            );
-          } else {
-            // currentL1 is a child of ROOT
-            setSelectedTopLevelJournalId(ROOT_JOURNAL_ID);
-            setSelectedLevel2JournalIds([selectedTopLevelJournalId]); // old L1 becomes selected L2
-            setSelectedLevel3JournalIds([]);
-            console.log(
-              `  Navigated up to ROOT (from L3 non-selected). New L2 (selected): ${selectedTopLevelJournalId}`
-            );
-          }
-        } else {
-          console.warn(
-            ` Current L1 node ${selectedTopLevelJournalId} not found for 'go back' (L3 non-selected).`
-          );
+          const newL1 =
+            grandParentL1IdForCurrentL1 ||
+            restrictedJournalId ||
+            ROOT_JOURNAL_ID;
+          setSelectedTopLevelJournalId(newL1);
+          setSelectedLevel2JournalIds([selectedTopLevelJournalId]);
+          setSelectedLevel3JournalIds([]);
         }
       }
       setSelectedFlatJournalIdState(null);
     },
     [
       selectedTopLevelJournalId,
-      setSelectedTopLevelJournalId,
-      setSelectedLevel2JournalIds,
-      setSelectedLevel3JournalIds,
       findNodeWithPath,
-      internalCurrentHierarchy /* Add internalCurrentHierarchy if findNodeWithPath uses it by default*/,
+      restrictedJournalId,
+      internalCurrentHierarchy,
     ]
   );
 
   const handleNavigateContextDown = useCallback(
+    // This seems fine, navigation is downwards within the hierarchy
     (
       args: { currentL1ToBecomeL2: string; longPressedL2ToBecomeL3?: string },
-      currentHierarchyData: AccountNodeData[]
+      _currentHierarchyData?: AccountNodeData[]
     ) => {
       const { currentL1ToBecomeL2, longPressedL2ToBecomeL3 } = args;
       setSelectedTopLevelJournalId(currentL1ToBecomeL2);
@@ -683,21 +707,23 @@ export const useJournalManager = ({
     []
   );
 
-  const setSelectedFlatJournalId = useCallback((id: string | null) => {
-    setSelectedFlatJournalIdState(id);
-    if (id !== null) {
-      // If a flat journal is selected, clear hierarchical selections
-      setSelectedTopLevelJournalId(ROOT_JOURNAL_ID);
-      setSelectedLevel2JournalIds([]);
-      setSelectedLevel3JournalIds([]);
-    }
-  }, []);
+  // ... (setSelectedFlatJournalId, setJournalRootFilterStatus, modal openers/closers, CRUD ops remain mostly same)
+  const setSelectedFlatJournalId = useCallback(
+    (id: string | null) => {
+      setSelectedFlatJournalIdState(id);
+      if (id !== null) {
+        setSelectedTopLevelJournalId(restrictedJournalId || ROOT_JOURNAL_ID); // Reset to restricted or actual root
+        setSelectedLevel2JournalIds([]);
+        setSelectedLevel3JournalIds([]);
+      }
+    },
+    [restrictedJournalId]
+  );
 
   const setJournalRootFilterStatus = useCallback(
     (status: "affected" | "unaffected" | "all" | null) => {
       setJournalRootFilterStatusState(status);
       if (status !== null && isJournalSliderPrimary) {
-        // If a root filter is applied while primary, ensure flat selection is off
         setSelectedFlatJournalIdState(null);
       }
     },
@@ -732,7 +758,7 @@ export const useJournalManager = ({
       }
     ) => {
       const journalToCreate: ServerCreateJournalData = {
-        id: formDataFromModal.code || formDataFromModal.id || "", // Backend should handle if ID is missing (e.g. for new entries)
+        id: formDataFromModal.code || formDataFromModal.id || "",
         name: formDataFromModal.name,
         parentId: addJournalContext?.parentId || undefined,
         isTerminal: formDataFromModal.isTerminal || false,
@@ -745,7 +771,6 @@ export const useJournalManager = ({
 
   const deleteJournal = useCallback(
     (journalId: string) => {
-      // Confirmation should be handled by UI before calling this
       deleteJournalMutation.mutate(journalId);
     },
     [deleteJournalMutation]
@@ -753,34 +778,33 @@ export const useJournalManager = ({
 
   // Effect to manage selection state based on primary status
   useEffect(() => {
-    if (isJournalSliderPrimary) {
-      // If Journal becomes primary and a flat ID was selected, clear flat ID
-      if (selectedFlatJournalId !== null) {
-        setSelectedFlatJournalIdState(null);
-      }
-    } else {
-      // If Journal is not primary, clear hierarchical selections (flat ID will be set by page.tsx via setSelectedFlatJournalId)
+    if (!isJournalSliderPrimary) {
+      // If Journal is not primary, clear hierarchical selections
+      // (flat ID will be set by page.tsx via setSelectedFlatJournalId)
+      const effectiveRoot = restrictedJournalId || ROOT_JOURNAL_ID;
       if (
-        selectedTopLevelJournalId !== ROOT_JOURNAL_ID ||
+        selectedTopLevelJournalId !== effectiveRoot ||
         selectedLevel2JournalIds.length > 0 ||
         selectedLevel3JournalIds.length > 0
       ) {
-        setSelectedTopLevelJournalId(ROOT_JOURNAL_ID);
+        setSelectedTopLevelJournalId(effectiveRoot);
         setSelectedLevel2JournalIds([]);
         setSelectedLevel3JournalIds([]);
       }
     }
+    // No specific action needed if it becomes primary, handled by other effects/init.
   }, [
     isJournalSliderPrimary,
-    selectedFlatJournalId,
+    // selectedFlatJournalId, // Flat ID logic seems managed elsewhere when becoming primary
     selectedTopLevelJournalId,
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
+    restrictedJournalId, // Add dependency
   ]);
 
   return {
-    hierarchyData: journalHierarchyQuery.data || [],
-    currentHierarchy: internalCurrentHierarchy,
+    hierarchyData: journalHierarchyQuery.data || [], // Raw data from query
+    currentHierarchy: internalCurrentHierarchy, // Memoized, potentially restricted sub-tree
     isHierarchyLoading: journalHierarchyQuery.isLoading,
     isHierarchyError: journalHierarchyQuery.isError,
     hierarchyError: journalHierarchyQuery.error,
@@ -789,9 +813,6 @@ export const useJournalManager = ({
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
     selectedFlatJournalId,
-
-    handleL2DoubleClick,
-    handleL3DoubleClick,
 
     effectiveSelectedJournalIds,
     isTerminalJournalActive,
@@ -813,6 +834,8 @@ export const useJournalManager = ({
     handleSelectTopLevelJournal,
     handleToggleLevel2JournalId,
     handleToggleLevel3JournalId,
+    handleL2DoubleClick,
+    handleL3DoubleClick,
     handleNavigateContextDown,
     resetJournalSelections,
     setSelectedFlatJournalId,

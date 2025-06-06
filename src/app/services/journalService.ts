@@ -315,8 +315,89 @@ async function getTopLevelJournalsByCompany(
   return topLevelJournals;
 }
 
-// The Chef's complete recipe book for Journals
-// (Make sure to add the new function here)
+async function getJournalSubHierarchy(
+  rootJournalId: string,
+  context: AuthenticatedUserContext
+): Promise<Journal[]> {
+  const { companyId } = context;
+  console.log(
+    `[journalService] Fetching sub-hierarchy for rootJournalId: ${rootJournalId}, companyId: ${companyId}`
+  );
+
+  // For debugging, construct the query string to log it.
+  // IMPORTANT: For actual execution, use parameterized queries as you were to prevent SQL injection.
+  // This is only for seeing the query.
+  const queryStringForLog = `
+    WITH RECURSIVE "SubTree" AS (
+      SELECT *, 0 AS level
+      FROM "journals"
+      WHERE "id" = '${rootJournalId.replace(
+        /'/g,
+        "''"
+      )}' AND "company_id" = '${companyId.replace(/'/g, "''")}'
+      UNION ALL
+      SELECT j.*, st.level + 1
+      FROM "journals" j
+      INNER JOIN "SubTree" st ON j."parent_id" = st."id"
+      WHERE j."company_id" = '${companyId.replace(/'/g, "''")}'
+    )
+    SELECT * FROM "SubTree" ORDER BY "level" ASC, "id" ASC;
+  `;
+  console.log(
+    `[journalService] Attempting SQL query: ${queryStringForLog
+      .replace(/\s\s+/g, " ")
+      .trim()}`
+  );
+
+  try {
+    const result = await prisma.$queryRaw<Journal[]>`
+      WITH RECURSIVE "SubTree" AS (
+        SELECT *, 0 AS "level" -- Added level for debugging and ensuring column name is quoted if needed
+        FROM "journals"
+        WHERE "id" = ${rootJournalId} AND "company_id" = ${companyId}
+        UNION ALL
+        SELECT j.*, st."level" + 1
+        FROM "journals" j
+        INNER JOIN "SubTree" st ON j."parent_id" = st."id"
+        WHERE j."company_id" = ${companyId}
+      )
+      SELECT "id", "company_id" AS "companyId", "name", "parent_id" AS "parentId", "is_terminal" AS "isTerminal", "additional_details" AS "additionalDetails", "created_at" AS "createdAt", "updated_at" AS "updatedAt"
+      FROM "SubTree" ORDER BY "level" ASC, "id" ASC;
+    `; // Explicitly select columns and alias them to match Prisma model for safety with $queryRaw
+
+    console.log(
+      `[journalService] Raw query result for sub-hierarchy (count: ${result.length}):`,
+      JSON.stringify(result, null, 2) // Pretty print the result
+    );
+
+    if (result.length === 0 && rootJournalId) {
+      console.warn(
+        `[journalService] No journals found for root ${rootJournalId} in company ${companyId} by sub-hierarchy query. Checking if root node exists separately...`
+      );
+      const rootNodeExists = await prisma.journal.findUnique({
+        where: { id_companyId: { id: rootJournalId, companyId: companyId } },
+      });
+      console.log(
+        `[journalService] Separate check: Root node ${rootJournalId} exists in company ${companyId}? :`,
+        !!rootNodeExists
+      );
+    }
+
+    console.log(
+      `[journalService] Returning ${result.length} journals from sub-hierarchy for rootJournalId: ${rootJournalId}`
+    );
+    return result;
+  } catch (error) {
+    console.error("[journalService] ERROR in getJournalSubHierarchy:", error);
+    // Log the actual error object from Prisma if it's a PrismaClientKnownRequestError
+    if (error instanceof prisma.PrismaClientKnownRequestError) {
+      console.error("[journalService] Prisma Error Code:", error.code);
+      console.error("[journalService] Prisma Error Meta:", error.meta);
+    }
+    throw error;
+  }
+}
+
 export const journalService = {
   getRootJournals,
   getJournalsByParentId,
@@ -325,5 +406,6 @@ export const journalService = {
   createJournal,
   updateJournal,
   deleteJournal,
-  getTopLevelJournalsByCompany, // <<< ADDED NEW FUNCTION
+  getTopLevelJournalsByCompany,
+  getJournalSubHierarchy,
 };
