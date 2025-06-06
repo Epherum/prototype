@@ -970,6 +970,7 @@ export default function Home() {
               isRootView: isHierarchicalSliderRootView,
               currentFilterStatus: journalManager.journalRootFilterStatus,
               onFilterStatusChange: journalManager.setJournalRootFilterStatus,
+              onOpenModal: journalManager.openJournalNavModal,
             };
           }
         case SLIDER_TYPES.PARTNER:
