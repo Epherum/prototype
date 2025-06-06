@@ -14,6 +14,8 @@ import type { AccountNodeData } from "@/lib/types";
 export interface UseJournalManagerProps {
   sliderOrder: string[];
   visibility: Record<string, boolean>;
+  restrictedJournalId?: string | null; // <<<< NEW PROP
+  restrictedJournalCompanyId?: string | null; // <<<< NEW PROP
 }
 
 export interface UseJournalManagerReturn {
@@ -110,15 +112,34 @@ const MAX_L3_SELECTIONS = 20;
 export const useJournalManager = ({
   sliderOrder,
   visibility,
+  restrictedJournalId, // <<<< Destructure the new prop
+  restrictedJournalCompanyId, // <<<< Destructure the new prop
 }: UseJournalManagerProps): UseJournalManagerReturn => {
   const queryClient = useQueryClient();
 
-  const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
-    queryKey: ["journalHierarchy"],
-    queryFn: fetchJournalHierarchy,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
+  useEffect(() => {
+    console.log("[useJournalManager] Props received:", {
+      restrictedJournalId,
+      restrictedJournalCompanyId,
+    });
+  }, [restrictedJournalId, restrictedJournalCompanyId]);
 
+  // THIS IS THE KEY AREA
+  const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
+    // Query key MUST include restrictedJournalId to refetch when it changes
+    queryKey: ["journalHierarchy", restrictedJournalId], // Use the actual string ID or null
+    queryFn: () => {
+      // Pass the string ID or null to fetchJournalHierarchy
+      console.log(
+        "[useJournalManager] Fetching hierarchy. Restriction ID from prop:",
+        restrictedJournalId
+      );
+      return fetchJournalHierarchy(restrictedJournalId); // fetchJournalHierarchy expects string | null
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    // Enable the query based on visibility AND if it's not explicitly disabled by lack of necessary IDs for other modes
+    enabled: visibility[SLIDER_TYPES.JOURNAL], // Basic enablement
+  });
   const { data: hierarchyDataFromQuery } = journalHierarchyQuery; // Renamed for clarity
 
   const internalCurrentHierarchy = useMemo(
@@ -160,8 +181,18 @@ export const useJournalManager = ({
     []
   );
 
+  // Ensure all dependent states are initialized correctly, especially those derived from hierarchyDataFromQuery
   const [selectedTopLevelJournalId, setSelectedTopLevelJournalId] =
-    useState<string>(ROOT_JOURNAL_ID);
+    useState<string>(() => {
+      // Initialize based on restriction if available and primary
+      const isPrimary =
+        sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
+        visibility[SLIDER_TYPES.JOURNAL];
+      return isPrimary && restrictedJournalId
+        ? restrictedJournalId
+        : ROOT_JOURNAL_ID;
+    });
+
   const [selectedLevel2JournalIds, setSelectedLevel2JournalIds] = useState<
     string[]
   >([]);
@@ -186,6 +217,23 @@ export const useJournalManager = ({
       visibility[SLIDER_TYPES.JOURNAL],
     [sliderOrder, visibility]
   );
+  // Effect to reset selections if restrictedJournalId changes and manager is primary
+  useEffect(() => {
+    const isPrimary =
+      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
+      visibility[SLIDER_TYPES.JOURNAL];
+    if (isPrimary) {
+      console.log(
+        "[useJournalManager] Restriction or primary status changed. New restriction ID:",
+        restrictedJournalId
+      );
+      setSelectedTopLevelJournalId(restrictedJournalId || ROOT_JOURNAL_ID);
+      setSelectedLevel2JournalIds([]);
+      setSelectedLevel3JournalIds([]);
+      // Potentially reset flat journal ID too if it's managed here
+      // setSelectedFlatJournalIdState(null);
+    }
+  }, [restrictedJournalId, isJournalSliderPrimary, visibility, sliderOrder]);
 
   const effectiveSelectedJournalIds = useMemo(() => {
     if (!isJournalSliderPrimary) return [];

@@ -5,6 +5,8 @@ import {
   UpdateJournalData,
 } from "@/app/services/journalService"; // Chef and Order Slip type
 import { z } from "zod"; // Waiter's notepad
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/authOptions";
 
 // Waiter's checklist for "Update Dish" orders
 const updateJournalSchema = z
@@ -21,18 +23,34 @@ const updateJournalSchema = z
 
 // This function runs when your frontend calls GET /api/journals/{some_id}
 export async function GET(
-  _request: NextRequest, // You can use _request if request object isn't used in this specific handler
-  { params: paramsPromise }: { params: Promise<{ id: string }> } // Type params as a Promise
+  _request: NextRequest,
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
   // Await the paramsPromise to get the actual params object
   const resolvedParams = await paramsPromise;
   const dishId = resolvedParams.id; // Access id from the resolved object
 
+  // You need to get the session to access companyId and userId
+  const session = (await getServerSession(authOptions)) as
+    | import("@/lib/authOptions").ExtendedSession
+    | null;
+  if (!session?.user || !session.user.id || !session.user.companyId) {
+    return NextResponse.json(
+      { message: "Unauthorized: Session or user details missing" },
+      { status: 401 }
+    );
+  }
+  const user = session.user as import("@/lib/authOptions").ExtendedUser;
+  const userContext = {
+    companyId: user.companyId,
+    userId: user.id,
+  };
+
   console.log(
     `Waiter (API): Customer wants details for dish '${dishId}'. Asking Chef...`
   );
   try {
-    const journal = await journalService.getJournalById(dishId);
+    const journal = await journalService.getJournalById(dishId, userContext);
     if (!journal) {
       console.warn(
         `Waiter (API): Chef says dish '${dishId}' is not on the menu.`
@@ -61,12 +79,28 @@ export async function GET(
 
 // This function runs when your frontend calls PUT /api/journals/{some_id} (to update)
 export async function PUT(
-  _request: NextRequest, // You can use _request if request object isn't used in this specific handler
-  { params: paramsPromise }: { params: Promise<{ id: string }> } // Type params as a Promise
+  _request: NextRequest,
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
   // Await the paramsPromise to get the actual params object
   const resolvedParams = await paramsPromise;
   const dishId = resolvedParams.id; // Access id from the resolved object
+
+  // Get session and user context as in GET
+  const session = (await getServerSession(authOptions)) as
+    | import("@/lib/authOptions").ExtendedSession
+    | null;
+  if (!session?.user || !session.user.id || !session.user.companyId) {
+    return NextResponse.json(
+      { message: "Unauthorized: Session or user details missing" },
+      { status: 401 }
+    );
+  }
+  const user = session.user as import("@/lib/authOptions").ExtendedUser;
+  const userContext = {
+    companyId: user.companyId,
+    userId: user.id,
+  };
 
   console.log(`Waiter (API): Customer wants to update dish '${dishId}'.`);
   try {
@@ -110,7 +144,8 @@ export async function PUT(
     // Give the changes to the Chef
     const updatedDish = await journalService.updateJournal(
       dishId,
-      validChanges
+      validChanges,
+      userContext
     );
     if (!updatedDish) {
       console.warn(
@@ -141,19 +176,35 @@ export async function PUT(
 
 // This function runs when your frontend calls DELETE /api/journals/{some_id}
 export async function DELETE(
-  _request: NextRequest, // You can use _request if request object isn't used in this specific handler
-  { params: paramsPromise }: { params: Promise<{ id: string }> } // Type params as a Promise
+  _request: NextRequest,
+  { params: paramsPromise }: { params: Promise<{ id: string }> }
 ) {
   // Await the paramsPromise to get the actual params object
   const resolvedParams = await paramsPromise;
   const dishId = resolvedParams.id; // Access id from the resolved object
+
+  // Get session and user context as in GET
+  const session = (await getServerSession(authOptions)) as
+    | import("@/lib/authOptions").ExtendedSession
+    | null;
+  if (!session?.user || !session.user.id || !session.user.companyId) {
+    return NextResponse.json(
+      { message: "Unauthorized: Session or user details missing" },
+      { status: 401 }
+    );
+  }
+  const user = session.user as import("@/lib/authOptions").ExtendedUser;
+  const userContext = {
+    companyId: user.companyId,
+    userId: user.id,
+  };
 
   console.log(
     `Waiter (API): Customer wants to remove dish '${dishId}' from the menu.`
   );
   try {
     // Tell the Chef to remove the dish
-    const deletedDish = await journalService.deleteJournal(dishId);
+    const deletedDish = await journalService.deleteJournal(dishId, userContext);
     // If service.deleteJournal throws an error if not found, this part might not be reached for 404.
     // The service currently returns null if not found, or throws for children.
     // Let's adjust service to throw for "not found" too for consistency. (See change in service)

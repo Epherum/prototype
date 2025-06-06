@@ -10,12 +10,16 @@ export interface AddJournalModalContext {
 }
 
 export function useModalStates() {
+  // Existing states
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
   const [isAddJournalModalOpen, setIsAddJournalModalOpen] = useState(false);
   const [addJournalContext, setAddJournalContext] =
     useState<AddJournalModalContext | null>(null);
-  // isConfirmationModalOpen is part of useDocumentCreation, so it stays there.
 
+  // --- NEW: State for Create User Modal ---
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
+
+  // Existing callbacks
   const openJournalModal = useCallback(() => setIsJournalModalOpen(true), []);
   const closeJournalModal = useCallback(() => setIsJournalModalOpen(false), []);
 
@@ -23,7 +27,7 @@ export function useModalStates() {
     (context: AddJournalModalContext) => {
       setAddJournalContext(context);
       setIsAddJournalModalOpen(true);
-      setIsJournalModalOpen(false); // Close the main journal modal if open
+      setIsJournalModalOpen(false);
     },
     []
   );
@@ -33,7 +37,22 @@ export function useModalStates() {
     setAddJournalContext(null);
   }, []);
 
+  // --- NEW: Callbacks for Create User Modal ---
+  const openCreateUserModal = useCallback(() => {
+    // Potentially close other conflicting modals if necessary
+    // e.g., if CreateUserModal shouldn't overlap with JournalModal
+    // setIsJournalModalOpen(false);
+    setIsCreateUserModalOpen(true);
+  }, []);
+
+  const closeCreateUserModal = useCallback(() => {
+    setIsCreateUserModalOpen(false);
+    // The CreateUserModal itself (via useUserManagement) will handle resetting its internal form state
+    // upon successful submission or when it's closed.
+  }, []);
+
   return {
+    // Existing returns
     isJournalModalOpen,
     openJournalModal,
     closeJournalModal,
@@ -41,5 +60,10 @@ export function useModalStates() {
     addJournalContext,
     openAddJournalModalWithContext,
     closeAddJournalModal,
+
+    // --- NEW: Returns for Create User Modal ---
+    isCreateUserModalOpen,
+    openCreateUserModal,
+    closeCreateUserModal,
   };
 }

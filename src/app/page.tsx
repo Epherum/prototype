@@ -65,8 +65,48 @@ import { useJournalManager } from "@/hooks/useJournalManager";
 
 import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
 
+import { useSession } from "next-auth/react"; // <<<< MAKE SURE THIS IS IMPORTED
+import { useModalStates } from "@/hooks/useModalStates"; // <<<< Import your updated modal states hook
+import CreateUserModal from "@/components/modals/CreateUserModal"; // <<<< Import the new modal
+import type { ExtendedUser } from "@/app/api/auth/[...nextauth]/route"; // Ensure this is imported
+
 // --- Main Page Component ---
 export default function Home() {
+  const { data: session, status: sessionStatus } = useSession();
+
+  // --- Determine effective journal restriction ---
+  let effectiveRestrictedJournalId: string | null = null;
+  let effectiveRestrictedJournalCompanyId: string | null = null;
+
+  if (sessionStatus === "authenticated" && session?.user) {
+    const user = session.user as ExtendedUser; // Cast to your detailed type
+    if (user.roles && user.roles.length > 0) {
+      // Find the first role with a journal restriction.
+      // You might have more complex logic if multiple roles can have restrictions.
+      const roleWithRestriction = user.roles.find(
+        (role) => !!role.restrictedTopLevelJournalId
+      );
+      if (roleWithRestriction) {
+        effectiveRestrictedJournalId =
+          roleWithRestriction.restrictedTopLevelJournalId || null;
+        effectiveRestrictedJournalCompanyId =
+          roleWithRestriction.restrictedTopLevelJournalCompanyId || null;
+      }
+    }
+  }
+  // Log the determined restriction for debugging
+  useEffect(() => {
+    if (sessionStatus === "authenticated") {
+      console.log("[Page.tsx] Effective Journal Restriction:", {
+        id: effectiveRestrictedJournalId,
+        companyId: effectiveRestrictedJournalCompanyId,
+      });
+    }
+  }, [
+    sessionStatus,
+    effectiveRestrictedJournalId,
+    effectiveRestrictedJournalCompanyId,
+  ]);
   // --- Hooks ---
   // 1. Base Custom Hooks (few dependencies on local state here)
   const { sliderOrder, visibility, toggleVisibility, moveSlider } =
@@ -76,7 +116,10 @@ export default function Home() {
   const journalManager = useJournalManager({
     sliderOrder,
     visibility,
+    restrictedJournalId: effectiveRestrictedJournalId,
+    restrictedJournalCompanyId: effectiveRestrictedJournalCompanyId,
   });
+
   const {
     // Destructure resetJournalSelections early if it's stable and used in deps
     hierarchyData: journalManagerHierarchyData,
@@ -97,6 +140,22 @@ export default function Home() {
     // e.g., isJournalNavModalOpen, closeJournalNavModal, resetJournalSelections, setSelectedFlatJournalId
     // openJournalNavModal, addJournalContext, createJournal, deleteJournal, setJournalRootFilterStatus
   } = journalManager;
+
+  // --- MODAL STATES HOOK ---
+  const {
+    // ... existing modal states and handlers from useModalStates
+    isJournalModalOpen, // Example, ensure all used ones are destructured
+    openJournalModal,
+    closeJournalModal,
+    isAddJournalModalOpen,
+    addJournalContext,
+    openAddJournalModalWithContext,
+    closeAddJournalModal,
+    // --- NEWLY ADDED for Create User Modal ---
+    isCreateUserModalOpen,
+    openCreateUserModal,
+    closeCreateUserModal,
+  } = useModalStates(); // <<<< Use the updated hook
 
   const documentCreation = useDocumentCreation(); // INSTANTIATE THE HOOK
 
@@ -1072,7 +1131,7 @@ export default function Home() {
   return (
     <div className={styles.pageContainer}>
       <h1 className={styles.title}>ERP Application Interface</h1>
-      <UserAuthDisplay />
+      <UserAuthDisplay onOpenCreateUserModal={openCreateUserModal} />
       <StickyHeaderControls
         visibility={visibility}
         onToggleVisibility={toggleVisibility}
@@ -1315,7 +1374,6 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </LayoutGroup>
-
       {isDocumentCreationMode && (
         <div className={styles.finishDocumentContainer}>
           <button
@@ -1327,7 +1385,6 @@ export default function Home() {
           </button>
         </div>
       )}
-
       {/* Modals */}
       <AnimatePresence>
         {partnerJournalLinking.isLinkPartnerToJournalsModalOpen && (
@@ -1597,7 +1654,6 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
-
       <AnimatePresence>
         {jpqlLinking.isLinkGoodToPartnersViaJournalModalOpen &&
           jpqlLinking.goodForJpgLinking &&
@@ -1647,7 +1703,6 @@ export default function Home() {
             />
           )}
       </AnimatePresence>
-
       <PartnerOptionsMenu
         isOpen={partnerManager.isPartnerOptionsMenuOpen}
         onClose={partnerManager.handleClosePartnerOptionsMenu}
@@ -1694,6 +1749,16 @@ export default function Home() {
         }
         canOpenUnlinkGoodFromPartnersModal={canUnlinkGoodFromPartnersViaJournal}
       />
+
+      {/* --- NEW: Render CreateUserModal --- */}
+      <AnimatePresence>
+        {isCreateUserModalOpen && (
+          <CreateUserModal
+            isOpen={isCreateUserModalOpen}
+            onClose={closeCreateUserModal}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

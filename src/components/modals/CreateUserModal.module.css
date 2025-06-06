@@ -1,0 +1,158 @@
+/* src/components/modals/CreateUserModal.module.css */
+
+.createUserModalContent {
+  width: 550px; /* Adjust as needed, might be wider due to more fields */
+  max-height: 90vh; /* Ensure it doesn't overflow viewport height */
+  display: flex;
+  flex-direction: column;
+}
+
+.createUserForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem; /* Slightly less gap if many fields */
+  padding: 0.5rem 0.1rem; /* Smaller horizontal padding */
+  overflow-y: auto; /* Allow form content to scroll if it exceeds modal height */
+  flex-grow: 1; /* Make form take available space */
+  margin-bottom: 1rem; /* Space before modal actions */
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.formGroup label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.formGroup input[type="text"],
+.formGroup input[type="email"],
+.formGroup input[type="password"],
+.formGroup select {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  font-size: 0.95rem;
+  background-color: var(--bg-input, white);
+  color: var(--text-primary);
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formGroup input[type="text"]:focus,
+.formGroup input[type="email"]:focus,
+.formGroup input[type="password"]:focus,
+.formGroup select:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-light);
+}
+
+.formGroup input[type="text"]:disabled,
+.formGroup input[type="email"]:disabled,
+.formGroup input[type="password"]:disabled,
+.formGroup select:disabled {
+  background-color: var(--bg-disabled, #e9ecef);
+  color: var(--text-disabled, #6c757d);
+  cursor: not-allowed;
+  border-color: var(--border-disabled, #ced4da);
+}
+
+.passwordInputContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.passwordInputContainer input[type="password"],
+.passwordInputContainer input[type="text"] {
+  /* When type is toggled */
+  padding-right: 2.5rem; /* Space for the toggle icon */
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 1.2rem; /* Adjust icon size */
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.roleAssignmentsSection {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.roleAssignmentsSection h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.6rem;
+}
+
+/* For multi-select, assuming you might use a library or a custom one.
+   If using a simple select with multiple attribute, it might need different styling.
+   This is a placeholder for a more robust role selection UI.
+*/
+.rolesSelect {
+  min-height: 80px; /* Example for a multiple select */
+}
+
+.assignedRoleItem {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background-color: var(--bg-secondary);
+}
+
+.assignedRoleHeader {
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.errorMessage {
+  color: var(
+    --accent-danger,
+    red
+  ); /* Define --accent-danger in globals.css if you don't have it */
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+  text-align: center; /* Center error message */
+}
+
+/* Consider adding loading spinner styles if not globally available */
+.loadingSpinner {
+  /* Basic spinner, replace with your preferred one */
+  border: 4px solid var(--bg-secondary);
+  border-top: 4px solid var(--accent-warm);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  animation: spin 1s linear infinite;
+  margin: 1rem auto; /* Center it */
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

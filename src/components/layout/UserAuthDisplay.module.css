@@ -1,18 +1,20 @@
-/* src/components/auth/UserAuthDisplay.module.css */
+/* src/components/layout/UserAuthDisplay.module.css */
 .authContainer {
   display: flex;
   align-items: center;
-  gap: calc(var(--spacing-unit) * 2);
+  gap: calc(var(--spacing-unit) * 1.5); /* Adjusted gap slightly */
   padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-
   border-radius: var(--border-radius-md);
-  /* box-shadow: 0 2px 4px var(--shadow-color); */ /* Optional shadow */
   border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card); /* Give it a card background */
 }
 
 .userInfo {
   font-size: 0.9em;
   color: var(--text-secondary);
+  display: flex; /* For potential multiple lines of info */
+  flex-direction: column; /* Stack name/company */
+  line-height: 1.3;
 }
 
 .userName {
@@ -20,16 +22,22 @@
   color: var(--text-primary);
 }
 
+.userCompany {
+  /* Optional style if you add company display */
+  font-size: 0.8em;
+  color: var(--text-secondary);
+}
+
 .authButton {
   padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
-  font-size: 0.9em;
+  font-size: 0.85em; /* Slightly smaller for multiple buttons */
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--accent-warm-light);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-pill);
-  background-color: var(--bg-card); /* Button background */
-  color: var(--accent-warm);
-  text-decoration: none; /* For Link component */
+  background-color: transparent; /* Make default transparent */
+  color: var(--text-secondary);
+  text-decoration: none;
   transition: background-color 0.2s ease, color 0.2s ease,
     border-color 0.2s ease, box-shadow 0.2s ease;
   white-space: nowrap;
@@ -37,9 +45,38 @@
 
 .authButton:hover {
   background-color: var(--accent-warm-light);
-  border-color: var(--accent-warm);
+  color: var(--accent-warm);
+  border-color: var(
+    --accent-warm-light
+  ); /* Keep border subtle or match hover bg */
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
+/* Specific styling for the Create User button to make it stand out if needed */
+.createUserButton {
+  color: var(--accent-warm);
+  border-color: var(--accent-warm-light);
+}
+
+.createUserButton:hover {
+  background-color: var(--accent-warm);
+  color: var(--bg-card); /* White text on accent bg */
+  border-color: var(--accent-warm);
+}
+
+/* Logout button might have a slightly different style or could be the same */
+/* If you want logout to be more prominent or different: */
+/*
+.authButton:last-of-type {
+  color: var(--accent-danger, #dc3545);
+  border-color: var(--accent-danger-light, #f8d7da);
+}
+.authButton:last-of-type:hover {
+  background-color: var(--accent-danger, #dc3545);
+  color: white;
+  border-color: var(--accent-danger, #dc3545);
+}
+*/
 
 .loadingText {
   font-size: 0.9em;
