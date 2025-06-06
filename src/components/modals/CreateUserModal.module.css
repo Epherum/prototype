@@ -165,7 +165,7 @@
 .actionButtonBase {
   padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1.5);
   border: none;
-  border-radius: var(--border-radius-sm); /* Updated to use global var */
+  border-radius: var(--border-radius-lg); /* Updated to use global var */
   cursor: pointer;
   font-size: 0.9em;
   font-weight: 500; /* Added for better readability */
@@ -190,7 +190,7 @@
 
 .selectJournalButton:hover,
 .changeButton:hover {
-  background-color: var(--accent-warm-light);
+  background-color: var(--accent-warm-light); /* Lighter shade on hover */
   /* color: var(--text-primary); Would be better for contrast on light bg */
   color: white; /* Sticking to white text requirement */
   box-shadow: 0 1px 3px var(--shadow-color);

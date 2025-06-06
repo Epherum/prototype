@@ -426,7 +426,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                               onClick={() =>
                                 openJournalSelectionModal(assignment.roleId)
                               }
-                              className={styles.selectJournalButton}
+                              className={`${styles.actionButtonBase} ${styles.selectJournalButton}`}
                               disabled={
                                 isSubmitting ||
                                 isLoadingJournals ||
