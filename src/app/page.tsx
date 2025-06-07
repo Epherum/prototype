@@ -1234,7 +1234,7 @@ export default function Home() {
                           className={`${styles.controlButton} ${styles.createDocumentButton}`}
                           title="Create Document with this Partner"
                         >
-                          <IoAddCircleOutline /> Create Doc
+                          <IoAddCircleOutline /> Doc
                         </button>
                       )}
                     {isPartnerSlider &&
