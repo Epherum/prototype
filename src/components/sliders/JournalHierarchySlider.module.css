@@ -1,31 +1,27 @@
-/* src/components/sliders/JournalHierarchySlider.module.css */
+/* --- NEW: 2-Row Header Layout --- */
 
-.journalParentHeader {
-  display: flex;
-  /* justify-content: flex-start; CHANGED - see below */
-  justify-content: space-between; /* CHANGED: To push filter controls to the right */
-  align-items: center;
-  margin-bottom: calc(var(--spacing-unit) * 1);
-  padding-bottom: calc(var(--spacing-unit) * 1);
-  min-height: 30px; /* Or adjust to fit content + buttons */
-  position: relative; /* For L1 Nav Options */
-  /* cursor: pointer; If entire area is double-clickable - consider carefully with buttons inside */
-  transition: background-color 0.2s ease;
-}
-.journalParentHeader.l1NavActive {
-  background-color: var(
-    --accent-warm-lighter
-  ); /* var(--accent-slider) in your globals */
-}
-
-.journalParentInfoAndL1Options {
-  /* NEW WRAPPER for L1 info and its potential nav options */
+/* Row 1: Container for Options Button and L1 Info */
+.headerTopRow {
   display: flex;
   align-items: center;
-  position: relative; /* For L1 Nav Options positioning relative to this group */
-  /* margin-right: auto; REMOVED - justify-content on parent handles spacing */
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  min-height: 30px;
 }
 
+/* Container for your options/filter icon button */
+.headerOptions {
+  flex-shrink: 0;
+  margin-right: var(--spacing-unit);
+}
+
+/* Container for the L1 info span */
+.headerL1InfoContainer {
+  flex-grow: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* The L1 info box itself, e.g., [Root -] */
 .journalParentInfo {
   font-size: 0.9em;
   font-weight: 500;
@@ -33,93 +29,53 @@
   background-color: var(--accent-warm-light);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   border-radius: var(--border-radius-sm);
-  /* margin-right: auto; REMOVED - parent flex handles spacing */
-  cursor: pointer; /* Add if only this part is double-clickable for L1 nav */
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-block;
 }
 
-/* L1 Navigation Options Overlay - Styles remain the same, but ensure its positioning
-   is relative to .journalParentInfoAndL1Options or .journalParentInfo if that's the trigger */
-.l1NavOptionsOverlay {
-  position: absolute;
-  bottom: calc(
-    100% + var(--spacing-unit)
-  ); /* Appears above its relative parent */
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--bg-card);
-  padding: var(--spacing-unit);
-  border-radius: var(--border-radius-md);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-  z-index: 30;
-  display: flex;
+/* Row 2: Container for the Filter Buttons */
+.headerFilterRow {
+  text-align: center; /* This centers the inline-flex group below */
+  width: 100%;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+}
+
+/* The group of filter buttons */
+.rootFilterControls {
+  display: inline-flex; /* Behaves like text, allowing it to be centered */
   align-items: center;
   gap: var(--spacing-unit);
+  background-color: #f7f7f7; /* Light grey background for the group */
+  padding: calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius-md);
+  border: 1px solid #eee;
 }
 
-.navOptionDismissInsideL1 {
-  background: transparent;
+.rootFilterControls button {
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   border: none;
-  color: var(--text-secondary);
-  font-size: 1.2em;
+  background-color: transparent; /* Inactive buttons are clear */
+  color: var(--text-secondary, #555);
+  border-radius: var(--border-radius-sm, 4px);
   cursor: pointer;
-  padding: calc(var(--spacing-unit) * 0.25);
-  line-height: 1;
+  font-size: 0.85em;
+  transition: all 0.2s ease;
 }
-.navOptionDismissInsideL1:hover {
+
+.rootFilterControls button:hover:not(.activeFilter) {
   color: var(--text-primary);
 }
 
-/* --- Root Filter Controls --- */
-.rootFilterControls {
-  display: flex;
-  /* justify-content: center; REMOVED - parent flex handles positioning */
-  align-items: center; /* Vertically align buttons with L1 info */
-  gap: var(--spacing-unit);
-  /* margin-top: calc(var(--spacing-unit) * 0.5); REMOVED - no longer needed */
-  /* margin-bottom: calc(var(--spacing-unit) * 1); REMOVED */
-  /* padding: calc(var(--spacing-unit) * 0.5); REMOVED or adjust if needed */
-  /* background-color: var(--bg-secondary); Optional: if you want a distinct background */
-  /* border-radius: var(--border-radius-md); Optional */
-}
-
-.filterButton {
-  padding: calc(var(--spacing-unit) * 0.6) var(--spacing-unit);
-  font-size: 0.75em;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--border-radius-sm);
-  background-color: var(--bg-card);
-  color: var(--text-secondary);
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease;
-  white-space: nowrap;
-}
-
-/* Use a different accent for these filter buttons if desired,
-   or use --accent-warm for consistency with L2/L3 active states.
-   The example below assumes you might have --accent-cool variables.
-   If not, replace with --accent-warm, --accent-warm-light etc. */
-
-.filterButton:hover {
-  border-color: var(--accent-warm-light); /* Using warm accent for hover */
-  background-color: #f0f0f0;
-}
-
-.filterButtonActive,
-.filterButtonActive:hover {
-  background-color: var(--accent-warm); /* Using warm accent for active */
-  color: var(--bg-card);
-  border-color: var(--accent-warm);
+.rootFilterControls button.activeFilter {
+  background-color: var(--accent-warm, #e89f71);
+  color: var(--bg-card, white);
   font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.filterButtonActive:hover {
-  background-color: #d68f63; /* Darker shade of warm accent */
-  border-color: #d68f63;
-}
+/* --- L2 and L3 Scroller Styles (Unchanged) --- */
 
-/* Styles for L2 and L3 remain unchanged from your provided CSS */
 .level2ScrollerTitle {
   font-size: 0.9em;
   color: var(--text-secondary);
@@ -153,6 +109,7 @@
   background-color: rgba(230, 230, 230, 0.7);
   border-radius: 50%;
 }
+
 .level2ScrollerSwiper .swiper-button-next:hover,
 .level2ScrollerSwiper .swiper-button-prev:hover {
   background-color: rgba(220, 220, 220, 0.9);
@@ -186,137 +143,22 @@
   transition: background-color 0.2s ease, color 0.2s ease,
     border-color 0.2s ease;
   white-space: nowrap;
-  min-width: 50px; /* Base width */
+  min-width: 50px;
   text-align: center;
   position: relative;
   z-index: 5;
   box-sizing: border-box;
 }
+
 .level2Button:hover:not(.level2ButtonActive) {
   border-color: var(--accent-warm-light);
   background-color: #f0f0f0;
 }
+
 .level2ButtonActive,
 .level2ButtonActive:hover {
   background-color: var(--accent-warm);
   color: var(--bg-card);
   border-color: var(--accent-warm);
-  font-weight: 600;
-}
-.level2ButtonActive:hover {
-  background-color: #d68f63;
-  border-color: #d68f63;
-}
-
-.l2ButtonExpandedWithOptions {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: space-between;
-  width: 180px;
-  min-height: 90px;
-  padding: var(--spacing-unit);
-  background-color: var(--bg-card);
-  border: 1px solid var(--accent-warm);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: var(--border-radius-md);
-  box-sizing: border-box;
-  cursor: default;
-}
-
-.expandedButtonHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.8em;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: calc(var(--spacing-unit) * 1);
-  padding-bottom: calc(var(--spacing-unit) * 0.5);
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-.expandedButtonHeader span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-right: var(--spacing-unit);
-}
-
-.navOptionDismissInside {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 1.2em;
-  font-weight: bold;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.navOptionDismissInside:hover {
-  color: var(--text-primary);
-}
-
-.navOptionsInside {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--spacing-unit) * 0.75);
-  flex-grow: 1;
-  justify-content: center;
-}
-
-.navOptionButtonInside {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--border-radius-sm);
-  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit);
-  font-size: 0.75em;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(var(--spacing-unit) * 0.5);
-  text-align: center;
-}
-.navOptionButtonInside:hover {
-  background-color: #e0e0e0;
-  border-color: #ccc;
-}
-.navIcon {
-  font-size: 0.9em;
-}
-
-.rootFilterControls {
-  display: flex;
-  gap: var(--spacing-unit, 8px); /* Use your spacing unit */
-  padding: calc(var(--spacing-unit, 8px) / 2) 0;
-}
-
-.rootFilterControls button {
-  padding: calc(var(--spacing-unit, 8px) * 0.5) var(--spacing-unit, 8px);
-  border: 1px solid var(--border-subtle, #ccc);
-  background-color: var(--bg-card, white);
-  color: var(--text-secondary, #555);
-  border-radius: var(--border-radius-sm, 4px);
-  cursor: pointer;
-  font-size: 0.85em;
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease;
-}
-
-.rootFilterControls button:hover {
-  border-color: var(--accent-warm, #e89f71);
-  color: var(--accent-warm, #e89f71);
-}
-
-.rootFilterControls button.activeFilter {
-  /* Assuming styles.activeFilter is the class name */
-  background-color: var(--accent-warm, #e89f71);
-  color: var(--bg-card, white); /* Or var(--text-on-accent, white) */
-  border-color: var(--accent-warm, #e89f71);
   font-weight: 600;
 }

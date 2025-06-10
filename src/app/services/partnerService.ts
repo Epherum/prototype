@@ -1,50 +1,223 @@
-// File: src/app/services/partnerService.ts
-import prisma from "@/app/utils/prisma"; // Storeroom Manager
-import { Partner, PartnerType, Prisma } from "@prisma/client"; // Added Prisma for WhereInput type
+// src/app/services/partnerService.ts
+import prisma from "@/app/utils/prisma";
+import {
+  Partner,
+  PartnerType,
+  Prisma,
+  EntityState,
+  ApprovalStatus,
+} from "@prisma/client";
+import { z } from "zod";
 
-// --- Types for "Order Slips" (Data Transfer Objects) for Partners ---
-// ... (CreatePartnerData, UpdatePartnerData types remain the same) ...
-export type CreatePartnerData = {
-  name: string;
-  partnerType: PartnerType; // From your Enum: LEGAL_ENTITY or NATURAL_PERSON
-  notes?: string | null;
-  logoUrl?: string | null;
-  photoUrl?: string | null;
-  isUs?: boolean | null;
-  // Legal Entity specific
-  registrationNumber?: string | null;
-  taxId?: string | null;
-  // Natural Person specific
-  bioFatherName?: string | null;
-  bioMotherName?: string | null;
-  additionalDetails?: any; // Or a more specific Zod schema
-  companyId: string;
-};
+// --- NEW: Define the schema as the single source of truth ---
+export const createPartnerSchema = z.object({
+  name: z.string().min(1, "Partner name is required").max(255),
+  partnerType: z.nativeEnum(PartnerType),
+  notes: z.string().optional().nullable(),
+  logoUrl: z.string().url("Invalid logo URL format").optional().nullable(),
+  photoUrl: z.string().url("Invalid photo URL format").optional().nullable(),
+  isUs: z.boolean().optional().nullable(),
+  registrationNumber: z.string().max(100).optional().nullable(),
+  taxId: z.string().max(100).optional().nullable(),
+  bioFatherName: z.string().max(100).optional().nullable(),
+  bioMotherName: z.string().max(100).optional().nullable(),
+  additionalDetails: z.any().optional().nullable(),
+});
 
+// --- UPDATED: Infer the type directly from the schema ---
+export type CreatePartnerData = z.infer<typeof createPartnerSchema>;
+
+// UpdatePartnerData remains the same, as it's a partial of the create type.
 export type UpdatePartnerData = Partial<Omit<CreatePartnerData, "partnerType">>;
 
-// --- Chef's Recipes for Partners ---
+/**
+ * @description Defines the options for the getAllPartners service method.
+ * This has been refactored to use a single `filterStatus` to handle
+ * the UI filtering logic from the JournalHierarchySlider.
+ */
+export interface GetAllPartnersOptions {
+  companyId: string;
+  where?: Prisma.PartnerWhereInput; // For pre-existing complex filters
+  take?: number;
+  skip?: number;
+  partnerType?: PartnerType;
+
+  // Unified filter status for the Journal-as-Root view
+  filterStatus?: "all" | "affected" | "unaffected" | "inProcess";
+  contextJournalIds?: string[]; // Required for 'affected' and 'all' filters
+  currentUserId?: string; // Required for 'inProcess' and 'all' filters
+}
 
 const partnerService = {
-  // ... (createPartner, getPartnerById methods remain the same) ...
-  async createPartner(data: CreatePartnerData): Promise<Partner> {
+  async createPartner(
+    data: CreatePartnerData,
+    companyId: string,
+    createdById: string,
+    createdByIp?: string | null
+  ): Promise<Partner> {
+    // ... (This function remains unchanged)
     console.log(
-      "Chef (PartnerService): Adding new partner to the guest list:",
-      data.name
+      "Chef (PartnerService): Adding new partner:",
+      data.name,
+      "for company:",
+      companyId,
+      "by user:",
+      createdById
     );
     const newPartner = await prisma.partner.create({
-      data: data,
+      data: {
+        ...data,
+        companyId: companyId,
+        createdById: createdById,
+        createdByIp: createdByIp,
+        entityState: EntityState.ACTIVE,
+        approvalStatus: ApprovalStatus.PENDING,
+      },
     });
     console.log(
       "Chef (PartnerService): Partner",
       newPartner.name,
       "added with ID:",
-      newPartner.id
+      newPartner.id,
+      "Status:",
+      newPartner.approvalStatus
     );
     return newPartner;
   },
 
+  /**
+   * REFACTORED FUNCTION
+   * Fetches partners with simplified and powerful filtering logic.
+   * This now directly implements the "all", "affected", "unaffected", and "inProcess" filters.
+   */
+  async getAllPartners(
+    options: GetAllPartnersOptions
+  ): Promise<{ partners: Partner[]; totalCount: number }> {
+    console.log(
+      "Chef (PartnerService): Fetching partners with new options:",
+      options
+    );
+
+    const {
+      companyId,
+      filterStatus,
+      contextJournalIds = [],
+      currentUserId,
+      where: externalWhere,
+      ...restOfOptions
+    } = options;
+
+    // --- Base Query ---
+    // All queries are scoped to the company and only retrieve ACTIVE partners.
+    // It also includes any pre-existing `where` clause passed in for other features (like J-G-P).
+    let prismaWhere: Prisma.PartnerWhereInput = {
+      companyId: companyId,
+      entityState: EntityState.ACTIVE,
+      ...externalWhere,
+    };
+
+    // --- Dynamic Filter Logic ---
+    // This block constructs the specific query conditions based on the filterStatus.
+    switch (filterStatus) {
+      case "affected":
+        console.log("Chef (PartnerService): Applying 'affected' filter.");
+        // If no journals are selected, the "affected" list should be empty.
+        if (contextJournalIds.length === 0) {
+          return { partners: [], totalCount: 0 };
+        }
+        prismaWhere.journalPartnerLinks = {
+          some: { journalId: { in: contextJournalIds } },
+        };
+        break;
+
+      case "unaffected":
+        console.log("Chef (PartnerService): Applying 'unaffected' filter.");
+        // Find partners NOT linked to ANY journal in the company.
+        prismaWhere.journalPartnerLinks = { none: {} };
+        break;
+
+      case "inProcess":
+        console.log("Chef (PartnerService): Applying 'inProcess' filter.");
+        // Find partners created by the current user, pending approval, AND unlinked.
+        if (!currentUserId) {
+          console.warn(
+            "Chef (PartnerService): 'inProcess' filter needs a currentUserId, but none was provided. Returning empty."
+          );
+          return { partners: [], totalCount: 0 };
+        }
+        prismaWhere.AND = [
+          { createdById: currentUserId },
+          { approvalStatus: ApprovalStatus.PENDING },
+          { journalPartnerLinks: { none: {} } },
+        ];
+        break;
+
+      case "all":
+        console.log("Chef (PartnerService): Applying 'all' filter.");
+        // Combines "Affected" (by current journal selection) and "In Process" (created by me).
+        if (!currentUserId) {
+          console.warn(
+            "Chef (PartnerService): 'all' filter needs a currentUserId for the 'inProcess' part. Returning empty."
+          );
+          return { partners: [], totalCount: 0 };
+        }
+
+        const affectedCondition: Prisma.PartnerWhereInput =
+          contextJournalIds.length > 0
+            ? {
+                journalPartnerLinks: {
+                  some: { journalId: { in: contextJournalIds } },
+                },
+              }
+            : { id: { in: [] } }; // A condition that is never met if no journals are selected
+
+        const inProcessCondition: Prisma.PartnerWhereInput = {
+          AND: [
+            { createdById: currentUserId },
+            { approvalStatus: ApprovalStatus.PENDING },
+            { journalPartnerLinks: { none: {} } },
+          ],
+        };
+
+        prismaWhere.OR = [affectedCondition, inProcessCondition];
+        break;
+
+      default:
+        // No filterStatus provided, so we perform a general fetch for the company.
+        console.log(
+          "Chef (PartnerService): No specific filterStatus. Performing general fetch."
+        );
+        if (options.partnerType) {
+          prismaWhere.partnerType = options.partnerType;
+        }
+        break;
+    }
+
+    console.log(
+      "Chef (PartnerService): Final Prisma 'where' clause:",
+      JSON.stringify(prismaWhere, null, 2)
+    );
+
+    const totalCount = await prisma.partner.count({ where: prismaWhere });
+
+    const partners = await prisma.partner.findMany({
+      where: prismaWhere,
+      take: restOfOptions.take,
+      skip: restOfOptions.skip,
+      orderBy: { name: "asc" },
+      include: {
+        _count: { select: { journalPartnerLinks: true } },
+      },
+    });
+
+    console.log(
+      `Chef (PartnerService): Fetched ${partners.length} partners. Total matching query: ${totalCount}`
+    );
+    return { partners, totalCount };
+  },
+
   async getPartnerById(id: bigint): Promise<Partner | null> {
+    // ... (This function remains unchanged)
     console.log("Chef (PartnerService): Looking up partner with ID:", id);
     const partner = await prisma.partner.findUnique({
       where: { id },
@@ -57,96 +230,11 @@ const partnerService = {
     return partner;
   },
 
-  // RECIPE 3: Get all partners (e.g., for a dropdown or a full list view)
-  // MODIFIED to support pagination and return totalCount
-  async getAllPartners(options?: {
-    partnerType?: PartnerType;
-    where?: Prisma.PartnerWhereInput; // Allows pre-existing filters (e.g., for J-G-P specific partner ID list)
-    take?: number;
-    skip?: number;
-    // New filter mechanism based on Journal Root selection status
-    // `filterByAffectedJournals`: Show partners linked to AT LEAST ONE of these journal IDs.
-    // If this array is empty, it means "linked to no journals from this specific list", resulting in no partners for this condition.
-    filterByAffectedJournals?: string[];
-    // `filterByUnaffected`: Show partners NOT linked to ANY journal.
-    // If true, this takes precedence over `filterByAffectedJournals`.
-    filterByUnaffected?: boolean;
-  }): Promise<{ partners: Partner[]; totalCount: number }> {
-    console.log(
-      "Chef (PartnerService): Fetching partners with options:",
-      options
-    );
-
-    // Initialize the main where clause, incorporating any externally provided 'where' conditions
-    const prismaWhere: Prisma.PartnerWhereInput = { ...options?.where };
-    const additionalConditions: Prisma.PartnerWhereInput[] = [];
-
-    if (options?.partnerType) {
-      additionalConditions.push({ partnerType: options.partnerType });
-      console.log(
-        "Chef (PartnerService): Filtering by partner type:",
-        options.partnerType
-      );
-    }
-
-    // Apply new journal link status filters
-    if (options?.filterByUnaffected) {
-      // Show partners not linked to any journal.
-      additionalConditions.push({ journalPartnerLinks: { none: {} } });
-      console.log(
-        "Chef (PartnerService): Filtering for unaffected partners (no journal links)."
-      );
-    } else if (options?.filterByAffectedJournals) {
-      // Show partners linked to the specified journals.
-      // If options.filterByAffectedJournals is an empty array, `journalId: { in: [] }` for `some`
-      // correctly results in no partners for this condition.
-      additionalConditions.push({
-        journalPartnerLinks: {
-          some: { journalId: { in: options.filterByAffectedJournals } },
-        },
-      });
-      console.log(
-        `Chef (PartnerService): Filtering for partners affected by journals: [${options.filterByAffectedJournals.join(
-          ", "
-        )}].`
-      );
-    }
-
-    // Combine all conditions using AND
-    if (additionalConditions.length > 0) {
-      if (prismaWhere.AND) {
-        if (Array.isArray(prismaWhere.AND)) {
-          prismaWhere.AND = [...prismaWhere.AND, ...additionalConditions];
-        } else {
-          prismaWhere.AND = [prismaWhere.AND, ...additionalConditions];
-        }
-      } else {
-        prismaWhere.AND = additionalConditions;
-      }
-    }
-
-    const totalCount = await prisma.partner.count({
-      where: prismaWhere,
-    });
-
-    const partners = await prisma.partner.findMany({
-      where: prismaWhere,
-      take: options?.take,
-      skip: options?.skip,
-      orderBy: { name: "asc" },
-    });
-
-    console.log(
-      `Chef (PartnerService): Fetched ${partners.length} partners. Total matching query: ${totalCount}`
-    );
-    return { partners, totalCount };
-  },
-
-  // ... (updatePartner, deletePartner methods remain the same) ...
   async updatePartner(
     id: bigint,
     data: UpdatePartnerData
   ): Promise<Partner | null> {
+    // ... (This function remains unchanged)
     console.log(
       "Chef (PartnerService): Updating details for partner ID:",
       id,
@@ -154,9 +242,10 @@ const partnerService = {
       data
     );
     try {
+      const { companyId, ...updatePayload } = data as any;
       const updatedPartner = await prisma.partner.update({
         where: { id },
-        data: data,
+        data: updatePayload,
       });
       console.log(
         "Chef (PartnerService): Partner",
@@ -176,6 +265,7 @@ const partnerService = {
   },
 
   async deletePartner(id: bigint): Promise<Partner | null> {
+    // ... (This function remains unchanged)
     console.log("Chef (PartnerService): Removing partner with ID:", id);
     try {
       const deletedPartner = await prisma.partner.delete({

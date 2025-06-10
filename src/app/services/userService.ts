@@ -111,7 +111,6 @@ export class UserService {
               email,
               passwordHash,
               companyId: adminCompanyId, // Associate with admin's company
-              isActive: true,
             },
           });
           console.log(

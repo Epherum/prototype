@@ -1,27 +1,33 @@
 // src/hooks/useUserManagement.ts
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createUser,
+  updateUser,
+  fetchUserById, // We will create this
   CreateUserClientPayload,
+  UpdateUserClientPayload,
 } from "@/services/clientUserService";
 import { fetchCompanyRoles } from "@/services/clientRoleService";
-import type { Role } from "@prisma/client";
 import { fetchAllJournalsForAdminRestriction } from "@/services/clientJournalService";
-import { JournalForAdminSelection } from "@/lib/helpers";
+import { useCurrentUser } from "./useCurrentUser";
+import type { RoleWithPermissions } from "@/lib/types";
+import type { JournalForAdminSelection } from "@/lib/helpers";
 
+// Types remain largely the same, but we make them reusable
 interface RoleAssignmentFormState {
   roleId: string;
   roleName?: string;
   restrictedTopLevelJournalId?: string | null;
-  restrictedTopLevelJournalCompanyId?: string | null; // NEW: To store the companyId of the restricted journal
-  restrictedJournalDisplayName?: string | null; // NEW: To store the display name of the restricted journal
+  restrictedTopLevelJournalCompanyId?: string | null;
+  restrictedJournalDisplayName?: string | null;
 }
 
 export interface UserManagementFormState {
+  id?: string; // For edit mode
   name: string;
   email: string;
-  password: string;
+  password?: string; // Optional for edit mode
   roleAssignments: RoleAssignmentFormState[];
 }
 
@@ -32,49 +38,116 @@ const initialFormState: UserManagementFormState = {
   roleAssignments: [],
 };
 
-export function useUserManagement() {
+// The hook now accepts an optional userId for editing
+export function useUserManagement(userIdToEdit?: string) {
   const queryClient = useQueryClient();
+  const currentUser = useCurrentUser(); // Get the currently logged-in admin
   const [formState, setFormState] =
     useState<UserManagementFormState>(initialFormState);
   const [showPassword, setShowPassword] = useState(false);
+  const isEditMode = !!userIdToEdit;
 
-  const {
-    data: companyRoles,
-    isLoading: isLoadingRoles,
-    error: errorRoles,
-  } = useQuery<Role[], Error>({
+  // --- DATA FETCHING (QUERIES) ---
+
+  // 1. Fetch the user to edit (if in edit mode)
+  const { data: userToEditData, isLoading: isLoadingUserToEdit } = useQuery({
+    queryKey: ["user", userIdToEdit],
+    queryFn: () => fetchUserById(userIdToEdit!),
+    enabled: isEditMode, // Only run this query if we're editing
+  });
+
+  // 2. Fetch all available roles for the company
+  const { data: companyRoles, isLoading: isLoadingRoles } = useQuery<
+    RoleWithPermissions[],
+    Error
+  >({
     queryKey: ["companyRoles"],
     queryFn: fetchCompanyRoles,
     staleTime: 5 * 60 * 1000,
   });
 
-  // UPDATED: Fetch all journals for the company for restriction selection
-  const {
-    data: allCompanyJournalsData,
-    isLoading: isLoadingJournals,
-    error: errorJournals,
-  } = useQuery<JournalForAdminSelection[], Error>({
-    // Use the specific type here
-    queryKey: ["allCompanyJournalsForRestriction"],
-    queryFn: fetchAllJournalsForAdminRestriction,
-    staleTime: 5 * 60 * 1000,
-  });
+  // 3. Fetch all journals for restriction selection (no change here)
+  const { data: allCompanyJournalsData, isLoading: isLoadingJournals } =
+    useQuery<JournalForAdminSelection[], Error>({
+      queryKey: ["allCompanyJournalsForRestriction"],
+      queryFn: fetchAllJournalsForAdminRestriction,
+      staleTime: 5 * 60 * 1000,
+    });
+
+  // --- SECURITY: Filter roles the admin is allowed to assign ---
+  const assignableRoles = useMemo(() => {
+    // The guard clause is essential for when the data is loading
+    if (!currentUser?.roles || !companyRoles) return [];
+
+    // Create a Set of the admin's own permissions (from the flattened session token)
+    const adminPermissions = new Set<string>();
+    currentUser.roles.forEach((role) =>
+      // `p` here is { action, resource }
+      role.permissions.forEach((p) =>
+        adminPermissions.add(`${p.action}:${p.resource}`)
+      )
+    );
+
+    // Filter the company roles (which have a nested structure from the API)
+    return companyRoles.filter((role) => {
+      // An admin can assign a role if they possess EVERY permission that role requires.
+      return role.permissions.every((p) => {
+        // `p` here is RolePermission, so we access `p.permission`
+        // THIS IS THE CORRECTED LOGIC
+        const permissionString = `${p.permission.action}:${p.permission.resource}`;
+        return adminPermissions.has(permissionString);
+      });
+    });
+  }, [companyRoles, currentUser]);
+
+  // --- DATA MUTATIONS (CREATE/UPDATE) ---
 
   const createUserMutation = useMutation({
     mutationFn: (userData: CreateUserClientPayload) => createUser(userData),
-    onSuccess: (data) => {
-      console.log("User created successfully:", data);
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-    },
-    onError: (error: Error) => {
-      console.error("Error creating user:", error.message);
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] }); // Invalidate list of all users
     },
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: (userData: UpdateUserClientPayload) =>
+      updateUser(userIdToEdit!, userData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] }); // Invalidate list
+      queryClient.invalidateQueries({ queryKey: ["user", userIdToEdit] }); // Invalidate this specific user
+    },
+  });
+
+  // --- FORM STATE MANAGEMENT ---
+
+  // Effect to populate the form when editing a user
+  useEffect(() => {
+    if (isEditMode && userToEditData) {
+      setFormState({
+        id: userToEditData.id,
+        name: userToEditData.name || "",
+        email: userToEditData.email,
+        password: "", // Password should be blank for editing
+        roleAssignments: userToEditData.userRoles.map((ur) => ({
+          roleId: ur.roleId,
+          roleName: ur.role.name,
+          restrictedTopLevelJournalId: ur.restrictedTopLevelJournalId,
+          restrictedTopLevelJournalCompanyId:
+            ur.restrictedTopLevelJournalCompanyId,
+          // We need a way to fetch/find the display name if needed, or reconstruct it
+          restrictedJournalDisplayName: ur.restrictedTopLevelJournalId
+            ? `ID: ${ur.restrictedTopLevelJournalId}`
+            : null,
+        })),
+      });
+    }
+  }, [isEditMode, userToEditData]);
+
+  // --- HANDLERS (no change in their logic, just their context) ---
+
   const handleInputChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const { name, value } = event.target;
-      setFormState((prev) => ({ ...prev, [name]: value }));
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setFormState((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     },
     []
   );
@@ -84,7 +157,7 @@ export function useUserManagement() {
       setFormState((prev) => {
         const newAssignments: RoleAssignmentFormState[] = selectedRoleIds.map(
           (roleId) => {
-            const existingAssignment = prev.roleAssignments.find(
+            const existing = prev.roleAssignments.find(
               (ra) => ra.roleId === roleId
             );
             const role = companyRoles?.find((r) => r.id === roleId);
@@ -92,12 +165,11 @@ export function useUserManagement() {
               roleId: roleId,
               roleName: role?.name || "Unknown Role",
               restrictedTopLevelJournalId:
-                existingAssignment?.restrictedTopLevelJournalId || null,
+                existing?.restrictedTopLevelJournalId || null,
               restrictedTopLevelJournalCompanyId:
-                existingAssignment?.restrictedTopLevelJournalCompanyId || null,
-              // Preserve or initialize display name
+                existing?.restrictedTopLevelJournalCompanyId || null,
               restrictedJournalDisplayName:
-                existingAssignment?.restrictedJournalDisplayName || null,
+                existing?.restrictedJournalDisplayName || null,
             };
           }
         );
@@ -107,97 +179,92 @@ export function useUserManagement() {
     [companyRoles]
   );
 
-  // MODIFIED: Now also takes displayName for UI update in the CreateUserModal
   const handleJournalRestrictionChange = useCallback(
     (
       roleId: string,
       journalId: string | null,
       journalCompanyId: string | null,
-      journalDisplayName: string | null
+      displayName: string | null
     ) => {
       setFormState((prev) => ({
         ...prev,
-        roleAssignments: prev.roleAssignments.map((assignment) => {
-          if (assignment.roleId === roleId) {
-            return {
-              ...assignment,
-              restrictedTopLevelJournalId: journalId,
-              restrictedTopLevelJournalCompanyId: journalCompanyId,
-              restrictedJournalDisplayName: journalDisplayName,
-            };
-          }
-          return assignment;
-        }),
+        roleAssignments: prev.roleAssignments.map((a) =>
+          a.roleId === roleId
+            ? {
+                ...a,
+                restrictedTopLevelJournalId: journalId,
+                restrictedTopLevelJournalCompanyId: journalCompanyId,
+                restrictedJournalDisplayName: displayName,
+              }
+            : a
+        ),
       }));
     },
-    [] // No dependency on allCompanyJournalsData here, as details are passed in
+    []
   );
 
   const resetForm = useCallback(() => {
     setFormState(initialFormState);
     setShowPassword(false);
-    createUserMutation.reset();
-  }, [createUserMutation]);
+  }, []);
 
-  const handleSubmit = useCallback(
-    async (event?: React.FormEvent<HTMLFormElement>) => {
-      if (event) event.preventDefault();
+  // Universal submit handler
+  const handleSubmit = useCallback(async () => {
+    if (formState.roleAssignments.length === 0) {
+      console.error("Attempted to submit with no roles assigned.");
+      return;
+    }
 
-      if (formState.roleAssignments.length === 0) {
-        console.error("Attempted to submit with no roles assigned.");
-        createUserMutation.reset(); // Reset to clear any previous error from mutation
-        return;
-      }
+    const assignmentPayload = formState.roleAssignments.map((ra) => ({
+      roleId: ra.roleId,
+      restrictedTopLevelJournalId: ra.restrictedTopLevelJournalId || null,
+      restrictedTopLevelJournalCompanyId:
+        ra.restrictedTopLevelJournalCompanyId || null,
+    }));
 
+    if (isEditMode) {
+      const payload: UpdateUserClientPayload = {
+        name: formState.name,
+        email: formState.email,
+        password: formState.password || undefined, // Send password only if it's been set
+        roleAssignments: assignmentPayload,
+      };
+      await updateUserMutation.mutateAsync(payload);
+    } else {
       const payload: CreateUserClientPayload = {
         name: formState.name,
         email: formState.email,
-        password: formState.password,
-        roleAssignments: formState.roleAssignments.map((ra) => ({
-          roleId: ra.roleId,
-          restrictedTopLevelJournalId: ra.restrictedTopLevelJournalId || null,
-          restrictedTopLevelJournalCompanyId:
-            ra.restrictedTopLevelJournalCompanyId || null, // NEW
-        })),
+        password: formState.password!, // Password is required for creation
+        roleAssignments: assignmentPayload,
       };
-      console.log("--- CLIENT SIDE PAYLOAD (useUserManagement) ---");
-      console.log(
-        "Payload to be sent to clientUserService.createUser:",
-        JSON.stringify(payload, null, 2)
-      );
       await createUserMutation.mutateAsync(payload);
-    },
-    [formState, createUserMutation]
-  );
+    }
+  }, [formState, isEditMode, createUserMutation, updateUserMutation]);
 
-  const isLoading =
-    isLoadingRoles || isLoadingJournals || createUserMutation.isPending;
-
-  const availableRolesForSelection = useMemo(() => {
-    return companyRoles || [];
-  }, [companyRoles]);
+  const mutation = isEditMode ? updateUserMutation : createUserMutation;
 
   return {
     formState,
     setFormState,
+    isEditMode,
+    isLoading: isLoadingRoles || isLoadingJournals || isLoadingUserToEdit,
+    isSubmitting: mutation.isPending,
+    isSuccess: mutation.isSuccess,
+    submissionError: mutation.error,
+    resetMutation: mutation.reset,
+
+    // Data
+    assignableRoles, // Use this in the modal!
+    allCompanyJournalsData,
+
+    // Handlers
     handleInputChange,
     handleRoleSelectionChange,
     handleJournalRestrictionChange,
     handleSubmit,
     resetForm,
 
-    companyRoles: companyRoles || [], // Return companyRoles, ensure it's an array
-
-    allCompanyJournalsData: allCompanyJournalsData, // <<<<------ ADD THIS LINE
-
-    isLoadingRoles,
-    errorRoles,
-    isLoadingJournals,
-    errorJournals,
-
-    createUserMutation,
-    isLoading,
-
+    // UI State
     showPassword,
     setShowPassword,
   };

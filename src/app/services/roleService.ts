@@ -1,105 +1,134 @@
 // src/app/services/roleService.ts
-import { PrismaClient, Role } from "@prisma/client";
 
-// Re-using a simplified session user type. Adapt if needed.
-interface AuthenticatedUserSession {
-  id: string;
-  companyId: string;
-  // roles and permissions might not be strictly needed for *fetching* company roles,
-  // as long as the user is authenticated and belongs to the company.
-  // However, if you have specific permissions for "VIEW_ROLES", they could be checked.
-  roles?: Array<{
-    name: string;
-    permissions: Array<{ action: string; resource: string }>;
-  }>;
-}
+import prisma from "@/app/utils/prisma";
+import { Role } from "@prisma/client";
+import { RoleWithPermissions } from "@/lib/types"; // We'll re-use the type from our plan
 
-// Optional: Helper for permission check if needed for viewing roles
-/*
-function hasPermission(
-  sessionUser: AuthenticatedUserSession,
-  action: string,
-  resource: string
-): boolean {
-  if (!sessionUser || !sessionUser.roles) {
-    return false;
-  }
-  return sessionUser.roles.some((role) =>
-    role.permissions.some(
-      (p) => p.action === action && p.resource === resource
-    )
-  );
-}
-*/
-
-export class RoleService {
-  private prisma: PrismaClient;
-
-  constructor(prismaClient: PrismaClient) {
-    this.prisma = prismaClient;
+/**
+ * Fetches all roles for a specific company, including the permissions for each role.
+ * Authorization (i.e., checking if the user *can* perform this action) should be handled
+ * by the caller (e.g., the API route handler).
+ *
+ * @param companyId - The ID of the company.
+ * @returns A promise that resolves to an array of roles, each with its permissions included.
+ */
+export const getRolesForCompany = async (
+  companyId: string
+): Promise<RoleWithPermissions[]> => {
+  if (!companyId) {
+    // This is a service-level guard, not an auth check.
+    throw new Error("Company ID is required to fetch roles.");
   }
 
-  /**
-   * Fetches all roles for a given company.
-   * The primary authorization is that the requesting user belongs to the company.
-   * An additional permission check (e.g., "VIEW_ROLES" or "MANAGE_USERS") can be added if necessary.
-   *
-   * @param companyId - The ID of the company for which to fetch roles.
-   * @param authenticatedUserSession - The session of the authenticated user making the request.
-   * @returns A promise that resolves to an array of Role objects.
-   * @throws Error if the authenticated user's company does not match the requested companyId
-   *         or if other permission checks fail.
-   */
-  async getCompanyRoles(
-    companyId: string,
-    authenticatedUserSession: AuthenticatedUserSession
-  ): Promise<Role[]> {
-    // 1. Authorization: Ensure the requesting user belongs to the company whose roles are being requested.
-    // This is a fundamental multi-tenancy check.
-    if (authenticatedUserSession.companyId !== companyId) {
-      console.warn(
-        `User ${authenticatedUserSession.id} from company ${authenticatedUserSession.companyId} ` +
-          `attempted to fetch roles for company ${companyId}.`
-      );
-      throw new Error(
-        "Forbidden: You can only fetch roles for your own company."
-      );
-    }
-
-    // 2. Optional Permission Check (e.g., if viewing roles requires a specific permission)
-    // For now, we assume any user in the company who can access user management
-    // can also see the list of roles to assign. If you have a "VIEW_ROLES" permission:
-    /*
-    if (!hasPermission(authenticatedUserSession, "VIEW", "ROLES") && !hasPermission(authenticatedUserSession, "MANAGE", "USERS")) {
-      throw new Error("Forbidden: User does not have permission to view roles.");
-    }
-    */
-    // As per the plan, an admin with "MANAGE_USERS" would need this list.
-    // This implicitly means they can view roles for assignment.
-
-    try {
-      const roles = await this.prisma.role.findMany({
-        where: {
-          companyId: companyId,
+  try {
+    const roles = await prisma.role.findMany({
+      where: {
+        companyId: companyId,
+      },
+      // IMPORTANT: We include the permissions so the frontend can display what each role does.
+      include: {
+        permissions: {
+          include: {
+            permission: true,
+          },
         },
-        orderBy: {
-          name: "asc", // Optional: order roles by name
-        },
-        // You might want to include permissions per role if the UI needs to display them,
-        // but for just assigning roles, the role ID and name are usually sufficient.
-        // include: {
-        //   permissions: {
-        //     include: {
-        //       permission: true
-        //     }
-        //   }
-        // }
-      });
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
 
-      return roles;
-    } catch (error: any) {
-      console.error(`Error fetching roles for company ${companyId}:`, error);
-      throw new Error(error.message || "Failed to fetch company roles.");
-    }
+    // We can cast here because the include guarantees the shape matches RoleWithPermissions
+    return roles as RoleWithPermissions[];
+  } catch (error) {
+    console.error(`Error fetching roles for company ${companyId}:`, error);
+    // Re-throw a generic error to be handled by the API layer
+    throw new Error("An error occurred while fetching roles.");
   }
-}
+};
+
+// // We will add more functions here later, like createUserWithRoles, updateUserRoles etc.
+// /**
+//  * Fetches the master list of all available permissions in the system.
+//  */
+// export const getAllPermissions = async (): Promise<Permission[]> => {
+//   return prisma.permission.findMany({
+//     orderBy: { resource: "asc", action: "asc" },
+//   });
+// };
+
+// interface RolePayload {
+//   name: string;
+//   description?: string;
+//   permissionIds: string[];
+// }
+
+// /**
+//  * Creates a new role for a company and connects it to a set of permissions.
+//  * @param companyId The company to create the role for.
+//  * @param payload The role data.
+//  * @returns The newly created role.
+//  */
+// export const createRole = async (
+//   companyId: string,
+//   payload: RolePayload
+// ): Promise<Role> => {
+//   const { name, description, permissionIds } = payload;
+
+//   return prisma.role.create({
+//     data: {
+//       name,
+//       description: description || "",
+//       companyId,
+//       permissions: {
+//         create: permissionIds.map((pid) => ({
+//           permission: {
+//             connect: { id: pid },
+//           },
+//         })),
+//       },
+//     },
+//   });
+// };
+
+// /**
+//  * Updates an existing role's name, description, and its set of permissions.
+//  * @param roleId The ID of the role to update.
+//  * @param payload The new role data.
+//  * @returns The updated role.
+//  */
+// export const updateRole = async (
+//   roleId: string,
+//   payload: RolePayload
+// ): Promise<Role> => {
+//   const { name, description, permissionIds } = payload;
+
+//   // This is a transactional operation:
+//   // 1. Update the role's basic details (name, description).
+//   // 2. Delete all existing permission links for this role.
+//   // 3. Create new permission links based on the provided permissionIds.
+//   return prisma.$transaction(async (tx) => {
+//     // Step 1 & 2
+//     await tx.rolePermission.deleteMany({
+//       where: { roleId: roleId },
+//     });
+
+//     // Step 3
+//     const updatedRole = await tx.role.update({
+//       where: { id: roleId },
+//       data: {
+//         name,
+//         description,
+//         permissions: {
+//           create: permissionIds.map((pid) => ({
+//             permission: {
+//               connect: { id: pid },
+//             },
+//           })),
+//         },
+//       },
+//     });
+
+//     return updatedRole;
+//   });
+// };

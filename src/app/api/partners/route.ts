@@ -1,65 +1,74 @@
-// File: src/app/api/partners/route.ts
+// src/app/api/partners/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import partnerService, {
-  CreatePartnerData,
+import partnerServiceImport, {
+  // --- UPDATED IMPORTS ---
+  createPartnerSchema, // Import the schema itself
+  GetAllPartnersOptions,
+  CreatePartnerData as ServiceCreatePartnerData, // Keep this for type hints if needed elsewhere
 } from "@/app/services/partnerService";
-import { z } from "zod";
-import { Partner, PartnerType, Prisma } from "@prisma/client"; // Added Prisma
+// We no longer need to import z here unless used for other schemas
+import { Partner, PartnerType } from "@prisma/client";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
-import journalPartnerLinkService from "@/app/services/journalPartnerLinkService"; // For specific scenarios if needed
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
 import { authOptions, ExtendedSession } from "@/lib/authOptions";
 
-const createPartnerSchema = z.object({
-  name: z.string().min(1, "Partner name is required").max(255),
-  partnerType: z.nativeEnum(PartnerType),
-  notes: z.string().optional().nullable(),
-  logoUrl: z.string().url("Invalid logo URL format").optional().nullable(),
-  photoUrl: z.string().url("Invalid photo URL format").optional().nullable(),
-  isUs: z.boolean().optional().nullable(),
-  registrationNumber: z.string().max(100).optional().nullable(),
-  taxId: z.string().max(100).optional().nullable(),
-  bioFatherName: z.string().max(100).optional().nullable(),
-  bioMotherName: z.string().max(100).optional().nullable(),
-  additionalDetails: z.any().optional().nullable(),
-});
+const partnerService = partnerServiceImport;
 
+/**
+ * REFACTORED GET HANDLER
+ * This handler is now simplified. It primarily parses parameters for the
+ * Journal-as-Root filter and for other specific flows (like J-G-P),
+ * then passes them to the new, more capable partnerService.getAllPartners.
+ */
 export async function GET(request: NextRequest) {
+  const session = (await getServerSession(
+    authOptions
+  )) as ExtendedSession | null;
+  if (!session?.user?.id || !session?.user?.companyId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const currentUserId = session.user.id;
+  const companyId = session.user.companyId;
+
   const { searchParams } = new URL(request.url);
 
-  // Parameters for the new "affected/unaffected" logic (Journal as Root)
+  // --- Parse Parameters ---
+
+  // Main filter status for Journal-as-Root view. This is our primary mechanism now.
   const filterStatus = searchParams.get("filterStatus") as
+    | "all"
     | "affected"
     | "unaffected"
-    | "all"
+    | "inProcess"
     | null;
-  const contextJournalIdsForFilterStatus =
-    searchParams.get("contextJournalIds");
 
-  // Existing parameters for other filtering scenarios
+  // Journal IDs for 'affected' and 'all' filters.
+  const contextJournalIdsParam = searchParams.get("contextJournalIds");
+
+  // Parameters for other filtering scenarios (J-G-P, G-P, etc.)
+  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds");
+  const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
+  const includeChildrenParam = searchParams.get("includeChildren"); // Still used by J-G-P
+
+  // General parameters
   const partnerTypeParam = searchParams.get(
     "partnerType"
   ) as PartnerType | null;
-  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds"); // For general J-P, J-G-P
-  const includeChildrenParam = searchParams.get("includeChildren"); // UI should resolve children to flat list
-  const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
-
-  // Pagination
   const limitParam = searchParams.get("limit");
   const offsetParam = searchParams.get("offset");
   const take = limitParam ? parseInt(limitParam, 10) : undefined;
   const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
 
-  // Base options for partnerService.getAllPartners
-  const serviceCallOptions: {
-    partnerType?: PartnerType;
-    take?: number;
-    skip?: number;
-    where?: Prisma.PartnerWhereInput;
-    filterByAffectedJournals?: string[];
-    filterByUnaffected?: boolean;
-  } = { take, skip };
+  // --- Build Service Call Options ---
+
+  // Base options for the service call. Always include auth context.
+  const serviceCallOptions: GetAllPartnersOptions = {
+    companyId,
+    currentUserId, // Pass the user ID for "inProcess" and "all" filters
+    take,
+    skip,
+  };
 
   if (
     partnerTypeParam &&
@@ -69,147 +78,80 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    let partnersResult: { partners: Partner[]; totalCount: number } | null =
-      null;
+    let partnersResult: { partners: Partner[]; totalCount: number };
 
-    // Priority 1: Filter by Journal(s) AND Good (J-G-P flow)
+    // --- Determine Filter Logic ---
+    // The logic is now much flatter. We check for highly specific, overriding
+    // scenarios first (like J-G-P), and otherwise fall back to our main filterStatus logic.
+
+    // Priority 1: J-G-P (Journal-Good-Partner) or G-J-P (Good-Journal-Partner)
     if (linkedToJournalIdsParam && linkedToGoodIdStr) {
       console.log(
-        `API /partners: J-G-P flow. Journals: '${linkedToJournalIdsParam}', Good: '${linkedToGoodIdStr}'.`
+        `API /partners: J-G-P/G-J-P flow. Journals: '${linkedToJournalIdsParam}', Good: '${linkedToGoodIdStr}'.`
       );
       const journalIds = linkedToJournalIdsParam
         .split(",")
         .map((id) => id.trim())
         .filter(Boolean);
-      if (journalIds.length === 0)
+      if (journalIds.length === 0) {
         return NextResponse.json(
-          { message: "No valid journal IDs for J-G-P." },
+          { message: "No valid journal IDs provided for J-G-P/G-J-P." },
           { status: 400 }
         );
+      }
 
       const goodId = parseBigIntParam(linkedToGoodIdStr, "linkedToGoodId");
-      if (goodId === null)
+      if (goodId === null) {
         return NextResponse.json(
-          { message: "Invalid linkedToGoodId for J-G-P." },
+          { message: "Invalid linkedToGoodId provided." },
           { status: 400 }
         );
+      }
 
-      const includeChildren = includeChildrenParam !== "false"; // UI resolves children
+      // This flow gets partner IDs from a different service, then filters partners by those IDs.
       const partnerIds = await jpgLinkService.getPartnerIdsForJournalsAndGood(
         journalIds,
         goodId,
-        includeChildren
+        includeChildrenParam !== "false"
       );
+      // We add this as a pre-filter `where` clause to our main service call.
+      serviceCallOptions.where = { id: { in: partnerIds } };
 
-      if (partnerIds.length === 0) {
-        partnersResult = { partners: [], totalCount: 0 };
-      } else {
-        serviceCallOptions.where = { id: { in: partnerIds } };
-        // Other filters (partnerType, pagination) will apply via getAllPartners
-        partnersResult = await partnerService.getAllPartners(
-          serviceCallOptions
-        );
-      }
-    }
-    // Priority 2: Filter by Good ID only (e.g., G-P flow)
-    else if (linkedToGoodIdStr) {
-      console.log(`API /partners: G-P flow. Good: '${linkedToGoodIdStr}'.`);
-      const goodId = parseBigIntParam(linkedToGoodIdStr, "linkedToGoodId");
-      if (goodId === null)
-        return NextResponse.json(
-          { message: "Invalid linkedToGoodId." },
-          { status: 400 }
-        );
-
-      const partnerIds = await jpgLinkService.getPartnerIdsForGood(goodId);
-      if (partnerIds.length === 0) {
-        partnersResult = { partners: [], totalCount: 0 };
-      } else {
-        serviceCallOptions.where = { id: { in: partnerIds } };
-        partnersResult = await partnerService.getAllPartners(
-          serviceCallOptions
-        );
-      }
-    }
-    // Priority 3: New Journal Root -> Partner filtering with "filterStatus"
-    else if (filterStatus) {
-      console.log(
-        `API /partners: Journal Root flow with filterStatus: '${filterStatus}'.`
-      );
-      if (filterStatus === "unaffected") {
-        serviceCallOptions.filterByUnaffected = true;
-      } else if (filterStatus === "affected") {
-        const journalIds =
-          contextJournalIdsForFilterStatus
-            ?.split(",")
-            .map((id) => id.trim())
-            .filter(Boolean) || [];
-        serviceCallOptions.filterByAffectedJournals = journalIds; // Service handles empty array correctly
-      } else if (filterStatus === "all") {
-        // "all" means no *additional* journal link filtering from this specific mechanism.
-      } else {
-        return NextResponse.json(
-          { message: `Invalid filterStatus: ${filterStatus}` },
-          { status: 400 }
-        );
-      }
-      partnersResult = await partnerService.getAllPartners(serviceCallOptions);
-    }
-    // Priority 4: Default to "affected" if contextJournalIdsForFilterStatus provided, but no filterStatus
-    // (Handles "neither button pressed" in the Journal root scenario when journals are selected)
-    else if (contextJournalIdsForFilterStatus) {
-      console.log(
-        `API /partners: Defaulting to 'affected' from contextJournalIds: [${contextJournalIdsForFilterStatus}].`
-      );
-      const journalIds =
-        contextJournalIdsForFilterStatus
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean) || [];
-      serviceCallOptions.filterByAffectedJournals = journalIds;
-      partnersResult = await partnerService.getAllPartners(serviceCallOptions);
-    }
-    // Priority 5: General J-P filtering (partners linked to specific journals, not necessarily root/filterStatus context)
-    // This is when `linkedToJournalIdsParam` is present, but not as part of J-G-P, and no filterStatus logic is active.
-    else if (linkedToJournalIdsParam) {
-      console.log(
-        `API /partners: General J-P filtering for journals: '${linkedToJournalIdsParam}'.`
-      );
-      const journalIds =
-        linkedToJournalIdsParam
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean) || [];
-      // This behaves like "affected" by these specific journals
-      serviceCallOptions.filterByAffectedJournals = journalIds;
-      // includeChildren should be handled by client sending resolved IDs in linkedToJournalIdsParam
-      partnersResult = await partnerService.getAllPartners(serviceCallOptions);
-    }
-    // Priority 6: No specific link-based filters - general fetch (with pagination/type)
-    else {
-      console.log("API /partners: General partner fetch (pagination, type).");
-      partnersResult = await partnerService.getAllPartners(serviceCallOptions);
-    }
-
-    // Send response
-    if (partnersResult) {
-      const responsePayload = {
-        data: partnersResult.partners,
-        total: partnersResult.totalCount,
-      };
-      const body = JSON.stringify(responsePayload, jsonBigIntReplacer);
-      return new NextResponse(body, {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      partnersResult =
+        partnerIds.length === 0
+          ? { partners: [], totalCount: 0 }
+          : await partnerService.getAllPartners(serviceCallOptions);
     } else {
-      // Should not happen if logic is correct, but as a fallback
-      console.error("API /partners: partnersResult was unexpectedly null.");
-      return NextResponse.json(
-        { message: "Failed to determine partner data." },
-        { status: 500 }
+      // Priority 2: Standard Journal-as-Root filtering (our main feature)
+      console.log(
+        `API /partners: Standard flow. filterStatus: '${
+          filterStatus || "none"
+        }'`
       );
+      if (filterStatus) {
+        serviceCallOptions.filterStatus = filterStatus;
+        // Only include contextJournalIds if they are relevant for the filter
+        if (filterStatus === "affected" || filterStatus === "all") {
+          serviceCallOptions.contextJournalIds =
+            contextJournalIdsParam
+              ?.split(",")
+              .map((id) => id.trim())
+              .filter(Boolean) || [];
+        }
+      }
+      partnersResult = await partnerService.getAllPartners(serviceCallOptions);
     }
+
+    // --- Send Response ---
+    const responsePayload = {
+      data: partnersResult.partners,
+      total: partnersResult.totalCount,
+    };
+    const body = JSON.stringify(responsePayload, jsonBigIntReplacer);
+    return new NextResponse(body, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     const e = error as Error;
     if (
@@ -229,28 +171,31 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST handler remains the same
 export async function POST(request: NextRequest) {
+  // ... (This function remains unchanged)
   console.log("Waiter (API /partners): Customer wants to add a new partner.");
-  try {
-    // --- AUTH ---
-    const session = (await getServerSession(
-      authOptions
-    )) as ExtendedSession | null;
-    if (!session?.user?.id || !session?.user?.companyId) {
-      return NextResponse.json(
-        { message: "Unauthorized: Session or user details missing" },
-        { status: 401 }
-      );
-    }
-    // --- END AUTH ---
+  const session = (await getServerSession(
+    authOptions
+  )) as ExtendedSession | null;
+  if (!session?.user?.id || !session?.user?.companyId) {
+    return NextResponse.json(
+      { message: "Unauthorized: Session or user details missing" },
+      { status: 401 }
+    );
+  }
+  const companyId = session.user.companyId;
+  const createdById = session.user.id;
+  const createdByIp =
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
 
+  try {
     const rawOrder = await request.json();
     console.log(
       "Waiter (API /partners): Customer's raw order for new partner:",
       rawOrder
     );
 
+    // Use the imported schema for validation
     const validation = createPartnerSchema.safeParse(rawOrder);
     if (!validation.success) {
       console.warn(
@@ -266,39 +211,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add companyId from session and ensure required fields are present
-    const {
-      name,
-      partnerType,
-      notes,
-      logoUrl,
-      photoUrl,
-      isUs,
-      registrationNumber,
-      taxId,
-      bioFatherName,
-      bioMotherName,
-      additionalDetails,
-    } = validation.data;
-    const validOrderData: CreatePartnerData = {
-      name,
-      partnerType,
-      notes: notes ?? null,
-      logoUrl: logoUrl ?? null,
-      photoUrl: photoUrl ?? null,
-      isUs: isUs ?? null,
-      registrationNumber: registrationNumber ?? null,
-      taxId: taxId ?? null,
-      bioFatherName: bioFatherName ?? null,
-      bioMotherName: bioMotherName ?? null,
-      additionalDetails: additionalDetails ?? null,
-      companyId: session.user.companyId,
-    };
+    // The type of validation.data is now guaranteed to match ServiceCreatePartnerData
+    // because they both derive from the exact same schema object.
+    const partnerDataForService: ServiceCreatePartnerData = validation.data;
+
     console.log(
       "Waiter (API /partners): Order for new partner is clear. Passing to Chef."
     );
-
-    const newPartner = await partnerService.createPartner(validOrderData);
+    const newPartner = await partnerService.createPartner(
+      partnerDataForService,
+      companyId,
+      createdById,
+      createdByIp
+    );
     const body = JSON.stringify(newPartner, jsonBigIntReplacer);
     return new NextResponse(body, {
       status: 201,

@@ -83,8 +83,12 @@ export const authOptions: NextAuthOptions = {
           // throw new Error("No user found with this email.");
           return null;
         }
-        if (!user.isActive) {
-          // throw new Error("This user account is inactive.");
+        //Check entityState instead of isActive
+        if (user.entityState !== "ACTIVE") {
+          // Assuming your User model now has entityState
+          console.warn(
+            `Login attempt for non-active user: ${user.email}, state: ${user.entityState}`
+          );
           return null;
         }
         // Ensure user.passwordHash exists; Prisma schema implies it.

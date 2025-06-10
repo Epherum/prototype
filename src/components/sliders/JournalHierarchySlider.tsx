@@ -6,7 +6,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import styles from "./JournalHierarchySlider.module.css";
 import { findNodeById, findParentOfNode } from "@/lib/helpers";
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData, PartnerFilterStatus } from "@/lib/types"; // Import new type
 
 const DOUBLE_CLICK_DELAY = 200;
 
@@ -28,10 +28,9 @@ interface JournalHierarchySliderProps {
   isLoading?: boolean;
   isError?: boolean;
   isRootView?: boolean;
-  currentFilterStatus?: "affected" | "unaffected" | "all" | null;
-  onFilterStatusChange?: (
-    status: "affected" | "unaffected" | "all" | null
-  ) => void;
+  // --- UPDATED PROPS ---
+  currentFilterStatus?: PartnerFilterStatus; // Use the shared type
+  onFilterStatusChange?: (status: PartnerFilterStatus) => void; // Use the shared type
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
@@ -351,10 +350,19 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
   return (
     <>
-      <div
-        className={`${styles.journalParentHeader} noSelect touchManipulation`}
-      >
-        <div className={styles.journalParentInfoAndL1Options}>
+      {/* --- ROW 1: Options Button and L1 Info --- */}
+      <div className={`${styles.headerTopRow} noSelect`}>
+        {/* Placeholder for the Options Menu button (far left) */}
+        <div className={styles.headerOptions}>
+          {/* 
+            Your actual Options Menu button, which is likely part of a different
+            component or hook, would be rendered here. For example:
+            <OptionsMenuButton onClick={handleOpenOptionsMenu} /> 
+          */}
+        </div>
+
+        {/* L1 Info (takes up remaining space) */}
+        <div className={styles.headerL1InfoContainer}>
           <span
             className={styles.journalParentInfo}
             style={{ cursor: canNavigateL1Up ? "pointer" : "default" }}
@@ -369,13 +377,17 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
             }
           >
             {currentL1ContextNode?.code ||
-              (isEffectivelyAtTrueRoot ? "Root" : "N/A")}{" "}
-            -{" "}
+              (isEffectivelyAtTrueRoot ? "Root" : "N/A")}
+            {" - "}
             {currentL1ContextNode?.name ||
               (isEffectivelyAtTrueRoot ? "" : "Selected Account")}
           </span>
         </div>
-        {isRootView && onFilterStatusChange && (
+      </div>
+
+      {/* --- ROW 2: Filter Buttons --- */}
+      {isRootView && onFilterStatusChange && (
+        <div className={styles.headerFilterRow}>
           <div className={styles.rootFilterControls}>
             <button
               className={
@@ -403,9 +415,18 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
             >
               Unaffected
             </button>
+            <button
+              className={
+                currentFilterStatus === "inProcess" ? styles.activeFilter : ""
+              }
+              onClick={() => onFilterStatusChange("inProcess")}
+              title="Partners created by you, pending approval, and not yet linked"
+            >
+              In Process
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       <h3 className={styles.level2ScrollerTitle}>
         {isEffectivelyAtTrueRoot

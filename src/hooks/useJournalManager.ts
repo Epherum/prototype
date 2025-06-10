@@ -832,8 +832,6 @@ export const useJournalManager = ({
         id: formDataFromModal.code || formDataFromModal.id || "",
         name: formDataFromModal.name,
         parentId: addJournalContext?.parentId || undefined,
-        isTerminal: formDataFromModal.isTerminal || false,
-        additionalDetails: formDataFromModal.additionalDetails,
       };
       createJournalMutation.mutate(journalToCreate);
     },

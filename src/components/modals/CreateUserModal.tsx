@@ -1,100 +1,85 @@
-// src/components/modals/CreateUserModal.tsx
+// src/components/modals/ManageUserModal.tsx
+
 import React, { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import baseStyles from "./ModalBase.module.css"; // Used by both
-import styles from "./CreateUserModal.module.css"; // Specific to CreateUserModal
+import baseStyles from "./ModalBase.module.css";
+import styles from "./CreateUserModal.module.css"; // Reuse the same styles
 import { IoClose, IoEye, IoEyeOff } from "react-icons/io5";
 import { useUserManagement } from "@/hooks/useUserManagement";
 import JournalModal from "./JournalModal";
-import { buildTree } from "@/lib/helpers";
-import type { AccountNodeData, Journal } from "@/lib/types";
-import { getJournalDisplayPath } from "@/lib/helpers";
+import { buildTree, getJournalDisplayPath } from "@/lib/helpers";
+import type { AccountNodeData } from "@/lib/types";
+// import type { AccountNodeData, JournalForAdminSelection } from "@/lib/types";
 
-interface CreateUserModalProps {
+interface ManageUserModalProps {
   isOpen: boolean;
   onClose: () => void;
+  userIdToEdit?: string; // If provided, we're in "edit" mode
 }
 
-// Z-index constants for clarity and management
-const CREATE_USER_MODAL_Z_INDEX = 1000;
+const MANAGE_USER_MODAL_Z_INDEX = 1000;
 const JOURNAL_MODAL_Z_INDEX = 1050; // Must be higher
 
-const CreateUserModal: React.FC<CreateUserModalProps> = ({
+const ManageUserModal: React.FC<ManageUserModalProps> = ({
   isOpen,
   onClose,
+  userIdToEdit,
 }) => {
+  // CORRECTED: Destructuring from the new, refactored useUserManagement hook
   const {
     formState,
+    isEditMode,
+    isLoading, // This combines all loading states
+    isSubmitting,
+    isSuccess,
+    submissionError,
+    resetMutation,
+    assignableRoles, // Use this for the dropdown
+    allCompanyJournalsData,
     handleInputChange,
     handleRoleSelectionChange,
     handleJournalRestrictionChange,
     handleSubmit,
     resetForm,
-    companyRoles,
-    allCompanyJournalsData, // Already exposed from the hook
-    isLoadingRoles,
-    errorRoles,
-    isLoadingJournals,
-    errorJournals,
-    createUserMutation,
     showPassword,
     setShowPassword,
-  } = useUserManagement();
-
-  const {
-    isPending: isSubmitting,
-    isSuccess,
-    error: submissionError,
-  } = createUserMutation;
+  } = useUserManagement(userIdToEdit);
 
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
   const [currentRoleIdForRestriction, setCurrentRoleIdForRestriction] =
     useState<string | null>(null);
 
-  // console.log("[CreateUserModal] allCompanyJournalsData:",allCompanyJournalsData);
-  // console.log("[CreateUserModal] isLoadingJournals:", isLoadingJournals);
-
   const journalHierarchyForModal = useMemo((): AccountNodeData[] => {
-    // console.log("[CreateUserModal useMemo] allCompanyJournalsData:", allCompanyJournalsData);
-    if (
-      isLoadingJournals ||
-      !allCompanyJournalsData ||
-      allCompanyJournalsData.length === 0
-    ) {
-      // console.log("[CreateUserModal useMemo] Returning empty array.");
-      return [];
-    }
+    if (!allCompanyJournalsData) return [];
     try {
-      const hierarchy = buildTree(allCompanyJournalsData as Journal[]); // Ensure cast is valid
-      // console.log("[CreateUserModal useMemo] Result from buildTree:", hierarchy);
-      return hierarchy;
+      // Cast if buildTree is strict about its input type
+      return buildTree(allCompanyJournalsData as any[]);
+      // return buildTree(allCompanyJournalsData as JournalForAdminSelection[]);
     } catch (error) {
-      console.error("[CreateUserModal useMemo] Error in buildTree:", error);
+      console.error("Error building journal hierarchy:", error);
       return [];
     }
-  }, [allCompanyJournalsData, isLoadingJournals]);
+  }, [allCompanyJournalsData]);
 
-  // console.log("[CreateUserModal] journalHierarchyForModal after useMemo:", journalHierarchyForModal);
-
+  // Effect to handle closing the modal upon successful submission
   useEffect(() => {
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        if (isJournalModalOpen) {
-          setIsJournalModalOpen(false); // Close JournalModal first
-        } else if (isOpen) {
-          onClose(); // Then CreateUserModal
-        }
-      }
-    };
-    // Listen if either modal could be open
-    if (isOpen || isJournalModalOpen) {
-      document.addEventListener("keydown", handleEscape);
+    if (isSuccess && isOpen) {
+      onClose();
     }
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [isOpen, onClose, isJournalModalOpen]); // Add isJournalModalOpen dependency
+  }, [isSuccess, isOpen, onClose]);
 
+  // Effect to reset the form state when the modal is closed
   useEffect(() => {
-    // Manage body overflow based on whether *any* modal is open
+    if (!isOpen) {
+      resetForm();
+      if (resetMutation) {
+        resetMutation();
+      }
+    }
+  }, [isOpen, resetForm, resetMutation]);
+
+  // Effect to handle body overflow
+  useEffect(() => {
     if (isOpen || isJournalModalOpen) {
       document.body.style.overflow = "hidden";
     } else {
@@ -103,30 +88,23 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
     return () => {
       document.body.style.overflow = "unset";
     };
-  }, [isOpen, isJournalModalOpen]); // Add isJournalModalOpen dependency
+  }, [isOpen, isJournalModalOpen]);
 
+  // Effect for escape key
   useEffect(() => {
-    if (isSuccess && isOpen) {
-      onClose();
-      resetForm();
-      createUserMutation.reset();
-    }
-  }, [isSuccess, onClose, resetForm, createUserMutation, isOpen]);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        isJournalModalOpen ? setIsJournalModalOpen(false) : onClose();
+      }
+    };
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isOpen, isJournalModalOpen, onClose]);
 
-  useEffect(() => {
-    if (!isOpen && !isSuccess) {
-      // If modal is closed without success, reset
-      resetForm();
-      createUserMutation.reset();
-      // Also ensure JournalModal is closed if CreateUserModal is closed
-      if (isJournalModalOpen) setIsJournalModalOpen(false);
-    }
-  }, [isOpen, resetForm, createUserMutation, isSuccess, isJournalModalOpen]);
-
-  const handleActualSubmit = async (e: React.FormEvent) => {
+  const handleActualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
-    await handleSubmit();
+    handleSubmit();
   };
 
   const handleRolesChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
@@ -138,25 +116,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
   };
 
   const openJournalSelectionModal = (roleId: string) => {
-    console.log(
-      "[CreateUserModal] openJournalSelectionModal called for roleId:",
-      roleId
-    );
-    if (isLoadingJournals || journalHierarchyForModal.length === 0) {
-      console.warn(
-        "[CreateUserModal] Journal data not ready or empty, JournalModal not opened."
-      );
-      alert(
-        "Journal data is still loading or no journals are available. Please try again in a moment."
-      );
-      return;
-    }
     setCurrentRoleIdForRestriction(roleId);
     setIsJournalModalOpen(true);
-    console.log(
-      "[CreateUserModal] isJournalModalOpen set to true. Hierarchy items:",
-      journalHierarchyForModal.length
-    );
   };
 
   const closeJournalSelectionModal = () => {
@@ -165,29 +126,18 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
   };
 
   const handleJournalSelectedFromModal = (selectedJournalId: string | null) => {
-    // This callback is `onConfirmSelection` from JournalModal.
-    // It will pass the ID of the selected journal, or a root/default ID if nothing specific was chosen
-    // and the user hit "Confirm Selection". In this restriction context, we only care about specific journals.
-    console.log(
-      "[CreateUserModal] Journal selected from modal:",
-      selectedJournalId
-    );
-
     if (
       currentRoleIdForRestriction &&
       selectedJournalId &&
       allCompanyJournalsData
     ) {
-      // Ensure selectedJournalId is not a conceptual root passed by JournalModal if user selects nothing then confirms
-      // (JournalModal's `onConfirmSelection` might pass ROOT_JOURNAL_ID or similar as a default)
       const selectedJournal = allCompanyJournalsData.find(
-        (j) => j.id === selectedJournalId && j.id !== "ROOT_JOURNAL_ID" // Example conceptual root check
+        (j) => j.id === selectedJournalId
       );
-
       if (selectedJournal) {
         const displayName = getJournalDisplayPath(
           selectedJournal.id,
-          allCompanyJournalsData // Correct type: JournalForAdminSelection[]
+          allCompanyJournalsData
         );
         handleJournalRestrictionChange(
           currentRoleIdForRestriction,
@@ -195,20 +145,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
           selectedJournal.companyId,
           displayName
         );
-      } else {
-        // If selectedJournalId was a conceptual root or not found, treat as clearing/no selection.
-        console.log(
-          `[CreateUserModal] No specific journal selected (ID: ${selectedJournalId}) or not found. Clearing restriction.`
-        );
-        handleJournalRestrictionChange(
-          currentRoleIdForRestriction,
-          null,
-          null,
-          null
-        );
       }
     } else if (currentRoleIdForRestriction) {
-      // If selectedJournalId is null (e.g., user explicitly cleared or cancelled)
       handleJournalRestrictionChange(
         currentRoleIdForRestriction,
         null,
@@ -216,20 +154,23 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
         null
       );
     }
-    closeJournalSelectionModal(); // Close the modal in all cases after handling
+    closeJournalSelectionModal();
   };
 
   const clearJournalRestriction = (roleId: string) => {
     handleJournalRestrictionChange(roleId, null, null, null);
   };
 
-  const isLoadingCriticalData = isLoadingRoles || isLoadingJournals;
+  const modalTitle = isEditMode
+    ? `Edit User: ${formState.name}`
+    : "Create New User";
+  const submitButtonText = isEditMode ? "Save Changes" : "Create User";
+  const submittingButtonText = isEditMode ? "Saving..." : "Creating...";
 
-  // Use a React Fragment to return multiple top-level elements (CreateUserModal and JournalModal)
   return (
     <>
       <AnimatePresence>
-        {isOpen && ( // This AnimatePresence controls CreateUserModal
+        {isOpen && (
           <motion.div
             className={baseStyles.modalOverlay}
             onClick={onClose}
@@ -237,7 +178,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            style={{ zIndex: CREATE_USER_MODAL_Z_INDEX }} // Apply z-index
+            style={{ zIndex: MANAGE_USER_MODAL_Z_INDEX }}
           >
             <motion.div
               className={`${baseStyles.modalContent} ${styles.createUserModalContent}`}
@@ -246,7 +187,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 50, opacity: 0 }}
               transition={{ duration: 0.2, ease: "easeOut" }}
-              // No z-index here, relies on parent overlay's stacking context
             >
               <button
                 className={baseStyles.modalCloseButton}
@@ -255,9 +195,9 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
               >
                 <IoClose />
               </button>
-              <h2 className={baseStyles.modalTitle}>Create New User</h2>
+              <h2 className={baseStyles.modalTitle}>{modalTitle}</h2>
 
-              {isLoadingCriticalData ? (
+              {isLoading ? (
                 <div
                   style={{
                     display: "flex",
@@ -266,15 +206,13 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     minHeight: "200px",
                   }}
                 >
-                  {/* Basic spinner or text */}
-                  <p>Loading necessary data...</p>
+                  <p>Loading user data...</p>
                 </div>
               ) : (
                 <form
                   onSubmit={handleActualSubmit}
                   className={styles.createUserForm}
                 >
-                  {/* Name Field */}
                   <div className={styles.formGroup}>
                     <label htmlFor="name">Full Name *</label>
                     <input
@@ -289,7 +227,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     />
                   </div>
 
-                  {/* Email Field */}
                   <div className={styles.formGroup}>
                     <label htmlFor="email">Email Address *</label>
                     <input
@@ -304,17 +241,19 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     />
                   </div>
 
-                  {/* Password Field */}
                   <div className={styles.formGroup}>
-                    <label htmlFor="password">Password *</label>
+                    <label htmlFor="password">
+                      Password{" "}
+                      {isEditMode ? "(Leave blank to keep current)" : "*"}
+                    </label>
                     <div className={styles.passwordInputContainer}>
                       <input
                         type={showPassword ? "text" : "password"}
                         id="password"
                         name="password"
-                        value={formState.password}
+                        value={formState.password || ""}
                         onChange={handleInputChange}
-                        required
+                        required={!isEditMode}
                         disabled={isSubmitting}
                         autoComplete="new-password"
                       />
@@ -322,9 +261,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className={styles.passwordToggle}
-                        aria-label={
-                          showPassword ? "Hide password" : "Show password"
-                        }
                         disabled={isSubmitting}
                       >
                         {showPassword ? <IoEyeOff /> : <IoEye />}
@@ -332,14 +268,8 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Role Assignments Section */}
                   <div className={styles.roleAssignmentsSection}>
                     <h3>Assign Roles *</h3>
-                    {errorRoles && (
-                      <p className={styles.errorMessage}>
-                        Error loading roles: {errorRoles.message}
-                      </p>
-                    )}
                     <div className={styles.formGroup}>
                       <label htmlFor="roles">
                         Roles (Ctrl/Cmd + click for multiple)
@@ -351,26 +281,21 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         value={formState.roleAssignments.map((ra) => ra.roleId)}
                         onChange={handleRolesChange}
                         className={styles.rolesSelect}
-                        disabled={
-                          isSubmitting ||
-                          isLoadingRoles ||
-                          !companyRoles?.length
-                        }
+                        disabled={isSubmitting || assignableRoles.length === 0}
                         required={formState.roleAssignments.length === 0}
                       >
-                        {companyRoles?.map((role) => (
+                        {assignableRoles.map((role) => (
                           <option key={role.id} value={role.id}>
                             {role.name}
                           </option>
                         ))}
                       </select>
-                      {companyRoles &&
-                        companyRoles.length === 0 &&
-                        !isLoadingRoles && (
-                          <p className={styles.inputHint}>
-                            No roles available in this company.
-                          </p>
-                        )}
+                      {assignableRoles.length === 0 && !isLoading && (
+                        <p className={styles.inputHint}>
+                          You do not have permissions to assign any available
+                          roles.
+                        </p>
+                      )}
                     </div>
 
                     {formState.roleAssignments.map((assignment) => (
@@ -382,11 +307,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                           Journal Restriction for:{" "}
                           {assignment.roleName || assignment.roleId}
                         </p>
-                        {errorJournals && (
-                          <p className={styles.errorMessage}>
-                            Error loading journals: {errorJournals.message}
-                          </p>
-                        )}
                         <div className={styles.formGroup}>
                           {assignment.restrictedTopLevelJournalId ? (
                             <div className={styles.restrictionDisplay}>
@@ -401,11 +321,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                                   openJournalSelectionModal(assignment.roleId)
                                 }
                                 className={styles.changeButton}
-                                disabled={
-                                  isSubmitting ||
-                                  isLoadingJournals ||
-                                  journalHierarchyForModal.length === 0
-                                }
+                                disabled={isSubmitting}
                               >
                                 Change
                               </button>
@@ -427,33 +343,11 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                                 openJournalSelectionModal(assignment.roleId)
                               }
                               className={`${styles.actionButtonBase} ${styles.selectJournalButton}`}
-                              disabled={
-                                isSubmitting ||
-                                isLoadingJournals ||
-                                journalHierarchyForModal.length === 0
-                              }
+                              disabled={isSubmitting}
                             >
                               Set Journal Restriction
                             </button>
                           )}
-                          {isLoadingJournals && <p>Loading journals...</p>}
-                          {!isLoadingJournals &&
-                            allCompanyJournalsData &&
-                            allCompanyJournalsData.length > 0 &&
-                            journalHierarchyForModal.length === 0 && (
-                              <p className={styles.inputHint}>
-                                Journals loaded, but hierarchy could not be
-                                built.
-                              </p>
-                            )}
-                          {!isLoadingJournals &&
-                            (!allCompanyJournalsData ||
-                              allCompanyJournalsData.length === 0) && (
-                              <p className={styles.inputHint}>
-                                No journals available in this company for
-                                restriction.
-                              </p>
-                            )}
                         </div>
                       </div>
                     ))}
@@ -465,13 +359,6 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         "An unexpected error occurred."}
                     </p>
                   )}
-                  {formState.roleAssignments.length === 0 &&
-                    createUserMutation.isError &&
-                    !submissionError && (
-                      <p className={styles.errorMessage}>
-                        Please assign at least one role to the user.
-                      </p>
-                    )}
 
                   <div className={baseStyles.modalActions}>
                     <button
@@ -489,7 +376,7 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
                         isSubmitting || formState.roleAssignments.length === 0
                       }
                     >
-                      {isSubmitting ? "Creating User..." : "Create User"}
+                      {isSubmitting ? submittingButtonText : submitButtonText}
                     </button>
                   </div>
                 </form>
@@ -499,39 +386,20 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
         )}
       </AnimatePresence>
 
-      {/* JournalModal is now a sibling to CreateUserModal's AnimatePresence block,
-          but it has its own AnimatePresence for its own lifecycle.
-          This is a common pattern for stacking modals. */}
       <AnimatePresence>
         {isJournalModalOpen && (
           <JournalModal
-            isOpen={isJournalModalOpen} // Prop for JournalModal's internal logic
+            isOpen={isJournalModalOpen}
             onClose={closeJournalSelectionModal}
-            // `onConfirmSelection` is the key for getting the selected journal ID
-            // JournalModal's "Confirm" button should trigger this.
-            // It should pass the ID of the selected journal, or null/ROOT_JOURNAL_ID if nothing specific selected.
             onConfirmSelection={handleJournalSelectedFromModal}
-            hierarchy={journalHierarchyForModal} // This is the hierarchy built from allCompanyJournalsData
-            isLoading={isLoadingJournals}
+            hierarchy={journalHierarchyForModal}
+            isLoading={!allCompanyJournalsData}
             modalTitle="Select Journal for Restriction"
-            // These props are not primary for this use case, but JournalModal might expect them.
-            // Provide stubs or ensure JournalModal handles their absence gracefully.
-            onSetShowRoot={() =>
-              console.log(
-                "JournalModal: onSetShowRoot triggered (no-op for restriction selection)"
-              )
-            }
-            onDeleteAccount={() =>
-              console.log(
-                "JournalModal: onDeleteAccount triggered (no-op for restriction selection)"
-              )
-            }
-            onTriggerAddChild={() =>
-              console.log(
-                "JournalModal: onTriggerAddChild triggered (no-op for restriction selection)"
-              )
-            }
-            onSelectForLinking={undefined} // Fix: explicitly pass undefined
+            // Pass stubs for unused props to satisfy the component's interface
+            onSetShowRoot={() => {}}
+            onDeleteAccount={() => {}}
+            onTriggerAddChild={() => {}}
+            onSelectForLinking={undefined}
           />
         )}
       </AnimatePresence>
@@ -539,4 +407,4 @@ const CreateUserModal: React.FC<CreateUserModalProps> = ({
   );
 };
 
-export default CreateUserModal;
+export default ManageUserModal;

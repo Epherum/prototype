@@ -4,34 +4,31 @@ import type {
   Partner,
   CreatePartnerClientData,
   UpdatePartnerClientData,
+  FetchPartnersParams, // Import the centralized, correct type
 } from "@/lib/types";
 
-interface FetchPartnersParams {
-  limit?: number;
-  offset?: number;
-  partnerType?: string; // Changed from PartnerType to string for query params
-  filterStatus?: "affected" | "unaffected" | "all" | null;
-  contextJournalIds?: string[]; // For "affected" status or default J->P
-  // Parameters for other linking scenarios
-  linkedToJournalIds?: string[]; // For general J-P, J-G-P, P-J-G if P is first
-  linkedToGoodId?: string; // For J-G-P, G-P
-  includeChildren?: boolean; // For linkedToJournalIds
-}
+// The local FetchPartnersParams interface has been removed. We now use the one from lib/types.
 
+/**
+ * REFACTORED FUNCTION
+ * This now uses the centralized FetchPartnersParams type and correctly appends
+ * the `filterStatus` (including "inProcess") to the URL for the API call.
+ */
 export async function fetchPartners(
   params: FetchPartnersParams = {}
 ): Promise<PaginatedPartnersResponse> {
   const queryParams = new URLSearchParams();
 
+  // Append standard pagination and type parameters
   if (params.limit !== undefined)
     queryParams.append("limit", String(params.limit));
   if (params.offset !== undefined)
     queryParams.append("offset", String(params.offset));
   if (params.partnerType) queryParams.append("partnerType", params.partnerType);
 
-  let isJPFilteringApplied = false;
+  // --- Logic for different filtering scenarios ---
 
-  // Priority 1: 3-way JPGL style linking (e.g., J-G-P, G-J-P)
+  // Priority 1: Specific linking scenarios (e.g., J-G-P, G-J-P)
   if (
     params.linkedToGoodId &&
     params.linkedToJournalIds &&
@@ -45,63 +42,32 @@ export async function fetchPartners(
     if (params.includeChildren !== undefined) {
       queryParams.append("includeChildren", String(params.includeChildren));
     }
-    isJPFilteringApplied = true; // This is a specific filter, not the J-P root filter
   }
-  // Priority 2: J-P flow (Journal is 1st, Partner is 2nd)
-  // This block handles explicit filterStatus OR the default case (filterStatus: null)
-  // params.contextJournalIds will be [] initially or when no journals are selected.
-  // params.filterStatus will be 'affected', 'unaffected', 'all', or null.
-  else if (
-    params.hasOwnProperty("filterStatus") ||
-    params.hasOwnProperty("contextJournalIds")
-  ) {
-    // We are in a J-P context if either filterStatus or contextJournalIds is provided from page.tsx for this flow
-    // (even if their values are null or empty array respectively)
-
-    const effectiveFilterStatus = params.filterStatus || "affected"; // Default to 'affected' if null
-    queryParams.append("filterStatus", effectiveFilterStatus);
-
-    if (params.contextJournalIds && params.contextJournalIds.length > 0) {
+  // Priority 2: Our main Journal-as-Root filter
+  else if (params.filterStatus) {
+    queryParams.append("filterStatus", params.filterStatus);
+    // Only append contextJournalIds if they are relevant and present
+    if (
+      (params.filterStatus === "affected" || params.filterStatus === "all") &&
+      params.contextJournalIds &&
+      params.contextJournalIds.length > 0
+    ) {
       queryParams.append(
         "contextJournalIds",
         params.contextJournalIds.join(",")
       );
     }
-    // If contextJournalIds is empty or not provided:
-    // - For "affected": backend should return [].
-    // - For "unaffected": backend should return partners not linked to ANY journal (or all if no journals exist).
-    // - For "all": backend should return all partners.
-
-    if (
-      params.includeChildren !== undefined &&
-      params.contextJournalIds &&
-      params.contextJournalIds.length > 0
-    ) {
-      queryParams.append("includeChildren", String(params.includeChildren));
-    }
-    isJPFilteringApplied = true;
   }
-  // Priority 3: General 2-way linking if linkedToJournalIds is used without linkedToGoodId (and not in J-P root filter)
-  // This might be redundant if J-P context (Priority 2) covers it with contextJournalIds.
-  // Kept for explicitness if `linkedToJournalIds` is used in a different, non-root-filter context by page.tsx.
+  // Priority 3: Other general linking (fallback)
   else if (params.linkedToJournalIds && params.linkedToJournalIds.length > 0) {
-    // This suggests a direct request to find partners for specific journals,
-    // not necessarily through the J-P root filtering UI.
-    // Backend might treat this like "filterStatus: affected" with these journal IDs.
     queryParams.append(
       "linkedToJournalIds",
       params.linkedToJournalIds.join(",")
     );
-    if (params.includeChildren !== undefined) {
-      queryParams.append("includeChildren", String(params.includeChildren));
-    }
-    isJPFilteringApplied = true;
   }
 
-  // If !isJPFilteringApplied, it means Partner slider is 1st, or no relevant filter params were passed.
-  // The URL will only have limit/offset, fetching all. This is correct for "Partner 1st".
-  // For "Journal 1st, Partner 2nd, initial load", `isJPFilteringApplied` should be true now,
-  // and `filterStatus=affected` (with no contextJournalIds) will be sent.
+  // If no specific filter params are provided, the URL will just have pagination/type,
+  // which correctly fetches all partners (the desired behavior for Partner-as-S1).
 
   console.log(
     `[fetchPartners] Fetching from URL: /api/partners?${queryParams.toString()}`
@@ -120,7 +86,6 @@ export async function fetchPartners(
   }
 
   const result: PaginatedPartnersResponse = await response.json();
-  // Ensure IDs are strings
   result.data = result.data.map((p) => ({ ...p, id: String(p.id) }));
   return result;
 }

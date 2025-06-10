@@ -1,7 +1,7 @@
 // src/hooks/usePartnerManager.ts
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   fetchPartners,
@@ -14,6 +14,7 @@ import type {
   CreatePartnerClientData,
   UpdatePartnerClientData,
   FetchPartnersParams,
+  PartnerFilterStatus, // Import our new type
 } from "@/lib/types";
 import { getFirstId } from "@/lib/helpers";
 import { SLIDER_TYPES } from "@/lib/constants";
@@ -24,7 +25,7 @@ export interface UsePartnerManagerProps {
   effectiveSelectedJournalIds: string[];
   selectedGoodsId: string | null; // This is crossFilterSelectedGoodsId from page.tsx
   selectedJournalIdForGjpFiltering: string | null;
-  journalRootFilterStatus: "affected" | "unaffected" | "all" | null;
+  journalRootFilterStatus: PartnerFilterStatus;
   isJournalHierarchyLoading: boolean;
   isFlatJournalsQueryForGoodLoading: boolean; // This is isGoodsDataLoading from page.tsx
   isGPGOrderActive?: boolean;
@@ -81,64 +82,48 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     } else if (partnerIndex === 0) {
       // Default params when Partner is first
     } else if (
-      orderString.startsWith(SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.PARTNER) // J-P (Partner S2)
+      // --- THIS IS THE KEY CHANGE ---
+      // When Journal is S1 and Partner is S2, use the new filterStatus
+      orderString.startsWith(`${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`)
     ) {
       params.filterStatus = journalRootFilterStatus;
-      params.contextJournalIds = [...effectiveSelectedJournalIds];
+      // Only pass contextJournalIds if the filter status requires it
+      if (
+        journalRootFilterStatus === "affected" ||
+        journalRootFilterStatus === "all"
+      ) {
+        params.contextJournalIds = [...effectiveSelectedJournalIds];
+      }
     } else if (
+      // J-G-P (Partner S3) logic remains the same
       orderString.startsWith(
-        SLIDER_TYPES.JOURNAL +
-          "-" +
-          SLIDER_TYPES.GOODS +
-          "-" +
-          SLIDER_TYPES.PARTNER // J-G-P (Partner S3)
+        `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}-${SLIDER_TYPES.PARTNER}`
       )
     ) {
       if (effectiveSelectedJournalIds.length > 0 && selectedGoodsId) {
         params.linkedToJournalIds = [...effectiveSelectedJournalIds];
         params.linkedToGoodId = selectedGoodsId;
-        params.includeChildren = true; // Journal is primary
-        console.log(
-          `[usePartnerManager] J-G-P params: linkedToJournalIds=${effectiveSelectedJournalIds.join(
-            ","
-          )}, linkedToGoodId=${selectedGoodsId}`
-        );
-      } else {
-        console.log(
-          `[usePartnerManager] J-G-P context missing. Params will lead to empty queryFn result.`
-        );
-        // queryFn will handle this by checking if params are incomplete
+        params.includeChildren = true;
       }
     } else if (
+      // G-J-P (Partner S3) logic remains the same
       orderString.startsWith(
-        SLIDER_TYPES.GOODS +
-          "-" +
-          SLIDER_TYPES.JOURNAL +
-          "-" +
-          SLIDER_TYPES.PARTNER // G-J-P (Partner S3)
+        `${SLIDER_TYPES.GOODS}-${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`
       )
     ) {
       if (selectedGoodsId && selectedJournalIdForGjpFiltering) {
         params.linkedToJournalIds = [selectedJournalIdForGjpFiltering];
         params.linkedToGoodId = selectedGoodsId;
-        params.includeChildren = false; // Journal is secondary
-        console.log(
-          `[usePartnerManager] G-J-P params: linkedToJournalIds=${selectedJournalIdForGjpFiltering}, linkedToGoodId=${selectedGoodsId}`
-        );
-      } else {
-        console.log(
-          `[usePartnerManager] G-J-P context missing. Params will lead to empty queryFn result.`
-        );
-        // queryFn will handle this
+        params.includeChildren = false;
       }
     }
     return params;
   }, [
     sliderOrder,
+    journalRootFilterStatus, // This is now a key dependency
     effectiveSelectedJournalIds,
-    selectedGoodsId, // Key for J-G-P
-    selectedJournalIdForGjpFiltering, // Key for G-J-P
-    journalRootFilterStatus,
+    selectedGoodsId,
+    selectedJournalIdForGjpFiltering,
     isGPGOrderActive,
     gpgContextJournalId,
   ]);
