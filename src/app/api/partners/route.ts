@@ -37,7 +37,6 @@ export async function GET(request: NextRequest) {
 
   // Main filter status for Journal-as-Root view. This is our primary mechanism now.
   const filterStatus = searchParams.get("filterStatus") as
-    | "all"
     | "affected"
     | "unaffected"
     | "inProcess"
@@ -131,7 +130,7 @@ export async function GET(request: NextRequest) {
       if (filterStatus) {
         serviceCallOptions.filterStatus = filterStatus;
         // Only include contextJournalIds if they are relevant for the filter
-        if (filterStatus === "affected" || filterStatus === "all") {
+        if (filterStatus === "affected") {
           serviceCallOptions.contextJournalIds =
             contextJournalIdsParam
               ?.split(",")

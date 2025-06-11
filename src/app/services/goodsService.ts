@@ -9,19 +9,23 @@ import {
 
 // --- Types for "Order Slips" (Data Transfer Objects) for Goods & Services ---
 
+// Update the "Order Slip" to include required linking IDs
 export type CreateGoodsData = {
+  companyId: string; // Required for linking to a company
+  createdById: string; // Required for audit trail
   label: string;
   referenceCode?: string | null;
   barcode?: string | null;
-  taxCodeId?: number | null; // Foreign Key to TaxCode
+  taxCodeId?: number | null;
   typeCode?: string | null;
   description?: string | null;
-  unitCodeId?: number | null; // Foreign Key to UnitOfMeasure
+  unitCodeId?: number | null;
   stockTrackingMethod?: string | null;
   packagingTypeCode?: string | null;
   photoUrl?: string | null;
-  additionalDetails?: any; // Or a more specific Zod schema
+  additionalDetails?: any;
 };
+// --- End of Changes ---
 
 // For updates, most fields are optional. We might not allow changing referenceCode easily.
 export type UpdateGoodsData = Partial<
@@ -55,12 +59,27 @@ const goodsService = {
         );
       }
     }
-    // Optional: Check for unique referenceCode or barcode if your business rules require it
-    // (Prisma schema already enforces this with @unique)
+
+    const {
+      companyId,
+      createdById,
+      ...restOfData // a an object with label, referenceCode, etc.
+    } = data;
 
     const newGood = await prisma.goodsAndService.create({
-      data: data,
+      data: {
+        ...restOfData,
+        company: {
+          connect: { id: companyId }, // Connect to the Company via its ID
+        },
+        createdBy: {
+          connect: { id: createdById }, // Connect to the User who created it
+        },
+        // The audit fields in your schema default to PENDING and ACTIVE, so you don't need to set them explicitly here
+        // unless you want to override the default.
+      },
     });
+
     console.log(
       "Chef (GoodsService): Item",
       newGood.label,

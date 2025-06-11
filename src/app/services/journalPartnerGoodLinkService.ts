@@ -25,14 +25,17 @@ const CreateRawJPGLSchema = z.object({
 });
 export type CreateRawJPGLData = z.infer<typeof CreateRawJPGLSchema>;
 
+// Update the Zod Schema to include companyId
 export const OrchestratedCreateJPGLSchema = z.object({
+  companyId: z.string().min(1, "Company ID is required"), // Add companyId
   journalId: z.string().min(1, "Journal ID is required"),
   partnerId: z.bigint().positive("Partner ID must be a positive number"),
   goodId: z.bigint().positive("Good ID must be a positive number"),
-  partnershipType: z.string().optional().default("STANDARD_TRANSACTION"), // Important: Define this default or make it required
+  partnershipType: z.string().optional().default("STANDARD_TRANSACTION"),
   descriptiveText: z.string().optional().nullable(),
   contextualTaxCodeId: z.number().int().positive().optional().nullable(),
 });
+
 export type OrchestratedCreateJPGLData = z.infer<
   typeof OrchestratedCreateJPGLSchema
 >;
@@ -42,23 +45,28 @@ const jpgLinkService = {
     data: OrchestratedCreateJPGLData
   ): Promise<JournalPartnerGoodLink> {
     const {
+      // --- Start of Changes ---
+      companyId, // Destructure companyId
+      // --- End of Changes ---
       journalId,
       partnerId,
       goodId,
-      partnershipType, // This is crucial for finding/creating the correct JPL
+      partnershipType,
       descriptiveText,
       contextualTaxCodeId,
     } = OrchestratedCreateJPGLSchema.parse(data);
 
     console.log(
-      `Chef (JPGLService): Orchestrating 3-way link for J:'${journalId}', P:'${partnerId}', G:'${goodId}', JPL Type:'${partnershipType}'.`
+      `Chef (JPGLService): Orchestrating 3-way link for C:'${companyId}', J:'${journalId}', P:'${partnerId}', G:'${goodId}', JPL Type:'${partnershipType}'.`
     );
 
     // Step 1: Find or Create the JournalPartnerLink
+    // --- Start of Major Changes (The Core Fix) ---
     let journalPartnerLink = await prisma.journalPartnerLink.findUnique({
       where: {
-        // Use the Prisma-generated compound key name
-        journalId_partnerId_partnershipType: {
+        // Use the CORRECT Prisma-generated compound key name
+        companyId_journalId_partnerId_partnershipType: {
+          companyId: companyId,
           journalId: journalId,
           partnerId: partnerId,
           partnershipType: partnershipType,
@@ -71,11 +79,10 @@ const jpgLinkService = {
       try {
         journalPartnerLink = await prisma.journalPartnerLink.create({
           data: {
+            companyId: companyId, // Pass companyId on creation
             journalId: journalId,
             partnerId: partnerId,
             partnershipType: partnershipType,
-            // Add other default fields for JournalPartnerLink if necessary (e.g., exoneration, periodType)
-            // exoneration: false, // Example
           },
         });
         console.log(
@@ -83,14 +90,14 @@ const jpgLinkService = {
         );
       } catch (error: any) {
         if (error.code === "P2002") {
-          // Check if 'error' is defined and has 'code'
           console.warn(
             " -> P2002 during JPL creation, attempting to re-fetch."
           );
           journalPartnerLink = await prisma.journalPartnerLink.findUnique({
             where: {
-              // Use the Prisma-generated compound key name here as well
-              journalId_partnerId_partnershipType: {
+              // Use the correct compound key name here as well
+              companyId_journalId_partnerId_partnershipType: {
+                companyId,
                 journalId,
                 partnerId,
                 partnershipType,
@@ -113,9 +120,13 @@ const jpgLinkService = {
         ` -> Found existing JournalPartnerLink with ID: ${journalPartnerLink.id}`
       );
     }
+    // --- End of Major Changes ---
 
-    // Step 2: Create the JournalPartnerGoodLink (using the 'raw' creation logic)
-    const rawJpglData: CreateRawJPGLData = {
+    // Step 2: Create the JournalPartnerGoodLink
+    const rawJpglData = {
+      // --- Start of Changes ---
+      companyId: companyId, // Pass companyId to the JPGL record as well
+      // --- End of Changes ---
       journalPartnerLinkId: journalPartnerLink.id,
       goodId: goodId,
       descriptiveText: descriptiveText,

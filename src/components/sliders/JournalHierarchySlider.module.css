@@ -1,39 +1,3 @@
-/* --- NEW: 2-Row Header Layout --- */
-
-/* Row 1: Container for Options Button and L1 Info */
-.headerTopRow {
-  display: flex;
-  align-items: center;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
-  min-height: 30px;
-}
-
-/* Container for your options/filter icon button */
-.headerOptions {
-  flex-shrink: 0;
-  margin-right: var(--spacing-unit);
-}
-
-/* Container for the L1 info span */
-.headerL1InfoContainer {
-  flex-grow: 1;
-  display: flex;
-  justify-content: flex-start;
-}
-
-/* The L1 info box itself, e.g., [Root -] */
-.journalParentInfo {
-  font-size: 0.9em;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background-color: var(--accent-warm-light);
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  display: inline-block;
-}
-
 /* Row 2: Container for the Filter Buttons */
 .headerFilterRow {
   text-align: center; /* This centers the inline-flex group below */

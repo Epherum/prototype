@@ -39,12 +39,6 @@ export type Partner = {
   } | null;
 };
 
-// --- (Other existing types like PaginatedPartnersResponse, AccountNodeData, etc. go here) ---
-
-// ... assume all other types are present and unchanged ...
-
-// --- REFACTORED AND NEW TYPES ---
-
 /**
  * @description Defines the possible filter states for the partner list when Journal is the primary slider.
  * This is the single source of truth for the filter buttons.
@@ -74,8 +68,6 @@ export interface FetchPartnersParams {
   linkedToGoodId?: string;
   includeChildren?: boolean; // Maintained for legacy/specific flows if needed
 }
-
-// ... (all other types like FetchGoodsParams, RoleData, etc. remain the same)
 
 // (Make sure to include all other existing types from your original file here)
 export type PaginatedPartnersResponse = { data: Partner[]; total: number };

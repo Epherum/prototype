@@ -56,9 +56,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   const l3ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const l3ClickCountRef = useRef<number>(0);
 
-  // Add ref for double-tap detection on touch devices
-  const lastTapRef = useRef<number | null>(null);
-
   console.log("[JHS] Props Received:", {
     selectedTopLevelId,
     selectedLevel2Ids,
@@ -230,22 +227,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     onSelectTopLevel(newTopLevelId, null);
   };
 
-  const handleL1HeaderDoubleClick = () => {
-    console.log("[JHS] L1 Header Double Clicked");
-    navigateUp(selectedTopLevelId);
-  };
-
-  const handleL1HeaderTouchEnd = () => {
-    const now = Date.now();
-    if (lastTapRef.current && now - lastTapRef.current < 300) {
-      // Double-tap detected
-      if (canNavigateL1Up) handleL1HeaderDoubleClick();
-      lastTapRef.current = null;
-    } else {
-      lastTapRef.current = now;
-    }
-  };
-
   const handleL2ItemClick = (l2ItemId: string) => {
     l2ClickCountRef.current += 1;
     if (l2ClickTimeoutRef.current) clearTimeout(l2ClickTimeoutRef.current);
@@ -342,63 +323,13 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   const isEffectivelyAtTrueRoot =
     selectedTopLevelId === rootJournalIdConst &&
     (!restrictedJournalId || restrictedJournalId === rootJournalIdConst);
-  // Can navigate up if not at the true root AND ( (not restricted) OR (is restricted but current L1 is not the restriction point) )
-  const canNavigateL1Up =
-    selectedTopLevelId !== rootJournalIdConst &&
-    (selectedTopLevelId !== restrictedJournalId ||
-      restrictedJournalId === rootJournalIdConst);
 
   return (
     <>
-      {/* --- ROW 1: Options Button and L1 Info --- */}
-      <div className={`${styles.headerTopRow} noSelect`}>
-        {/* Placeholder for the Options Menu button (far left) */}
-        <div className={styles.headerOptions}>
-          {/* 
-            Your actual Options Menu button, which is likely part of a different
-            component or hook, would be rendered here. For example:
-            <OptionsMenuButton onClick={handleOpenOptionsMenu} /> 
-          */}
-        </div>
-
-        {/* L1 Info (takes up remaining space) */}
-        <div className={styles.headerL1InfoContainer}>
-          <span
-            className={styles.journalParentInfo}
-            style={{ cursor: canNavigateL1Up ? "pointer" : "default" }}
-            onDoubleClick={
-              canNavigateL1Up ? handleL1HeaderDoubleClick : undefined
-            }
-            onTouchEnd={handleL1HeaderTouchEnd}
-            title={
-              canNavigateL1Up
-                ? "Double-click to go up"
-                : currentL1ContextNode?.name || "Current View"
-            }
-          >
-            {currentL1ContextNode?.code ||
-              (isEffectivelyAtTrueRoot ? "Root" : "N/A")}
-            {" - "}
-            {currentL1ContextNode?.name ||
-              (isEffectivelyAtTrueRoot ? "" : "Selected Account")}
-          </span>
-        </div>
-      </div>
-
       {/* --- ROW 2: Filter Buttons --- */}
       {isRootView && onFilterStatusChange && (
         <div className={styles.headerFilterRow}>
           <div className={styles.rootFilterControls}>
-            <button
-              className={
-                currentFilterStatus === "all" || !currentFilterStatus
-                  ? styles.activeFilter
-                  : ""
-              }
-              onClick={() => onFilterStatusChange("all")}
-            >
-              All
-            </button>
             <button
               className={
                 currentFilterStatus === "affected" ? styles.activeFilter : ""

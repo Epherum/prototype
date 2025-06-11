@@ -27,7 +27,7 @@ import {
 } from "@/services/clientJournalService";
 
 // Libs (Helpers, Constants, Types)
-import { findNodeById } from "@/lib/helpers";
+import { findNodeById, findParentOfNode } from "@/lib/helpers";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
 import type {
   AccountNodeData,
@@ -1144,6 +1144,71 @@ export default function Home() {
       setSelectedDocumentId, // For DOCUMENT slider
     ]
   );
+
+  // --- Logic for Journal L1 'Up' Button (moved from JHS) ---
+  const lastTapRef = useRef<number | null>(null);
+
+  const journalL1NodeForControls = useMemo(() => {
+    const { selectedTopLevelJournalId, hierarchyData } = journalManager;
+    if (!selectedTopLevelJournalId) return null;
+    if (
+      selectedTopLevelJournalId === ROOT_JOURNAL_ID &&
+      (!effectiveRestrictedJournalId ||
+        effectiveRestrictedJournalId === ROOT_JOURNAL_ID)
+    ) {
+      return {
+        id: ROOT_JOURNAL_ID,
+        name: "",
+        code: "Root",
+      } as AccountNodeData;
+    }
+    return findNodeById(hierarchyData, selectedTopLevelJournalId);
+  }, [
+    journalManager.selectedTopLevelJournalId,
+    journalManager.hierarchyData,
+    effectiveRestrictedJournalId,
+  ]);
+
+  const canJournalNavigateUp = useMemo(
+    () =>
+      journalManager.selectedTopLevelJournalId !== ROOT_JOURNAL_ID &&
+      (journalManager.selectedTopLevelJournalId !==
+        effectiveRestrictedJournalId ||
+        effectiveRestrictedJournalId === ROOT_JOURNAL_ID),
+    [journalManager.selectedTopLevelJournalId, effectiveRestrictedJournalId]
+  );
+
+  const handleJournalNavigateUp = useCallback(() => {
+    const {
+      selectedTopLevelJournalId,
+      hierarchyData,
+      handleSelectTopLevelJournal,
+    } = journalManager;
+    if (!selectedTopLevelJournalId || !canJournalNavigateUp) return;
+    const parentOfCurrentL1 = findParentOfNode(
+      selectedTopLevelJournalId,
+      hierarchyData
+    );
+    const newL1TargetId = parentOfCurrentL1
+      ? parentOfCurrentL1.id
+      : ROOT_JOURNAL_ID;
+    handleSelectTopLevelJournal(
+      newL1TargetId,
+      hierarchyData,
+      selectedTopLevelJournalId
+    );
+  }, [journalManager, canJournalNavigateUp]);
+
+  const handleJournalHeaderTouchEnd = useCallback(() => {
+    const now = Date.now();
+    if (lastTapRef.current && now - lastTapRef.current < 300) {
+      if (canJournalNavigateUp) handleJournalNavigateUp();
+      lastTapRef.current = null;
+    } else {
+      lastTapRef.current = now;
+    }
+  }, [canJournalNavigateUp, handleJournalNavigateUp]);
+
   // --- Component JSX ---
   return (
     <div className={styles.pageContainer}>
@@ -1206,48 +1271,81 @@ export default function Home() {
                   className={styles.sliderWrapper}
                 >
                   <div className={styles.controls}>
-                    <button
-                      onClick={
-                        (sliderSpecificProps as any).onOpenModal ||
-                        (() =>
-                          console.log(
-                            `Options for ${currentSliderTitle} (no modal)`
-                          ))
-                      }
-                      className={`${styles.controlButton} ${styles.editButton}`}
-                      aria-label={`Options for ${currentSliderTitle}`}
-                      title={`Options for ${currentSliderTitle}`}
-                      disabled={
+                    <div className={styles.controlsLeftGroup}>
+                      <button
+                        onClick={
+                          (sliderSpecificProps as any).onOpenModal ||
+                          (() =>
+                            console.log(
+                              `Options for ${currentSliderTitle} (no modal)`
+                            ))
+                        }
+                        className={`${styles.controlButton} ${styles.editButton}`}
+                        aria-label={`Options for ${currentSliderTitle}`}
+                        title={`Options for ${currentSliderTitle}`}
+                        disabled={
+                          isDocumentCreationMode &&
+                          isPartnerSlider &&
+                          lockedPartnerId !== partnerManager.selectedPartnerId
+                        }
+                      >
+                        <IoOptionsOutline />
+                      </button>
+                      {sliderId === SLIDER_TYPES.JOURNAL &&
+                        !isJournalFlatMode &&
+                        journalL1NodeForControls && (
+                          <span
+                            className={`${styles.journalParentInfo} noSelect`}
+                            style={{
+                              cursor: canJournalNavigateUp
+                                ? "pointer"
+                                : "default",
+                            }}
+                            onDoubleClick={
+                              canJournalNavigateUp
+                                ? handleJournalNavigateUp
+                                : undefined
+                            }
+                            onTouchEnd={
+                              canJournalNavigateUp
+                                ? handleJournalHeaderTouchEnd
+                                : undefined
+                            }
+                            title={
+                              canJournalNavigateUp
+                                ? "Double-click to go up"
+                                : journalL1NodeForControls.name ||
+                                  "Current View"
+                            }
+                          >
+                            {journalL1NodeForControls.code || "N/A"}
+                          </span>
+                        )}
+                      {isPartnerSlider &&
+                        isTerminalJournalActive &&
+                        !isDocumentCreationMode &&
+                        partnerManager.selectedPartnerId && (
+                          <button
+                            onClick={handleStartDocumentCreation}
+                            className={`${styles.controlButton} ${styles.createDocumentButton}`}
+                            title="Create Document with this Partner"
+                          >
+                            <IoAddCircleOutline /> Doc
+                          </button>
+                        )}
+                      {isPartnerSlider &&
                         isDocumentCreationMode &&
-                        isPartnerSlider &&
-                        lockedPartnerId !== partnerManager.selectedPartnerId
-                      }
-                    >
-                      <IoOptionsOutline />
-                    </button>
-                    {isPartnerSlider &&
-                      isTerminalJournalActive &&
-                      !isDocumentCreationMode &&
-                      partnerManager.selectedPartnerId && (
-                        <button
-                          onClick={handleStartDocumentCreation}
-                          className={`${styles.controlButton} ${styles.createDocumentButton}`}
-                          title="Create Document with this Partner"
-                        >
-                          <IoAddCircleOutline /> Doc
-                        </button>
-                      )}
-                    {isPartnerSlider &&
-                      isDocumentCreationMode &&
-                      lockedPartnerId === partnerManager.selectedPartnerId && (
-                        <button
-                          onClick={handleCancelDocumentCreation}
-                          className={`${styles.controlButton} ${styles.cancelDocumentButton}`}
-                          title="Cancel Document Creation"
-                        >
-                          <IoTrashBinOutline /> Cancel Doc
-                        </button>
-                      )}
+                        lockedPartnerId ===
+                          partnerManager.selectedPartnerId && (
+                          <button
+                            onClick={handleCancelDocumentCreation}
+                            className={`${styles.controlButton} ${styles.cancelDocumentButton}`}
+                            title="Cancel Document Creation"
+                          >
+                            <IoTrashBinOutline /> Cancel Doc
+                          </button>
+                        )}
+                    </div>
                     <div className={styles.moveButtonGroup}>
                       {canMoveUp && (
                         <button

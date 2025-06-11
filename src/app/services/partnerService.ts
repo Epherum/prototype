@@ -43,7 +43,7 @@ export interface GetAllPartnersOptions {
   partnerType?: PartnerType;
 
   // Unified filter status for the Journal-as-Root view
-  filterStatus?: "all" | "affected" | "unaffected" | "inProcess";
+  filterStatus?: "affected" | "unaffected" | "inProcess";
   contextJournalIds?: string[]; // Required for 'affected' and 'all' filters
   currentUserId?: string; // Required for 'inProcess' and 'all' filters
 }
@@ -151,37 +151,6 @@ const partnerService = {
           { journalPartnerLinks: { none: {} } },
         ];
         break;
-
-      case "all":
-        console.log("Chef (PartnerService): Applying 'all' filter.");
-        // Combines "Affected" (by current journal selection) and "In Process" (created by me).
-        if (!currentUserId) {
-          console.warn(
-            "Chef (PartnerService): 'all' filter needs a currentUserId for the 'inProcess' part. Returning empty."
-          );
-          return { partners: [], totalCount: 0 };
-        }
-
-        const affectedCondition: Prisma.PartnerWhereInput =
-          contextJournalIds.length > 0
-            ? {
-                journalPartnerLinks: {
-                  some: { journalId: { in: contextJournalIds } },
-                },
-              }
-            : { id: { in: [] } }; // A condition that is never met if no journals are selected
-
-        const inProcessCondition: Prisma.PartnerWhereInput = {
-          AND: [
-            { createdById: currentUserId },
-            { approvalStatus: ApprovalStatus.PENDING },
-            { journalPartnerLinks: { none: {} } },
-          ],
-        };
-
-        prismaWhere.OR = [affectedCondition, inProcessCondition];
-        break;
-
       default:
         // No filterStatus provided, so we perform a general fetch for the company.
         console.log(

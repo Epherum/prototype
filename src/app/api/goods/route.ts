@@ -6,6 +6,8 @@ import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt"; /
 import journalGoodLinkService from "@/app/services/journalGoodLinkService"; // Import the new service
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService"; // Import the new service
 import { GoodsAndService, Prisma } from "@prisma/client"; // Added Prisma and GoodsAndService
+import { getServerSession } from "next-auth/next";
+import { authOptions, ExtendedUser } from "@/lib/authOptions";
 
 // Waiter's checklist for "Create New Good/Service"
 const createGoodsSchema = z.object({
@@ -228,6 +230,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  const user = session?.user as ExtendedUser | undefined;
+
+  if (!user?.companyId || !user?.id) {
+    return NextResponse.json(
+      { message: "Unauthorized or user/company session data is missing." },
+      { status: 401 }
+    );
+  }
+  const companyId = user.companyId;
+  const createdById = user.id;
+
   console.log("Waiter (API /goods): Customer wants to add a new good/service.");
   try {
     const rawOrder = await request.json();
@@ -251,12 +265,41 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validOrderData = validation.data as CreateGoodsData;
+    // --- Start of the Correct and Final Fix ---
+
+    // The spread syntax (...) is causing a type inference issue.
+    // We will build the object explicitly to guarantee its shape for TypeScript.
+    // This removes all ambiguity.
+    const serviceData: CreateGoodsData = {
+      // Server-side required properties
+      companyId: companyId,
+      createdById: createdById,
+
+      // Client-side required properties (from validation)
+      label: validation.data.label,
+
+      // Client-side optional properties (from validation)
+      referenceCode: validation.data.referenceCode,
+      barcode: validation.data.barcode,
+      taxCodeId: validation.data.taxCodeId,
+      typeCode: validation.data.typeCode,
+      description: validation.data.description,
+      unitCodeId: validation.data.unitCodeId,
+      stockTrackingMethod: validation.data.stockTrackingMethod,
+      packagingTypeCode: validation.data.packagingTypeCode,
+      photoUrl: validation.data.photoUrl,
+      additionalDetails: validation.data.additionalDetails,
+    };
+
+    // --- End of the Correct and Final Fix ---
+
     console.log(
       "Waiter (API /goods): Order for new good is clear. Passing to Chef."
     );
 
-    const newGood = await goodsService.createGood(validOrderData);
+    // Now, pass the correctly and explicitly shaped object to the service.
+    const newGood = await goodsService.createGood(serviceData);
+
     console.log(
       "Waiter (API /goods): Chef added the new good! Preparing for customer."
     );
@@ -266,12 +309,13 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
+    // ... rest of error handling remains the same
     const e = error as Error;
     console.error(
       "Waiter (API /goods): Chef couldn't add new good!",
-      e.message
+      e.message,
+      e
     );
-    // Prisma unique constraint errors (like for referenceCode or barcode) have code P2002
     if ((e as any)?.code === "P2002") {
       return NextResponse.json(
         {
@@ -281,14 +325,13 @@ export async function POST(request: NextRequest) {
           errorCode: "P2002",
         },
         { status: 409 }
-      ); // Conflict
+      );
     }
     if (e.message.includes("not found")) {
-      // For FK violations like TaxCode not found
       return NextResponse.json(
         { message: "Failed to create good.", error: e.message },
         { status: 400 }
-      ); // Bad request
+      );
     }
     return NextResponse.json(
       { message: "Chef couldn't add the new good.", error: e.message },

@@ -1,47 +1,37 @@
-// src/lib/permissions.ts
+// // src/app/api/permissions/route.ts
 
-import { ExtendedUser } from "./authOptions";
+// import { NextResponse } from "next/server";
+// import { getServerSession } from "next-auth/next";
+// import { authOptions, ExtendedSession } from "@/lib/authOptions";
+// import { getAllPermissions } from "@/app/services/roleService";
+// import { hasPermission } from "@/lib/permissions";
 
-/**
- * Checks if a user has a specific permission by checking for an action on a resource.
- * The check is case-insensitive.
- *
- * @param user - The user object from the session, containing their roles and permissions.
- * @param action - The action to check for (e.g., 'CREATE', 'MANAGE').
- * @param resource - The resource the action applies to (e.g., 'PARTNER', 'USERS').
- * @returns {boolean} - True if the user has the permission, false otherwise.
- */
-export const hasPermission = (
-  user: ExtendedUser | undefined | null,
-  action: string,
-  resource: string
-): boolean => {
-  if (!user?.roles) {
-    return false;
-  }
+// export async function GET(request: Request) {
+//   const session = (await getServerSession(
+//     authOptions
+//   )) as ExtendedSession | null;
+//   const user = session?.user;
 
-  const requiredAction = action.toUpperCase();
-  const requiredResource = resource.toUpperCase();
+//   if (!user?.id || !user?.companyId) {
+//     return NextResponse.json({ message: "Not authenticated" }, { status: 401 });
+//   }
 
-  // Iterate through each role the user has
-  for (const role of user.roles) {
-    // Check if any permission in that role matches the required action and resource
-    // The user's original code and the error message confirm that 'p' is the permission object itself.
-    if (
-      role.permissions.some(
-        (p) =>
-          // BEFORE (Incorrect):
-          // p.permission.action.toUpperCase() === requiredAction &&
-          // p.permission.resource.toUpperCase() === requiredResource
+//   // Authorization: User must have permission to manage roles.
+//   if (!hasPermission(user, "MANAGE", "ROLES")) {
+//     return NextResponse.json(
+//       { message: "Forbidden: You do not have permission to manage roles." },
+//       { status: 403 }
+//     );
+//   }
 
-          // AFTER (Correct):
-          p.action.toUpperCase() === requiredAction &&
-          p.resource.toUpperCase() === requiredResource
-      )
-    ) {
-      return true; // Permission found, no need to check further
-    }
-  }
-
-  return false; // No matching permission was found in any role
-};
+//   try {
+//     const permissions = await getAllPermissions();
+//     return NextResponse.json(permissions);
+//   } catch (error: any) {
+//     console.error("API Error in GET /api/permissions:", error);
+//     return NextResponse.json(
+//       { message: error.message || "An unexpected error occurred" },
+//       { status: 500 }
+//     );
+//   }
+// }
