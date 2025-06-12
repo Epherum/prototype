@@ -8,8 +8,9 @@ import {
   ApprovalStatus,
 } from "@prisma/client";
 import { z } from "zod";
-import { journalService } from "./journalService"; // <-- IMPORT JOURNAL SERVICE
-import { ROOT_JOURNAL_ID } from "@/lib/constants"; // <-- IMPORT ROOT CONSTANT
+import { journalService } from "./journalService";
+import { ROOT_JOURNAL_ID } from "@/lib/constants";
+import { PartnerFilterStatus } from "@/lib/types";
 
 export const createPartnerSchema = z.object({
   name: z.string().min(1, "Partner name is required").max(255),
@@ -38,6 +39,7 @@ export interface GetAllPartnersOptions {
   take?: number;
   skip?: number;
   partnerType?: PartnerType;
+  filterStatuses?: PartnerFilterStatus[]; // Changed from filterStatus to filterStatuses (array)
 
   // Unified filter status
   filterStatus?: "affected" | "unaffected" | "inProcess";
@@ -90,13 +92,13 @@ const partnerService = {
     options: GetAllPartnersOptions
   ): Promise<{ partners: Partner[]; totalCount: number }> {
     console.log(
-      "Chef (PartnerService): Fetching partners with DETAILED RULES:",
+      "Chef (PartnerService): Fetching partners with MULTI-SELECT RULES:",
       options
     );
 
     const {
       companyId,
-      filterStatus,
+      filterStatuses = [], // Default to empty array
       contextJournalIds = [],
       currentUserId,
       restrictedJournalId,
@@ -104,119 +106,111 @@ const partnerService = {
       ...restOfOptions
     } = options;
 
-    // The currentUserId is now essential for 'unaffected' and 'inProcess'
-    if (
-      (filterStatus === "unaffected" || filterStatus === "inProcess") &&
-      !currentUserId
-    ) {
+    if (filterStatuses.length > 0 && !currentUserId) {
       console.warn(
-        `Chef (PartnerService): '${filterStatus}' filter requires a currentUserId, but none was provided. Returning empty.`
+        `Chef (PartnerService): Filters require a currentUserId. Returning empty.`
       );
       return { partners: [], totalCount: 0 };
     }
 
     let prismaWhere: Prisma.PartnerWhereInput = {
       companyId: companyId,
-      entityState: EntityState.ACTIVE, // We only care about active partners
+      entityState: "ACTIVE",
       ...externalWhere,
     };
 
     const isRootUser =
       !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
 
-    switch (filterStatus) {
-      case "affected":
-        console.log(
-          "Chef (PartnerService): Applying 'affected' filter (Unchanged)."
-        );
-        if (contextJournalIds.length === 0) {
-          return { partners: [], totalCount: 0 };
-        }
-        prismaWhere.journalPartnerLinks = {
-          some: { journalId: { in: contextJournalIds } },
-        };
-        break;
+    // --- NEW: Multi-filter logic ---
+    if (filterStatuses.length > 0) {
+      const orConditions: Prisma.PartnerWhereInput[] = [];
 
-      case "unaffected":
-        if (isRootUser) {
-          // --- ROOT USER: UNAFFECTED ---
-          console.log(
-            "Chef (PartnerService): Applying 'unaffected' filter for ROOT user."
-          );
-          prismaWhere.AND = [
-            { journalPartnerLinks: { none: {} } }, // Not linked to ANY journal
-            { createdById: { not: currentUserId } }, // AND not created by me
-          ];
-        } else {
-          // --- RESTRICTED USER: UNAFFECTED ---
-          console.log(
-            `Chef (PartnerService): Applying 'unaffected' filter for RESTRICTED user. Root: ${restrictedJournalId}`
-          );
-          const descendantIds = await journalService.getDescendantJournalIds(
-            restrictedJournalId!,
-            companyId
-          );
-          prismaWhere.AND = [
-            // Linked to my parent journal
-            {
-              journalPartnerLinks: {
-                some: { journalId: restrictedJournalId!, companyId: companyId },
-              },
-            },
-            // AND NOT linked to any of its children
-            ...(descendantIds.length > 0
-              ? [
+      // Asynchronously get descendantIds if needed, once.
+      const descendantIds =
+        !isRootUser && filterStatuses.includes("unaffected")
+          ? await journalService.getDescendantJournalIds(
+              restrictedJournalId!,
+              companyId
+            )
+          : [];
+
+      for (const status of filterStatuses) {
+        switch (status) {
+          case "affected":
+            if (contextJournalIds.length > 0) {
+              orConditions.push({
+                journalPartnerLinks: {
+                  some: { journalId: { in: contextJournalIds } },
+                },
+              });
+            }
+            break;
+
+          case "unaffected":
+            if (isRootUser) {
+              orConditions.push({
+                AND: [
+                  { journalPartnerLinks: { none: {} } },
+                  { createdById: { not: currentUserId } },
+                ],
+              });
+            } else {
+              orConditions.push({
+                AND: [
                   {
-                    NOT: {
-                      journalPartnerLinks: {
-                        some: {
-                          journalId: { in: descendantIds },
-                          companyId: companyId,
-                        },
-                      },
+                    journalPartnerLinks: {
+                      some: { journalId: restrictedJournalId! },
                     },
                   },
-                ]
-              : []),
-          ];
-        }
-        break;
+                  ...(descendantIds.length > 0
+                    ? [
+                        {
+                          NOT: {
+                            journalPartnerLinks: {
+                              some: { journalId: { in: descendantIds } },
+                            },
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              });
+            }
+            break;
 
-      case "inProcess":
-        if (isRootUser) {
-          // --- ROOT USER: IN PROCESS ---
-          console.log(
-            "Chef (PartnerService): Applying 'inProcess' filter for ROOT user."
-          );
-          prismaWhere.AND = [
-            { journalPartnerLinks: { none: {} } }, // Not linked to ANY journal
-            { createdById: currentUserId }, // AND created by me
-          ];
-        } else {
-          // --- RESTRICTED USER: IN PROCESS ---
-          console.log(
-            `Chef (PartnerService): Applying 'inProcess' filter for RESTRICTED user. Root: ${restrictedJournalId}`
-          );
-          prismaWhere.AND = [
-            // NOT linked to my parent/restricted journal
-            {
-              journalPartnerLinks: {
-                none: { journalId: restrictedJournalId!, companyId: companyId },
-              },
-            },
-            // AND created by me
-            { createdById: currentUserId },
-          ];
+          case "inProcess":
+            if (isRootUser) {
+              orConditions.push({
+                AND: [
+                  { journalPartnerLinks: { none: {} } },
+                  { createdById: currentUserId },
+                ],
+              });
+            } else {
+              orConditions.push({
+                AND: [
+                  {
+                    journalPartnerLinks: {
+                      none: { journalId: restrictedJournalId! },
+                    },
+                  },
+                  { createdById: currentUserId },
+                ],
+              });
+            }
+            break;
         }
-        break;
+      }
 
-      default:
-        // NO filterStatus, e.g., Partner is S1.
-        // Fetch all active partners.
-        console.log(
-          "Chef (PartnerService): No filterStatus. Fetching all active partners."
-        );
-        break;
+      // If any conditions were generated, combine them with OR
+      if (orConditions.length > 0) {
+        prismaWhere.OR = orConditions;
+      } else {
+        // If filters were selected but no valid conditions could be made (e.g. 'affected' with no journal IDs)
+        // return nothing.
+        return { partners: [], totalCount: 0 };
+      }
     }
 
     console.log(

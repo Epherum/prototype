@@ -132,13 +132,11 @@ export default function Home() {
     selectedLevel3JournalIds,
     effectiveSelectedJournalIds,
     isTerminalJournalActive,
-    journalRootFilterStatus,
     selectedFlatJournalId,
     isJournalSliderPrimary,
     resetJournalSelections, // Make sure this is destructured
-    // Destructure other needed values from journalManager if used directly before linking hooks
-    // e.g., isJournalNavModalOpen, closeJournalNavModal, resetJournalSelections, setSelectedFlatJournalId
-    // openJournalNavModal, addJournalContext, createJournal, deleteJournal, setJournalRootFilterStatus
+    activeJournalRootFilters, // <-- Get the new state array
+    handleToggleJournalRootFilter, // <-- Get the new handler function
   } = journalManager;
 
   // --- MODAL STATES HOOK ---
@@ -260,7 +258,6 @@ export default function Home() {
       sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1
         ? journalManager.selectedFlatJournalId
         : null,
-    journalRootFilterStatus: journalManager.journalRootFilterStatus,
     isJournalHierarchyLoading: journalManager.isHierarchyLoading,
     // isFlatJournalsQueryForGoodLoading will be derived from flatJournalsQueryForGood.isLoading later
     isGPGOrderActive: isGPStartOrder,
@@ -270,6 +267,7 @@ export default function Home() {
     isFlatJournalsQueryForGoodLoading: isGoodsDataLoading,
 
     effectiveRestrictedJournalId: effectiveRestrictedJournalId, // <-- THE KEY CHANGE
+    filterStatuses: activeJournalRootFilters, // Pass the array here
   });
 
   // Good Manager INSTANCE
@@ -284,7 +282,6 @@ export default function Home() {
       sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1
         ? journalManager.selectedFlatJournalId
         : null,
-    journalRootFilterStatus: journalManager.journalRootFilterStatus,
     isJournalHierarchyLoading: journalManager.isHierarchyLoading,
     isPartnerQueryLoading: isPartnerDataLoading, // INPUT: loading state from partnerManager (via page state)
     // Pass flatJournalsQuery loading state if it's defined *before* this hook
@@ -294,6 +291,7 @@ export default function Home() {
     gpgContextJournalId: selectedContextJournalIdForGPG,
 
     effectiveRestrictedJournalId: effectiveRestrictedJournalId, // <-- Also add here for Goods symmetry
+    filterStatuses: activeJournalRootFilters, // Pass the array here
   });
 
   // useEffects to sync internal hook selections and loading states to page-level states
@@ -589,7 +587,6 @@ export default function Home() {
       setCrossFilterSelectedGoodsId(null);
     }
   }, [
-    journalManager.journalRootFilterStatus,
     journalManager.effectiveSelectedJournalIds,
     sliderOrder,
     goodManager.setSelectedGoodsId,
@@ -661,11 +658,6 @@ export default function Home() {
       }
     },
     [journalManager.deleteJournal]
-  );
-
-  const handleJournalRootFilterChange = useCallback(
-    journalManager.setJournalRootFilterStatus,
-    [journalManager.setJournalRootFilterStatus]
   );
 
   const handleOpenJournalModalForNavigation = useCallback(() => {
@@ -972,8 +964,8 @@ export default function Home() {
               rootJournalIdConst: ROOT_JOURNAL_ID,
               restrictedJournalId: effectiveRestrictedJournalId, // <<<< Pass restriction ID
               isRootView: isHierarchicalSliderRootView,
-              currentFilterStatus: journalManager.journalRootFilterStatus,
-              onFilterStatusChange: journalManager.setJournalRootFilterStatus,
+              activeFilters: activeJournalRootFilters,
+              onToggleFilter: handleToggleJournalRootFilter,
               onOpenModal: journalManager.openJournalNavModal,
             };
           }
@@ -1130,8 +1122,8 @@ export default function Home() {
       journalManager.handleSelectTopLevelJournal,
       journalManager.handleToggleLevel2JournalId,
       journalManager.handleToggleLevel3JournalId,
-      journalManager.journalRootFilterStatus,
-      journalManager.setJournalRootFilterStatus,
+      activeJournalRootFilters, // <-- Add to dependency array
+      handleToggleJournalRootFilter, // <-- Add to dependency array
       effectiveRestrictedJournalId, // <<<< Added for isHierarchicalSliderRootView and restrictedJournalId prop
       // partnerManager props for PARTNER case
       partnerManager.partnersForSlider, // Data source for partner slider
@@ -1449,12 +1441,12 @@ export default function Home() {
                           (sliderSpecificProps as any).restrictedJournalId
                         }
                         isRootView={(sliderSpecificProps as any).isRootView}
-                        currentFilterStatus={
-                          (sliderSpecificProps as any).currentFilterStatus
-                        }
-                        onFilterStatusChange={
-                          (sliderSpecificProps as any).onFilterStatusChange
-                        }
+                        activeFilters={
+                          (sliderSpecificProps as any).activeFilters
+                        } // This will now be correctly populated
+                        onToggleFilter={
+                          (sliderSpecificProps as any).onToggleFilter
+                        } // This will now be the correct function
                       />
                     )
                   ) : sliderId === SLIDER_TYPES.PARTNER ? (

@@ -40,18 +40,17 @@ export type Partner = {
   } | null;
 };
 
-export type PartnerFilterStatus =
-  | "all"
-  | "affected"
-  | "unaffected"
-  | "inProcess"
-  | null;
+export type PartnerFilterStatus = "affected" | "unaffected" | "inProcess";
+
+// The state will now be an array of these statuses
+export type ActivePartnerFilters = PartnerFilterStatus[];
 
 export interface FetchPartnersParams {
   limit?: number;
   offset?: number;
   partnerType?: PartnerTypeClient;
-  filterStatus?: PartnerFilterStatus;
+  filterStatus?: ActivePartnerFilters;
+  filterStatuses?: string[];
   contextJournalIds?: string[];
   restrictedJournalId?: string | null;
   linkedToJournalIds?: string[];

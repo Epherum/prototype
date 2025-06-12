@@ -6,7 +6,11 @@ import "swiper/css";
 import "swiper/css/navigation";
 import styles from "./JournalHierarchySlider.module.css";
 import { findNodeById, findParentOfNode } from "@/lib/helpers";
-import type { AccountNodeData, PartnerFilterStatus } from "@/lib/types"; // Import new type
+import type {
+  AccountNodeData,
+  ActivePartnerFilters,
+  PartnerFilterStatus,
+} from "@/lib/types"; // Import new type
 
 const DOUBLE_CLICK_DELAY = 200;
 
@@ -29,8 +33,8 @@ interface JournalHierarchySliderProps {
   isError?: boolean;
   isRootView?: boolean;
   // --- UPDATED PROPS ---
-  currentFilterStatus?: PartnerFilterStatus; // Use the shared type
-  onFilterStatusChange?: (status: PartnerFilterStatus) => void; // Use the shared type
+  activeFilters: ActivePartnerFilters;
+  onToggleFilter: (status: PartnerFilterStatus) => void;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
@@ -48,8 +52,8 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   isLoading,
   isError,
   isRootView,
-  currentFilterStatus,
-  onFilterStatusChange,
+  activeFilters,
+  onToggleFilter,
 }) => {
   const l2ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const l2ClickCountRef = useRef<number>(0);
@@ -327,31 +331,31 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   return (
     <>
       {/* --- ROW 2: Filter Buttons --- */}
-      {isRootView && onFilterStatusChange && (
+      {isRootView && onToggleFilter && (
         <div className={styles.headerFilterRow}>
           <div className={styles.rootFilterControls}>
             <button
               className={
-                currentFilterStatus === "affected" ? styles.activeFilter : ""
+                activeFilters.includes("affected") ? styles.activeFilter : ""
               }
-              onClick={() => onFilterStatusChange("affected")}
+              onClick={() => onToggleFilter("affected")}
             >
               Affected
             </button>
             <button
               className={
-                currentFilterStatus === "unaffected" ? styles.activeFilter : ""
+                activeFilters.includes("unaffected") ? styles.activeFilter : ""
               }
-              onClick={() => onFilterStatusChange("unaffected")}
+              onClick={() => onToggleFilter("unaffected")}
             >
               Unaffected
             </button>
             <button
               className={
-                currentFilterStatus === "inProcess" ? styles.activeFilter : ""
+                activeFilters.includes("inProcess") ? styles.activeFilter : ""
               }
-              onClick={() => onFilterStatusChange("inProcess")}
-              title="Partners created by you, pending approval, and not yet linked"
+              onClick={() => onToggleFilter("inProcess")}
+              title="Items created by you, not yet linked to your home journal"
             >
               In Process
             </button>

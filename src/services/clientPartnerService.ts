@@ -41,13 +41,14 @@ export async function fetchPartners(
       queryParams.append("includeChildren", String(params.includeChildren));
     }
   }
-  // Priority 2: Our main Journal-as-Root filter
-  else if (params.filterStatus) {
-    queryParams.append("filterStatus", params.filterStatus);
+  // Priority 2: Our main Journal-as-Root multi-select filter
+  else if (params.filterStatuses && params.filterStatuses.length > 0) {
+    // Join the array into a comma-separated string for the URL
+    queryParams.append("filterStatuses", params.filterStatuses.join(","));
 
-    // Only append contextJournalIds if they are relevant and present
+    // contextJournalIds is primarily for the 'affected' filter.
     if (
-      (params.filterStatus === "affected" || params.filterStatus === "all") &&
+      params.filterStatuses.includes("affected") &&
       params.contextJournalIds &&
       params.contextJournalIds.length > 0
     ) {
@@ -56,13 +57,6 @@ export async function fetchPartners(
         params.contextJournalIds.join(",")
       );
     }
-
-    // *** THE MISSING PIECE OF THE FIX ***
-    // Always append restrictedJournalId if it exists.
-    // The backend knows how to use it, especially for the 'unaffected' filter.
-    if (params.restrictedJournalId) {
-      queryParams.append("restrictedJournalId", params.restrictedJournalId);
-    }
   }
   // Priority 3: Other general linking (fallback)
   else if (params.linkedToJournalIds && params.linkedToJournalIds.length > 0) {
@@ -70,6 +64,12 @@ export async function fetchPartners(
       "linkedToJournalIds",
       params.linkedToJournalIds.join(",")
     );
+  }
+
+  // This parameter is independent and should be added if present,
+  // as it's crucial for the backend logic of 'unaffected' and 'inProcess'.
+  if (params.restrictedJournalId) {
+    queryParams.append("restrictedJournalId", params.restrictedJournalId);
   }
 
   console.log(
@@ -83,7 +83,7 @@ export async function fetchPartners(
       const errorData = await response.json();
       errorMessage = errorData.message || errorMessage;
     } catch (e) {
-      /* Could not parse JSON */
+      // Could not parse JSON, use the original status text
     }
     throw new Error(errorMessage);
   }

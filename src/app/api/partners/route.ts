@@ -9,13 +9,11 @@ import { Partner, PartnerType } from "@prisma/client";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions"; // <-- Ensure ExtendedUser is available if needed
+import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+import { PartnerFilterStatus } from "@/lib/types";
 
 const partnerService = partnerServiceImport;
 
-/**
- * === REFACTORED GET HANDLER WITH NEW PARAMETER ===
- */
 export async function GET(request: NextRequest) {
   const session = (await getServerSession(
     authOptions
@@ -30,49 +28,33 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   // --- Parse Parameters ---
-
-  const filterStatus = searchParams.get("filterStatus") as
-    | "affected"
-    | "unaffected"
-    | "inProcess"
-    | null;
-
-  const contextJournalIdsParam = searchParams.get("contextJournalIds");
-  const restrictedJournalId = searchParams.get("restrictedJournalId"); // <-- NEW
-
-  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds");
-  const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
-  const includeChildrenParam = searchParams.get("includeChildren");
-
-  const partnerTypeParam = searchParams.get(
-    "partnerType"
-  ) as PartnerType | null;
   const limitParam = searchParams.get("limit");
   const offsetParam = searchParams.get("offset");
   const take = limitParam ? parseInt(limitParam, 10) : undefined;
   const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
 
-  // --- Build Service Call Options ---
+  // --- Parameters for standard J-P flow ---
+  const filterStatusesParam = searchParams.get("filterStatuses");
+  const contextJournalIdsParam = searchParams.get("contextJournalIds");
+  const restrictedJournalId = searchParams.get("restrictedJournalId");
 
-  const serviceCallOptions: GetAllPartnersOptions = {
-    companyId,
-    currentUserId,
-    take,
-    skip,
-    restrictedJournalId: restrictedJournalId || null, // <-- PASS IT
-  };
-
-  if (
-    partnerTypeParam &&
-    Object.values(PartnerType).includes(partnerTypeParam)
-  ) {
-    serviceCallOptions.partnerType = partnerTypeParam;
-  }
+  // --- Parameters for linking flows (J-G-P, G-J-P) ---
+  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds");
+  const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
+  const includeChildrenParam = searchParams.get("includeChildren");
 
   try {
     let partnersResult: { partners: Partner[]; totalCount: number };
 
-    // Priority 1: J-G-P / G-J-P flow
+    // --- Build Service Call Options ---
+    const serviceCallOptions: GetAllPartnersOptions = {
+      companyId,
+      currentUserId,
+      take,
+      skip,
+    };
+
+    // Priority 1: Linking flows (J-G-P / G-J-P)
     if (linkedToJournalIdsParam && linkedToGoodIdStr) {
       console.log(
         `API /partners: J-G-P/G-J-P flow. Journals: '${linkedToJournalIdsParam}', Good: '${linkedToGoodIdStr}'.`
@@ -87,7 +69,6 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-
       const goodId = parseBigIntParam(linkedToGoodIdStr, "linkedToGoodId");
       if (goodId === null) {
         return NextResponse.json(
@@ -95,35 +76,47 @@ export async function GET(request: NextRequest) {
           { status: 400 }
         );
       }
-
       const partnerIds = await jpgLinkService.getPartnerIdsForJournalsAndGood(
         journalIds,
         goodId,
         includeChildrenParam !== "false"
       );
       serviceCallOptions.where = { id: { in: partnerIds } };
-
       partnersResult =
         partnerIds.length === 0
           ? { partners: [], totalCount: 0 }
           : await partnerService.getAllPartners(serviceCallOptions);
-    } else {
-      // Priority 2: Standard Journal-as-Root filtering
+    }
+    // Priority 2: Standard Journal-as-Root filtering flow
+    else {
       console.log(
-        `API /partners: Standard flow. filterStatus: '${
-          filterStatus || "none"
+        `API /partners: Standard flow. Filters: '${
+          filterStatusesParam || "none"
         }'`
       );
-      if (filterStatus) {
-        serviceCallOptions.filterStatus = filterStatus;
-        if (filterStatus === "affected") {
-          serviceCallOptions.contextJournalIds =
-            contextJournalIdsParam
-              ?.split(",")
-              .map((id) => id.trim())
-              .filter(Boolean) || [];
-        }
+
+      // ============================ FIX IS HERE ============================
+      // This is the single source of truth for handling filters now.
+
+      const filterStatuses = filterStatusesParam
+        ? (filterStatusesParam
+            .split(",")
+            .filter(Boolean) as PartnerFilterStatus[])
+        : [];
+
+      serviceCallOptions.filterStatuses = filterStatuses;
+      serviceCallOptions.restrictedJournalId = restrictedJournalId || null;
+
+      // If the 'affected' filter is present, we MUST parse and pass the context journal IDs.
+      if (filterStatuses.includes("affected")) {
+        serviceCallOptions.contextJournalIds =
+          contextJournalIdsParam
+            ?.split(",")
+            .map((id) => id.trim())
+            .filter(Boolean) || [];
       }
+      // ========================= END OF FIX ==========================
+
       partnersResult = await partnerService.getAllPartners(serviceCallOptions);
     }
 

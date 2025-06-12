@@ -1,4 +1,4 @@
-// 1. Define your datasource (PostgreSQL in this case)
+//schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
