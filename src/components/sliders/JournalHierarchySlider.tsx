@@ -9,7 +9,7 @@ import { findNodeById, findParentOfNode } from "@/lib/helpers";
 import type {
   AccountNodeData,
   ActivePartnerFilters,
-  PartnerFilterStatus,
+  PartnerGoodFilterStatus,
 } from "@/lib/types"; // Import new type
 
 const DOUBLE_CLICK_DELAY = 200;
@@ -34,7 +34,7 @@ interface JournalHierarchySliderProps {
   isRootView?: boolean;
   // --- UPDATED PROPS ---
   activeFilters: ActivePartnerFilters;
-  onToggleFilter: (status: PartnerFilterStatus) => void;
+  onToggleFilter: (status: PartnerGoodFilterStatus) => void;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({

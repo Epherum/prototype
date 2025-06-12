@@ -6,11 +6,10 @@ import goodsService, {
 } from "@/app/services/goodsService"; // Import new options type
 import { z } from "zod";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt"; // Our BigInt helper
-import journalGoodLinkService from "@/app/services/journalGoodLinkService"; // Import the new service
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService"; // Import the new service
-import { GoodsAndService, Prisma } from "@prisma/client"; // Added Prisma and GoodsAndService
 import { getServerSession } from "next-auth/next";
 import { authOptions, ExtendedUser } from "@/lib/authOptions";
+import { PartnerGoodFilterStatus } from "@/lib/types"; // Import the type
 
 // Waiter's checklist for "Create New Good/Service"
 const createGoodsSchema = z.object({
@@ -32,51 +31,42 @@ export async function GET(request: NextRequest) {
   const user = session?.user as ExtendedUser | undefined;
 
   if (!user?.companyId) {
-    return NextResponse.json(
-      { message: "Unauthorized or company session data is missing." },
-      { status: 401 }
-    );
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
 
-  // --- Parse Parameters ---
-  const filterStatus = searchParams.get("filterStatus") as
-    | "affected"
-    | "unaffected"
-    | "inProcess"
-    | null;
-  const contextJournalIdsParam = searchParams.get("contextJournalIds");
-  const restrictedJournalId = searchParams.get("restrictedJournalId");
+  // --- Parse All Potential Parameters ---
+  const limitParam = searchParams.get("limit");
+  const offsetParam = searchParams.get("offset");
+  const take = limitParam ? parseInt(limitParam, 10) : undefined;
+  const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
 
+  // J-P-G flow params
   const forJournalIdsParam = searchParams.get("forJournalIds");
   const forPartnerIdStr = searchParams.get("forPartnerId");
   const includeJournalChildrenParam = searchParams.get(
     "includeJournalChildren"
   );
 
+  // J-G flow params
+  const filterStatusesParam = searchParams.get("filterStatuses");
+  const contextJournalIdsParam = searchParams.get("contextJournalIds");
+  const restrictedJournalId = searchParams.get("restrictedJournalId");
   const typeCode = searchParams.get("typeCode") || undefined;
-  const limitParam = searchParams.get("limit");
-  const offsetParam = searchParams.get("offset");
-  const take = limitParam ? parseInt(limitParam, 10) : undefined;
-  const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
-
-  // --- Build Service Call Options ---
-  const serviceCallOptions: GetAllGoodsOptions = {
-    companyId: user.companyId,
-    currentUserId: user.id, // Pass for the new filter logic
-    take,
-    skip,
-    typeCode,
-  };
 
   try {
-    // Priority 1: J-P-G (3-way linking) - This is a highly specific query that bypasses the standard filters.
+    const serviceCallOptions: GetAllGoodsOptions = {
+      companyId: user.companyId,
+      currentUserId: user.id,
+      take,
+      skip,
+      typeCode,
+    };
+
+    // Priority 1: J-P-G (3-way linking) - Highly specific override
     if (forJournalIdsParam && forPartnerIdStr) {
-      console.log(
-        `API /goods: J-P-G flow. Journals: '${forJournalIdsParam}', Partner: '${forPartnerIdStr}'.`
-      );
-      // This flow is so specific, we can still use the dedicated service for it as it's an override.
+      // ... (this logic remains the same, it's already correct)
       const journalIds = forJournalIdsParam
         .split(",")
         .map((id) => id.trim())
@@ -84,7 +74,7 @@ export async function GET(request: NextRequest) {
       const partnerId = parseBigIntParam(forPartnerIdStr, "forPartnerId");
       if (journalIds.length === 0 || partnerId === null) {
         return NextResponse.json(
-          { message: "Invalid parameters for J-P-G flow." },
+          { message: "Invalid params for J-P-G flow." },
           { status: 400 }
         );
       }
@@ -103,11 +93,17 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Priority 2: Standard Journal-as-Root filtering (our main feature)
-    if (filterStatus) {
-      serviceCallOptions.filterStatus = filterStatus;
+    // --- REFACTORED: Priority 2: Standard Journal-as-Root filtering flow ---
+    const filterStatuses = filterStatusesParam
+      ? (filterStatusesParam
+          .split(",")
+          .filter(Boolean) as PartnerGoodFilterStatus[])
+      : [];
+
+    if (filterStatuses.length > 0) {
+      serviceCallOptions.filterStatuses = filterStatuses;
       serviceCallOptions.restrictedJournalId = restrictedJournalId || null;
-      if (filterStatus === "affected") {
+      if (filterStatuses.includes("affected")) {
         serviceCallOptions.contextJournalIds =
           contextJournalIdsParam
             ?.split(",")
@@ -115,8 +111,7 @@ export async function GET(request: NextRequest) {
             .filter(Boolean) || [];
       }
     }
-
-    // Now, just call the refactored service. It handles all the logic.
+    // Now call the service. It handles all cases, including no filters.
     const goodsResult = await goodsService.getAllGoods(serviceCallOptions);
 
     const responsePayload = {
@@ -129,7 +124,7 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    // ... Error handling remains the same ...
+    // ... (error handling remains the same)
     const e = error as Error;
     console.error("API /goods GET Error:", e.message, e.stack);
     return NextResponse.json(

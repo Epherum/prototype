@@ -5,19 +5,15 @@ import type {
   PaginatedGoodsResponse,
   UpdateGoodClientData,
   FetchGoodsParams,
+  ActivePartnerFilters, // Import the array type
 } from "@/lib/types";
 
-/**
- * === REFACTORED fetchGoods FUNCTION ===
- * This function constructs the API request URL for fetching goods based on various
- * UI contexts and filter states, now including role-based parameters.
- */
 export async function fetchGoods(
   params: FetchGoodsParams = {}
 ): Promise<PaginatedGoodsResponse> {
   const queryParams = new URLSearchParams();
 
-  // Append standard pagination and type parameters
+  // Standard params
   if (params.limit !== undefined)
     queryParams.append("limit", String(params.limit));
   if (params.offset !== undefined)
@@ -26,7 +22,7 @@ export async function fetchGoods(
 
   // --- Logic for different filtering scenarios ---
 
-  // Priority 1: 3-way JPGL linking (e.g., J-P-G, P-J-G)
+  // Priority 1: J-P-G linking
   if (
     params.forPartnerId &&
     params.forJournalIds &&
@@ -41,13 +37,11 @@ export async function fetchGoods(
       );
     }
   }
-  // Priority 2: Journal-as-Root filtering (our main feature)
-  else if (params.filterStatus) {
-    queryParams.append("filterStatus", params.filterStatus);
-
-    // Append contextJournalIds if needed for 'affected'
+  // --- REFACTORED: Priority 2: Journal-as-Root filtering ---
+  else if (params.filterStatuses && params.filterStatuses.length > 0) {
+    queryParams.append("filterStatuses", params.filterStatuses.join(",")); // Send the array
     if (
-      params.filterStatus === "affected" &&
+      params.filterStatuses.includes("affected") &&
       params.contextJournalIds &&
       params.contextJournalIds.length > 0
     ) {
@@ -56,14 +50,11 @@ export async function fetchGoods(
         params.contextJournalIds.join(",")
       );
     }
-
-    // Always append restrictedJournalId when filterStatus is used.
-    // The backend service will use it for role-based logic.
     if (params.restrictedJournalId) {
       queryParams.append("restrictedJournalId", params.restrictedJournalId);
     }
   }
-  // Priority 3: Fallback for other linking scenarios (e.g., G-J when not using filterStatus)
+  // Priority 3: Other linking scenarios
   else if (params.linkedToJournalIds && params.linkedToJournalIds.length > 0) {
     queryParams.append(
       "linkedToJournalIds",
@@ -77,25 +68,14 @@ export async function fetchGoods(
     }
   }
 
-  // If none of the above, it's a general fetch (e.g., Goods slider is 1st),
-  // and the URL will only contain pagination/typeCode parameters.
-
-  console.log(
-    `[fetchGoods] Fetching from URL: /api/goods?${queryParams.toString()}`
-  );
   const response = await fetch(`/api/goods?${queryParams.toString()}`);
-
   if (!response.ok) {
     const errorData = await response
       .json()
-      .catch(() => ({ message: "Unknown error fetching goods" }));
-    throw new Error(
-      errorData.message || `Failed to fetch goods: ${response.statusText}`
-    );
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(errorData.message || `Failed to fetch goods`);
   }
-
   const result: PaginatedGoodsResponse = await response.json();
-  // Ensure IDs are strings and optional fields are handled for frontend consistency
   result.data = result.data.map((good) => ({
     ...good,
     id: String(good.id),
@@ -104,9 +84,7 @@ export async function fetchGoods(
   }));
   return result;
 }
-
 // --- CRUD Operations (createGood, updateGood, deleteGood, fetchGoodById) ---
-// These remain largely the same as you provided.
 export async function createGood(
   goodData: CreateGoodClientData
 ): Promise<Good> {

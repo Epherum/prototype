@@ -10,6 +10,8 @@ import {
 
 export type PartnerTypeClient = "LEGAL_ENTITY" | "NATURAL_PERSON";
 
+export type PartnerGoodFilterStatus = "affected" | "unaffected" | "inProcess";
+
 export type RoleWithPermissions = Role & {
   permissions: (RolePermission & {
     permission: Permission;
@@ -40,10 +42,8 @@ export type Partner = {
   } | null;
 };
 
-export type PartnerFilterStatus = "affected" | "unaffected" | "inProcess";
-
 // The state will now be an array of these statuses
-export type ActivePartnerFilters = PartnerFilterStatus[];
+export type ActivePartnerFilters = PartnerGoodFilterStatus[];
 
 export interface FetchPartnersParams {
   limit?: number;
@@ -130,7 +130,9 @@ export interface FetchGoodsParams {
   typeCode?: string;
 
   // For J-G flow (Journal is 1st, Goods is 2nd) with filter buttons
-  filterStatus?: "affected" | "unaffected" | "inProcess" | "all" | null;
+  filterStatus?: ActivePartnerFilters;
+  filterStatuses?: string[];
+
   contextJournalIds?: string[]; // Used for 'affected'
   restrictedJournalId?: string | null; // Used for role-based 'unaffected' and 'inProcess'
 

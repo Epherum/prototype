@@ -10,7 +10,7 @@ import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
 import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
-import { PartnerFilterStatus } from "@/lib/types";
+import { PartnerGoodFilterStatus } from "@/lib/types";
 
 const partnerService = partnerServiceImport;
 
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       const filterStatuses = filterStatusesParam
         ? (filterStatusesParam
             .split(",")
-            .filter(Boolean) as PartnerFilterStatus[])
+            .filter(Boolean) as PartnerGoodFilterStatus[])
         : [];
 
       serviceCallOptions.filterStatuses = filterStatuses;

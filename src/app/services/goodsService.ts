@@ -1,12 +1,11 @@
-// File: src/app/services/goodsService.ts
-import prisma from "@/app/utils/prisma"; // Storeroom Manager
-import { GoodsAndService, Prisma, EntityState } from "@prisma/client"; // Added Prisma
-import { journalService } from "./journalService"; // Import for descendant logic
-import { ROOT_JOURNAL_ID } from "@/lib/constants"; // Import for root check
+// src/app/services/goodsService.ts
+import prisma from "@/app/utils/prisma";
+import { GoodsAndService, Prisma, EntityState } from "@prisma/client";
+import { journalService } from "./journalService";
+import { ROOT_JOURNAL_ID } from "@/lib/constants";
+import { PartnerGoodFilterStatus } from "@/lib/types"; // Use the same filter type
 
-// --- Types for "Order Slips" (Data Transfer Objects) for Goods & Services ---
-
-// --- NEW: Define the options interface for getAllGoods ---
+// --- Define the options interface for getAllGoods ---
 export interface GetAllGoodsOptions {
   companyId: string;
   where?: Prisma.GoodsAndServiceWhereInput;
@@ -14,17 +13,17 @@ export interface GetAllGoodsOptions {
   skip?: number;
   typeCode?: string;
 
-  // Unified filter status from the UI
-  filterStatus?: "affected" | "unaffected" | "inProcess";
+  // --- NEW: Multi-select filtering ---
+  filterStatuses?: PartnerGoodFilterStatus[]; // Use an array
   contextJournalIds?: string[]; // For 'affected'
-  currentUserId?: string; // CRITICAL for 'inProcess' and 'unaffected'
+  currentUserId?: string; // For 'inProcess' and 'unaffected'
   restrictedJournalId?: string | null; // For role-based logic
 }
 
-// Update the "Order Slip" to include required linking IDs
 export type CreateGoodsData = {
-  companyId: string; // Required for linking to a company
-  createdById: string; // Required for audit trail
+  // ... (type remains the same)
+  companyId: string;
+  createdById: string;
   label: string;
   referenceCode?: string | null;
   barcode?: string | null;
@@ -37,9 +36,7 @@ export type CreateGoodsData = {
   photoUrl?: string | null;
   additionalDetails?: any;
 };
-// --- End of Changes ---
 
-// For updates, most fields are optional. We might not allow changing referenceCode easily.
 export type UpdateGoodsData = Partial<
   Omit<CreateGoodsData, "referenceCode" | "barcode">
 >;
@@ -124,13 +121,13 @@ const goodsService = {
     options: GetAllGoodsOptions
   ): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
     console.log(
-      "Chef (GoodsService): Fetching items from catalog with DETAILED RULES:",
+      "Chef (GoodsService): Fetching items with MULTI-SELECT RULES:",
       options
     );
 
     const {
       companyId,
-      filterStatus,
+      filterStatuses = [], // Default to empty array
       contextJournalIds = [],
       currentUserId,
       restrictedJournalId,
@@ -139,12 +136,9 @@ const goodsService = {
       ...restOfOptions
     } = options;
 
-    if (
-      (filterStatus === "unaffected" || filterStatus === "inProcess") &&
-      !currentUserId
-    ) {
+    if (filterStatuses.length > 0 && !currentUserId) {
       console.warn(
-        `Chef (GoodsService): '${filterStatus}' filter requires a currentUserId, but none was provided. Returning empty.`
+        `Chef (GoodsService): Filters require a currentUserId, but none was provided. Returning empty.`
       );
       return { goods: [], totalCount: 0 };
     }
@@ -159,97 +153,94 @@ const goodsService = {
     const isRootUser =
       !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
 
-    switch (filterStatus) {
-      case "affected":
-        console.log("Chef (GoodsService): Applying 'affected' filter.");
-        if (contextJournalIds.length === 0) {
-          return { goods: [], totalCount: 0 };
-        }
-        prismaWhere.journalGoodLinks = {
-          some: { journalId: { in: contextJournalIds } },
-        };
-        break;
+    // --- NEW: Multi-filter logic ---
+    if (filterStatuses.length > 0) {
+      const orConditions: Prisma.GoodsAndServiceWhereInput[] = [];
+      const descendantIds =
+        !isRootUser && filterStatuses.includes("unaffected")
+          ? await journalService.getDescendantJournalIds(
+              restrictedJournalId!,
+              companyId
+            )
+          : [];
 
-      case "unaffected":
-        if (isRootUser) {
-          // --- ROOT USER: UNAFFECTED ---
-          console.log(
-            "Chef (GoodsService): Applying 'unaffected' filter for ROOT user."
-          );
-          prismaWhere.AND = [
-            { journalGoodLinks: { none: {} } }, // Not linked to ANY journal
-            { createdById: { not: currentUserId } }, // AND not created by me
-          ];
-        } else {
-          // --- RESTRICTED USER: UNAFFECTED ---
-          console.log(
-            `Chef (GoodsService): Applying 'unaffected' filter for RESTRICTED user. Root: ${restrictedJournalId}`
-          );
-          const descendantIds = await journalService.getDescendantJournalIds(
-            restrictedJournalId!,
-            companyId
-          );
-          prismaWhere.AND = [
-            {
-              journalGoodLinks: {
-                some: { journalId: restrictedJournalId!, companyId: companyId },
-              },
-            },
-            ...(descendantIds.length > 0
-              ? [
+      for (const status of filterStatuses) {
+        switch (status) {
+          case "affected":
+            if (contextJournalIds.length > 0) {
+              orConditions.push({
+                journalGoodLinks: {
+                  some: { journalId: { in: contextJournalIds } },
+                },
+              });
+            }
+            break;
+
+          case "unaffected":
+            if (isRootUser) {
+              orConditions.push({
+                AND: [
+                  { journalGoodLinks: { none: {} } },
+                  { createdById: { not: currentUserId } },
+                ],
+              });
+            } else {
+              orConditions.push({
+                AND: [
                   {
-                    NOT: {
-                      journalGoodLinks: {
-                        some: {
-                          journalId: { in: descendantIds },
-                          companyId: companyId,
-                        },
-                      },
+                    journalGoodLinks: {
+                      some: { journalId: restrictedJournalId! },
                     },
                   },
-                ]
-              : []),
-          ];
-        }
-        break;
+                  ...(descendantIds.length > 0
+                    ? [
+                        {
+                          NOT: {
+                            journalGoodLinks: {
+                              some: { journalId: { in: descendantIds } },
+                            },
+                          },
+                        },
+                      ]
+                    : []),
+                ],
+              });
+            }
+            break;
 
-      case "inProcess":
-        if (isRootUser) {
-          // --- ROOT USER: IN PROCESS ---
-          console.log(
-            "Chef (GoodsService): Applying 'inProcess' filter for ROOT user."
-          );
-          prismaWhere.AND = [
-            { journalGoodLinks: { none: {} } }, // Not linked to ANY journal
-            { createdById: currentUserId }, // AND created by me
-          ];
-        } else {
-          // --- RESTRICTED USER: IN PROCESS ---
-          console.log(
-            `Chef (GoodsService): Applying 'inProcess' filter for RESTRICTED user. Root: ${restrictedJournalId}`
-          );
-          prismaWhere.AND = [
-            // NOT linked to my parent/restricted journal
-            {
-              journalGoodLinks: {
-                none: { journalId: restrictedJournalId!, companyId: companyId },
-              },
-            },
-            // AND created by me
-            { createdById: currentUserId },
-          ];
+          case "inProcess":
+            if (isRootUser) {
+              orConditions.push({
+                AND: [
+                  { journalGoodLinks: { none: {} } },
+                  { createdById: currentUserId },
+                ],
+              });
+            } else {
+              orConditions.push({
+                AND: [
+                  {
+                    journalGoodLinks: {
+                      none: { journalId: restrictedJournalId! },
+                    },
+                  },
+                  { createdById: currentUserId },
+                ],
+              });
+            }
+            break;
         }
-        break;
+      }
 
-      default:
-        console.log(
-          "Chef (GoodsService): No filterStatus. Fetching all active goods."
-        );
-        break;
+      if (orConditions.length > 0) {
+        prismaWhere.OR = orConditions;
+      } else {
+        return { goods: [], totalCount: 0 };
+      }
     }
 
     console.log(
-      "Chef (GoodsService): Final prismaWhere clause for goods:",
+      "Chef (GoodsService): Final prismaWhere clause:",
       JSON.stringify(prismaWhere, null, 2)
     );
 
@@ -264,9 +255,6 @@ const goodsService = {
       include: { taxCode: true, unitOfMeasure: true },
     });
 
-    console.log(
-      `Chef (GoodsService): Fetched ${goods.length} items. Total matching query: ${totalCount}.`
-    );
     return { goods, totalCount };
   },
 

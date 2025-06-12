@@ -10,7 +10,7 @@ import {
 import { z } from "zod";
 import { journalService } from "./journalService";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
-import { PartnerFilterStatus } from "@/lib/types";
+import { PartnerGoodFilterStatus } from "@/lib/types";
 
 export const createPartnerSchema = z.object({
   name: z.string().min(1, "Partner name is required").max(255),
@@ -39,7 +39,7 @@ export interface GetAllPartnersOptions {
   take?: number;
   skip?: number;
   partnerType?: PartnerType;
-  filterStatuses?: PartnerFilterStatus[]; // Changed from filterStatus to filterStatuses (array)
+  filterStatuses?: PartnerGoodFilterStatus[]; // Changed from filterStatus to filterStatuses (array)
 
   // Unified filter status
   filterStatus?: "affected" | "unaffected" | "inProcess";

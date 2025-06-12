@@ -12,7 +12,7 @@ import type { CreateJournalData as ServerCreateJournalData } from "@/app/service
 import type {
   AccountNodeData,
   ActivePartnerFilters,
-  PartnerFilterStatus,
+  PartnerGoodFilterStatus,
 } from "@/lib/types";
 
 // ... (Interfaces, props, and most of the hook are unchanged) ...
@@ -89,7 +89,9 @@ export interface UseJournalManagerReturn {
   resetJournalSelections: (options?: { keepRootFilter?: boolean }) => void;
   setSelectedFlatJournalId: (id: string | null) => void;
   activeJournalRootFilters: ActivePartnerFilters;
-  handleToggleJournalRootFilter: (filterToToggle: PartnerFilterStatus) => void;
+  handleToggleJournalRootFilter: (
+    filterToToggle: PartnerGoodFilterStatus
+  ) => void;
 }
 
 const MAX_L2_SELECTIONS = 10;
@@ -392,7 +394,7 @@ export const useJournalManager = ({
     [restrictedJournalId]
   );
   const handleToggleJournalRootFilter = useCallback(
-    (filterToToggle: PartnerFilterStatus) => {
+    (filterToToggle: PartnerGoodFilterStatus) => {
       setActiveJournalRootFilters((prevFilters) => {
         const isAlreadyActive = prevFilters.includes(filterToToggle);
         if (isAlreadyActive) {
