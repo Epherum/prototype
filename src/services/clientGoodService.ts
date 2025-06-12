@@ -4,45 +4,29 @@ import type {
   Good,
   PaginatedGoodsResponse,
   UpdateGoodClientData,
+  FetchGoodsParams,
 } from "@/lib/types";
 
-// Ensure this interface matches the parameters `goodsQueryKeyParamsStructure` in page.tsx produces
-interface FetchGoodsParams {
-  limit?: number;
-  offset?: number;
-  typeCode?: string; // For filtering by good type if applicable
-
-  // For J-G flow (Journal is 1st, Goods is 2nd) with filter buttons
-  filterStatus?: "affected" | "unaffected" | "all" | null;
-  contextJournalIds?: string[]; // Journal IDs from Journal slider (used with filterStatus or as default for J->G)
-
-  // For J-P-G or P-J-G flows (Goods is 3rd, filtered by JPGL)
-  forJournalIds?: string[]; // Journal IDs (from hierarchy or flat list selection)
-  forPartnerId?: string; // Partner ID (from Partner slider selection)
-
-  // For J-G (2-way link, if not using filterStatus, or G-J)
-  linkedToJournalIds?: string[]; // General journal linking if no partner context
-
-  // For P-G (2-way link, if no journal context)
-  linkedToPartnerId?: string; // General partner linking if no journal context
-
-  // Common parameter for hierarchical journal selections
-  includeJournalChildren?: boolean;
-}
-
+/**
+ * === REFACTORED fetchGoods FUNCTION ===
+ * This function constructs the API request URL for fetching goods based on various
+ * UI contexts and filter states, now including role-based parameters.
+ */
 export async function fetchGoods(
   params: FetchGoodsParams = {}
 ): Promise<PaginatedGoodsResponse> {
   const queryParams = new URLSearchParams();
 
+  // Append standard pagination and type parameters
   if (params.limit !== undefined)
     queryParams.append("limit", String(params.limit));
   if (params.offset !== undefined)
     queryParams.append("offset", String(params.offset));
   if (params.typeCode) queryParams.append("typeCode", params.typeCode);
 
-  // Priority 1: 3-way JPGL style linking (e.g., J-P-G, P-J-G)
-  // These parameters are sent from page.tsx's goodsQueryKeyParamsStructure for these specific flows.
+  // --- Logic for different filtering scenarios ---
+
+  // Priority 1: 3-way JPGL linking (e.g., J-P-G, P-J-G)
   if (
     params.forPartnerId &&
     params.forJournalIds &&
@@ -56,13 +40,14 @@ export async function fetchGoods(
         String(params.includeJournalChildren)
       );
     }
-    // Backend /api/goods should prioritize these for fetching goods via JournalPartnerGoodLink
   }
-  // Priority 2: filterStatus for J-G flow (Journal is 1st, Goods is 2nd)
+  // Priority 2: Journal-as-Root filtering (our main feature)
   else if (params.filterStatus) {
     queryParams.append("filterStatus", params.filterStatus);
+
+    // Append contextJournalIds if needed for 'affected'
     if (
-      (params.filterStatus === "affected" || !params.filterStatus) && // Also handles null filterStatus as 'affected'
+      params.filterStatus === "affected" &&
       params.contextJournalIds &&
       params.contextJournalIds.length > 0
     ) {
@@ -71,35 +56,15 @@ export async function fetchGoods(
         params.contextJournalIds.join(",")
       );
     }
-    // `includeJournalChildren` might be relevant here if contextJournalIds implies hierarchy.
-    // Backend needs to know if includeJournalChildren applies to contextJournalIds for filterStatus.
-    if (
-      params.includeJournalChildren !== undefined &&
-      params.contextJournalIds &&
-      params.contextJournalIds.length > 0
-    ) {
-      queryParams.append(
-        "includeJournalChildren",
-        String(params.includeJournalChildren)
-      );
+
+    // Always append restrictedJournalId when filterStatus is used.
+    // The backend service will use it for role-based logic.
+    if (params.restrictedJournalId) {
+      queryParams.append("restrictedJournalId", params.restrictedJournalId);
     }
   }
-  // Priority 3: Default J->G linking (no explicit filterStatus, but contextJournalIds present)
-  // Or general 2-way linking for G-J (linkedToJournalIds) or P-G (linkedToPartnerId).
-  else if (params.contextJournalIds && params.contextJournalIds.length > 0) {
-    // Handles J is 1st, G is 2nd, no filterStatus button clicked, but journals are selected.
-    queryParams.append("contextJournalIds", params.contextJournalIds.join(","));
-    if (params.includeJournalChildren !== undefined) {
-      queryParams.append(
-        "includeJournalChildren",
-        String(params.includeJournalChildren)
-      );
-    }
-  } else if (
-    params.linkedToJournalIds &&
-    params.linkedToJournalIds.length > 0
-  ) {
-    // Fallback for G-J or simple J-G (2-way JournalGoodLink)
+  // Priority 3: Fallback for other linking scenarios (e.g., G-J when not using filterStatus)
+  else if (params.linkedToJournalIds && params.linkedToJournalIds.length > 0) {
     queryParams.append(
       "linkedToJournalIds",
       params.linkedToJournalIds.join(",")
@@ -110,15 +75,10 @@ export async function fetchGoods(
         String(params.includeJournalChildren)
       );
     }
-  } else if (params.linkedToPartnerId) {
-    // Fallback for P-G (2-way PartnerGoodLink - if you have such a direct link)
-    // Or, if your backend interprets linkedToPartnerId without journal context
-    // as "all goods linked to this partner via JPGL".
-    // The existing `fetchGoodsLinkedToPartnerViaJPGL` might be more specific for this.
-    // If this `linkedToPartnerId` is meant for a different 2-way link, ensure backend distinguishes.
-    queryParams.append("linkedToPartnerId", params.linkedToPartnerId);
   }
-  // If none of the above, it's a general fetch (e.g., Goods slider is 1st)
+
+  // If none of the above, it's a general fetch (e.g., Goods slider is 1st),
+  // and the URL will only contain pagination/typeCode parameters.
 
   console.log(
     `[fetchGoods] Fetching from URL: /api/goods?${queryParams.toString()}`
@@ -135,6 +95,7 @@ export async function fetchGoods(
   }
 
   const result: PaginatedGoodsResponse = await response.json();
+  // Ensure IDs are strings and optional fields are handled for frontend consistency
   result.data = result.data.map((good) => ({
     ...good,
     id: String(good.id),

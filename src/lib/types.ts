@@ -1,11 +1,11 @@
 // src/lib/types.ts
+
 import {
-  PartnerType as PrismaPartnerType,
   ApprovalStatus,
   EntityState,
+  Permission,
   Role,
   RolePermission,
-  Permission,
 } from "@prisma/client";
 
 export type PartnerTypeClient = "LEGAL_ENTITY" | "NATURAL_PERSON";
@@ -15,6 +15,7 @@ export type RoleWithPermissions = Role & {
     permission: Permission;
   })[];
 };
+
 export type Partner = {
   id: string;
   name: string;
@@ -39,10 +40,6 @@ export type Partner = {
   } | null;
 };
 
-/**
- * @description Defines the possible filter states for the partner list when Journal is the primary slider.
- * This is the single source of truth for the filter buttons.
- */
 export type PartnerFilterStatus =
   | "all"
   | "affected"
@@ -50,34 +47,29 @@ export type PartnerFilterStatus =
   | "inProcess"
   | null;
 
-/**
- * @description Client-side parameters for fetching partners.
- * This has been simplified to align with the refactored API route and backend service.
- */
 export interface FetchPartnersParams {
   limit?: number;
   offset?: number;
   partnerType?: PartnerTypeClient;
-
-  // --- Primary filter mechanism for Journal-as-Root view ---
   filterStatus?: PartnerFilterStatus;
-  contextJournalIds?: string[]; // Used for 'affected' and 'all' filter statuses
-
-  // --- Parameters for other linking scenarios (e.g., J-G-P, G-J-P) ---
+  contextJournalIds?: string[];
+  restrictedJournalId?: string | null;
   linkedToJournalIds?: string[];
   linkedToGoodId?: string;
-  includeChildren?: boolean; // Maintained for legacy/specific flows if needed
+  includeChildren?: boolean;
 }
 
-// (Make sure to include all other existing types from your original file here)
 export type PaginatedPartnersResponse = { data: Partner[]; total: number };
+
 export interface AccountNodeData {
   id: string;
   name: string;
   code: string;
   children?: AccountNodeData[];
   isConceptualRoot?: boolean;
+  isTerminal?: boolean;
 }
+
 export interface Journal {
   id: string;
   name: string;
@@ -85,6 +77,7 @@ export interface Journal {
   isTerminal?: boolean;
   additionalDetails?: any;
 }
+
 export interface JournalPartnerLinkWithDetails {
   id: string;
   partnerId: string;
@@ -98,6 +91,7 @@ export interface JournalPartnerLinkWithDetails {
   dateFin?: string | null;
   documentReference?: string | null;
 }
+
 export interface Good {
   id: string;
   label: string;
@@ -124,7 +118,34 @@ export interface Good {
   code?: string;
   unit_code?: string;
 }
+
 export type PaginatedGoodsResponse = { data: Good[]; total: number };
+
+/**
+ * === UPDATED INTERFACE FOR GOODS ===
+ * This now mirrors FetchPartnersParams for consistent filtering logic.
+ */
+export interface FetchGoodsParams {
+  limit?: number;
+  offset?: number;
+  typeCode?: string;
+
+  // For J-G flow (Journal is 1st, Goods is 2nd) with filter buttons
+  filterStatus?: "affected" | "unaffected" | "inProcess" | "all" | null;
+  contextJournalIds?: string[]; // Used for 'affected'
+  restrictedJournalId?: string | null; // Used for role-based 'unaffected' and 'inProcess'
+
+  // For J-P-G or P-J-G flows (Goods is 3rd, filtered by JPGL)
+  forJournalIds?: string[];
+  forPartnerId?: string;
+
+  // For G-J or simple J-G when not using filterStatus
+  linkedToJournalIds?: string[];
+
+  // Common parameter for hierarchical journal selections
+  includeJournalChildren?: boolean;
+}
+
 export type CreatePartnerClientData = {
   name: string;
   partnerType: PartnerTypeClient;
@@ -138,9 +159,11 @@ export type CreatePartnerClientData = {
   bioMotherName?: string | null;
   additionalDetails?: any;
 };
+
 export type UpdatePartnerClientData = Partial<
   Omit<CreatePartnerClientData, "partnerType">
 >;
+
 export type CreateGoodClientData = {
   label: string;
   referenceCode?: string | null;
@@ -155,9 +178,11 @@ export type CreateGoodClientData = {
   additionalDetails?: any;
   price?: number;
 };
+
 export type UpdateGoodClientData = Partial<
   Omit<CreateGoodClientData, "referenceCode" | "barcode">
 >;
+
 export type CreateJournalPartnerLinkClientData = {
   journalId: string;
   partnerId: string;
@@ -168,6 +193,7 @@ export type CreateJournalPartnerLinkClientData = {
   dateFin?: string | null;
   documentReference?: string | null;
 };
+
 export interface JournalPartnerLinkClient {
   id: string;
   journalId: string;
@@ -183,10 +209,12 @@ export interface JournalPartnerLinkClient {
   createdAt?: string;
   updatedAt?: string;
 }
+
 export interface CreateJournalGoodLinkClientData {
   journalId: string;
   goodId: string;
 }
+
 export interface JournalGoodLinkClient {
   id: string;
   journalId: string;
@@ -194,6 +222,7 @@ export interface JournalGoodLinkClient {
   createdAt?: string;
   updatedAt?: string;
 }
+
 export interface JournalGoodLinkWithDetails {
   id: string;
   goodId: string;
@@ -202,6 +231,7 @@ export interface JournalGoodLinkWithDetails {
   journalCode?: string;
   createdAt?: string | null;
 }
+
 export interface CreateJournalPartnerGoodLinkClientData {
   journalId: string;
   partnerId: string;
@@ -210,6 +240,7 @@ export interface CreateJournalPartnerGoodLinkClientData {
   descriptiveText?: string | null;
   contextualTaxCodeId?: number | null;
 }
+
 export interface JournalPartnerGoodLinkClient {
   id: string;
   journalPartnerLinkId: string;
@@ -227,18 +258,7 @@ export interface JournalPartnerGoodLinkClient {
     description?: string | null;
   } | null;
 }
-export interface FetchGoodsParams {
-  limit?: number;
-  offset?: number;
-  typeCode?: string;
-  filterStatus?: "affected" | "unaffected" | "all" | null;
-  contextJournalIds?: string[];
-  linkedToJournalIds?: string[];
-  linkedToPartnerId?: string;
-  forJournalIds?: string[];
-  forPartnerId?: string;
-  includeJournalChildren?: boolean;
-}
+
 export interface RoleData {
   name: string;
   permissions: Array<{ action: string; resource: string }>;

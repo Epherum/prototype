@@ -188,119 +188,28 @@ async function main() {
   });
   console.log(`Created Company: ${company1.name}`);
 
-  // --- 2. Create Permissions & Roles ---
+  // --- 2. Create Permissions & Roles (without user assignment yet) ---
   const permissionsData = [
-    // User & Role Management
-    {
-      action: "MANAGE",
-      resource: "USERS",
-      description: "Create, edit, and assign roles to users.",
-    },
-    {
-      action: "MANAGE",
-      resource: "ROLES",
-      description: "Create, edit, and define roles and their permissions.",
-    },
-
-    // Partner Management
-    {
-      action: "CREATE",
-      resource: "PARTNER",
-      description: "Create new partners.",
-    },
-    {
-      action: "READ",
-      resource: "PARTNER",
-      description: "View partner details.",
-    },
-    {
-      action: "UPDATE",
-      resource: "PARTNER",
-      description: "Edit existing partners.",
-    },
-    {
-      action: "DELETE",
-      resource: "PARTNER",
-      description: "Soft-delete partners.",
-    },
-    {
-      action: "APPROVE",
-      resource: "PARTNER",
-      description: "Approve or reject pending partners.",
-    },
-    {
-      action: "READ_HISTORY",
-      resource: "PARTNER",
-      description: "View the version history of a partner.",
-    },
-
-    // Goods & Services Management
-    {
-      action: "CREATE",
-      resource: "GOODS_AND_SERVICE",
-      description: "Create new goods/services.",
-    },
-    {
-      action: "READ",
-      resource: "GOODS_AND_SERVICE",
-      description: "View goods/services.",
-    },
-    {
-      action: "UPDATE",
-      resource: "GOODS_AND_SERVICE",
-      description: "Edit existing goods/services.",
-    },
-    {
-      action: "DELETE",
-      resource: "GOODS_AND_SERVICE",
-      description: "Soft-delete goods/services.",
-    },
-    {
-      action: "APPROVE",
-      resource: "GOODS_AND_SERVICE",
-      description: "Approve or reject pending goods/services.",
-    },
-    {
-      action: "READ_HISTORY",
-      resource: "GOODS_AND_SERVICE",
-      description: "View the version history of a good/service.",
-    },
-
-    // Journal (Chart of Accounts) Management
-    {
-      action: "READ",
-      resource: "JOURNAL",
-      description: "View the chart of accounts.",
-    },
-    {
-      action: "MANAGE",
-      resource: "JOURNAL",
-      description: "Create and edit the chart of accounts.",
-    },
-
-    // Entity Linking Management
-    {
-      action: "LINK",
-      resource: "PARTNER_JOURNAL",
-      description: "Can link partners to journals.",
-    },
-    {
-      action: "LINK",
-      resource: "GOOD_JOURNAL",
-      description: "Can link goods to journals.",
-    },
-    {
-      action: "LINK",
-      resource: "GOOD_PARTNER_JOURNAL",
-      description: "Can create the tri-partite link.",
-    },
-
-    // Document / Transaction Management
-    {
-      action: "CREATE",
-      resource: "DOCUMENT",
-      description: "Can create transactional documents.",
-    },
+    { action: "MANAGE", resource: "USERS" },
+    { action: "MANAGE", resource: "ROLES" },
+    { action: "CREATE", resource: "PARTNER" },
+    { action: "READ", resource: "PARTNER" },
+    { action: "UPDATE", resource: "PARTNER" },
+    { action: "DELETE", resource: "PARTNER" },
+    { action: "APPROVE", resource: "PARTNER" },
+    { action: "READ_HISTORY", resource: "PARTNER" },
+    { action: "CREATE", resource: "GOODS_AND_SERVICE" },
+    { action: "READ", resource: "GOODS_AND_SERVICE" },
+    { action: "UPDATE", resource: "GOODS_AND_SERVICE" },
+    { action: "DELETE", resource: "GOODS_AND_SERVICE" },
+    { action: "APPROVE", resource: "GOODS_AND_SERVICE" },
+    { action: "READ_HISTORY", resource: "GOODS_AND_SERVICE" },
+    { action: "READ", resource: "JOURNAL" },
+    { action: "MANAGE", resource: "JOURNAL" },
+    { action: "LINK", resource: "PARTNER_JOURNAL" },
+    { action: "LINK", resource: "GOOD_JOURNAL" },
+    { action: "LINK", resource: "GOOD_PARTNER_JOURNAL" },
+    { action: "CREATE", resource: "DOCUMENT" },
   ];
   await prisma.permission.createMany({
     data: permissionsData,
@@ -312,9 +221,10 @@ async function main() {
     {} as Record<string, string>
   );
 
-  const adminRoleC1 = await prisma.role.create({
+  const adminRole = await prisma.role.create({
     data: {
       name: "Company Admin",
+      description: "Full access to all company data and settings.",
       companyId: company1.id,
       permissions: {
         create: Object.values(permMap).map((permissionId) => ({
@@ -324,30 +234,53 @@ async function main() {
     },
   });
 
-  // --- 3. Create Users ---
-  const adminUserC1 = await prisma.user.create({
+  const salesManagerRole = await prisma.role.create({
     data: {
-      email: "admin@bakerydemo.com",
-      name: "Admin User",
-      passwordHash: await bcrypt.hash("admin123", 10),
+      name: "Sales Manager",
+      description:
+        "Manages customers, sales-related goods, and can create documents. View is restricted to Revenue journals.",
       companyId: company1.id,
-      userRoles: { create: { roleId: adminRoleC1.id } },
+      permissions: {
+        create: [
+          { permissionId: permMap["CREATE_PARTNER"] },
+          { permissionId: permMap["READ_PARTNER"] },
+          { permissionId: permMap["UPDATE_PARTNER"] },
+          { permissionId: permMap["CREATE_GOODS_AND_SERVICE"] },
+          { permissionId: permMap["READ_GOODS_AND_SERVICE"] },
+          { permissionId: permMap["UPDATE_GOODS_AND_SERVICE"] },
+          { permissionId: permMap["READ_JOURNAL"] },
+          { permissionId: permMap["LINK_PARTNER_JOURNAL"] },
+          { permissionId: permMap["LINK_GOOD_JOURNAL"] },
+          { permissionId: permMap["LINK_GOOD_PARTNER_JOURNAL"] },
+          { permissionId: permMap["CREATE_DOCUMENT"] },
+        ],
+      },
     },
   });
-  const accountantUserC1 = await prisma.user.create({
+
+  const procurementRole = await prisma.role.create({
     data: {
-      email: "accountant@bakerydemo.com",
-      name: "Accountant User",
-      passwordHash: await bcrypt.hash("accountant123", 10),
+      name: "Procurement Specialist",
+      description:
+        "Manages suppliers and ingredients. View is restricted to Expense journals.",
       companyId: company1.id,
-      userRoles: { create: { roleId: adminRoleC1.id } },
+      permissions: {
+        create: [
+          { permissionId: permMap["CREATE_PARTNER"] },
+          { permissionId: permMap["READ_PARTNER"] },
+          { permissionId: permMap["UPDATE_PARTNER"] },
+          { permissionId: permMap["APPROVE_PARTNER"] }, // Can approve new suppliers
+          { permissionId: permMap["READ_GOODS_AND_SERVICE"] },
+          { permissionId: permMap["READ_JOURNAL"] },
+          { permissionId: permMap["LINK_PARTNER_JOURNAL"] },
+        ],
+      },
     },
   });
-  console.log(`Created Users. Accountant ID: ${accountantUserC1.id}`);
+  console.log("Created Roles: Admin, Sales Manager, Procurement Specialist");
 
-  const creatorId = accountantUserC1.id; // Use accountant as the default creator for seeded data.
-
-  // --- 4. Create Journals ---
+  // --- 3. Create Journals (MOVED UP) ---
+  // This MUST be done before creating users that have journal restrictions.
   const journalsStructure: SeedJournalInput[] = [
     {
       id: "1",
@@ -359,7 +292,36 @@ async function main() {
           name: "Current Assets",
           isTerminal: false,
           children: [
+            { id: "1001", name: "Cash and Equivalents", isTerminal: true },
             { id: "1002", name: "Accounts Receivable", isTerminal: true },
+            { id: "1003", name: "Inventory", isTerminal: true },
+          ],
+        },
+        {
+          id: "11",
+          name: "Non-Current Assets",
+          isTerminal: false,
+          children: [
+            {
+              id: "1101",
+              name: "Property, Plant, & Equipment",
+              isTerminal: true,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "2",
+      name: "Liabilities",
+      isTerminal: false,
+      children: [
+        {
+          id: "20",
+          name: "Current Liabilities",
+          isTerminal: false,
+          children: [
+            { id: "2001", name: "Accounts Payable", isTerminal: true },
           ],
         },
       ],
@@ -371,11 +333,21 @@ async function main() {
       children: [
         {
           id: "40",
-          name: "Sales Revenue",
+          name: "Sales Revenue - Goods",
           isTerminal: false,
           children: [
             { id: "4001", name: "Cake Sales", isTerminal: true },
             { id: "4002", name: "Cookie Sales", isTerminal: true },
+            { id: "4003", name: "Pastry Sales", isTerminal: true },
+          ],
+        },
+        {
+          id: "41",
+          name: "Sales Revenue - Services",
+          isTerminal: false,
+          children: [
+            { id: "4101", name: "Catering Services", isTerminal: true },
+            { id: "4102", name: "Custom Orders", isTerminal: true },
           ],
         },
       ],
@@ -387,107 +359,260 @@ async function main() {
       children: [
         {
           id: "50",
-          name: "Ingredient Costs",
+          name: "Cost of Goods Sold (COGS)",
           isTerminal: false,
           children: [
-            { id: "5001", name: "Flour Costs", isTerminal: true },
-            { id: "5002", name: "Sugar Costs", isTerminal: true },
+            { id: "5001", name: "Flour & Grains", isTerminal: true },
+            { id: "5002", name: "Sweeteners", isTerminal: true },
+            { id: "5003", name: "Dairy & Eggs", isTerminal: true },
+            { id: "5004", name: "Packaging Materials", isTerminal: true },
+          ],
+        },
+        {
+          id: "51",
+          name: "Operating Expenses",
+          isTerminal: false,
+          children: [
+            { id: "5101", name: "Rent Expense", isTerminal: true },
+            { id: "5102", name: "Utilities Expense", isTerminal: true },
+            { id: "5103", name: "Marketing & Advertising", isTerminal: true },
           ],
         },
       ],
     },
   ];
   await createJournalsForCompany(company1.id, journalsStructure);
-  console.log("Journals seeded.");
+  console.log("Expanded Journals seeded.");
 
-  // --- 5. Create Standard, APPROVED Partners ---
-  console.log("\nCreating standard, APPROVED partners...");
+  // --- 4. Create Users ---
+  // Now that journals exist, these foreign key relations will be valid.
+  const adminUser = await prisma.user.create({
+    data: {
+      email: "admin@bakerydemo.com",
+      name: "Admin User",
+      passwordHash: await bcrypt.hash("admin123", 10),
+      companyId: company1.id,
+      userRoles: { create: { roleId: adminRole.id } }, // No journal restriction
+    },
+  });
+
+  const salesUser = await prisma.user.create({
+    data: {
+      email: "sales.manager@bakerydemo.com",
+      name: "Sales Manager Sam",
+      passwordHash: await bcrypt.hash("sales123", 10),
+      companyId: company1.id,
+      userRoles: {
+        create: {
+          roleId: salesManagerRole.id,
+          restrictedTopLevelJournalId: "4", // RESTRICTED to the 'Revenue' branch
+          restrictedTopLevelJournalCompanyId: company1.id,
+        },
+      },
+    },
+  });
+
+  const procurementUser = await prisma.user.create({
+    data: {
+      email: "procurement.specialist@bakerydemo.com",
+      name: "Procurement Specialist Pat",
+      passwordHash: await bcrypt.hash("procurement123", 10),
+      companyId: company1.id,
+      userRoles: {
+        create: {
+          roleId: procurementRole.id,
+          restrictedTopLevelJournalId: "5", // RESTRICTED to the 'Expenses' branch
+          restrictedTopLevelJournalCompanyId: company1.id,
+        },
+      },
+    },
+  });
+
+  console.log(
+    `Created Users: Admin (unrestricted), Sales Manager (restricted to journal '4'), Procurement Specialist (restricted to journal '5')`
+  );
+  const defaultCreatorId = salesUser.id; // Use Sales Manager as the default creator for most data.
+
+  // --- 5. Create Tax Codes & Units of Measure ---
+  const taxStd = await prisma.taxCode.create({
+    data: {
+      code: "STD20",
+      description: "Standard 20%",
+      rate: 0.2,
+      companyId: company1.id,
+    },
+  });
+  const taxExempt = await prisma.taxCode.create({
+    data: {
+      code: "EXEMPT",
+      description: "Tax Exempt",
+      rate: 0,
+      companyId: company1.id,
+    },
+  });
+  const uomEach = await prisma.unitOfMeasure.create({
+    data: { code: "EA", name: "Each", companyId: company1.id },
+  });
+  const uomKg = await prisma.unitOfMeasure.create({
+    data: { code: "KG", name: "Kilogram", companyId: company1.id },
+  });
+  const uomBox = await prisma.unitOfMeasure.create({
+    data: { code: "BOX", name: "Box", companyId: company1.id },
+  });
+
+  // --- 6. Create Partners (Customers & Suppliers) ---
+  console.log("\nCreating partners...");
   const pSupplierFlourMart = await prisma.partner.create({
     data: {
       name: "FlourMart Inc.",
       partnerType: PartnerType.LEGAL_ENTITY,
       companyId: company1.id,
-      createdById: creatorId,
+      createdById: procurementUser.id,
       approvalStatus: ApprovalStatus.APPROVED,
       entityState: EntityState.ACTIVE,
     },
   });
+  const pSupplierSweetHarvest = await prisma.partner.create({
+    data: {
+      name: "Sweet Harvest Co.",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      companyId: company1.id,
+      createdById: procurementUser.id,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+  const pSupplierPackRight = await prisma.partner.create({
+    data: {
+      name: "PackRight Solutions",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      companyId: company1.id,
+      createdById: procurementUser.id,
+      approvalStatus: ApprovalStatus.PENDING,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+
   const pCustomerCafeA = await prisma.partner.create({
     data: {
       name: "The Cozy Cafe",
       partnerType: PartnerType.LEGAL_ENTITY,
       companyId: company1.id,
-      createdById: creatorId,
+      createdById: defaultCreatorId,
       approvalStatus: ApprovalStatus.APPROVED,
       entityState: EntityState.ACTIVE,
     },
   });
-
-  // --- 6. Create Special-Case Partners for Filter Testing ---
-  console.log("\nCreating special-case partners for filter testing...");
-
-  // For "Unaffected" filter: APPROVED but unlinked. Created by a different user.
-  const pUnaffectedLogistics = await prisma.partner.create({
+  const pCustomerMegaCorp = await prisma.partner.create({
     data: {
-      name: "Speedy Logistics (Unaffected)",
+      name: "MegaCorp Events",
       partnerType: PartnerType.LEGAL_ENTITY,
+      companyId: company1.id,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+  const pCustomerUnaffected = await prisma.partner.create({
+    data: {
+      name: "Unaffected Individual Buyer",
+      partnerType: PartnerType.NATURAL_PERSON,
       notes: "Approved, but unlinked.",
       companyId: company1.id,
-      createdById: adminUserC1.id,
+      createdById: adminUser.id,
       approvalStatus: ApprovalStatus.APPROVED,
       entityState: EntityState.ACTIVE,
     },
   });
-  console.log(`Created Unaffected Partner: ${pUnaffectedLogistics.name}`);
-
-  // For "In Process" filter: PENDING and unlinked. CRITICAL: Created by the 'accountant' user.
-  const pInProcessNewClient = await prisma.partner.create({
+  const pCustomerInProcess = await prisma.partner.create({
     data: {
-      name: "New Client Prospect (In Process)",
+      name: "New Hotel Prospect (In Process)",
       partnerType: PartnerType.LEGAL_ENTITY,
-      notes: "A new client created by the accountant, pending approval.",
+      notes: "A new client created by the sales manager, pending approval.",
       companyId: company1.id,
-      createdById: creatorId,
+      createdById: defaultCreatorId,
       approvalStatus: ApprovalStatus.PENDING,
       entityState: EntityState.ACTIVE,
     },
   });
-  console.log(`Created 'In Process' Partner: ${pInProcessNewClient.name}`);
 
-  // --- 7. Create Tax Codes & Units of Measure ---
-  const taxStd = await prisma.taxCode.create({
-    data: { code: "STD20", rate: 0.2, companyId: company1.id },
+  // --- 7. Create Goods & Services ---
+  console.log("\nCreating goods & services...");
+  const gGoodFlour = await prisma.goodsAndService.create({
+    data: {
+      label: "Artisan Bread Flour",
+      referenceCode: "ING-FLR-01",
+      companyId: company1.id,
+      createdById: procurementUser.id,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxExempt.id,
+      unitCodeId: uomKg.id,
+    },
   });
-  const uomEach = await prisma.unitOfMeasure.create({
-    data: { code: "EA", name: "Each", companyId: company1.id },
+  const gGoodSugar = await prisma.goodsAndService.create({
+    data: {
+      label: "Organic Cane Sugar",
+      referenceCode: "ING-SGR-01",
+      companyId: company1.id,
+      createdById: procurementUser.id,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxExempt.id,
+      unitCodeId: uomKg.id,
+    },
+  });
+  const gGoodBoxes = await prisma.goodsAndService.create({
+    data: {
+      label: "Cake Boxes (100 pack)",
+      referenceCode: "PKG-BOX-LG",
+      companyId: company1.id,
+      createdById: procurementUser.id,
+      approvalStatus: ApprovalStatus.PENDING,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxExempt.id,
+      unitCodeId: uomBox.id,
+    },
   });
 
-  // --- 8. Create Goods & Services ---
-  const goodChocolateCake = await prisma.goodsAndService.create({
+  const gGoodChocolateCake = await prisma.goodsAndService.create({
     data: {
       label: "Classic Chocolate Cake",
+      referenceCode: "CAKE-CHOC-01",
       companyId: company1.id,
-      createdById: creatorId,
+      createdById: defaultCreatorId,
       approvalStatus: ApprovalStatus.APPROVED,
       entityState: EntityState.ACTIVE,
       taxCodeId: taxStd.id,
       unitCodeId: uomEach.id,
     },
   });
-  const gInProcessNewSupply = await prisma.goodsAndService.create({
+  const gGoodCroissant = await prisma.goodsAndService.create({
     data: {
-      label: "New Eco-Friendly Boxes (In Process)",
+      label: "Butter Croissant",
+      referenceCode: "PST-CRS-01",
       companyId: company1.id,
-      createdById: creatorId,
-      approvalStatus: ApprovalStatus.PENDING,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
       entityState: EntityState.ACTIVE,
       taxCodeId: taxStd.id,
       unitCodeId: uomEach.id,
     },
   });
-  console.log("Goods and Services seeded.");
+  const gGoodCatering = await prisma.goodsAndService.create({
+    data: {
+      label: "Gold Catering Package",
+      referenceCode: "SVC-CAT-GLD",
+      companyId: company1.id,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxStd.id,
+      unitCodeId: uomEach.id,
+    },
+  });
 
-  // --- 9. Create Links (with Hierarchy) ---
+  // --- 8. Create Links (Partner-Journal & Good-Journal) with Hierarchy ---
   console.log("\nLinking entities with hierarchy...");
   await linkPartnerToJournalWithHierarchy(
     company1.id,
@@ -497,16 +622,78 @@ async function main() {
   );
   await linkPartnerToJournalWithHierarchy(
     company1.id,
+    pSupplierSweetHarvest.id,
+    "5002",
+    "SUPPLIER"
+  );
+  await linkPartnerToJournalWithHierarchy(
+    company1.id,
     pCustomerCafeA.id,
     "4001",
     "CUSTOMER"
   );
+  await linkPartnerToJournalWithHierarchy(
+    company1.id,
+    pCustomerCafeA.id,
+    "4003",
+    "CUSTOMER"
+  );
+  await linkPartnerToJournalWithHierarchy(
+    company1.id,
+    pCustomerMegaCorp.id,
+    "4101",
+    "CUSTOMER"
+  );
+
+  await linkGoodToJournalWithHierarchy(company1.id, gGoodFlour.id, "5001");
+  await linkGoodToJournalWithHierarchy(company1.id, gGoodSugar.id, "5002");
   await linkGoodToJournalWithHierarchy(
     company1.id,
-    goodChocolateCake.id,
+    gGoodChocolateCake.id,
     "4001"
   );
-  console.log("Hierarchical links created.");
+  await linkGoodToJournalWithHierarchy(company1.id, gGoodCroissant.id, "4003");
+  await linkGoodToJournalWithHierarchy(company1.id, gGoodCatering.id, "4101");
+  console.log("Hierarchical Partner-Journal and Good-Journal links created.");
+
+  // --- 9. Create Tri-partite Links (Journal-Partner-Good) ---
+  console.log("\nCreating tri-partite Journal-Partner-Good links...");
+  const jplCafeCakes = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerCafeA.id, journalId: "4001" },
+  });
+  await prisma.journalPartnerGoodLink.create({
+    data: {
+      companyId: company1.id,
+      journalPartnerLinkId: jplCafeCakes.id,
+      goodId: gGoodChocolateCake.id,
+      descriptiveText: "Weekly standing order for chocolate cakes.",
+    },
+  });
+
+  const jplCafePastries = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerCafeA.id, journalId: "4003" },
+  });
+  await prisma.journalPartnerGoodLink.create({
+    data: {
+      companyId: company1.id,
+      journalPartnerLinkId: jplCafePastries.id,
+      goodId: gGoodCroissant.id,
+      descriptiveText: "Daily delivery of 50 croissants.",
+    },
+  });
+
+  const jplMegaCorpCatering = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerMegaCorp.id, journalId: "4101" },
+  });
+  await prisma.journalPartnerGoodLink.create({
+    data: {
+      companyId: company1.id,
+      journalPartnerLinkId: jplMegaCorpCatering.id,
+      goodId: gGoodCatering.id,
+      descriptiveText: "Contract for annual gala event.",
+    },
+  });
+  console.log("Tri-partite links created successfully.");
 
   console.log("\n--- Seeding finished successfully! ---");
 }

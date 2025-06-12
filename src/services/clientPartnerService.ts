@@ -1,18 +1,16 @@
 // src/services/clientPartnerService.ts
+
 import type {
   PaginatedPartnersResponse,
   Partner,
   CreatePartnerClientData,
   UpdatePartnerClientData,
-  FetchPartnersParams, // Import the centralized, correct type
+  FetchPartnersParams,
 } from "@/lib/types";
 
-// The local FetchPartnersParams interface has been removed. We now use the one from lib/types.
-
 /**
- * REFACTORED FUNCTION
- * This now uses the centralized FetchPartnersParams type and correctly appends
- * the `filterStatus` (including "inProcess") to the URL for the API call.
+ * === CORRECTED FUNCTION ===
+ * This now correctly appends `restrictedJournalId` when it's present in the params.
  */
 export async function fetchPartners(
   params: FetchPartnersParams = {}
@@ -46,6 +44,7 @@ export async function fetchPartners(
   // Priority 2: Our main Journal-as-Root filter
   else if (params.filterStatus) {
     queryParams.append("filterStatus", params.filterStatus);
+
     // Only append contextJournalIds if they are relevant and present
     if (
       (params.filterStatus === "affected" || params.filterStatus === "all") &&
@@ -57,6 +56,13 @@ export async function fetchPartners(
         params.contextJournalIds.join(",")
       );
     }
+
+    // *** THE MISSING PIECE OF THE FIX ***
+    // Always append restrictedJournalId if it exists.
+    // The backend knows how to use it, especially for the 'unaffected' filter.
+    if (params.restrictedJournalId) {
+      queryParams.append("restrictedJournalId", params.restrictedJournalId);
+    }
   }
   // Priority 3: Other general linking (fallback)
   else if (params.linkedToJournalIds && params.linkedToJournalIds.length > 0) {
@@ -65,9 +71,6 @@ export async function fetchPartners(
       params.linkedToJournalIds.join(",")
     );
   }
-
-  // If no specific filter params are provided, the URL will just have pagination/type,
-  // which correctly fetches all partners (the desired behavior for Partner-as-S1).
 
   console.log(
     `[fetchPartners] Fetching from URL: /api/partners?${queryParams.toString()}`
@@ -90,7 +93,8 @@ export async function fetchPartners(
   return result;
 }
 
-// ... (createPartner, updatePartner, deletePartner, fetchPartnerById remain the same) ...
+// ... (createPartner, updatePartner, deletePartner, etc. remain the same) ...
+
 export async function createPartner(
   partnerData: CreatePartnerClientData
 ): Promise<Partner> {
@@ -169,25 +173,6 @@ export async function fetchPartnerById(
   return { ...partner, id: String(partner.id) };
 }
 
-// The existing fetchPartnersLinkedToJournals and fetchPartnersLinkedToJournalsAndGood
-// effectively become specific use cases of the more general `fetchPartners` above
-// if the backend API route `/api/partners` correctly prioritizes parameters.
-// You could choose to deprecate them or keep them as convenience wrappers.
-
-// For example, fetchPartnersLinkedToJournals could be:
-// export async function fetchPartnersLinkedToJournals(journalIds: string[], includeChildren: boolean = true): Promise<Partner[]> {
-//   if (!journalIds || journalIds.length === 0) return [];
-//   const result = await fetchPartners({ linkedToJournalIds: journalIds, includeChildren });
-//   return result.data;
-// }
-// However, the current fetchPartnersLinkedToJournals is fine as it maps directly to a specific backend behavior.
-// The key is that your main `fetchPartners` can now handle the new filterStatus.
-
-// Keep existing specific fetchers if they map to distinct UI needs or backend logic paths
-// that are not covered by the general `filterStatus` approach.
-// The backend `/api/partners/route.ts` already has logic to handle `linkedToJournalIds`
-// distinctly if `filterStatus` is not present.
-
 export async function fetchPartnersLinkedToJournals(
   journalIds: string[],
   includeChildren: boolean = true
@@ -198,12 +183,9 @@ export async function fetchPartnersLinkedToJournals(
     );
     return [];
   }
-  // This call will hit the backend logic that handles 'linkedToJournalIds' specifically,
-  // which internally in partnerService might use 'filterByAffectedJournals'.
   const result = await fetchPartners({
     linkedToJournalIds: journalIds,
     includeChildren: includeChildren,
-    // Not sending filterStatus here, so backend uses its priority for linkedToJournalIds
   });
   return result.data;
 }
@@ -220,7 +202,6 @@ export async function fetchPartnersLinkedToJournalsAndGood(
     linkedToJournalIds: journalIds,
     linkedToGoodId: goodId,
     includeChildren: includeChildren,
-    // Not sending filterStatus here
   });
   return result.data;
 }

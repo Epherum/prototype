@@ -1,13 +1,25 @@
 // File: src/app/services/goodsService.ts
 import prisma from "@/app/utils/prisma"; // Storeroom Manager
-import {
-  GoodsAndService,
-  TaxCode,
-  UnitOfMeasure,
-  Prisma,
-} from "@prisma/client"; // Added Prisma
+import { GoodsAndService, Prisma, EntityState } from "@prisma/client"; // Added Prisma
+import { journalService } from "./journalService"; // Import for descendant logic
+import { ROOT_JOURNAL_ID } from "@/lib/constants"; // Import for root check
 
 // --- Types for "Order Slips" (Data Transfer Objects) for Goods & Services ---
+
+// --- NEW: Define the options interface for getAllGoods ---
+export interface GetAllGoodsOptions {
+  companyId: string;
+  where?: Prisma.GoodsAndServiceWhereInput;
+  take?: number;
+  skip?: number;
+  typeCode?: string;
+
+  // Unified filter status from the UI
+  filterStatus?: "affected" | "unaffected" | "inProcess";
+  contextJournalIds?: string[]; // For 'affected'
+  currentUserId?: string; // CRITICAL for 'inProcess' and 'unaffected'
+  restrictedJournalId?: string | null; // For role-based logic
+}
 
 // Update the "Order Slip" to include required linking IDs
 export type CreateGoodsData = {
@@ -108,65 +120,134 @@ const goodsService = {
   },
 
   // RECIPE 3: Get all Goods/Services (e.g., for a product list)
-  async getAllGoods(options?: {
-    typeCode?: string;
-    where?: Prisma.GoodsAndServiceWhereInput; // Use Prisma's type for better type safety
-    take?: number;
-    skip?: number;
-    // New filters for Journal Root -> Goods scenario
-    filterByAffectedJournals?: string[]; // Goods linked to AT LEAST ONE of these journal IDs
-    filterByUnaffected?: boolean; // Goods NOT linked to ANY journal
-  }): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
+  async getAllGoods(
+    options: GetAllGoodsOptions
+  ): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
     console.log(
-      "Chef (GoodsService): Fetching items from catalog with options:",
+      "Chef (GoodsService): Fetching items from catalog with DETAILED RULES:",
       options
     );
-    const prismaWhere: Prisma.GoodsAndServiceWhereInput = { ...options?.where };
-    const additionalConditions: Prisma.GoodsAndServiceWhereInput[] = [];
 
-    if (options?.typeCode) {
-      additionalConditions.push({ typeCode: options.typeCode });
-      console.log(
-        "Chef (GoodsService): Filtering by typeCode:",
-        options.typeCode
+    const {
+      companyId,
+      filterStatus,
+      contextJournalIds = [],
+      currentUserId,
+      restrictedJournalId,
+      where: externalWhere,
+      typeCode,
+      ...restOfOptions
+    } = options;
+
+    if (
+      (filterStatus === "unaffected" || filterStatus === "inProcess") &&
+      !currentUserId
+    ) {
+      console.warn(
+        `Chef (GoodsService): '${filterStatus}' filter requires a currentUserId, but none was provided. Returning empty.`
       );
+      return { goods: [], totalCount: 0 };
     }
 
-    // Apply new journal link status filters for Goods
-    if (options?.filterByUnaffected) {
-      // Show goods not linked to any journal.
-      additionalConditions.push({ journalGoodLinks: { none: {} } });
-      console.log(
-        "Chef (GoodsService): Filtering for unaffected goods (no journal links)."
-      );
-    } else if (options?.filterByAffectedJournals) {
-      // Show goods linked to the specified journals.
-      // If options.filterByAffectedJournals is an empty array, `journalId: { in: [] }` for `some`
-      // correctly results in no goods for this condition.
-      additionalConditions.push({
-        journalGoodLinks: {
-          some: { journalId: { in: options.filterByAffectedJournals } },
-        },
-      });
-      console.log(
-        `Chef (GoodsService): Filtering for goods affected by journals: [${options.filterByAffectedJournals.join(
-          ", "
-        )}].`
-      );
-    }
+    let prismaWhere: Prisma.GoodsAndServiceWhereInput = {
+      companyId: companyId,
+      entityState: EntityState.ACTIVE,
+      ...(typeCode && { typeCode: typeCode }),
+      ...externalWhere,
+    };
 
-    // Combine all conditions using AND
-    if (additionalConditions.length > 0) {
-      if (prismaWhere.AND) {
-        if (Array.isArray(prismaWhere.AND)) {
-          prismaWhere.AND = [...prismaWhere.AND, ...additionalConditions];
-        } else {
-          prismaWhere.AND = [prismaWhere.AND, ...additionalConditions];
+    const isRootUser =
+      !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
+
+    switch (filterStatus) {
+      case "affected":
+        console.log("Chef (GoodsService): Applying 'affected' filter.");
+        if (contextJournalIds.length === 0) {
+          return { goods: [], totalCount: 0 };
         }
-      } else {
-        prismaWhere.AND = additionalConditions;
-      }
+        prismaWhere.journalGoodLinks = {
+          some: { journalId: { in: contextJournalIds } },
+        };
+        break;
+
+      case "unaffected":
+        if (isRootUser) {
+          // --- ROOT USER: UNAFFECTED ---
+          console.log(
+            "Chef (GoodsService): Applying 'unaffected' filter for ROOT user."
+          );
+          prismaWhere.AND = [
+            { journalGoodLinks: { none: {} } }, // Not linked to ANY journal
+            { createdById: { not: currentUserId } }, // AND not created by me
+          ];
+        } else {
+          // --- RESTRICTED USER: UNAFFECTED ---
+          console.log(
+            `Chef (GoodsService): Applying 'unaffected' filter for RESTRICTED user. Root: ${restrictedJournalId}`
+          );
+          const descendantIds = await journalService.getDescendantJournalIds(
+            restrictedJournalId!,
+            companyId
+          );
+          prismaWhere.AND = [
+            {
+              journalGoodLinks: {
+                some: { journalId: restrictedJournalId!, companyId: companyId },
+              },
+            },
+            ...(descendantIds.length > 0
+              ? [
+                  {
+                    NOT: {
+                      journalGoodLinks: {
+                        some: {
+                          journalId: { in: descendantIds },
+                          companyId: companyId,
+                        },
+                      },
+                    },
+                  },
+                ]
+              : []),
+          ];
+        }
+        break;
+
+      case "inProcess":
+        if (isRootUser) {
+          // --- ROOT USER: IN PROCESS ---
+          console.log(
+            "Chef (GoodsService): Applying 'inProcess' filter for ROOT user."
+          );
+          prismaWhere.AND = [
+            { journalGoodLinks: { none: {} } }, // Not linked to ANY journal
+            { createdById: currentUserId }, // AND created by me
+          ];
+        } else {
+          // --- RESTRICTED USER: IN PROCESS ---
+          console.log(
+            `Chef (GoodsService): Applying 'inProcess' filter for RESTRICTED user. Root: ${restrictedJournalId}`
+          );
+          prismaWhere.AND = [
+            // NOT linked to my parent/restricted journal
+            {
+              journalGoodLinks: {
+                none: { journalId: restrictedJournalId!, companyId: companyId },
+              },
+            },
+            // AND created by me
+            { createdById: currentUserId },
+          ];
+        }
+        break;
+
+      default:
+        console.log(
+          "Chef (GoodsService): No filterStatus. Fetching all active goods."
+        );
+        break;
     }
+
     console.log(
       "Chef (GoodsService): Final prismaWhere clause for goods:",
       JSON.stringify(prismaWhere, null, 2)
@@ -175,11 +256,10 @@ const goodsService = {
     const totalCount = await prisma.goodsAndService.count({
       where: prismaWhere,
     });
-
     const goods = await prisma.goodsAndService.findMany({
       where: prismaWhere,
-      take: options?.take,
-      skip: options?.skip,
+      take: restOfOptions.take,
+      skip: restOfOptions.skip,
       orderBy: { label: "asc" },
       include: { taxCode: true, unitOfMeasure: true },
     });

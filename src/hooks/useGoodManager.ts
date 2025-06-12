@@ -22,11 +22,17 @@ export interface UseGoodManagerProps {
   sliderOrder: string[];
   visibility: { [key: string]: boolean };
   effectiveSelectedJournalIds: string[];
-  selectedPartnerId: string | null; // This is crossFilterSelectedPartnerId from page.tsx
+  selectedPartnerId: string | null;
   selectedJournalIdForPjgFiltering: string | null;
-  journalRootFilterStatus: "affected" | "unaffected" | "all" | null;
+  journalRootFilterStatus:
+    | "affected"
+    | "unaffected"
+    | "inProcess"
+    | "all"
+    | null;
+  effectiveRestrictedJournalId: string | null; // <-- ADD THIS PROP
   isJournalHierarchyLoading: boolean;
-  isPartnerQueryLoading: boolean; // This is isPartnerDataLoading from page.tsx
+  isPartnerQueryLoading: boolean;
   isFlatJournalsQueryLoading: boolean;
   isGPContextActive?: boolean;
   gpgContextJournalId?: string | null;
@@ -40,6 +46,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     selectedPartnerId, // Used for J-P-G (S3)
     selectedJournalIdForPjgFiltering, // Used for P-J-G (S3)
     journalRootFilterStatus,
+    effectiveRestrictedJournalId,
     isJournalHierarchyLoading, // S1 Journal loading state
     isPartnerQueryLoading, // S2 Partner loading state (for J-P-G)
     isFlatJournalsQueryLoading, // S2 Journal loading state (for P-J-G)
@@ -85,8 +92,15 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
         SLIDER_TYPES.JOURNAL + "-" + SLIDER_TYPES.GOODS
       ) // J-G (Goods S2)
     ) {
+      // --- THIS IS THE KEY CHANGE ---
       params.filterStatus = journalRootFilterStatus;
-      params.contextJournalIds = [...effectiveSelectedJournalIds];
+      params.restrictedJournalId = effectiveRestrictedJournalId; // Pass the ID
+      if (
+        journalRootFilterStatus === "affected" ||
+        journalRootFilterStatus === "all"
+      ) {
+        params.contextJournalIds = [...props.effectiveSelectedJournalIds];
+      }
     } else if (
       currentOrderString.startsWith(
         SLIDER_TYPES.JOURNAL +
@@ -143,6 +157,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     isGPContextActive,
     gpgContextJournalId,
     journalRootFilterStatus,
+    effectiveRestrictedJournalId, // Key for J-G
     effectiveSelectedJournalIds,
     selectedPartnerId, // Key for J-P-G
     selectedJournalIdForPjgFiltering, // Key for P-J-G

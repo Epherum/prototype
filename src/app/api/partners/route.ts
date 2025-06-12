@@ -1,25 +1,20 @@
 // src/app/api/partners/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import partnerServiceImport, {
-  // --- UPDATED IMPORTS ---
-  createPartnerSchema, // Import the schema itself
+  createPartnerSchema,
   GetAllPartnersOptions,
-  CreatePartnerData as ServiceCreatePartnerData, // Keep this for type hints if needed elsewhere
+  CreatePartnerData as ServiceCreatePartnerData,
 } from "@/app/services/partnerService";
-// We no longer need to import z here unless used for other schemas
 import { Partner, PartnerType } from "@prisma/client";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession } from "@/lib/authOptions";
+import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions"; // <-- Ensure ExtendedUser is available if needed
 
 const partnerService = partnerServiceImport;
 
 /**
- * REFACTORED GET HANDLER
- * This handler is now simplified. It primarily parses parameters for the
- * Journal-as-Root filter and for other specific flows (like J-G-P),
- * then passes them to the new, more capable partnerService.getAllPartners.
+ * === REFACTORED GET HANDLER WITH NEW PARAMETER ===
  */
 export async function GET(request: NextRequest) {
   const session = (await getServerSession(
@@ -28,29 +23,27 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.id || !session?.user?.companyId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const currentUserId = session.user.id;
-  const companyId = session.user.companyId;
+  const user = session.user as ExtendedUser;
+  const currentUserId = user.id;
+  const companyId = user.companyId;
 
   const { searchParams } = new URL(request.url);
 
   // --- Parse Parameters ---
 
-  // Main filter status for Journal-as-Root view. This is our primary mechanism now.
   const filterStatus = searchParams.get("filterStatus") as
     | "affected"
     | "unaffected"
     | "inProcess"
     | null;
 
-  // Journal IDs for 'affected' and 'all' filters.
   const contextJournalIdsParam = searchParams.get("contextJournalIds");
+  const restrictedJournalId = searchParams.get("restrictedJournalId"); // <-- NEW
 
-  // Parameters for other filtering scenarios (J-G-P, G-P, etc.)
   const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds");
   const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
-  const includeChildrenParam = searchParams.get("includeChildren"); // Still used by J-G-P
+  const includeChildrenParam = searchParams.get("includeChildren");
 
-  // General parameters
   const partnerTypeParam = searchParams.get(
     "partnerType"
   ) as PartnerType | null;
@@ -61,12 +54,12 @@ export async function GET(request: NextRequest) {
 
   // --- Build Service Call Options ---
 
-  // Base options for the service call. Always include auth context.
   const serviceCallOptions: GetAllPartnersOptions = {
     companyId,
-    currentUserId, // Pass the user ID for "inProcess" and "all" filters
+    currentUserId,
     take,
     skip,
+    restrictedJournalId: restrictedJournalId || null, // <-- PASS IT
   };
 
   if (
@@ -79,11 +72,7 @@ export async function GET(request: NextRequest) {
   try {
     let partnersResult: { partners: Partner[]; totalCount: number };
 
-    // --- Determine Filter Logic ---
-    // The logic is now much flatter. We check for highly specific, overriding
-    // scenarios first (like J-G-P), and otherwise fall back to our main filterStatus logic.
-
-    // Priority 1: J-G-P (Journal-Good-Partner) or G-J-P (Good-Journal-Partner)
+    // Priority 1: J-G-P / G-J-P flow
     if (linkedToJournalIdsParam && linkedToGoodIdStr) {
       console.log(
         `API /partners: J-G-P/G-J-P flow. Journals: '${linkedToJournalIdsParam}', Good: '${linkedToGoodIdStr}'.`
@@ -107,13 +96,11 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // This flow gets partner IDs from a different service, then filters partners by those IDs.
       const partnerIds = await jpgLinkService.getPartnerIdsForJournalsAndGood(
         journalIds,
         goodId,
         includeChildrenParam !== "false"
       );
-      // We add this as a pre-filter `where` clause to our main service call.
       serviceCallOptions.where = { id: { in: partnerIds } };
 
       partnersResult =
@@ -121,7 +108,7 @@ export async function GET(request: NextRequest) {
           ? { partners: [], totalCount: 0 }
           : await partnerService.getAllPartners(serviceCallOptions);
     } else {
-      // Priority 2: Standard Journal-as-Root filtering (our main feature)
+      // Priority 2: Standard Journal-as-Root filtering
       console.log(
         `API /partners: Standard flow. filterStatus: '${
           filterStatus || "none"
@@ -129,7 +116,6 @@ export async function GET(request: NextRequest) {
       );
       if (filterStatus) {
         serviceCallOptions.filterStatus = filterStatus;
-        // Only include contextJournalIds if they are relevant for the filter
         if (filterStatus === "affected") {
           serviceCallOptions.contextJournalIds =
             contextJournalIdsParam
@@ -141,7 +127,6 @@ export async function GET(request: NextRequest) {
       partnersResult = await partnerService.getAllPartners(serviceCallOptions);
     }
 
-    // --- Send Response ---
     const responsePayload = {
       data: partnersResult.partners,
       total: partnersResult.totalCount,
@@ -170,8 +155,8 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ... (POST handler is unchanged)
 export async function POST(request: NextRequest) {
-  // ... (This function remains unchanged)
   console.log("Waiter (API /partners): Customer wants to add a new partner.");
   const session = (await getServerSession(
     authOptions
@@ -194,7 +179,6 @@ export async function POST(request: NextRequest) {
       rawOrder
     );
 
-    // Use the imported schema for validation
     const validation = createPartnerSchema.safeParse(rawOrder);
     if (!validation.success) {
       console.warn(
@@ -210,8 +194,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // The type of validation.data is now guaranteed to match ServiceCreatePartnerData
-    // because they both derive from the exact same schema object.
     const partnerDataForService: ServiceCreatePartnerData = validation.data;
 
     console.log(

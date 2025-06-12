@@ -26,6 +26,7 @@ export interface UsePartnerManagerProps {
   selectedGoodsId: string | null; // This is crossFilterSelectedGoodsId from page.tsx
   selectedJournalIdForGjpFiltering: string | null;
   journalRootFilterStatus: PartnerFilterStatus;
+  effectiveRestrictedJournalId: string | null;
   isJournalHierarchyLoading: boolean;
   isFlatJournalsQueryForGoodLoading: boolean; // This is isGoodsDataLoading from page.tsx
   isGPGOrderActive?: boolean;
@@ -40,6 +41,8 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
     selectedGoodsId, // Used for J-G-P (S3)
     selectedJournalIdForGjpFiltering, // Used for G-J-P (S3)
     journalRootFilterStatus,
+    effectiveRestrictedJournalId,
+
     isJournalHierarchyLoading, // S1 Journal loading state
     isFlatJournalsQueryForGoodLoading, // S2 Good loading state (for J-G-P) / S2 Journal loading state (for G-J-P)
     isGPGOrderActive,
@@ -63,13 +66,14 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
 
   const partnerQueryKeyParamsStructure = useMemo((): FetchPartnersParams => {
     const orderString = sliderOrder.join("-");
+    // Always start with the base params
     let params: FetchPartnersParams = { limit: 1000, offset: 0 };
     const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
     console.log(
       `[usePartnerManager] Recalculating partnerQueryKeyParams. Order: ${orderString}, Journal IDs: ${effectiveSelectedJournalIds.join(
         ","
-      )}, Good ID: ${selectedGoodsId}, GJP Journal ID: ${selectedJournalIdForGjpFiltering}`
+      )}, Good ID: ${selectedGoodsId}, GJP Journal ID: ${selectedJournalIdForGjpFiltering}, Restricted ID: ${effectiveRestrictedJournalId}` // Log the new prop
     );
 
     if (isGPGOrderActive && partnerIndex === 1) {
@@ -79,15 +83,16 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
       } else {
         params.linkedToJournalIds = ["__NO_GPG_CONTEXT_JOURNAL__"];
       }
-    } else if (partnerIndex === 0) {
-      // Default params when Partner is first
     } else if (
-      // --- THIS IS THE KEY CHANGE ---
       // When Journal is S1 and Partner is S2, use the new filterStatus
       orderString.startsWith(`${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`)
     ) {
       params.filterStatus = journalRootFilterStatus;
-      // Only pass contextJournalIds if the filter status requires it
+      // *** THE CORE FIX ***
+      // Pass the restricted journal ID when using the filter status.
+      // The backend service will decide how to use this, especially for 'unaffected'.
+      params.restrictedJournalId = effectiveRestrictedJournalId;
+
       if (
         journalRootFilterStatus === "affected" ||
         journalRootFilterStatus === "all"
@@ -95,7 +100,6 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
         params.contextJournalIds = [...effectiveSelectedJournalIds];
       }
     } else if (
-      // J-G-P (Partner S3) logic remains the same
       orderString.startsWith(
         `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}-${SLIDER_TYPES.PARTNER}`
       )
@@ -106,7 +110,6 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
         params.includeChildren = true;
       }
     } else if (
-      // G-J-P (Partner S3) logic remains the same
       orderString.startsWith(
         `${SLIDER_TYPES.GOODS}-${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`
       )
@@ -116,12 +119,19 @@ export const usePartnerManager = (props: UsePartnerManagerProps) => {
         params.linkedToGoodId = selectedGoodsId;
         params.includeChildren = false;
       }
+    } else if (partnerIndex === 0) {
+      // If Partner is first, it should not be filtered by journals
+      // unless a specific logic requires it.
+      // If you need a default filter status even when Partner is first, add it here.
+      // For now, it will fetch all partners.
     }
+
     return params;
   }, [
     sliderOrder,
-    journalRootFilterStatus, // This is now a key dependency
+    journalRootFilterStatus,
     effectiveSelectedJournalIds,
+    effectiveRestrictedJournalId, // <-- ADD THE NEW PROP AS A DEPENDENCY
     selectedGoodsId,
     selectedJournalIdForGjpFiltering,
     isGPGOrderActive,

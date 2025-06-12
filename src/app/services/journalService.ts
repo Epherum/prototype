@@ -1,14 +1,8 @@
-// File: src/app/services/journalService.ts
-import { PrismaClient, Journal } from "@prisma/client"; // Assuming PrismaClient is the actual type of your prisma instance
-import prisma from "@/app/utils/prisma"; // Your existing Prisma client instance
+// src/app/services/journalService.ts
+import { PrismaClient, Journal } from "@prisma/client";
+import prisma from "@/app/utils/prisma";
 
-// --- Session User Type (for context) ---
-interface AuthenticatedUserContext {
-  companyId: string;
-  // userId?: string; // If needed for audit logs, etc.
-}
-
-// --- Types for "Order Slips" (Data Transfer Objects) ---
+// --- Types (Existing) ---
 export type CreateJournalData = {
   id: string;
   name: string;
@@ -23,14 +17,57 @@ export type UpdateJournalData = {
   additionalDetails?: any;
 };
 
-// --- Type for Admin Journal Selection ---
 export type JournalForAdminSelection = Pick<
   Journal,
   "id" | "name" | "parentId" | "companyId"
 >;
 
-// --- Chef's Recipes (Service Functions - Updated for Multi-Tenancy) ---
+interface AuthenticatedUserContext {
+  companyId: string;
+}
 
+// --- NEW HELPER FUNCTION ---
+/**
+ * Finds all descendant journal IDs for a given parent journal.
+ * Uses a recursive Common Table Expression (CTE) for efficiency.
+ * @param parentJournalId The ID of the top-level journal to start from.
+ * @param companyId The company ID.
+ * @returns A promise that resolves to an array of descendant journal IDs (strings).
+ */
+async function getDescendantJournalIds(
+  parentJournalId: string,
+  companyId: string
+): Promise<string[]> {
+  console.log(
+    `Chef (Service - Company ${companyId}): Finding all descendant dishes for main dish '${parentJournalId}'.`
+  );
+  // Note: We only query for children, not the parent itself.
+  const result = await prisma.$queryRaw<Array<{ id: string }>>`
+    WITH RECURSIVE "JournalDescendants" AS (
+      -- Anchor member: direct children of the parent
+      SELECT "id", "parent_id"
+      FROM "journals"
+      WHERE "parent_id" = ${parentJournalId} AND "company_id" = ${companyId}
+
+      UNION ALL
+
+      -- Recursive member: children of the journals found in the previous step
+      SELECT j."id", j."parent_id"
+      FROM "journals" j
+      INNER JOIN "JournalDescendants" jd ON j."parent_id" = jd."id"
+      WHERE j."company_id" = ${companyId}
+    )
+    SELECT "id" FROM "JournalDescendants";
+  `;
+
+  const ids = result.map((row) => row.id);
+  console.log(
+    `Chef (Service - Company ${companyId}): Found ${ids.length} descendant dishes for '${parentJournalId}'.`
+  );
+  return ids;
+}
+
+// --- Existing Service Functions ---
 async function getRootJournals(
   context: AuthenticatedUserContext
 ): Promise<Journal[]> {
@@ -379,7 +416,6 @@ async function getJournalSubHierarchy(
   }
 }
 
-// NEW RECIPE for Admin User Management - Fetch ALL journals for restriction selection
 async function getAllJournalsForAdminSelection(
   context: AuthenticatedUserContext
 ): Promise<JournalForAdminSelection[]> {
@@ -394,7 +430,7 @@ async function getAllJournalsForAdminSelection(
       id: true,
       name: true,
       parentId: true,
-      companyId: true, // Important for UserRole.restrictedTopLevelJournalCompanyId
+      companyId: true,
     },
     orderBy: [{ parentId: "asc" }, { id: "asc" }],
   });
@@ -407,6 +443,7 @@ async function getAllJournalsForAdminSelection(
 }
 
 export const journalService = {
+  getDescendantJournalIds,
   getRootJournals,
   getJournalsByParentId,
   getJournalById,
@@ -414,7 +451,7 @@ export const journalService = {
   createJournal,
   updateJournal,
   deleteJournal,
-  getTopLevelJournalsByCompany, // Keep if used elsewhere
+  getTopLevelJournalsByCompany,
   getJournalSubHierarchy,
-  getAllJournalsForAdminSelection, // Add new function
+  getAllJournalsForAdminSelection,
 };

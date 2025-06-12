@@ -268,6 +268,8 @@ export default function Home() {
     // Pass flatJournalsQueryForGood loading state if it's defined *before* this hook
     // For now, use isGoodsDataLoading as a proxy if it's generally about goods related loading affecting partners
     isFlatJournalsQueryForGoodLoading: isGoodsDataLoading,
+
+    effectiveRestrictedJournalId: effectiveRestrictedJournalId, // <-- THE KEY CHANGE
   });
 
   // Good Manager INSTANCE
@@ -290,6 +292,8 @@ export default function Home() {
     isFlatJournalsQueryLoading: isPartnerDataLoading,
     isGPContextActive: isGPStartOrder,
     gpgContextJournalId: selectedContextJournalIdForGPG,
+
+    effectiveRestrictedJournalId: effectiveRestrictedJournalId, // <-- Also add here for Goods symmetry
   });
 
   // useEffects to sync internal hook selections and loading states to page-level states
