@@ -7,7 +7,7 @@ import type {
   AccountNodeData,
   CreateJournalPartnerGoodLinkClientData,
 } from "@/lib/types";
-import baseStyles from "./ModalBase.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import listStyles from "./LinkGoodToPartnersViaJournalModal.module.css"; // A new CSS module for the list items
 import { IoClose } from "react-icons/io5";
 

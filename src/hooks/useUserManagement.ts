@@ -45,6 +45,7 @@ export function useUserManagement(userIdToEdit?: string) {
   const [formState, setFormState] =
     useState<UserManagementFormState>(initialFormState);
   const [showPassword, setShowPassword] = useState(false);
+  const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const isEditMode = !!userIdToEdit;
 
   // --- DATA FETCHING (QUERIES) ---
@@ -208,6 +209,17 @@ export function useUserManagement(userIdToEdit?: string) {
     setShowPassword(false);
   }, []);
 
+  const openCreateUserModal = useCallback(() => {
+    // Reset form state in case it was used for editing before
+    resetForm();
+    setIsCreateUserModalOpen(true);
+  }, [resetForm]);
+
+  const closeCreateUserModal = useCallback(() => {
+    setIsCreateUserModalOpen(false);
+    resetForm();
+  }, [resetForm]);
+
   // Universal submit handler
   const handleSubmit = useCallback(async () => {
     if (formState.roleAssignments.length === 0) {
@@ -254,7 +266,7 @@ export function useUserManagement(userIdToEdit?: string) {
     resetMutation: mutation.reset,
 
     // Data
-    assignableRoles, // Use this in the modal!
+    assignableRoles,
     allCompanyJournalsData,
 
     // Handlers
@@ -267,5 +279,11 @@ export function useUserManagement(userIdToEdit?: string) {
     // UI State
     showPassword,
     setShowPassword,
+    isCreateUserModalOpen,
+    // EXPORT THE NEW FUNCTION
+    openCreateUserModal,
+    closeCreateUserModal,
+    // Remove the setter from the public API
+    // setIsCreateUserModalOpen,
   };
 }

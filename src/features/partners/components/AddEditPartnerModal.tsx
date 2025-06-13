@@ -1,7 +1,7 @@
 // src/components/modals/AddEditPartnerModal.tsx
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import baseStyles from "./ModalBase.module.css"; // Shared styles
+import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Shared styles
 import formStyles from "./AddEditPartnerModal.module.css"; // Styles specific to this modal's form
 import { IoClose } from "react-icons/io5";
 import type {

@@ -8,6 +8,13 @@
     "module": "esnext",
     "moduleResolution": "node"
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "src/components/layout/StickyHeaderControls.tss"
+  ],
   "exclude": ["node_modules"]
 }

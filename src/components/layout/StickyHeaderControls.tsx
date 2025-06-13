@@ -1,56 +1,60 @@
-// src/components/layout/StickyHeaderControls.js
-"use client"; // If it uses client-side hooks like useRef for Swiper
+"use client";
 
-import { useRef } from "react"; // Only if you pass visibilitySwiperRef down
 import { motion, LayoutGroup } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules"; // Keep if Swiper needs it, even if nav buttons hidden
+import { Navigation } from "swiper/modules";
 import "swiper/css";
-// No need for "swiper/css/navigation" if visual nav buttons are not used for this Swiper.
+import styles from "./StickyHeaderControls.module.css";
+import type { SliderType, SliderVisibility } from "@/store/appStore"; // Import types from store
 
-import styles from "./StickyHeaderControls.module.css"; // Its own CSS module
+// Define the shape of the config object for clarity
+interface SliderConfig {
+  title: string;
+}
+type SliderConfigs = Record<SliderType, SliderConfig>;
 
-// Assuming INITIAL_ORDER and SLIDER_CONFIG_REF are passed as props or imported if static
-// For now, let's assume SLIDER_CONFIG_REF and INITIAL_ORDER are passed down or managed
-// in a way that this component receives the necessary info.
-// Alternatively, if INITIAL_ORDER is truly static, it can be imported from constants.
+interface StickyHeaderControlsProps {
+  visibility: SliderVisibility;
+  onToggleVisibility: (sliderId: SliderType) => void;
+  // This is the full, unchanging order of all sliders defined in constants.
+  allSliderIds: SliderType[];
+  // The current, dynamic order of visible sliders to derive numbering.
+  visibleSliderOrder: SliderType[];
+  sliderConfigs: SliderConfigs;
+  // This prop is no longer needed since we aren't passing a Swiper instance up
+  // onVisibilitySwiper?: (swiper: any) => void;
+}
 
 export default function StickyHeaderControls({
   visibility,
   onToggleVisibility,
-  sliderOrder, // Used for numbering visible toggles
-  initialSliderOrder, // The full, static order for rendering toggles
-  sliderConfigs, // To get titles for the toggles: { [SLIDER_TYPES.JOURNAL]: { title: "Journal" }, ... }
-  onVisibilitySwiper, // Callback to pass the swiper instance up
-}) {
-  // const visibilitySwiperRef = useRef(null); // Manage ref locally if not passed down
-
+  allSliderIds,
+  visibleSliderOrder,
+  sliderConfigs,
+}: StickyHeaderControlsProps) {
   return (
     <div className={styles.stickyHeaderContainer}>
       <LayoutGroup id="visibility-toggles-layout">
         <div className={styles.visibilitySwiperContainer}>
           <Swiper
-            modules={[Navigation]} // Navigation module might still be needed for API, even if buttons are hidden
+            modules={[Navigation]}
             spaceBetween={10}
             slidesPerView={"auto"}
-            centeredSlides={false}
-            loop={false}
             className={styles.visibilitySwiper}
-            onSwiper={onVisibilitySwiper} // Pass instance up
-            // onSwiper={(swiper) => { visibilitySwiperRef.current = swiper; }} // Or manage locally
             observer={true}
             observeParents={true}
           >
-            {initialSliderOrder.map((sliderId) => {
+            {/* We map over the static list of ALL possible sliders */}
+            {allSliderIds.map((sliderId) => {
               const config = sliderConfigs[sliderId];
               if (!config) return null;
+
               const title = config.title || sliderId;
               const isCurrentlyVisible = visibility[sliderId];
-              let visibleIndex = -1;
-              if (isCurrentlyVisible) {
-                const visibleOrder = sliderOrder.filter((id) => visibility[id]);
-                visibleIndex = visibleOrder.indexOf(sliderId);
-              }
+
+              // Find the index in the *visible* order array to get the number
+              const visibleIndex = visibleSliderOrder.indexOf(sliderId);
+
               return (
                 <SwiperSlide
                   key={sliderId}
@@ -58,7 +62,7 @@ export default function StickyHeaderControls({
                 >
                   <motion.div
                     layout
-                    layoutId={`visibility-${sliderId}`} // Ensure this ID is unique if LayoutGroup is used elsewhere with similar IDs
+                    layoutId={`visibility-${sliderId}`}
                     className={styles.visibilitySlideContent}
                     initial={false}
                     animate={{
@@ -76,6 +80,7 @@ export default function StickyHeaderControls({
                       }`}
                       aria-pressed={isCurrentlyVisible}
                     >
+                      {/* Display number only if it's visible */}
                       {isCurrentlyVisible && visibleIndex !== -1
                         ? `${visibleIndex + 1}: `
                         : ""}

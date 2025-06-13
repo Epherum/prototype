@@ -3,7 +3,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { IoAddCircleOutline } from "react-icons/io5";
 
-import baseStyles from "./ModalBase.module.css"; // Shared modal structure styles
+import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
+
 import specificStyles from "./AddJournalModal.module.css"; // Styles unique to AddJournalModal form
 
 function AddJournalModal({ isOpen, onClose, onSubmit, context }) {

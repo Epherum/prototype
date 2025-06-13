@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 
 // Import BOTH style modules
-import baseStyles from "./ModalBase.module.css"; // Shared modal structure styles
+import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 import styles from "./DocumentConfirmationModal.module.css"; // Styles unique to this modal's content
 
 function DocumentConfirmationModal({

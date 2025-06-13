@@ -1,7 +1,7 @@
 // src/components/modals/AddEditGoodModal.tsx
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import baseStyles from "./ModalBase.module.css"; // Shared modal shell styles
+import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 import formStyles from "./AddEditGoodModal.module.css"; // Create this CSS Module
 import { IoClose } from "react-icons/io5";
 import type {

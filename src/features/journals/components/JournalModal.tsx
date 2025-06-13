@@ -1,7 +1,7 @@
 // src/components/modals/JournalModal.js
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import baseStyles from "./ModalBase.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 import styles from "./JournalModal.module.css";
 import AccountNode from "./AccountNode"; // Assuming AccountNodeData type is implicitly handled or defined elsewhere
 import { ROOT_JOURNAL_ID } from "@/lib/constants"; // Assuming this is your actual root ID constant

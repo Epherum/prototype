@@ -1,7 +1,7 @@
-// src/components/options/PartnerOptionsMenu.tsx
+//src/features/partners/components/PartnerOptionsMenu.tsx
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import styles from "./PartnerOptionsMenu.module.css";
+import styles from "@/features/shared/components/OptionsMenu.module.css"; // Reuse styles if they are generic enough
 import {
   IoAddCircleOutline,
   IoPencilOutline,
@@ -65,9 +65,8 @@ const PartnerOptionsMenu: React.FC<PartnerOptionsMenuProps> = ({
   // Calculate style only if anchorEl exists
   const menuStyle: React.CSSProperties | undefined = anchorEl
     ? {
-        position: "absolute",
-        top: anchorEl.getBoundingClientRect().bottom + window.scrollY + 8,
-        left: anchorEl.getBoundingClientRect().left + window.scrollX,
+        top: anchorEl.getBoundingClientRect().bottom + 8, // +8 for a small gap
+        left: anchorEl.getBoundingClientRect().left,
       }
     : undefined;
 

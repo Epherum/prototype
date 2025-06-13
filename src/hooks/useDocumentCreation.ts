@@ -16,6 +16,8 @@ export function useDocumentCreation() {
     GoodForDocument[]
   >([]);
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
+  const [lockedPartnerDetails, setLockedPartnerDetails] =
+    useState<Partner | null>(null);
 
   const handleStartDocumentCreation = useCallback(
     (partnerIdToLock: string | null, openGoodsAccordionCb?: () => void) => {
@@ -133,12 +135,20 @@ export function useDocumentCreation() {
     setSelectedGoodsForDocument([]);
   }, []);
 
+  const handleValidateDocument = useCallback(async () => {
+    // This would typically make an API call to validate the document
+    // For now, we'll just close the modal and reset state
+    resetDocumentCreationState();
+    return true;
+  }, []);
+
   return {
     isDocumentCreationMode,
     lockedPartnerId,
     selectedGoodsForDocument,
     isConfirmationModalOpen,
     setIsConfirmationModalOpen, // Expose if Home needs to control it directly for any reason
+    lockedPartnerDetails,
     handleStartDocumentCreation,
     handleCancelDocumentCreation,
     handleToggleGoodForDocument,
@@ -146,5 +156,6 @@ export function useDocumentCreation() {
     handleFinishDocument,
     closeConfirmationModal,
     resetDocumentCreationState, // To be called after successful document submission
+    handleValidateDocument,
   };
 }

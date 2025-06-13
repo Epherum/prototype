@@ -2,14 +2,13 @@
 
 import React, { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import baseStyles from "./ModalBase.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 import styles from "./CreateUserModal.module.css"; // Reuse the same styles
 import { IoClose, IoEye, IoEyeOff } from "react-icons/io5";
 import { useUserManagement } from "@/hooks/useUserManagement";
-import JournalModal from "./JournalModal";
+import JournalModal from "../../features/journals/components/JournalModal";
 import { buildTree, getJournalDisplayPath } from "@/lib/helpers";
 import type { AccountNodeData } from "@/lib/types";
-// import type { AccountNodeData, JournalForAdminSelection } from "@/lib/types";
 
 interface ManageUserModalProps {
   isOpen: boolean;

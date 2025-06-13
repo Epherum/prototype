@@ -1,4 +1,4 @@
-// src/components/sliders/JournalHierarchySlider.tsx
+//src/features/journals/components/JournalHierarchySlider.tsx
 import React, { useRef, useMemo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";

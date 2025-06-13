@@ -1,4 +1,4 @@
-// src/hooks/useGoodManager.ts
+// src/features/goods/useGoodManager.ts
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -9,88 +9,102 @@ import {
   updateGood,
   deleteGood,
 } from "@/services/clientGoodService";
+import { getFirstId } from "@/lib/helpers";
+import { SLIDER_TYPES } from "@/lib/constants";
+import { useAppStore } from "@/store/appStore"; // <<-- 1. IMPORT THE STORE
+
+// Import types from your existing files
 import type {
   Good,
   CreateGoodClientData,
   UpdateGoodClientData,
   FetchGoodsParams,
-  ActivePartnerFilters, // Import the array type
 } from "@/lib/types";
-import { getFirstId } from "@/lib/helpers";
-import { SLIDER_TYPES } from "@/lib/constants";
 
-export interface UseGoodManagerProps {
-  sliderOrder: string[];
-  visibility: { [key: string]: boolean };
-  effectiveSelectedJournalIds: string[];
-  selectedPartnerId: string | null;
-  selectedJournalIdForPjgFiltering: string | null;
-  // --- UPDATED PROPS ---
-  filterStatuses: ActivePartnerFilters; // Use array type
-  effectiveRestrictedJournalId: string | null;
-  // --------------------
-  isJournalHierarchyLoading: boolean;
-  isPartnerQueryLoading: boolean;
-  isFlatJournalsQueryLoading: boolean;
-  isGPContextActive?: boolean;
-  gpgContextJournalId?: string | null;
-}
+// <<-- 2. THE `UseGoodManagerProps` INTERFACE HAS BEEN DELETED.
 
-export const useGoodManager = (props: UseGoodManagerProps) => {
-  const {
-    sliderOrder,
-    visibility,
-    effectiveSelectedJournalIds,
-    selectedPartnerId,
-    selectedJournalIdForPjgFiltering,
-    // --- UPDATED PROPS ---
-    filterStatuses,
-    effectiveRestrictedJournalId,
-    // --------------------
-    isJournalHierarchyLoading,
-    isPartnerQueryLoading,
-    isFlatJournalsQueryLoading,
-    isGPContextActive,
-    gpgContextJournalId,
-  } = props;
-
-  // ... (state variables are unchanged)
+export const useGoodManager = () => {
+  // <<-- 3. THE HOOK NOW TAKES NO PROPS.
   const queryClient = useQueryClient();
-  const [selectedGoodsId, setSelectedGoodsId] = useState<string | null>(null);
+
+  // --- 4. CONSUME ALL STATE AND ACTIONS FROM THE ZUSTAND STORE ---
+  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
+  const visibility = useAppStore((state) => state.ui.visibility);
+  const effectiveRestrictedJournalId = useAppStore(
+    (state) => state.auth.effectiveRestrictedJournalId
+  );
+  const selections = useAppStore((state) => state.selections);
+  const setSelection = useAppStore((state) => state.setSelection);
+
+  // Destructure selections for easier use
+  const {
+    journal: journalSelections,
+    partner: selectedPartnerId,
+    goods: selectedGoodsId,
+    gpgContextJournalId,
+  } = selections;
+
+  // Derive the effectiveJournalIds here, inside the hook.
+  const effectiveSelectedJournalIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (journalSelections.topLevelId) ids.add(journalSelections.topLevelId);
+    journalSelections.level2Ids.forEach((id) => ids.add(id));
+    journalSelections.level3Ids.forEach((id) => ids.add(id));
+    return Array.from(ids);
+  }, [journalSelections]);
+
+  // Local UI state for the hook's own components (modals, menus) remains here.
   const [isGoodsOptionsMenuOpen, setIsGoodsOptionsMenuOpen] = useState(false);
   const [goodsOptionsMenuAnchorEl, setGoodsOptionsMenuAnchorEl] =
     useState<HTMLElement | null>(null);
   const [isAddEditGoodModalOpen, setIsAddEditGoodModalOpen] = useState(false);
   const [editingGoodData, setEditingGoodData] = useState<Good | null>(null);
+
+  // --- 5. RE-WIRE STATE SETTERS TO USE STORE ACTIONS ---
+  const setSelectedGoodsId = useCallback(
+    (id: string | null) => {
+      setSelection("goods", id);
+    },
+    [setSelection]
+  );
+
+  // --- Logic depending on store state ---
+
   const goodsSliderIndex = useMemo(
     () => sliderOrder.indexOf(SLIDER_TYPES.GOODS),
     [sliderOrder]
   );
+
+  const isGPContextActive = useMemo(() => {
+    const visibleSliders = sliderOrder.filter((id) => visibility[id]);
+    return (
+      visibleSliders.length >= 2 &&
+      visibleSliders[0] === SLIDER_TYPES.GOODS &&
+      visibleSliders[1] === SLIDER_TYPES.PARTNER
+    );
+  }, [sliderOrder, visibility]);
 
   const mainGoodsQueryKeyParams = useMemo((): FetchGoodsParams => {
     let params: FetchGoodsParams = { limit: 1000, offset: 0 };
     const currentOrderString = sliderOrder.join("-");
 
     if (isGPContextActive && goodsSliderIndex === 0) {
-      if (gpgContextJournalId)
+      if (gpgContextJournalId) {
         params.linkedToJournalIds = [gpgContextJournalId];
+      }
     } else if (goodsSliderIndex === 0) {
-      // Default params (all goods)
-    }
-    // --- REFACTORED: J-G Flow ---
-    else if (
+      // Default case when Goods is first, no special filters
+    } else if (
       currentOrderString.startsWith(
         `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}`
       )
     ) {
-      params.filterStatuses = filterStatuses;
+      params.filterStatuses = journalSelections.rootFilter;
       params.restrictedJournalId = effectiveRestrictedJournalId;
-      if (filterStatuses.includes("affected")) {
+      if (journalSelections.rootFilter.includes("affected")) {
         params.contextJournalIds = effectiveSelectedJournalIds;
       }
-    }
-    // --- (Other flows are unchanged) ---
-    else if (
+    } else if (
       currentOrderString.startsWith(
         `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.GOODS}`
       )
@@ -99,18 +113,18 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
         params.forPartnerId = selectedPartnerId;
         params.forJournalIds = [...effectiveSelectedJournalIds];
       } else {
-        params.forPartnerId = "__IMPOSSIBLE_JPGL_CONTEXT__";
+        params.forPartnerId = "__IMPOSSIBLE_JPGL_CONTEXT__"; // Prevent fetch
       }
     } else if (
       currentOrderString.startsWith(
         `${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}`
       )
     ) {
-      if (selectedPartnerId && selectedJournalIdForPjgFiltering) {
+      if (selectedPartnerId && journalSelections.flatId) {
         params.forPartnerId = selectedPartnerId;
-        params.forJournalIds = [selectedJournalIdForPjgFiltering];
+        params.forJournalIds = [journalSelections.flatId];
       } else {
-        params.forPartnerId = "__IMPOSSIBLE_PJGL_CONTEXT__";
+        params.forPartnerId = "__IMPOSSIBLE_PJGL_CONTEXT__"; // Prevent fetch
       }
     }
     return params;
@@ -119,18 +133,52 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     goodsSliderIndex,
     isGPContextActive,
     gpgContextJournalId,
-    filterStatuses, // Use new array
+    journalSelections.rootFilter,
+    journalSelections.flatId,
     effectiveRestrictedJournalId,
     effectiveSelectedJournalIds,
     selectedPartnerId,
-    selectedJournalIdForPjgFiltering,
   ]);
+
+  // --- 6. SIMPLIFIED ENABLED LOGIC ---
+  const isGoodsQueryEnabled = useMemo(() => {
+    if (!visibility[SLIDER_TYPES.GOODS]) return false;
+
+    const params = mainGoodsQueryKeyParams;
+
+    // Always enabled if Goods is the first slider
+    if (goodsSliderIndex === 0) return true;
+
+    // J-G Flow
+    if (sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0) {
+      if (params.filterStatuses?.length === 0) return false;
+      if (
+        params.filterStatuses?.includes("affected") &&
+        params.contextJournalIds?.length === 0
+      ) {
+        return params.filterStatuses.some((f) => f !== "affected");
+      }
+      return true;
+    }
+
+    // J-P-G or P-J-G flows are enabled only if the context isn't impossible
+    if (
+      params.forPartnerId &&
+      !params.forPartnerId.startsWith("__IMPOSSIBLE")
+    ) {
+      return true;
+    }
+
+    return false; // Disable by default
+  }, [visibility, goodsSliderIndex, sliderOrder, mainGoodsQueryKeyParams]);
 
   const mainGoodsQuery = useQuery<Good[], Error>({
     queryKey: ["mainGoods", mainGoodsQueryKeyParams],
     queryFn: async () => {
-      if (mainGoodsQueryKeyParams.forPartnerId?.startsWith("__IMPOSSIBLE"))
+      // The query function itself can check for the impossible context as a safeguard
+      if (mainGoodsQueryKeyParams.forPartnerId?.startsWith("__IMPOSSIBLE")) {
         return [];
+      }
       const result = await fetchGoods(mainGoodsQueryKeyParams);
       return result.data.map((g: any) => ({
         ...g,
@@ -139,89 +187,43 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
         unitCodeId: g.unitCodeId ?? null,
       }));
     },
-    enabled: (() => {
-      // --- UPDATED enabled logic for J-G flow ---
-      if (!visibility[SLIDER_TYPES.GOODS]) return false;
-      const orderString = sliderOrder.join("-");
-      if (goodsSliderIndex === 0) return true;
-      if (
-        orderString.startsWith(`${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}`)
-      ) {
-        // This logic is now the same as the Partner one, checking for valid filter states
-        if (filterStatuses.length === 0) return false;
-        const hasContextFreeFilter = filterStatuses.some(
-          (status) => status === "unaffected" || status === "inProcess"
-        );
-        if (hasContextFreeFilter) return !isJournalHierarchyLoading;
-        if (filterStatuses.includes("affected")) {
-          return (
-            effectiveSelectedJournalIds.length > 0 && !isJournalHierarchyLoading
-          );
-        }
-        return false;
-      }
-      if (
-        orderString.startsWith(
-          `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.GOODS}`
-        )
-      ) {
-        return (
-          !!selectedPartnerId &&
-          effectiveSelectedJournalIds.length > 0 &&
-          !isJournalHierarchyLoading &&
-          !isPartnerQueryLoading
-        );
-      }
-      if (
-        orderString.startsWith(
-          `${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}`
-        )
-      ) {
-        return (
-          !!selectedPartnerId &&
-          !!selectedJournalIdForPjgFiltering &&
-          !isPartnerQueryLoading &&
-          !isFlatJournalsQueryLoading
-        );
-      }
-      return false;
-    })(),
+    enabled: isGoodsQueryEnabled,
   });
 
-  // ... (Rest of the hook is unchanged)
-  const goodsForSlider = useMemo(
-    () => mainGoodsQuery.data || [],
-    [mainGoodsQuery.data]
-  );
-  const isLoadingCurrentGoods = useMemo(
-    () => mainGoodsQuery.isLoading,
-    [mainGoodsQuery.isLoading]
-  );
-  const isErrorCurrentGoods = useMemo(
-    () => mainGoodsQuery.isError,
-    [mainGoodsQuery.isError]
-  );
-  const currentGoodsError = useMemo(
-    () => mainGoodsQuery.error,
-    [mainGoodsQuery.error]
-  );
-  const createGoodMutation = useMutation({
+  // This effect ensures that if the query becomes disabled, its stale data is cleared.
+  useEffect(() => {
+    if (!isGoodsQueryEnabled && mainGoodsQuery.data?.length) {
+      queryClient.setQueryData(["mainGoods", mainGoodsQueryKeyParams], []);
+    }
+  }, [
+    isGoodsQueryEnabled,
+    mainGoodsQuery.data,
+    mainGoodsQueryKeyParams,
+    queryClient,
+  ]);
+
+  // Mutations (unchanged logic, but they call the new setSelectedGoodsId)
+  const createGoodMutation = useMutation<Good, Error, CreateGoodClientData>({
     mutationFn: createGood,
     onSuccess: (newGood) => {
       queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${newGood.label}' created successfully!`);
-      setSelectedGoodsId(String(newGood.id));
+      setSelectedGoodsId(String(newGood.id)); // <<-- Uses new setter
     },
     onError: (error: Error) => {
       console.error("Failed to create good/service:", error);
       alert(`Error creating good/service: ${error.message}`);
     },
   });
-  const updateGoodMutation = useMutation({
-    mutationFn: (variables: { id: string; data: UpdateGoodClientData }) =>
-      updateGood(variables.id, variables.data),
+
+  const updateGoodMutation = useMutation<
+    Good,
+    Error,
+    { id: string; data: UpdateGoodClientData }
+  >({
+    mutationFn: (variables) => updateGood(variables.id, variables.data),
     onSuccess: (updatedGood) => {
       queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
       setIsAddEditGoodModalOpen(false);
@@ -233,7 +235,8 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       alert(`Error updating good/service: ${error.message}`);
     },
   });
-  const deleteGoodMutation = useMutation({
+
+  const deleteGoodMutation = useMutation<{ message: string }, Error, string>({
     mutationFn: deleteGood,
     onSuccess: (response, deletedGoodId) => {
       queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
@@ -242,7 +245,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
           `Good/Service ${deletedGoodId} deleted successfully!`
       );
       if (selectedGoodsId === deletedGoodId) {
-        setSelectedGoodsId(null);
+        setSelectedGoodsId(null); // <<-- Uses new setter
       }
     },
     onError: (error: Error, deletedGoodId) => {
@@ -250,6 +253,8 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       alert(`Error deleting good/service: ${error.message}`);
     },
   });
+
+  // Auto-selection logic
   useEffect(() => {
     const currentData = mainGoodsQuery.data;
     if (mainGoodsQuery.isSuccess && currentData) {
@@ -260,24 +265,15 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
       } else if (currentData.length === 0 && selectedGoodsId !== null) {
         setSelectedGoodsId(null);
       }
-    } else if (
-      !mainGoodsQuery.isLoading &&
-      !mainGoodsQuery.isFetching &&
-      !mainGoodsQuery.isError &&
-      selectedGoodsId !== null
-    ) {
-      if (!currentData || currentData.length === 0) {
-        setSelectedGoodsId(null);
-      }
     }
   }, [
     mainGoodsQuery.data,
     mainGoodsQuery.isSuccess,
-    mainGoodsQuery.isLoading,
-    mainGoodsQuery.isFetching,
-    mainGoodsQuery.isError,
     selectedGoodsId,
+    setSelectedGoodsId,
   ]);
+
+  // Callback handlers for opening/closing modals (logic is unchanged)
   const handleOpenGoodsOptionsMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       setGoodsOptionsMenuAnchorEl(event.currentTarget);
@@ -285,15 +281,18 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     },
     []
   );
+
   const handleCloseGoodsOptionsMenu = useCallback(() => {
     setIsGoodsOptionsMenuOpen(false);
     setGoodsOptionsMenuAnchorEl(null);
   }, []);
+
   const handleOpenAddGoodModal = useCallback(() => {
     setEditingGoodData(null);
     setIsAddEditGoodModalOpen(true);
     handleCloseGoodsOptionsMenu();
   }, [handleCloseGoodsOptionsMenu]);
+
   const handleOpenEditGoodModal = useCallback(() => {
     const sourceData = mainGoodsQuery.data;
     if (selectedGoodsId && sourceData) {
@@ -307,43 +306,21 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     }
     handleCloseGoodsOptionsMenu();
   }, [selectedGoodsId, mainGoodsQuery.data, handleCloseGoodsOptionsMenu]);
+
   const handleCloseAddEditGoodModal = useCallback(() => {
     setIsAddEditGoodModalOpen(false);
     setEditingGoodData(null);
   }, []);
+
   const handleAddOrUpdateGoodSubmit = useCallback(
     (
       dataFromModal: CreateGoodClientData | UpdateGoodClientData,
       goodIdToUpdate?: string
     ) => {
       if (goodIdToUpdate && editingGoodData) {
-        const payloadForUpdate: UpdateGoodClientData = {
-          label: dataFromModal.label,
-          taxCodeId: (dataFromModal as any).taxCodeId,
-          typeCode: (dataFromModal as any).typeCode,
-          description: (dataFromModal as any).description,
-          unitCodeId: (dataFromModal as any).unitCodeId,
-          stockTrackingMethod: (dataFromModal as any).stockTrackingMethod,
-          packagingTypeCode: (dataFromModal as any).packagingTypeCode,
-          photoUrl: (dataFromModal as any).photoUrl,
-          additionalDetails: (dataFromModal as any).additionalDetails,
-          price: (dataFromModal as any).price,
-        };
-        Object.keys(payloadForUpdate).forEach((keyStr) => {
-          const key = keyStr as keyof UpdateGoodClientData;
-          if (payloadForUpdate[key] === undefined) {
-            delete payloadForUpdate[key];
-          }
-        });
-        if (Object.keys(payloadForUpdate).length === 0) {
-          alert("No changes detected to save for the good/service.");
-          setIsAddEditGoodModalOpen(false);
-          setEditingGoodData(null);
-          return;
-        }
         updateGoodMutation.mutate({
           id: goodIdToUpdate,
-          data: payloadForUpdate,
+          data: dataFromModal as UpdateGoodClientData,
         });
       } else {
         createGoodMutation.mutate(dataFromModal as CreateGoodClientData);
@@ -351,6 +328,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     },
     [editingGoodData, createGoodMutation, updateGoodMutation]
   );
+
   const handleDeleteCurrentGood = useCallback(() => {
     if (selectedGoodsId) {
       if (
@@ -364,6 +342,7 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     handleCloseGoodsOptionsMenu();
   }, [selectedGoodsId, deleteGoodMutation, handleCloseGoodsOptionsMenu]);
 
+  // --- 7. RETURN VALUE ---
   return {
     selectedGoodsId,
     setSelectedGoodsId,
@@ -371,15 +350,13 @@ export const useGoodManager = (props: UseGoodManagerProps) => {
     goodsOptionsMenuAnchorEl,
     isAddEditGoodModalOpen,
     editingGoodData,
-    goodsForSlider,
+    goodsForSlider: mainGoodsQuery.data || [],
     goodsQueryState: {
-      isLoading: isLoadingCurrentGoods,
-      isError: isErrorCurrentGoods,
-      error: currentGoodsError,
-      data: goodsForSlider,
-      refetch: () => {
-        mainGoodsQuery.refetch();
-      },
+      isLoading: mainGoodsQuery.isLoading,
+      isError: mainGoodsQuery.isError,
+      error: mainGoodsQuery.error,
+      data: mainGoodsQuery.data,
+      refetch: mainGoodsQuery.refetch,
       isFetching: mainGoodsQuery.isFetching,
     },
     createGoodMutation,

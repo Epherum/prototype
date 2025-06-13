@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import type { Good, JournalGoodLinkWithDetails } from "@/lib/types";
-import baseStyles from "./ModalBase.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
 // Reusing the CSS module from partner unlinking for similar structure.
 // You can create a dedicated one if distinctions grow.
 import unlinkStyles from "./UnlinkPartnerFromJournalsModal.module.css"; // Assuming this exists from previous step

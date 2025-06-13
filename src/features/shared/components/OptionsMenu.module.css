@@ -1,0 +1,74 @@
+/* src/features/shared/components/OptionsMenu.module.css */
+
+.optionsOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: transparent;
+  z-index: 900;
+}
+
+.optionsMenu {
+  /* --- THIS IS THE KEY FIX --- */
+  position: fixed; /* Changed from absolute to fixed */
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 4px 12px var(--shadow-color);
+  padding: var(--spacing-unit) 0;
+  min-width: 200px;
+  z-index: 901;
+  overflow: hidden;
+}
+
+.optionButton {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 1);
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 1.25) calc(var(--spacing-unit) * 2);
+  text-align: left;
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+}
+
+.optionButton svg {
+  font-size: 1.1em;
+  color: var(--text-secondary);
+  transition: color 0.15s ease-in-out;
+}
+
+.optionButton:hover {
+  background-color: var(--accent-slider);
+  color: var(--accent-warm);
+}
+
+.optionButton:hover svg {
+  color: var(--accent-warm);
+}
+
+.optionButton:disabled {
+  color: #b0b0b0;
+  cursor: not-allowed;
+  background-color: transparent;
+}
+.optionButton:disabled svg {
+  color: #b0b0b0;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background-color: var(--accent-warm-light);
+  color: #c82333;
+}
+.deleteButton:hover:not(:disabled) svg {
+  color: #c82333;
+}
+
+.menuDivider {
+  height: 1px;
+  background-color: var(--border-subtle);
+  margin: var(--spacing-unit) 0;
+}

@@ -1,54 +1,59 @@
-// src/components/modals/LinkGoodToJournalsModal.tsx
+// src/components/modals/LinkPartnerToJournalsModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import type {
-  Good,
+  Partner,
   AccountNodeData,
-  CreateJournalGoodLinkClientData,
+  CreateJournalPartnerLinkClientData,
 } from "@/lib/types";
-import baseStyles from "./ModalBase.module.css";
-// Reusing the CSS module from partner linking for similar structure.
-// You can create a dedicated one if distinctions grow.
-import linkStyles from "./LinkPartnerToJournalsModal.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
+import styles from "./LinkPartnerToJournalsModal.module.css"; // Create this CSS module
 
-interface LinkGoodToJournalsModalProps {
+interface LinkPartnerToJournalsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitLinks: (linksData: CreateJournalGoodLinkClientData[]) => void;
-  goodToLink: Good | null;
+  onSubmitLinks: (linksData: CreateJournalPartnerLinkClientData[]) => void;
+  partnerToLink: Partner | null;
   isSubmitting: boolean;
   onOpenJournalSelector: (
     onSelectCallback: (journalNode: AccountNodeData) => void
   ) => void;
-  // fullJournalHierarchy: AccountNodeData[]; // Not directly used by this modal, but passed to JournalModal via Home
+  fullJournalHierarchy: AccountNodeData[]; // For finding node details if needed, though JournalModal gives full node
+  // isJournalSelectorOpen?: boolean; // Optional: To disable close button while JournalModal is open
 }
 
-export default function LinkGoodToJournalsModal({
+export default function LinkPartnerToJournalsModal({
   isOpen,
   onClose,
   onSubmitLinks,
-  goodToLink,
+  partnerToLink,
   isSubmitting,
   onOpenJournalSelector,
-}: LinkGoodToJournalsModalProps) {
+  fullJournalHierarchy,
+}: // isJournalSelectorOpen,
+LinkPartnerToJournalsModalProps) {
   const [selectedJournals, setSelectedJournals] = useState<AccountNodeData[]>(
     []
   );
 
+  // Reset selected journals when the modal is closed or the partner changes
   useEffect(() => {
-    if (!isOpen || !goodToLink) {
+    if (!isOpen || !partnerToLink) {
       setSelectedJournals([]);
     }
-  }, [isOpen, goodToLink]);
+  }, [isOpen, partnerToLink]);
 
   const handleJournalSelectedBySelector = useCallback(
     (journalNode: AccountNodeData) => {
+      // This function is called by JournalModal (via Home.tsx) when a journal is selected for linking
       setSelectedJournals((prevSelected) => {
         if (prevSelected.find((j) => j.id === journalNode.id)) {
           return prevSelected; // Already selected
         }
         return [...prevSelected, journalNode];
       });
+      // The JournalModal (selector) itself remains open for further selections.
+      // The user closes JournalModal when they are "Done Selecting".
     },
     []
   );
@@ -60,30 +65,36 @@ export default function LinkGoodToJournalsModal({
   };
 
   const handleTriggerJournalSelector = () => {
+    // Call the prop from Home.tsx, passing our internal callback
     onOpenJournalSelector(handleJournalSelectedBySelector);
   };
 
   const handleSubmit = () => {
-    if (!goodToLink || selectedJournals.length === 0) {
+    if (!partnerToLink || selectedJournals.length === 0) {
       alert("Please select at least one journal to link.");
       return;
     }
-    const linksToCreate: CreateJournalGoodLinkClientData[] =
+    const linksToCreate: CreateJournalPartnerLinkClientData[] =
       selectedJournals.map((journal) => ({
-        goodId: String(goodToLink.id), // Ensure goodId is string for the client data type
+        partnerId: partnerToLink.id, // Ensure partnerId is string if your type expects string
         journalId: journal.id,
+        // Add any other default properties for the link if necessary
       }));
     onSubmitLinks(linksToCreate);
+    // Closing the modal is typically handled by Home.tsx after successful submission (e.g., invalidating queries and then `handleCloseLinkPartnerToJournalsModal`)
+    // or if onSubmitLinks itself triggers a state change that closes it.
+    // For now, we assume Home.tsx's createJPLMutation onSuccess/onError will lead to modal closure if needed.
   };
 
   if (!isOpen) {
+    // Framer Motion handles the exit animation
     return null;
   }
 
   return (
     <motion.div
       className={baseStyles.modalOverlay}
-      onClick={onClose}
+      onClick={onClose} // Allow closing by clicking overlay
       initial="closed"
       animate="open"
       exit="closed"
@@ -91,7 +102,7 @@ export default function LinkGoodToJournalsModal({
       transition={{ duration: 0.2 }}
     >
       <motion.div
-        className={`${baseStyles.modalContent} ${linkStyles.linkModalContentSizing}`}
+        className={`${baseStyles.modalContent} ${styles.linkModalContentSizing}`} // Add specific sizing if needed
         onClick={(e) => e.stopPropagation()}
         initial={{ opacity: 0, scale: 0.95, y: "2%" }}
         animate={{ opacity: 1, scale: 1, y: "0%" }}
@@ -101,24 +112,25 @@ export default function LinkGoodToJournalsModal({
         <button
           className={baseStyles.modalCloseButton}
           onClick={onClose}
-          aria-label="Close link good to journals modal"
+          aria-label="Close link partner to journals modal"
+          // disabled={isJournalSelectorOpen} // Optional: disable if journal selector is open
         >
           ×
         </button>
         <h2 className={baseStyles.modalTitle}>
-          Link Good/Service: {goodToLink?.label || "N/A"} to Journals
+          Link Partner: {partnerToLink?.name || "N/A"} to Journals
         </h2>
 
-        <div className={linkStyles.modalBody}>
+        <div className={styles.modalBody}>
           <button
             onClick={handleTriggerJournalSelector}
-            className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary} ${linkStyles.selectJournalsButton}`}
+            className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary} ${styles.selectJournalsButton}`}
           >
             Select Journal(s) to Link
           </button>
 
           {selectedJournals.length > 0 && (
-            <div className={linkStyles.selectedJournalsList}>
+            <div className={styles.selectedJournalsList}>
               <h4>Selected Journals:</h4>
               <ul>
                 {selectedJournals.map((journal) => (
@@ -128,7 +140,7 @@ export default function LinkGoodToJournalsModal({
                     </span>
                     <button
                       onClick={() => handleRemoveJournal(journal.id)}
-                      className={linkStyles.removeJournalButton}
+                      className={styles.removeJournalButton}
                       aria-label={`Remove ${journal.name}`}
                     >
                       ×
@@ -138,18 +150,14 @@ export default function LinkGoodToJournalsModal({
               </ul>
             </div>
           )}
-          {selectedJournals.length === 0 && goodToLink && (
-            <p className={linkStyles.noJournalsSelected}>
+          {selectedJournals.length === 0 && partnerToLink && (
+            <p className={styles.noJournalsSelected}>
               No journals selected yet. Click "Select Journal(s)" to add.
             </p>
           )}
-          {!goodToLink && (
-            <p
-              className={
-                linkStyles.noPartnerError /* Reusing class, might rename to noItemError */
-              }
-            >
-              Error: No Good/Service identified for linking.
+          {!partnerToLink && (
+            <p className={styles.noPartnerError}>
+              Error: No partner identified for linking.
             </p>
           )}
         </div>
@@ -159,7 +167,7 @@ export default function LinkGoodToJournalsModal({
             type="button"
             onClick={onClose}
             className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
-            disabled={isSubmitting}
+            disabled={isSubmitting /* || isJournalSelectorOpen */}
           >
             Cancel
           </button>
@@ -168,7 +176,7 @@ export default function LinkGoodToJournalsModal({
             onClick={handleSubmit}
             className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
             disabled={
-              isSubmitting || selectedJournals.length === 0 || !goodToLink
+              isSubmitting || selectedJournals.length === 0 || !partnerToLink
             }
           >
             {isSubmitting

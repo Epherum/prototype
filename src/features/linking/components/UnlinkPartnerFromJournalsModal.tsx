@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Partner, JournalPartnerLinkWithDetails } from "@/lib/types";
-import baseStyles from "./ModalBase.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./UnlinkPartnerFromJournalsModal.module.css"; // Create this
 
 interface UnlinkPartnerFromJournalsModalProps {
