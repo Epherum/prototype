@@ -1,19 +1,21 @@
 // src/features/partners/usePartnerManager.ts
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useAppStore } from "@/store/appStore";
+import { SLIDER_TYPES } from "@/lib/constants";
+import { getFirstId } from "@/lib/helpers";
+
 import {
   fetchPartners,
   createPartner,
   updatePartner,
   deletePartner,
 } from "@/services/clientPartnerService";
-import { getFirstId } from "@/lib/helpers";
-import { SLIDER_TYPES } from "@/lib/constants";
-import { useAppStore } from "@/store/appStore"; // <<-- 1. IMPORT THE STORE
 
-// Import types from your existing files
+import { useJournalManager } from "@/features/journals/useJournalManager";
+
 import type {
   Partner,
   CreatePartnerClientData,
@@ -21,40 +23,29 @@ import type {
   FetchPartnersParams,
 } from "@/lib/types";
 
-// <<-- 2. THE `UsePartnerManagerProps` INTERFACE HAS BEEN DELETED.
-
 export const usePartnerManager = () => {
-  // <<-- 3. THE HOOK NOW TAKES NO PROPS.
   const queryClient = useQueryClient();
 
-  // --- 4. CONSUME ALL STATE AND ACTIONS FROM THE ZUSTAND STORE ---
-  // Use multiple, granular selectors to avoid re-render issues.
+  // --- Consume state from Zustand ---
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
+  const selections = useAppStore((state) => state.selections);
+  const setSelection = useAppStore((state) => state.setSelection);
   const effectiveRestrictedJournalId = useAppStore(
     (state) => state.auth.effectiveRestrictedJournalId
   );
-  const selections = useAppStore((state) => state.selections);
-  const setSelection = useAppStore((state) => state.setSelection);
 
-  // Destructure selections for easier use in memos
   const {
     journal: journalSelections,
     goods: selectedGoodsId,
     partner: selectedPartnerId,
-    gpgContextJournalId,
   } = selections;
 
-  // Derive the effectiveJournalIds here, inside the hook that needs it.
-  const effectiveSelectedJournalIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (journalSelections.topLevelId) ids.add(journalSelections.topLevelId);
-    journalSelections.level2Ids.forEach((id) => ids.add(id));
-    journalSelections.level3Ids.forEach((id) => ids.add(id));
-    return Array.from(ids);
-  }, [journalSelections]);
+  // --- Consume the specialist hook for derived journal data ---
+  const { effectiveSelectedJournalIds, isJournalSliderPrimary } =
+    useJournalManager();
 
-  // Local UI state for the hook's own components (modals, menus) remains here.
+  // --- Local UI state for modals/menus ---
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
     useState(false);
   const [partnerOptionsMenuAnchorEl, setPartnerOptionsMenuAnchorEl] =
@@ -65,7 +56,6 @@ export const usePartnerManager = () => {
     null
   );
 
-  // --- 5. RE-WIRE STATE SETTERS TO USE STORE ACTIONS ---
   const setSelectedPartnerId = useCallback(
     (id: string | null) => {
       setSelection("partner", id);
@@ -73,59 +63,37 @@ export const usePartnerManager = () => {
     [setSelection]
   );
 
-  // --- Logic depending on store state (e.g., query keys, enabled flags) ---
-
-  const isGPGOrderActive = useMemo(() => {
-    const visibleSliders = sliderOrder.filter((id) => visibility[id]);
-    return (
-      visibleSliders.length >= 2 &&
-      visibleSliders[0] === SLIDER_TYPES.GOODS &&
-      visibleSliders[1] === SLIDER_TYPES.PARTNER
-    );
-  }, [sliderOrder, visibility]);
-
+  // --- CORRECTED: Robust Query Parameter Generation ---
   const partnerQueryKeyParamsStructure = useMemo((): FetchPartnersParams => {
-    const orderString = sliderOrder.join("-");
     let params: FetchPartnersParams = { limit: 1000, offset: 0 };
     const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
-    if (isGPGOrderActive && partnerIndex === 1) {
-      if (gpgContextJournalId) {
-        params.linkedToJournalIds = [gpgContextJournalId];
-        params.includeChildren = false;
-      } else {
-        // Provide a non-existent ID to ensure no results are returned if context is required but missing.
-        params.linkedToJournalIds = ["__NO_GPG_CONTEXT_JOURNAL__"];
-      }
-    } else if (
-      orderString.startsWith(`${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`)
+    // --- KEY FIX 1: ALWAYS apply general filters first. ---
+    // This ensures "unaffected" and "inProcess" work regardless of slider order.
+    params.filterStatuses = journalSelections.rootFilter;
+    params.restrictedJournalId = effectiveRestrictedJournalId;
+
+    // --- KEY FIX 2: ONLY add the specific `contextJournalIds` when needed. ---
+    // This is an additional parameter just for the "affected" case in the J-P flow.
+    if (
+      isJournalSliderPrimary &&
+      journalSelections.rootFilter.includes("affected")
     ) {
-      params.filterStatuses = journalSelections.rootFilter;
-      params.restrictedJournalId = effectiveRestrictedJournalId;
-      if (journalSelections.rootFilter.includes("affected")) {
-        params.contextJournalIds = effectiveSelectedJournalIds;
-      }
-    } else if (
-      orderString.startsWith(
-        `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}-${SLIDER_TYPES.PARTNER}`
-      )
-    ) {
-      if (effectiveSelectedJournalIds.length > 0 && selectedGoodsId) {
-        params.linkedToJournalIds = [...effectiveSelectedJournalIds];
-        params.linkedToGoodId = selectedGoodsId;
-        params.includeChildren = true;
-      }
-    } else if (
-      orderString.startsWith(
-        `${SLIDER_TYPES.GOODS}-${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`
-      )
+      params.contextJournalIds = effectiveSelectedJournalIds;
+    }
+
+    // Handle other, mutually exclusive slider order logic (e.g., G-J-P)
+    if (
+      sliderOrder.indexOf(SLIDER_TYPES.GOODS) === 0 &&
+      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1 &&
+      partnerIndex === 2
     ) {
       if (selectedGoodsId && journalSelections.flatId) {
         params.linkedToJournalIds = [journalSelections.flatId];
         params.linkedToGoodId = selectedGoodsId;
-        params.includeChildren = false;
       }
     }
+
     return params;
   }, [
     sliderOrder,
@@ -134,8 +102,7 @@ export const usePartnerManager = () => {
     effectiveSelectedJournalIds,
     effectiveRestrictedJournalId,
     selectedGoodsId,
-    isGPGOrderActive,
-    gpgContextJournalId,
+    isJournalSliderPrimary,
   ]);
 
   const partnerQueryKey = useMemo(
@@ -143,76 +110,66 @@ export const usePartnerManager = () => {
     [partnerQueryKeyParamsStructure]
   );
 
-  // --- 6. SIMPLIFIED ENABLED LOGIC ---
-  // The hook no longer cares about the loading state of other hooks.
-  // It only cares if the STATE it needs to build its query is available.
+  // --- CORRECTED: Robust Query Enabled Logic ---
   const isPartnerQueryEnabled = useMemo(() => {
-    if (!visibility[SLIDER_TYPES.PARTNER]) return false;
-
-    const params = partnerQueryKeyParamsStructure;
-
-    // GPG Order: Enabled only if a context journal is selected.
-    if (isGPGOrderActive) {
-      return (
-        !!params.linkedToJournalIds &&
-        params.linkedToJournalIds[0] !== "__NO_GPG_CONTEXT_JOURNAL__"
-      );
+    if (!visibility[SLIDER_TYPES.PARTNER]) {
+      return false;
     }
 
-    // J-P Order: Enabled if any filters are active. If 'affected' is the only one, requires a journal selection.
-    if (sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0) {
-      if (params.filterStatuses?.length === 0) return false;
-      if (
-        params.filterStatuses?.includes("affected") &&
-        params.contextJournalIds?.length === 0
-      ) {
-        // 'affected' is on, but no journals selected. If other context-free filters are also on, allow it.
-        return params.filterStatuses.some((f) => f !== "affected");
-      }
+    // Case 1: Partner is the first slider, always fetch all partners.
+    if (sliderOrder.indexOf(SLIDER_TYPES.PARTNER) === 0) {
       return true;
     }
 
-    // G-J-P Order: Enabled only if both good and flat journal are selected
-    if (
-      sliderOrder.indexOf(SLIDER_TYPES.GOODS) === 0 &&
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1
-    ) {
-      return (
-        !!params.linkedToGoodId &&
-        !!params.linkedToJournalIds &&
-        params.linkedToJournalIds.length > 0
-      );
+    // Case 2: ANY root filter is active. This covers "affected", "unaffected",
+    // and "inProcess" correctly.
+    if (journalSelections.rootFilter.length > 0) {
+      return true;
     }
 
-    // P is first slider
-    if (sliderOrder.indexOf(SLIDER_TYPES.PARTNER) === 0) return true;
+    // You can add other specific flow conditions here if needed.
+    // e.g., for G-J-P flow
+    const params = partnerQueryKeyParamsStructure;
+    if (params.linkedToGoodId && params.linkedToJournalIds?.length > 0) {
+      return true;
+    }
 
-    return false; // Disable by default if no case matches
+    // Default to disabled if no valid condition is met.
+    return false;
   }, [
     visibility,
     sliderOrder,
+    journalSelections.rootFilter,
     partnerQueryKeyParamsStructure,
-    isGPGOrderActive,
   ]);
 
-  const partnerQuery = useQuery<Partner[], Error>({
+  const partnerQuery = useQuery<{ data: Partner[] }>({
     queryKey: partnerQueryKey,
-    queryFn: async (): Promise<Partner[]> => {
-      // The query function itself doesn't need to change much.
-      const result = await fetchPartners(partnerQueryKeyParamsStructure);
-      return result.data.map((p: any) => ({ ...p, id: String(p.id) }));
-    },
+    queryFn: () => fetchPartners(partnerQueryKeyParamsStructure),
     enabled: isPartnerQueryEnabled,
   });
 
-  // This effect ensures that if the query becomes disabled, its stale data is cleared.
+  // Auto-selection logic (unchanged)
   useEffect(() => {
-    if (!isPartnerQueryEnabled && partnerQuery.data?.length) {
-      queryClient.setQueryData(partnerQueryKey, []);
+    if (partnerQuery.isSuccess && partnerQuery.data) {
+      const fetchedPartners = partnerQuery.data.data;
+      const currentSelectionInList =
+        selectedPartnerId &&
+        fetchedPartners.some((p) => String(p.id) === selectedPartnerId);
+      if (fetchedPartners.length > 0 && !currentSelectionInList) {
+        setSelectedPartnerId(getFirstId(fetchedPartners));
+      } else if (fetchedPartners.length === 0 && selectedPartnerId !== null) {
+        setSelectedPartnerId(null);
+      }
     }
-  }, [isPartnerQueryEnabled, partnerQuery.data, partnerQueryKey, queryClient]);
+  }, [
+    partnerQuery.data,
+    partnerQuery.isSuccess,
+    selectedPartnerId,
+    setSelectedPartnerId,
+  ]);
 
-  // Mutations (unchanged logic, but they call the new setSelectedPartnerId)
+  // --- Mutations and Modal Handlers (No changes needed) ---
   const createPartnerMutation = useMutation<
     Partner,
     Error,
@@ -224,7 +181,7 @@ export const usePartnerManager = () => {
       setIsAddEditPartnerModalOpen(false);
       setEditingPartnerData(null);
       alert(`Partner '${newPartner.name}' created successfully!`);
-      setSelectedPartnerId(String(newPartner.id)); // <<-- Uses new setter
+      setSelectedPartnerId(String(newPartner.id));
     },
     onError: (error: Error) => {
       console.error("Failed to create partner:", error);
@@ -260,7 +217,7 @@ export const usePartnerManager = () => {
             `Partner ${deletedPartnerId} deleted successfully!`
         );
         if (selectedPartnerId === deletedPartnerId) {
-          setSelectedPartnerId(null); // <<-- Uses new setter
+          setSelectedPartnerId(null);
         }
       },
       onError: (error: Error, deletedPartnerId) => {
@@ -270,27 +227,7 @@ export const usePartnerManager = () => {
     }
   );
 
-  // Auto-selection logic (remains crucial)
-  useEffect(() => {
-    if (partnerQuery.isSuccess && partnerQuery.data) {
-      const fetchedPartners = partnerQuery.data;
-      const currentSelectionInList =
-        selectedPartnerId &&
-        fetchedPartners.some((p) => p.id === selectedPartnerId);
-      if (fetchedPartners.length > 0 && !currentSelectionInList) {
-        setSelectedPartnerId(getFirstId(fetchedPartners));
-      } else if (fetchedPartners.length === 0 && selectedPartnerId !== null) {
-        setSelectedPartnerId(null);
-      }
-    }
-  }, [
-    partnerQuery.data,
-    partnerQuery.isSuccess,
-    selectedPartnerId,
-    setSelectedPartnerId,
-  ]);
-
-  // Callback handlers for opening/closing modals (logic is unchanged)
+  // Modal handler callbacks (unchanged)
   const handleOpenPartnerOptionsMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       setPartnerOptionsMenuAnchorEl(event.currentTarget);
@@ -298,22 +235,19 @@ export const usePartnerManager = () => {
     },
     []
   );
-
   const handleClosePartnerOptionsMenu = useCallback(() => {
     setIsPartnerOptionsMenuOpen(false);
     setPartnerOptionsMenuAnchorEl(null);
   }, []);
-
   const handleOpenAddPartnerModal = useCallback(() => {
     setEditingPartnerData(null);
     setIsAddEditPartnerModalOpen(true);
     handleClosePartnerOptionsMenu();
   }, [handleClosePartnerOptionsMenu]);
-
   const handleOpenEditPartnerModal = useCallback(() => {
-    if (selectedPartnerId && partnerQuery.data) {
-      const partnerToEdit = partnerQuery.data.find(
-        (p) => p.id === selectedPartnerId
+    if (selectedPartnerId && partnerQuery.data?.data) {
+      const partnerToEdit = partnerQuery.data.data.find(
+        (p) => String(p.id) === selectedPartnerId
       );
       if (partnerToEdit) {
         setEditingPartnerData(partnerToEdit);
@@ -324,12 +258,10 @@ export const usePartnerManager = () => {
     }
     handleClosePartnerOptionsMenu();
   }, [selectedPartnerId, partnerQuery.data, handleClosePartnerOptionsMenu]);
-
   const handleCloseAddEditPartnerModal = useCallback(() => {
     setIsAddEditPartnerModalOpen(false);
     setEditingPartnerData(null);
   }, []);
-
   const handleAddOrUpdatePartnerSubmit = useCallback(
     (
       dataFromModal: CreatePartnerClientData | UpdatePartnerClientData,
@@ -346,12 +278,11 @@ export const usePartnerManager = () => {
     },
     [editingPartnerData, createPartnerMutation, updatePartnerMutation]
   );
-
   const handleDeleteCurrentPartner = useCallback(() => {
     if (selectedPartnerId) {
       if (
         window.confirm(
-          `Are you sure you want to delete partner ${selectedPartnerId}? This might affect related documents or links.`
+          `Are you sure you want to delete partner with ID ${selectedPartnerId}? This might affect related documents or links.`
         )
       ) {
         deletePartnerMutation.mutate(selectedPartnerId);
@@ -360,17 +291,15 @@ export const usePartnerManager = () => {
     handleClosePartnerOptionsMenu();
   }, [selectedPartnerId, deletePartnerMutation, handleClosePartnerOptionsMenu]);
 
-  // --- 7. RETURN VALUE ---
-  // The return signature is the same, but the values are now derived from the store or React Query.
   return {
     selectedPartnerId,
-    setSelectedPartnerId, // Return the memoized setter
+    setSelectedPartnerId,
+    partnersForSlider: partnerQuery.data?.data || [],
+    partnerQuery,
     isPartnerOptionsMenuOpen,
     partnerOptionsMenuAnchorEl,
     isAddEditPartnerModalOpen,
     editingPartnerData,
-    partnersForSlider: partnerQuery.data || [],
-    partnerQuery,
     partnerQueryKey,
     createPartnerMutation,
     updatePartnerMutation,

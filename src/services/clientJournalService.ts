@@ -2,6 +2,7 @@
 import type { AccountNodeData, Journal } from "@/lib/types";
 import type { Journal as PrismaJournal } from "@prisma/client";
 import { JournalForAdminSelection, buildTree } from "@/lib/helpers";
+import { ROOT_JOURNAL_ID } from "@/lib/constants"; // <-- 1. IMPORT THE CONSTANT
 
 export async function fetchJournalHierarchy(
   restrictedTopLevelJournalId?: string | null
@@ -9,26 +10,27 @@ export async function fetchJournalHierarchy(
   let apiUrl = "/api/journals";
   const params = new URLSearchParams();
 
-  if (restrictedTopLevelJournalId) {
-    // If a user is restricted, fetch their specific sub-hierarchy.
-    // The API's getJournalSubHierarchy will return the restrictedTopLevelJournalId node
-    // and all its descendants. buildTree will then correctly form a tree with
-    // restrictedTopLevelJournalId as the root because its parent won't be in the fetched list.
-    params.append("fetchSubtree", "true"); // Signal to API to fetch the sub-tree
+  // --- 2. FIX THE LOGIC HERE ---
+  // The goal is to fetch a subtree ONLY if the user is TRULY restricted to a specific journal ID,
+  // NOT when they are an admin whose "restriction" is the conceptual root.
+  if (
+    restrictedTopLevelJournalId &&
+    restrictedTopLevelJournalId !== ROOT_JOURNAL_ID
+  ) {
+    // THIS BLOCK IS FOR TRULY RESTRICTED USERS
+    params.append("fetchSubtree", "true");
     params.append("restrictedTopLevelJournalId", restrictedTopLevelJournalId);
     console.log(
       `[clientJournalService] Fetching RESTRICTED journal sub-hierarchy for: ${restrictedTopLevelJournalId}`
     );
   } else {
-    // For unrestricted users, fetch all journals for the company.
-    // The API GET handler (without specific params like parentId or restrictedTopLevelJournalId)
-    // defaults to journalService.getAllJournals(). buildTree will construct the full hierarchy.
+    // THIS BLOCK IS FOR ADMINS / UNRESTRICTED USERS
+    // It will fetch all journals for the company.
     console.log(
-      "[clientJournalService] Fetching COMPLETE journal hierarchy for unrestricted user."
+      "[clientJournalService] Fetching COMPLETE journal hierarchy for admin/unrestricted user."
     );
-    // No specific params needed if API default is getAllJournals for the company.
-    // If your API requires an explicit "fetchAll" or "root=true" for all top-levels, add it here.
-    // For now, assuming calling /api/journals with no params gives all journals for the company.
+    // No parameters are needed if your API's default GET /api/journals
+    // returns all journals for the user's company.
   }
 
   if (params.toString()) {
@@ -53,15 +55,9 @@ export async function fetchJournalHierarchy(
   }
 
   const flatJournals: Journal[] = await response.json();
-  // buildTree will correctly form a tree. If restrictedTopLevelJournalId was used,
-  // that node will be the root of the returned tree because its actual parent
-  // (if any) won't be in flatJournals.
   const hierarchy = buildTree(flatJournals);
   console.log(
-    "[clientJournalService] Built journal hierarchy, count:",
-    hierarchy.length,
-    "top-level nodes. Data:",
-    hierarchy
+    `[clientJournalService] Built journal hierarchy, count: ${hierarchy.length} top-level nodes.`
   );
   return hierarchy;
 }

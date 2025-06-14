@@ -1,28 +1,31 @@
 // src/store/appStore.ts
+
 import { create } from "zustand";
 import { type Session } from "next-auth";
-import type { SessionProviderProps } from "next-auth/react";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
 
 // Import types from your existing files
-import type { ExtendedUser } from "@/lib/authOptions"; // <-- CORRECTED IMPORT
-import type { PartnerGoodFilterStatus } from "@/lib/types"; // <-- CORRECTED IMPORT
+import type { ExtendedUser } from "@/lib/authOptions";
+import type { PartnerGoodFilterStatus } from "@/lib/types";
 
-// Define slider-specific types that were not in the global types.ts
+// Define slider-specific types
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];
 export type SliderVisibility = Record<SliderType, boolean>;
+
 // --- State Slice Interfaces ---
 
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
 interface AuthSlice {
   sessionStatus: SessionStatus;
-  user: Partial<ExtendedUser>; // Use Partial to handle loading/unauthenticated states
+  user: Partial<ExtendedUser>;
   companyId: string | null;
   /** The most specific journal ID a user is allowed to see as their root. */
   effectiveRestrictedJournalId: string;
   /** The company ID associated with the restricted journal. */
   effectiveRestrictedJournalCompanyId: string | null;
+  /** A derived boolean for easy admin checks across the app. */
+  isAdmin: boolean;
 }
 
 interface SelectionsSlice {
@@ -31,13 +34,12 @@ interface SelectionsSlice {
     level2Ids: string[];
     level3Ids: string[];
     flatId: string | null;
-    rootFilter: string[]; // e.g., ['affected', 'inProcess']
+    rootFilter: string[];
   };
   partner: string | null;
   goods: string | null;
   project: string | null;
   document: string | null;
-  // Contextual selections
   gpgContextJournalId: string | null;
 }
 
@@ -57,7 +59,6 @@ interface AppState {
   moveSlider: (sliderId: SliderType, direction: "up" | "down") => void;
   setSliderVisibility: (visibility: SliderVisibility) => void;
   toggleSliderVisibility: (sliderId: SliderType) => void;
-  // --- CORRECTED SIGNATURE ---
   setSelection: (
     sliderType:
       | keyof Omit<SelectionsSlice, "journal">
@@ -78,7 +79,7 @@ const getInitialSelections = (
     level2Ids: [],
     level3Ids: [],
     flatId: null,
-    rootFilter: [], // Default to no filters
+    rootFilter: [],
   },
   partner: null,
   goods: null,
@@ -95,8 +96,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
     sessionStatus: "loading",
     user: {},
     companyId: null,
-    effectiveRestrictedJournalId: ROOT_JOURNAL_ID, // Default to conceptual root
+    effectiveRestrictedJournalId: ROOT_JOURNAL_ID,
     effectiveRestrictedJournalCompanyId: null,
+    isAdmin: false, // Default to false
   },
   ui: {
     sliderOrder: INITIAL_ORDER as SliderType[],
@@ -119,7 +121,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
         let restrictedId = ROOT_JOURNAL_ID;
         let restrictedCompanyId = null;
 
-        // This logic is moved directly from page.tsx to here.
+        // NEW: Determine if the user has an "ADMIN" role
+        const userIsAdmin =
+          user.roles?.some((role) => role.name.toUpperCase() === "ADMIN") ??
+          false;
+
         if (user.roles && user.roles.length > 0) {
           const roleWithRestriction = user.roles.find(
             (role) => !!role.restrictedTopLevelJournalId
@@ -140,34 +146,30 @@ export const useAppStore = create<AppState>()((set, get) => ({
             companyId: user.companyId || null,
             effectiveRestrictedJournalId: restrictedId,
             effectiveRestrictedJournalCompanyId: restrictedCompanyId,
+            isAdmin: userIsAdmin, // Set the derived admin flag
           },
-          // When auth changes, reset selections to respect the new restriction
           selections: getInitialSelections(restrictedId),
         };
       }
       // Handle loading and unauthenticated states
       return {
         auth: {
-          sessionStatus: status,
+          sessionStatus: "loading",
           user: {},
           companyId: null,
           effectiveRestrictedJournalId: ROOT_JOURNAL_ID,
           effectiveRestrictedJournalCompanyId: null,
+          isAdmin: false, // Ensure isAdmin is false when not authenticated
         },
         selections: getInitialSelections(),
       };
     }),
 
   setSliderOrder: (order) =>
-    set((state) => {
-      // When slider order changes, reset all selections to prevent invalid contexts
-      return {
-        ui: { ...state.ui, sliderOrder: order },
-        selections: getInitialSelections(
-          state.auth.effectiveRestrictedJournalId
-        ),
-      };
-    }),
+    set((state) => ({
+      ui: { ...state.ui, sliderOrder: order },
+      selections: getInitialSelections(state.auth.effectiveRestrictedJournalId),
+    })),
 
   moveSlider: (sliderId, direction) =>
     set((state) => {
@@ -179,7 +181,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
         (direction === "up" && currentIndex <= 0) ||
         (direction === "down" && currentIndex >= visibleOrderedIds.length - 1)
       ) {
-        return state; // Cannot move
+        return state;
       }
 
       const newOrderedVisibleIds = [...visibleOrderedIds];
@@ -188,7 +190,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [newOrderedVisibleIds[currentIndex], newOrderedVisibleIds[targetIndex]] =
         [newOrderedVisibleIds[targetIndex], newOrderedVisibleIds[currentIndex]];
 
-      // Reconstruct the full sliderOrder array
       const newSliderOrder = [...sliderOrder];
       let visibleIndex = 0;
       for (let i = 0; i < newSliderOrder.length; i++) {
@@ -198,7 +199,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       }
 
-      // Moving sliders also resets selections due to changed dependencies
       return {
         ui: { ...state.ui, sliderOrder: newSliderOrder },
         selections: getInitialSelections(
@@ -221,17 +221,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
       },
     })),
 
-  /**
-   * This is the most important action in the refactor.
-   * It updates a selection and automatically resets dependent selections
-   * based on the slider order, replacing the need for complex useEffect chains.
-   */
   setSelection: (sliderType, value) =>
     set((state) => {
       const newSelections = { ...state.selections };
-      let clearSubsequent = true; // Assume we clear subsequent sliders by default
+      let clearSubsequent = true;
 
-      // 1. Update the selection for the target slider type
       if (sliderType === "journal.rootFilter") {
         const currentFilters = newSelections.journal.rootFilter;
         const newFilterSet = new Set(currentFilters);
@@ -241,18 +235,15 @@ export const useAppStore = create<AppState>()((set, get) => ({
           newFilterSet.add(value);
         }
         newSelections.journal.rootFilter = Array.from(newFilterSet);
-        clearSubsequent = false; // <<< IMPORTANT: Do NOT clear subsequent sliders for a filter change
+        clearSubsequent = false;
       } else if (sliderType === "journal") {
         newSelections.journal = { ...newSelections.journal, ...value };
       } else {
-        // This handles 'partner', 'goods', 'gpgContextJournalId', etc.
         (newSelections[sliderType as keyof SelectionsSlice] as any) = value;
       }
 
       if (clearSubsequent) {
-        // This part remains the same, but is now only triggered for actual selections
         const order = state.ui.sliderOrder;
-        // Handle the case where sliderType is 'journal.rootFilter' which is not in the order
         const simpleSliderType = String(sliderType).split(".")[0];
         const currentSliderIndex = order.indexOf(
           simpleSliderType.toUpperCase() as SliderType

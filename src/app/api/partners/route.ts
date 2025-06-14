@@ -95,8 +95,8 @@ export async function GET(request: NextRequest) {
         }'`
       );
 
-      // ============================ FIX IS HERE ============================
-      // This is the single source of truth for handling filters now.
+      // ============================ THE FIX IS HERE ============================
+      // This logic correctly handles the parameters sent from the corrected frontend.
 
       const filterStatuses = filterStatusesParam
         ? (filterStatusesParam
@@ -104,17 +104,18 @@ export async function GET(request: NextRequest) {
             .filter(Boolean) as PartnerGoodFilterStatus[])
         : [];
 
-      serviceCallOptions.filterStatuses = filterStatuses;
-      serviceCallOptions.restrictedJournalId = restrictedJournalId || null;
+      const contextJournalIds =
+        contextJournalIdsParam
+          ?.split(",")
+          .map((id) => id.trim())
+          .filter(Boolean) || [];
 
-      // If the 'affected' filter is present, we MUST parse and pass the context journal IDs.
-      if (filterStatuses.includes("affected")) {
-        serviceCallOptions.contextJournalIds =
-          contextJournalIdsParam
-            ?.split(",")
-            .map((id) => id.trim())
-            .filter(Boolean) || [];
-      }
+      // Pass all relevant parameters directly to the service.
+      // The service layer (`partnerService`) contains the complex logic
+      // for how to use these parameters. This API layer's job is just to pass them along.
+      serviceCallOptions.filterStatuses = filterStatuses;
+      serviceCallOptions.contextJournalIds = contextJournalIds;
+      serviceCallOptions.restrictedJournalId = restrictedJournalId || null;
       // ========================= END OF FIX ==========================
 
       partnersResult = await partnerService.getAllPartners(serviceCallOptions);

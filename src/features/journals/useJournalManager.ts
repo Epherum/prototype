@@ -8,7 +8,7 @@ import {
   createJournalEntry as serverCreateJournalEntry,
   deleteJournalEntry as serverDeleteJournalEntry,
 } from "@/services/clientJournalService";
-import { findNodeById } from "@/lib/helpers";
+import { findNodeById, findParentOfNode } from "@/lib/helpers";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import { useAppStore } from "@/store/appStore";
 
@@ -25,13 +25,11 @@ const MAX_L3_SELECTIONS = 20;
 export const useJournalManager = () => {
   const queryClient = useQueryClient();
 
+  // State from Zustand Store
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
   const restrictedJournalId = useAppStore(
     (state) => state.auth.effectiveRestrictedJournalId
-  );
-  const restrictedJournalCompanyId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalCompanyId
   );
   const selections = useAppStore((state) => state.selections);
   const setSelection = useAppStore((state) => state.setSelection);
@@ -44,6 +42,7 @@ export const useJournalManager = () => {
     rootFilter: activeJournalRootFilters,
   } = selections.journal;
 
+  // Local component state
   const [isAddJournalModalOpen, setIsAddJournalModalOpen] = useState(false);
   const [addJournalContext, setAddJournalContext] = useState<{
     level: "top" | "child";
@@ -61,11 +60,7 @@ export const useJournalManager = () => {
   );
 
   const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
-    queryKey: [
-      "journalHierarchy",
-      restrictedJournalId,
-      restrictedJournalCompanyId,
-    ],
+    queryKey: ["journalHierarchy", restrictedJournalId],
     queryFn: () => fetchJournalHierarchy(restrictedJournalId),
     staleTime: 5 * 60 * 1000,
     enabled: visibility[SLIDER_TYPES.JOURNAL],
@@ -87,64 +82,77 @@ export const useJournalManager = () => {
     return topLevelNode ? topLevelNode.children || [] : [];
   }, [selectedTopLevelJournalId, hierarchyData, restrictedJournalId]);
 
+  // ==================================================================
+  // --- FINAL, REVISED LOGIC ---
+  // This version correctly handles the initial state and per-branch drill-down.
+  // ==================================================================
   const effectiveSelectedJournalIds = useMemo(() => {
+    // Guard Clause 1: If journal slider isn't primary, it's a flat list.
     if (!isJournalSliderPrimary) {
       return selectedFlatJournalId ? [selectedFlatJournalId] : [];
     }
 
+    // Guard Clause 2: If no root filter (e.g., "Affected") is active, drill-down is disabled.
+    // Return empty array so subsequent queries do not filter by journal.
+    if (activeJournalRootFilters.length === 0) {
+      return [];
+    }
+
+    // *** THE CRITICAL FIX IS HERE ***
+    // Guard Clause 3: If a root filter IS active, but the user has not yet selected
+    // any L2 or L3 items, the context should be empty. This prevents the top-level
+    // ID from being used as a filter by default, fulfilling the user story.
+    if (
+      selectedLevel2JournalIds.length === 0 &&
+      selectedLevel3JournalIds.length === 0
+    ) {
+      return [];
+    }
+
+    // --- Begin Per-Branch Replacement Algorithm ---
     const finalIds = new Set<string>();
+
+    // Step 1: Add all L3 Selections. These are the most specific and always take precedence.
     selectedLevel3JournalIds.forEach((id) => finalIds.add(id));
 
-    const parentsOfSelectedL3s = new Set<string>();
+    // Step 2: Identify the L2 parents of the L3 selections.
+    const l2ParentsOfSelectedL3s = new Set<string>();
     if (selectedLevel3JournalIds.length > 0) {
-      const sourceForL2s =
-        selectedTopLevelJournalId === (restrictedJournalId || ROOT_JOURNAL_ID)
-          ? hierarchyData
-          : findNodeById(hierarchyData, selectedTopLevelJournalId)?.children ||
-            [];
-
-      sourceForL2s.forEach((l2Node) => {
-        if (
-          (l2Node.children || []).some((l3Child) =>
-            selectedLevel3JournalIds.includes(l3Child.id)
-          )
-        ) {
-          parentsOfSelectedL3s.add(l2Node.id);
+      selectedLevel3JournalIds.forEach((l3Id) => {
+        const parent = findParentOfNode(l3Id, hierarchyData);
+        if (parent) {
+          l2ParentsOfSelectedL3s.add(parent.id);
         }
       });
     }
 
+    // Step 3: Add L2 Selections conditionally.
     selectedLevel2JournalIds.forEach((l2Id) => {
-      if (!parentsOfSelectedL3s.has(l2Id)) {
+      // Add the L2 ID to the final set ONLY IF it is NOT already "represented" by a selected L3 child.
+      if (!l2ParentsOfSelectedL3s.has(l2Id)) {
         finalIds.add(l2Id);
       }
     });
-
-    const effectiveRoot = restrictedJournalId || ROOT_JOURNAL_ID;
-    if (finalIds.size === 0 && selectedTopLevelJournalId !== effectiveRoot) {
-      finalIds.add(selectedTopLevelJournalId);
-    }
 
     return Array.from(finalIds);
   }, [
     isJournalSliderPrimary,
     selectedFlatJournalId,
-    selectedTopLevelJournalId,
+    activeJournalRootFilters,
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
     hierarchyData,
-    restrictedJournalId,
   ]);
 
   const isTerminalJournalActive = useMemo(() => {
     if (!isJournalSliderPrimary || effectiveSelectedJournalIds.length !== 1)
       return false;
-
     const singleSelectedId = effectiveSelectedJournalIds[0];
     const node = findNodeById(hierarchyData, singleSelectedId);
     return !!node?.isTerminal;
   }, [isJournalSliderPrimary, effectiveSelectedJournalIds, hierarchyData]);
 
+  // --- Handlers ---
   const handleToggleJournalRootFilter = useCallback(
     (filterToToggle: PartnerGoodFilterStatus) => {
       setSelection("journal.rootFilter", filterToToggle);
@@ -167,11 +175,7 @@ export const useJournalManager = () => {
         level3Ids: [],
         flatId: null,
       };
-      if (options?.keepRootFilter) {
-        // <<-- FIX: Use `useAppStore.getState()` instead of `get()`.
-        resetPayload.rootFilter =
-          useAppStore.getState().selections.journal.rootFilter;
-      } else {
+      if (!options?.keepRootFilter) {
         resetPayload.rootFilter = [];
       }
       setSelection("journal", resetPayload);
@@ -196,6 +200,11 @@ export const useJournalManager = () => {
 
   const handleToggleLevel2JournalId = useCallback(
     (level2IdToToggle: string) => {
+      if (useAppStore.getState().selections.journal.rootFilter.length === 0) {
+        alert("Please select a filter like 'Affected' to enable drill-down.");
+        return;
+      }
+
       const currentL2s = useAppStore.getState().selections.journal.level2Ids;
       const isSelected = currentL2s.includes(level2IdToToggle);
       let newL2s;
@@ -214,11 +223,16 @@ export const useJournalManager = () => {
 
       setSelection("journal", { level2Ids: newL2s, level3Ids: newL3s });
     },
-    [setSelection, hierarchyData]
+    [hierarchyData, setSelection]
   );
 
   const handleToggleLevel3JournalId = useCallback(
     (level3IdToToggle: string) => {
+      if (useAppStore.getState().selections.journal.rootFilter.length === 0) {
+        alert("Please select a filter like 'Affected' to enable drill-down.");
+        return;
+      }
+
       const currentL3s = useAppStore.getState().selections.journal.level3Ids;
       const isSelected = currentL3s.includes(level3IdToToggle);
       let newL3s;
@@ -232,32 +246,17 @@ export const useJournalManager = () => {
     [setSelection]
   );
 
-  // <<-- FIX: The mutation now expects to return AccountNodeData
+  // ... rest of the file is unchanged ...
+
   const createJournalMutation = useMutation<
-    AccountNodeData,
+    Journal,
     Error,
     ServerCreateJournalData
   >({
-    // <<-- FIX: Map the `Journal` response from the server to the `AccountNodeData` type.
-    mutationFn: async (
-      data: ServerCreateJournalData
-    ): Promise<AccountNodeData> => {
-      const newJournal: Journal = await serverCreateJournalEntry(data);
-      return {
-        id: newJournal.id,
-        name: newJournal.name,
-        code: newJournal.id, // The 'code' property is required by AccountNodeData
-        isTerminal: newJournal.isTerminal,
-        children: [],
-      };
-    },
+    mutationFn: (data) => serverCreateJournalEntry(data),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          "journalHierarchy",
-          restrictedJournalId,
-          restrictedJournalCompanyId,
-        ],
+        queryKey: ["journalHierarchy", restrictedJournalId],
       });
       closeAddJournalModal();
     },
@@ -268,11 +267,7 @@ export const useJournalManager = () => {
       mutationFn: (journalId) => serverDeleteJournalEntry(journalId),
       onSuccess: () => {
         queryClient.invalidateQueries({
-          queryKey: [
-            "journalHierarchy",
-            restrictedJournalId,
-            restrictedJournalCompanyId,
-          ],
+          queryKey: ["journalHierarchy", restrictedJournalId],
         });
         resetJournalSelections();
       },

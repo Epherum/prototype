@@ -1,4 +1,4 @@
-// src/components/modals/JournalModal.js
+// src/features/journals/components/JournalModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
@@ -6,19 +6,6 @@ import styles from "./JournalModal.module.css";
 import AccountNode from "./AccountNode"; // Assuming AccountNodeData type is implicitly handled or defined elsewhere
 import { ROOT_JOURNAL_ID } from "@/lib/constants"; // Assuming this is your actual root ID constant
 import { findNodeById } from "@/lib/helpers"; // If needed for getting selected node details
-
-// Interface for props (if you were using TypeScript, good for clarity)
-// interface JournalModalProps {
-//   isOpen: boolean;
-//   onClose: () => void;
-//   onConfirmSelection: (selectedId: string, childToSelectInL2?: string | null) => void;
-//   onSetShowRoot: () => void;
-//   hierarchy: AccountNodeData[];
-//   isLoading?: boolean;
-//   onTriggerAddChild: (parentId: string | null, parentCode: string | null) => void;
-//   onDeleteAccount: (accountId: string) => void;
-//   onSelectForLinking?: (selectedNode: AccountNodeData) => void;
-// }
 
 function JournalModal({
   isOpen,
@@ -55,8 +42,6 @@ function JournalModal({
   }, []);
 
   const handleSelectNode = useCallback((nodeId, node) => {
-    // Pass the full node object
-    // Do not allow selecting the conceptual root for any action
     if (node?.isConceptualRoot) {
       setSelectedAccountId(null);
       return;
@@ -111,24 +96,19 @@ function JournalModal({
 
   // New handler for the main action button
   const handleConfirmOrAddToList = useCallback(() => {
-    // Scenario 1: Linking mode (`onSelectForLinking` is provided)
     if (onSelectForLinking) {
       if (selectedAccountId) {
-        // An item is actively selected via single-click
+        // Find the node from the already-fetched hierarchy
         const actualHierarchy = hierarchy[0]?.isConceptualRoot
           ? hierarchy[0].children
           : hierarchy;
-        const selectedNode = findNodeById(
-          actualHierarchy || [],
-          selectedAccountId
-        );
+        const selectedNode = findNodeById(actualHierarchy, selectedAccountId); // Keep using findNodeById here is okay
 
         if (selectedNode && !selectedNode.isConceptualRoot) {
-          onSelectForLinking(selectedNode); // Pass the full node object
-          setSelectedAccountId(null); // Clear internal selection for next potential pick
-          // Modal closure is handled by the component calling onSelectForLinking
-          // (e.g., page.tsx for GPG, or Link...Modals)
-          return; // Action handled, exit function
+          onSelectForLinking(selectedNode);
+          setSelectedAccountId(null);
+          // Don't close modal here, parent decides
+          return;
         } else {
           // Selected item was conceptual root or not found (should be prevented by handleSelectNode)
           alert("Please select a valid journal account.");

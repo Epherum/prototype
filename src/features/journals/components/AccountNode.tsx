@@ -1,3 +1,4 @@
+//src/features/journals/components/AccountNode.tsx
 import {
   IoChevronDownOutline,
   IoChevronForwardOutline,
@@ -31,12 +32,12 @@ function AccountNode({
       e.stopPropagation();
       return;
     }
-    onSelectNode(node.id);
+    onSelectNode(node.id, node);
   };
 
   const handleRowDoubleClick = () => {
     if (onDoubleClickNode) {
-      onDoubleClickNode(node.id, isConceptualRootNode, isActualL1Account);
+      onDoubleClickNode(node.id, isConceptualRootNode, isActualL1Account, node);
     }
   };
 
