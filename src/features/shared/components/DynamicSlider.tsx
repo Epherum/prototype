@@ -1,4 +1,4 @@
-// src/components/sliders/DynamicSlider.tsx
+//src/features/shared/components/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import {

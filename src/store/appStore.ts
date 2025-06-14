@@ -46,6 +46,7 @@ interface SelectionsSlice {
 interface UiSlice {
   sliderOrder: SliderType[];
   visibility: SliderVisibility;
+  isCreatingDocument: boolean; // <<< NEW STATE
 }
 
 // --- Combined State and Actions ---
@@ -67,6 +68,9 @@ interface AppState {
     value: any
   ) => void;
   resetSelections: () => void;
+  // +++ NEW ACTIONS +++
+  enterDocumentCreationMode: () => void;
+  exitDocumentCreationMode: () => void;
 }
 
 // --- Helper Functions ---
@@ -109,6 +113,7 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [SLIDER_TYPES.PROJECT]: false,
       [SLIDER_TYPES.DOCUMENT]: false,
     },
+    isCreatingDocument: false, // <<< INITIALIZE NEW STATE
   },
   selections: getInitialSelections(),
 
@@ -268,5 +273,22 @@ export const useAppStore = create<AppState>()((set, get) => ({
   resetSelections: () =>
     set((state) => ({
       selections: getInitialSelections(state.auth.effectiveRestrictedJournalId),
+    })),
+
+  enterDocumentCreationMode: () =>
+    set((state) => ({
+      ui: { ...state.ui, isCreatingDocument: true },
+      // FIX: Preserve the partner and journal context.
+      // Only clear the selections that will be made *during* document creation.
+      selections: {
+        ...state.selections,
+        goods: null, // Clear any previously selected good.
+        // DO NOT clear partner. It's the context for the new document.
+      },
+    })),
+
+  exitDocumentCreationMode: () =>
+    set((state) => ({
+      ui: { ...state.ui, isCreatingDocument: false },
     })),
 }));
