@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAppStore } from "@/store/appStore"; // Import the Zustand store
+import { useAppStore } from "@/store/appStore";
 import {
   createUser,
   updateUser,
@@ -10,18 +10,15 @@ import {
   CreateUserClientPayload,
   UpdateUserClientPayload,
 } from "@/services/clientUserService";
-import { fetchCompanyRoles } from "@/services/clientRoleService";
+import { fetchAllRoles } from "@/services/clientRoleService";
 import { fetchAllJournalsForAdminRestriction } from "@/services/clientJournalService";
 import { useCurrentUser } from "./useCurrentUser";
 import type { RoleWithPermissions } from "@/lib/types";
-import type { JournalForAdminSelection } from "@/lib/helpers";
 
-// Types remain the same
 interface RoleAssignmentFormState {
   roleId: string;
   roleName?: string;
   restrictedTopLevelJournalId?: string | null;
-  restrictedTopLevelJournalCompanyId?: string | null;
   restrictedJournalDisplayName?: string | null;
 }
 
@@ -43,8 +40,6 @@ const initialFormState: UserManagementFormState = {
 export function useUserManagement(userIdToEdit?: string) {
   const queryClient = useQueryClient();
   const currentUser = useCurrentUser();
-
-  // Get the isAdmin flag from our global store
   const isAdmin = useAppStore((state) => state.auth.isAdmin);
 
   const [formState, setFormState] =
@@ -61,42 +56,42 @@ export function useUserManagement(userIdToEdit?: string) {
     enabled: isEditMode,
   });
 
-  const { data: companyRoles, isLoading: isLoadingRoles } = useQuery<
+  const { data: allRoles, isLoading: isLoadingRoles } = useQuery<
     RoleWithPermissions[],
     Error
   >({
-    queryKey: ["companyRoles"],
-    queryFn: fetchCompanyRoles,
-    enabled: isAdmin, // Also a good idea to only fetch roles if the user is an admin
+    queryKey: ["allRoles"],
+    queryFn: fetchAllRoles,
+    enabled: isAdmin,
     staleTime: 5 * 60 * 1000,
   });
 
-  // --- THIS IS THE CORRECTED QUERY ---
-  const { data: allCompanyJournalsData, isLoading: isLoadingJournals } =
-    useQuery<JournalForAdminSelection[], Error>({
-      queryKey: ["allCompanyJournalsForRestriction"],
-      queryFn: fetchAllJournalsForAdminRestriction,
-      // This query will now ONLY run if the logged-in user is an admin.
-      enabled: isAdmin,
-      staleTime: 10 * 60 * 1000,
-    });
+  const { data: allJournalsData, isLoading: isLoadingJournals } = useQuery<
+    any[],
+    Error
+  >({
+    queryKey: ["allJournalsForRestriction"],
+    queryFn: fetchAllJournalsForAdminRestriction,
+    enabled: isAdmin,
+    staleTime: 10 * 60 * 1000,
+  });
 
-  // --- SECURITY: Filter roles the admin is allowed to assign ---
+  // Security: Admins can only assign roles whose permissions are a subset of their own.
   const assignableRoles = useMemo(() => {
-    if (!currentUser?.roles || !companyRoles) return [];
+    if (!currentUser?.roles || !allRoles) return [];
     const adminPermissions = new Set<string>();
     currentUser.roles.forEach((role) =>
       role.permissions.forEach((p) =>
         adminPermissions.add(`${p.action}:${p.resource}`)
       )
     );
-    return companyRoles.filter((role) => {
+    return allRoles.filter((role) => {
       return role.permissions.every((p) => {
         const permissionString = `${p.permission.action}:${p.permission.resource}`;
         return adminPermissions.has(permissionString);
       });
     });
-  }, [companyRoles, currentUser]);
+  }, [allRoles, currentUser]);
 
   // --- DATA MUTATIONS (CREATE/UPDATE) ---
 
@@ -104,7 +99,6 @@ export function useUserManagement(userIdToEdit?: string) {
     mutationFn: (userData: CreateUserClientPayload) => createUser(userData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      closeCreateUserModal(); // Close modal on success
     },
   });
 
@@ -114,7 +108,6 @@ export function useUserManagement(userIdToEdit?: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       queryClient.invalidateQueries({ queryKey: ["user", userIdToEdit] });
-      closeCreateUserModal(); // Close modal on success
     },
   });
 
@@ -131,13 +124,13 @@ export function useUserManagement(userIdToEdit?: string) {
           roleId: ur.roleId,
           roleName: ur.role.name,
           restrictedTopLevelJournalId: ur.restrictedTopLevelJournalId,
-          restrictedTopLevelJournalCompanyId:
-            ur.restrictedTopLevelJournalCompanyId,
           restrictedJournalDisplayName: ur.restrictedTopLevelJournalId
             ? `ID: ${ur.restrictedTopLevelJournalId}`
             : null,
         })),
       });
+    } else {
+      resetForm();
     }
   }, [isEditMode, userToEditData]);
 
@@ -158,14 +151,12 @@ export function useUserManagement(userIdToEdit?: string) {
             const existing = prev.roleAssignments.find(
               (ra) => ra.roleId === roleId
             );
-            const role = companyRoles?.find((r) => r.id === roleId);
+            const role = allRoles?.find((r) => r.id === roleId);
             return {
               roleId: roleId,
               roleName: role?.name || "Unknown Role",
               restrictedTopLevelJournalId:
                 existing?.restrictedTopLevelJournalId || null,
-              restrictedTopLevelJournalCompanyId:
-                existing?.restrictedTopLevelJournalCompanyId || null,
               restrictedJournalDisplayName:
                 existing?.restrictedJournalDisplayName || null,
             };
@@ -174,16 +165,11 @@ export function useUserManagement(userIdToEdit?: string) {
         return { ...prev, roleAssignments: newAssignments };
       });
     },
-    [companyRoles]
+    [allRoles]
   );
 
   const handleJournalRestrictionChange = useCallback(
-    (
-      roleId: string,
-      journalId: string | null,
-      journalCompanyId: string | null,
-      displayName: string | null
-    ) => {
+    (roleId: string, journalId: string | null, displayName: string | null) => {
       setFormState((prev) => ({
         ...prev,
         roleAssignments: prev.roleAssignments.map((a) =>
@@ -191,7 +177,6 @@ export function useUserManagement(userIdToEdit?: string) {
             ? {
                 ...a,
                 restrictedTopLevelJournalId: journalId,
-                restrictedTopLevelJournalCompanyId: journalCompanyId,
                 restrictedJournalDisplayName: displayName,
               }
             : a
@@ -206,19 +191,8 @@ export function useUserManagement(userIdToEdit?: string) {
     setShowPassword(false);
   }, []);
 
-  const openCreateUserModal = useCallback(() => {
-    resetForm();
-    setIsCreateUserModalOpen(true);
-  }, [resetForm]);
-
-  const closeCreateUserModal = useCallback(() => {
-    setIsCreateUserModalOpen(false);
-    resetForm();
-  }, [resetForm]);
-
   const handleSubmit = useCallback(async () => {
     if (formState.roleAssignments.length === 0) {
-      console.error("Attempted to submit with no roles assigned.");
       alert("A user must have at least one role.");
       return;
     }
@@ -226,8 +200,6 @@ export function useUserManagement(userIdToEdit?: string) {
     const assignmentPayload = formState.roleAssignments.map((ra) => ({
       roleId: ra.roleId,
       restrictedTopLevelJournalId: ra.restrictedTopLevelJournalId || null,
-      restrictedTopLevelJournalCompanyId:
-        ra.restrictedTopLevelJournalCompanyId || null,
     }));
 
     const mutationToRun = isEditMode ? updateUserMutation : createUserMutation;
@@ -242,11 +214,19 @@ export function useUserManagement(userIdToEdit?: string) {
       await mutationToRun.mutateAsync(payload as any);
     } catch (error) {
       console.error("Submission failed", error);
-      // Error will be available on mutation.error, no need to alert here
     }
   }, [formState, isEditMode, createUserMutation, updateUserMutation]);
 
   const mutation = isEditMode ? updateUserMutation : createUserMutation;
+
+  const openCreateUserModal = useCallback(() => {
+    setIsCreateUserModalOpen(true);
+  }, []);
+
+  const closeCreateUserModal = useCallback(() => {
+    setIsCreateUserModalOpen(false);
+    resetForm();
+  }, [resetForm]);
 
   return {
     formState,
@@ -257,7 +237,7 @@ export function useUserManagement(userIdToEdit?: string) {
     submissionError: mutation.error,
     resetMutation: mutation.reset,
     assignableRoles,
-    allCompanyJournalsData,
+    allJournalsData, // Changed from allCompanyJournalsData
     handleInputChange,
     handleRoleSelectionChange,
     handleJournalRestrictionChange,

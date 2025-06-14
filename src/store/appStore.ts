@@ -3,10 +3,7 @@
 import { create } from "zustand";
 import { type Session } from "next-auth";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
-
-// Import types from your existing files
 import type { ExtendedUser } from "@/lib/authOptions";
-import type { PartnerGoodFilterStatus } from "@/lib/types";
 
 // Define slider-specific types
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];
@@ -14,17 +11,13 @@ export type SliderVisibility = Record<SliderType, boolean>;
 export type AccordionState = Partial<Record<SliderType, boolean>>;
 
 // --- State Slice Interfaces ---
-
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
 interface AuthSlice {
   sessionStatus: SessionStatus;
   user: Partial<ExtendedUser>;
-  companyId: string | null;
   /** The most specific journal ID a user is allowed to see as their root. */
   effectiveRestrictedJournalId: string;
-  /** The company ID associated with the restricted journal. */
-  effectiveRestrictedJournalCompanyId: string | null;
   /** A derived boolean for easy admin checks across the app. */
   isAdmin: boolean;
 }
@@ -70,7 +63,6 @@ interface AppState {
     value: any
   ) => void;
   resetSelections: () => void;
-  // +++ NEW ACTIONS +++
   enterDocumentCreationMode: () => void;
   exitDocumentCreationMode: () => void;
   toggleAccordion: (sliderId: SliderType) => void;
@@ -102,10 +94,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
   auth: {
     sessionStatus: "loading",
     user: {},
-    companyId: null,
     effectiveRestrictedJournalId: ROOT_JOURNAL_ID,
-    effectiveRestrictedJournalCompanyId: null,
-    isAdmin: false, // Default to false
+    isAdmin: false,
   },
   ui: {
     sliderOrder: INITIAL_ORDER as SliderType[],
@@ -116,10 +106,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [SLIDER_TYPES.PROJECT]: false,
       [SLIDER_TYPES.DOCUMENT]: false,
     },
-    isCreatingDocument: false, // <<< INITIALIZE NEW STATE
+    isCreatingDocument: false,
     accordionState: {
-      [SLIDER_TYPES.PARTNER]: false, // Default to closed
-      [SLIDER_TYPES.GOODS]: false, // Default to closed
+      [SLIDER_TYPES.PARTNER]: false,
+      [SLIDER_TYPES.GOODS]: false,
     },
   },
   selections: getInitialSelections(),
@@ -127,13 +117,11 @@ export const useAppStore = create<AppState>()((set, get) => ({
   // --- Actions Implementation ---
 
   setAuth: (session, status) =>
-    set((state) => {
+    set(() => {
       if (status === "authenticated" && session?.user) {
         const user = session.user as ExtendedUser;
         let restrictedId = ROOT_JOURNAL_ID;
-        let restrictedCompanyId = null;
 
-        // NEW: Determine if the user has an "ADMIN" role
         const userIsAdmin =
           user.roles?.some((role) => role.name.toUpperCase() === "ADMIN") ??
           false;
@@ -146,8 +134,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
             restrictedId =
               roleWithRestriction.restrictedTopLevelJournalId ||
               ROOT_JOURNAL_ID;
-            restrictedCompanyId =
-              roleWithRestriction.restrictedTopLevelJournalCompanyId || null;
           }
         }
 
@@ -155,10 +141,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
           auth: {
             sessionStatus: "authenticated",
             user: user,
-            companyId: user.companyId || null,
             effectiveRestrictedJournalId: restrictedId,
-            effectiveRestrictedJournalCompanyId: restrictedCompanyId,
-            isAdmin: userIsAdmin, // Set the derived admin flag
+            isAdmin: userIsAdmin,
           },
           selections: getInitialSelections(restrictedId),
         };
@@ -168,10 +152,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
         auth: {
           sessionStatus: "loading",
           user: {},
-          companyId: null,
           effectiveRestrictedJournalId: ROOT_JOURNAL_ID,
-          effectiveRestrictedJournalCompanyId: null,
-          isAdmin: false, // Ensure isAdmin is false when not authenticated
+          isAdmin: false,
         },
         selections: getInitialSelections(),
       };
@@ -285,12 +267,9 @@ export const useAppStore = create<AppState>()((set, get) => ({
   enterDocumentCreationMode: () =>
     set((state) => ({
       ui: { ...state.ui, isCreatingDocument: true },
-      // FIX: Preserve the partner and journal context.
-      // Only clear the selections that will be made *during* document creation.
       selections: {
         ...state.selections,
-        goods: null, // Clear any previously selected good.
-        // DO NOT clear partner. It's the context for the new document.
+        goods: null,
       },
     })),
 

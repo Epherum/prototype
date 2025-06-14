@@ -12,24 +12,13 @@ export interface RolePayload {
 }
 
 /**
- * Fetches all roles for a specific company, including the permissions for each role.
- * Authorization should be handled by the caller.
+ * Fetches all roles in the system, including the permissions for each role.
  *
- * @param companyId - The ID of the company.
  * @returns A promise that resolves to an array of roles, each with its permissions included.
  */
-export const getRolesForCompany = async (
-  companyId: string
-): Promise<RoleWithPermissions[]> => {
-  if (!companyId) {
-    throw new Error("Company ID is required to fetch roles.");
-  }
-
+export const getAllRoles = async (): Promise<RoleWithPermissions[]> => {
   try {
     const roles = await prisma.role.findMany({
-      where: {
-        companyId: companyId,
-      },
       include: {
         permissions: {
           include: {
@@ -44,7 +33,7 @@ export const getRolesForCompany = async (
 
     return roles as RoleWithPermissions[];
   } catch (error) {
-    console.error(`Error fetching roles for company ${companyId}:`, error);
+    console.error(`Error fetching roles:`, error);
     throw new Error("An error occurred while fetching roles.");
   }
 };
@@ -65,24 +54,17 @@ export const getAllPermissions = async (): Promise<Permission[]> => {
 };
 
 /**
- * Creates a new role for a company and connects it to a set of permissions.
- * @param companyId The company to create the role for.
+ * Creates a new role and connects it to a set of permissions.
  * @param payload The role data.
  * @returns The newly created role.
  */
-export const createRole = async (
-  companyId: string,
-  payload: RolePayload
-): Promise<Role> => {
+export const createRole = async (payload: RolePayload): Promise<Role> => {
   const { name, description, permissionIds } = payload;
 
   return prisma.role.create({
     data: {
       name,
       description: description || undefined,
-      company: {
-        connect: { id: companyId },
-      },
       permissions: {
         create: permissionIds.map((pid) => ({
           permission: {
@@ -96,29 +78,23 @@ export const createRole = async (
 
 /**
  * Updates an existing role's name, description, and its set of permissions.
- * Enforces that the role belongs to the specified company.
  * @param roleId The ID of the role to update.
- * @param companyId The ID of the company that owns the role.
  * @param payload The new role data.
  * @returns The updated role.
  */
 export const updateRole = async (
   roleId: string,
-  companyId: string,
   payload: RolePayload
 ): Promise<Role> => {
   const { name, description, permissionIds } = payload;
 
-  // First, verify the role exists and belongs to the correct company
-  const role = await prisma.role.findFirst({
-    where: {
-      id: roleId,
-      companyId: companyId,
-    },
+  // First, verify the role exists.
+  const role = await prisma.role.findUnique({
+    where: { id: roleId },
   });
 
   if (!role) {
-    throw new Error("Role not found or you do not have permission to edit it.");
+    throw new Error("Role not found.");
   }
 
   // Use a transaction to ensure atomicity
@@ -153,30 +129,18 @@ export const updateRole = async (
 };
 
 /**
- * Deletes a role from a company.
- * Enforces that the role belongs to the specified company.
+ * Deletes a role.
  * Prisma's `onDelete: Cascade` on UserRole and RolePermission handles cleanup.
  * @param roleId The ID of the role to delete.
- * @param companyId The ID of the company that owns the role.
  */
-export const deleteRole = async (
-  roleId: string,
-  companyId: string
-): Promise<void> => {
-  // Use `deleteMany` to safely delete only if the companyId matches.
-  // This prevents accidentally deleting if the roleId is found but companyId doesn't match.
-  const deleteResult = await prisma.role.deleteMany({
-    where: {
-      id: roleId,
-      companyId: companyId,
-    },
-  });
-
-  if (deleteResult.count === 0) {
-    // This means the role either didn't exist or didn't belong to the user's company.
-    // We throw an error so the API can return a 404 or 403.
-    throw new Error(
-      "Role not found or you do not have permission to delete it."
-    );
+export const deleteRole = async (roleId: string): Promise<void> => {
+  try {
+    await prisma.role.delete({
+      where: { id: roleId },
+    });
+  } catch (error) {
+    // Handle cases where the role doesn't exist (e.g., Prisma's P2025 error)
+    console.error(`Failed to delete role with ID ${roleId}:`, error);
+    throw new Error("Role not found or could not be deleted.");
   }
 };

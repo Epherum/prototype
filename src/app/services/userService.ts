@@ -1,20 +1,18 @@
-// File: src/app/services/userService.ts
-import { PrismaClient, User, Role, Journal, Prisma } from "@prisma/client"; // Added Prisma for transaction type
+// src/app/services/userService.ts
+import { PrismaClient, User, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
-import prismaInstance from "@/app/utils/prisma"; // Assuming your prisma instance is exported like this
+import prismaInstance from "@/app/utils/prisma";
 
-// Admin user context from session (can be more aligned with your ExtendedSession if needed)
+// Admin user context from session
 interface AdminSessionUser {
   id: string;
-  companyId: string;
-  // The structure should match what your authOptions provide in the session
   roles: Array<{
-    name: string; // Role name
-    permissions: Array<{ action: string; resource: string }>; // Permission details
+    name: string;
+    permissions: Array<{ action: string; resource: string }>;
   }>;
 }
 
-// Helper to check permissions based on the structure in Project Overview (permission string like "MANAGE_USERS")
+// Helper to check permissions
 function hasGlobalPermission(
   sessionUser: AdminSessionUser,
   permissionIdentifier: string // e.g., "MANAGE_USERS"
@@ -22,7 +20,6 @@ function hasGlobalPermission(
   if (!sessionUser || !sessionUser.roles) {
     return false;
   }
-  // This checks if any of the user's roles have a permission whose concatenated action_resource matches
   return sessionUser.roles.some((role) =>
     role.permissions.some(
       (p) => `${p.action}_${p.resource}` === permissionIdentifier
@@ -30,11 +27,10 @@ function hasGlobalPermission(
   );
 }
 
-// CORRECTED: Payload for individual role assignments
+// Payload for individual role assignments
 export interface CreateUserPayloadRoleAssignment {
   roleId: string;
   restrictedTopLevelJournalId?: string | null;
-  restrictedTopLevelJournalCompanyId?: string | null; // <-- ADDED THIS FIELD
 }
 
 // Overall payload for user creation
@@ -48,13 +44,12 @@ export interface CreateUserPayload {
 export class UserService {
   private prisma: PrismaClient;
 
-  constructor(prismaClient: PrismaClient) {
+  constructor(prismaClient: PrismaClient = prismaInstance) {
     this.prisma = prismaClient;
   }
 
   /**
    * Creates a new user, assigns them to roles, and optionally restricts their journal access per role.
-   * All operations are performed within the company of the authenticated admin.
    * @param payload - The user creation data.
    * @param adminSessionUser - The authenticated admin user performing the action.
    * @returns The newly created User object (excluding passwordHash).
@@ -65,23 +60,20 @@ export class UserService {
     adminSessionUser: AdminSessionUser
   ): Promise<Omit<User, "passwordHash">> {
     // 1. Permission Check
-    // Using MANAGE_USERS as the specific permission string mentioned in the project overview
     if (!hasGlobalPermission(adminSessionUser, "MANAGE_USERS")) {
       console.warn(
         `User ${adminSessionUser.id} attempted to create user without MANAGE_USERS permission.`
       );
-      throw new Error("Forbidden: User does not have MANAGE_USERS permission.");
+      throw new Error("Forbidden: You do not have permission to manage users.");
     }
 
     const { name, email, password, roleAssignments } = payload;
-    const adminCompanyId = adminSessionUser.companyId;
 
     // 2. Input Validation (Basic)
     if (!name || !email || !password) {
       throw new Error("Name, email, and password are required.");
     }
     if (password.length < 6) {
-      // Adjusted to common minimum, can be more complex
       throw new Error("Password must be at least 6 characters long.");
     }
     if (!roleAssignments || roleAssignments.length === 0) {
@@ -96,7 +88,7 @@ export class UserService {
     try {
       const newUser = await this.prisma.$transaction(
         async (tx: Prisma.TransactionClient) => {
-          // 4a. Check if user with this email already exists (email is globally unique as per schema)
+          // 4a. Check if user with this email already exists (email is globally unique)
           const existingUserByEmail = await tx.user.findUnique({
             where: { email },
           });
@@ -110,87 +102,43 @@ export class UserService {
               name,
               email,
               passwordHash,
-              companyId: adminCompanyId, // Associate with admin's company
+              createdById: adminSessionUser.id, // Audit who created this user
             },
           });
-          console.log(
-            `User ${createdUser.id} created successfully for company ${adminCompanyId}.`
-          );
+          console.log(`User ${createdUser.id} created successfully.`);
 
           // 4c. Process Role Assignments
           for (const assignment of roleAssignments) {
-            const {
-              roleId,
-              restrictedTopLevelJournalId,
-              restrictedTopLevelJournalCompanyId,
-            } = assignment;
+            const { roleId, restrictedTopLevelJournalId } = assignment;
 
-            // Validate role exists and belongs to the admin's company
-            const role = await tx.role.findFirst({
-              where: {
-                id: roleId,
-                companyId: adminCompanyId,
-              },
+            // Validate role exists
+            const role = await tx.role.findUnique({
+              where: { id: roleId },
             });
             if (!role) {
               console.warn(
-                `Role with ID ${roleId} not found in company ${adminCompanyId} during user creation.`
+                `Role with ID ${roleId} not found during user creation.`
               );
-              throw new Error(
-                `Role with ID ${roleId} not found in your company.`
-              );
+              throw new Error(`Role with ID ${roleId} not found.`);
             }
 
             let finalRestrictedJournalId: string | null = null;
-            let finalRestrictedJournalCompanyId: string | null = null;
 
-            if (
-              restrictedTopLevelJournalId &&
-              restrictedTopLevelJournalCompanyId
-            ) {
-              // Validate the journal exists and belongs to the specified company (which should be admin's company)
-              if (restrictedTopLevelJournalCompanyId !== adminCompanyId) {
-                // This is a critical integrity check. The client should only send journals from admin's company.
-                console.error(
-                  `Security Alert: Attempt to assign journal restriction from different company. Admin: ${adminCompanyId}, Journal: ${restrictedTopLevelJournalCompanyId}`
-                );
-                throw new Error(
-                  "Invalid journal assignment: Journal does not belong to your company."
-                );
-              }
-
+            if (restrictedTopLevelJournalId) {
+              // Validate the journal exists
               const journalForRestriction = await tx.journal.findUnique({
-                where: {
-                  id_companyId: {
-                    // Prisma schema uses composite key [id, companyId] for Journal
-                    id: restrictedTopLevelJournalId,
-                    companyId: restrictedTopLevelJournalCompanyId, // Use the companyId from the payload
-                  },
-                },
+                where: { id: restrictedTopLevelJournalId },
               });
 
               if (!journalForRestriction) {
                 console.warn(
-                  `Journal with ID ${restrictedTopLevelJournalId} and company ${restrictedTopLevelJournalCompanyId} not found during user creation.`
+                  `Journal with ID ${restrictedTopLevelJournalId} not found during user creation.`
                 );
                 throw new Error(
-                  `Journal with ID ${restrictedTopLevelJournalId} not found in your company.`
+                  `Journal with ID ${restrictedTopLevelJournalId} not found.`
                 );
               }
-              // REMOVED: The check for journalForRestriction.parentId === null
-              // This now allows ANY journal (top-level or child) from the company to be a restriction root.
-
               finalRestrictedJournalId = journalForRestriction.id;
-              finalRestrictedJournalCompanyId = journalForRestriction.companyId; // This will be adminCompanyId
-            } else if (
-              restrictedTopLevelJournalId ||
-              restrictedTopLevelJournalCompanyId
-            ) {
-              // If one is provided but not the other (except both being null/undefined), it's an inconsistent state.
-              console.warn(
-                `Inconsistent journal restriction data for role ${roleId}: journalId=${restrictedTopLevelJournalId}, journalCompanyId=${restrictedTopLevelJournalCompanyId}`
-              );
-              throw new Error("Incomplete journal restriction data provided.");
             }
 
             // Create UserRole entry
@@ -199,8 +147,6 @@ export class UserService {
                 userId: createdUser.id,
                 roleId: role.id,
                 restrictedTopLevelJournalId: finalRestrictedJournalId,
-                restrictedTopLevelJournalCompanyId:
-                  finalRestrictedJournalCompanyId,
               },
             });
             console.log(
@@ -219,7 +165,6 @@ export class UserService {
 
       return newUser;
     } catch (error: any) {
-      // Specific Prisma error for unique constraint violation
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === "P2002"
@@ -231,7 +176,6 @@ export class UserService {
         }
       }
       console.error("Error in createUserAndAssignRoles transaction:", error);
-      // Re-throw original error message if it's specific, otherwise a generic one
       throw new Error(
         error.message || "An unexpected error occurred while creating the user."
       );

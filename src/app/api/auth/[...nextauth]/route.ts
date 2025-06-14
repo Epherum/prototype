@@ -4,23 +4,18 @@ import NextAuth, {
   User as NextAuthUser,
   Session,
 } from "next-auth";
-import CredentialsProvider from "next-auth/providers/credentials";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
 import { JWT } from "next-auth/jwt";
 import { authOptions } from "@/lib/authOptions";
 
-const prisma = new PrismaClient();
+// Note: The PrismaClient and bcrypt imports are typically used in authOptions.ts,
+// but are kept here for context if this file were to expand.
 
-// Your ExtendedUser, ExtendedSession, ExtendedJWT interfaces remain the same
 interface ExtendedUser extends NextAuthUser {
   id: string;
-  companyId: string;
   roles: Array<{
     name: string;
     permissions: Array<{ action: string; resource: string }>;
     restrictedTopLevelJournalId?: string | null;
-    restrictedTopLevelJournalCompanyId?: string | null;
   }>;
 }
 
@@ -31,12 +26,10 @@ interface ExtendedSession extends Session {
 
 interface ExtendedJWT extends JWT {
   id: string;
-  companyId: string;
   roles: Array<{
     name: string;
     permissions: Array<{ action: string; resource: string }>;
     restrictedTopLevelJournalId?: string | null;
-    restrictedTopLevelJournalCompanyId?: string | null;
   }>;
   name?: string | null;
   email?: string | null;

@@ -34,39 +34,32 @@ export type UpdatePartnerData = Partial<Omit<CreatePartnerData, "partnerType">>;
  * @description Defines the options for the getAllPartners service method.
  */
 export interface GetAllPartnersOptions {
-  companyId: string;
   where?: Prisma.PartnerWhereInput;
   take?: number;
   skip?: number;
   partnerType?: PartnerType;
-  filterStatuses?: PartnerGoodFilterStatus[]; // Changed from filterStatus to filterStatuses (array)
+  filterStatuses?: PartnerGoodFilterStatus[];
 
-  // Unified filter status
-  filterStatus?: "affected" | "unaffected" | "inProcess";
   contextJournalIds?: string[];
   currentUserId?: string;
-  restrictedJournalId?: string | null; // <-- NEW: For the new unaffected logic
+  restrictedJournalId?: string | null;
 }
 
 const partnerService = {
   async createPartner(
     data: CreatePartnerData,
-    companyId: string,
     createdById: string,
     createdByIp?: string | null
   ): Promise<Partner> {
     console.log(
       "Chef (PartnerService): Adding new partner:",
       data.name,
-      "for company:",
-      companyId,
       "by user:",
       createdById
     );
     const newPartner = await prisma.partner.create({
       data: {
         ...data,
-        companyId: companyId,
         createdById: createdById,
         createdByIp: createdByIp,
         entityState: EntityState.ACTIVE,
@@ -85,8 +78,8 @@ const partnerService = {
   },
 
   /**
-   * === REFACTORED FUNCTION WITH NEW UNAFFECTED LOGIC ===
-   * Fetches partners with simplified and powerful filtering logic.
+   * === REFACTORED FUNCTION ===
+   * Fetches partners with simplified and powerful filtering logic in a single-tenant environment.
    */
   async getAllPartners(
     options: GetAllPartnersOptions
@@ -97,8 +90,7 @@ const partnerService = {
     );
 
     const {
-      companyId,
-      filterStatuses = [], // Default to empty array
+      filterStatuses = [],
       contextJournalIds = [],
       currentUserId,
       restrictedJournalId,
@@ -114,7 +106,6 @@ const partnerService = {
     }
 
     let prismaWhere: Prisma.PartnerWhereInput = {
-      companyId: companyId,
       entityState: "ACTIVE",
       ...externalWhere,
     };
@@ -122,17 +113,14 @@ const partnerService = {
     const isRootUser =
       !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
 
-    // --- NEW: Multi-filter logic ---
+    // --- Multi-filter logic ---
     if (filterStatuses.length > 0) {
       const orConditions: Prisma.PartnerWhereInput[] = [];
 
       // Asynchronously get descendantIds if needed, once.
       const descendantIds =
         !isRootUser && filterStatuses.includes("unaffected")
-          ? await journalService.getDescendantJournalIds(
-              restrictedJournalId!,
-              companyId
-            )
+          ? await journalService.getDescendantJournalIds(restrictedJournalId!)
           : [];
 
       for (const status of filterStatuses) {
@@ -235,7 +223,6 @@ const partnerService = {
     return { partners, totalCount };
   },
 
-  // ... (getPartnerById, updatePartner, deletePartner functions remain unchanged) ...
   async getPartnerById(id: bigint): Promise<Partner | null> {
     console.log("Chef (PartnerService): Looking up partner with ID:", id);
     const partner = await prisma.partner.findUnique({
@@ -260,10 +247,9 @@ const partnerService = {
       data
     );
     try {
-      const { companyId, ...updatePayload } = data as any;
       const updatedPartner = await prisma.partner.update({
         where: { id },
-        data: updatePayload,
+        data: data,
       });
       console.log(
         "Chef (PartnerService): Partner",

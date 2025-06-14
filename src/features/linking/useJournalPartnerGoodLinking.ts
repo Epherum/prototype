@@ -10,7 +10,7 @@ import {
 } from "@/services/clientJournalPartnerGoodLinkService";
 import { fetchPartnersLinkedToJournals } from "@/services/clientPartnerService";
 import { fetchGoodById } from "@/services/clientGoodService";
-import { fetchJournalHierarchy } from "@/services/clientJournalService"; // Import for the hierarchy query
+import { fetchJournalHierarchy } from "@/services/clientJournalService";
 import { findNodeById } from "@/lib/helpers";
 import { SLIDER_TYPES } from "@/lib/constants";
 import { useAppStore } from "@/store/appStore";
@@ -33,23 +33,15 @@ export const useJournalPartnerGoodLinking = () => {
   const restrictedJournalId = useAppStore(
     (state) => state.auth.effectiveRestrictedJournalId
   );
-  const restrictedJournalCompanyId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalCompanyId
-  );
 
   // Destructure selections for easier access
   const { goods: selectedGoodsId, journal: journalSelections } = selections;
 
-  // <<-- FIX: Fetch the journal hierarchy data using the same key as useJournalManager
-  // This reads from the cache without a new network request.
+  // Fetch the journal hierarchy data using a simplified query key
   const { data: hierarchyData } = useQuery<AccountNodeData[], Error>({
-    queryKey: [
-      "journalHierarchy",
-      restrictedJournalId,
-      restrictedJournalCompanyId,
-    ],
+    queryKey: ["journalHierarchy", restrictedJournalId],
     queryFn: () => fetchJournalHierarchy(restrictedJournalId),
-    staleTime: Infinity, // We only want to read from cache, not refetch here.
+    staleTime: Infinity,
   });
   const safeHierarchyData = useMemo(() => hierarchyData || [], [hierarchyData]);
 
@@ -77,7 +69,6 @@ export const useJournalPartnerGoodLinking = () => {
   // Fetch partners for the "Link Good to Partners via Journal" modal
   const { data: partnersForJpgModal, isLoading: isLoadingPartnersForJpgModal } =
     useQuery<Partner[], Error>({
-      // <<-- FIX: Use `?? null` to prevent `undefined` in the query key.
       queryKey: ["partnersForJpgModal", targetJournalForJpgLinking?.id ?? null],
       queryFn: () =>
         fetchPartnersLinkedToJournals([targetJournalForJpgLinking!.id], false),
@@ -89,7 +80,6 @@ export const useJournalPartnerGoodLinking = () => {
     data: existingJpgLinksForModal,
     isLoading: isLoadingJpgLinksForModal,
   } = useQuery<JournalPartnerGoodLinkClient[], Error>({
-    // <<-- FIX: Use `?? null` to prevent `undefined` in the query key.
     queryKey: [
       "jpgLinksForContext",
       goodForUnlinkingContext?.id ?? null,
@@ -158,7 +148,6 @@ export const useJournalPartnerGoodLinking = () => {
       queryKey: ["goodDetails", selectedGoodsId],
       queryFn: () => fetchGoodById(selectedGoodsId),
     });
-    // <<-- FIX: Use the correctly fetched `safeHierarchyData`.
     const targetJournalNode = findNodeById(
       safeHierarchyData,
       targetJournalNodeId
@@ -228,7 +217,6 @@ export const useJournalPartnerGoodLinking = () => {
       queryKey: ["goodDetails", selectedGoodsId],
       queryFn: () => fetchGoodById(selectedGoodsId),
     });
-    // <<-- FIX: Use the correctly fetched `safeHierarchyData`.
     const journalNode = findNodeById(safeHierarchyData, contextJournalId);
 
     if (!good || !journalNode) {

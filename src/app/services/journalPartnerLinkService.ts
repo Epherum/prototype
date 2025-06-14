@@ -1,4 +1,4 @@
-// File: src/app/services/journalPartnerLinkService.ts
+// src/app/services/journalPartnerLinkService.ts
 import prisma from "@/app/utils/prisma";
 import { JournalPartnerLink, Partner, Journal } from "@prisma/client";
 
@@ -11,7 +11,6 @@ export type CreateJournalPartnerLinkData = {
   dateDebut?: Date | string | null; // Allow string for API input, convert to Date
   dateFin?: Date | string | null; // Allow string for API input, convert to Date
   documentReference?: string | null;
-  companyId: string;
 };
 
 const journalPartnerLinkService = {
@@ -25,9 +24,7 @@ const journalPartnerLinkService = {
 
     // Validation: Check if Journal exists
     const journalExists = await prisma.journal.findUnique({
-      where: {
-        id_companyId: { id: data.journalId, companyId: data.companyId },
-      },
+      where: { id: data.journalId },
     });
     if (!journalExists) {
       throw new Error(`Journal with ID '${data.journalId}' not found.`);
@@ -41,10 +38,7 @@ const journalPartnerLinkService = {
       throw new Error(`Partner with ID '${data.partnerId}' not found.`);
     }
 
-    // Prisma's @@unique constraint on [journalId, partnerId, partnershipType] will handle duplicates
-    // if partnershipType is part of the uniqueness. If not, you might want a check here.
-    // For now, assuming the schema unique constraint is sufficient.
-
+    // Prisma's @@unique constraint on [journalId, partnerId, partnershipType] will handle duplicates.
     const linkDataToCreate: any = { ...data };
     if (data.dateDebut && typeof data.dateDebut === "string") {
       linkDataToCreate.dateDebut = new Date(data.dateDebut);
@@ -141,7 +135,6 @@ const journalPartnerLinkService = {
     }
 
     if (targetJournalIds.length === 0) {
-      // Should not happen if journalId is valid, but good to handle
       return [];
     }
 
@@ -167,12 +160,9 @@ const journalPartnerLinkService = {
   },
 
   //RECIPE 6: Get all Partners linked to multiple Journals (optionally including their children)
-  // This function is similar to getPartnersForJournal but handles multiple journal IDs
   async getPartnersForJournals(
-    // Renamed and signature changed
     journalIds: string[],
-    includeChildren: boolean = false // This flag might be tricky with multiple initial journalIds
-    // For now, assume if includeChildren is true, we find children for *each* ID in journalIds
+    includeChildren: boolean = false
   ): Promise<Partner[]> {
     console.log(
       `Chef (JPLService): Getting partners for Journal IDs '${journalIds.join(
@@ -183,12 +173,11 @@ const journalPartnerLinkService = {
       return [];
     }
 
-    let targetJournalIds: string[] = [...journalIds]; // Start with the provided IDs
+    let targetJournalIds: string[] = [...journalIds];
 
     if (includeChildren) {
       const allDescendantIds = new Set<string>(targetJournalIds);
       for (const journalId of journalIds) {
-        // Find children for each initial ID
         const descendantJournals = await prisma.$queryRaw<
           Array<{ id: string }>
         >`
@@ -265,32 +254,20 @@ const journalPartnerLinkService = {
     });
   },
 
-  // RECIPE 10: Find a specific link by Journal ID and Partner ID
+  // RECIPE 10: Find a specific link (or the first one) by Journal ID and Partner ID
   async findByJournalAndPartner(
     journalId: string,
     partnerId: bigint
   ): Promise<JournalPartnerLink | null> {
-    // Assuming your Journal ID in JournalPartnerLink is also a string that might need conversion
-    // or that journalId on JournalPartnerLink is also BigInt if it's a direct FK to a BigInt Journal ID.
-    // For consistency, let's assume Journal.id is string and JournalPartnerLink.journalId is string.
     console.log(
-      `JPL Service: Finding link for Journal ${journalId} and Partner ${partnerId}`
+      `JPL Service: Finding first link for Journal ${journalId} and Partner ${partnerId}`
     );
-    return prisma.journalPartnerLink.findUnique({
+    // Use findFirst because the unique constraint also includes partnershipType,
+    // so there could be multiple links between the same journal and partner.
+    return prisma.journalPartnerLink.findFirst({
       where: {
-        // This assumes you have a unique constraint on (journalId, partnerId)
-        // If your schema names it differently, adjust:
-        // journalId_partnerId: { journalId: journalId, partnerId: partnerId }
-        // OR if journalId on JPL is also BigInt:
-        // journalId_partnerId: { journalId: BigInt(journalId), partnerId: partnerId }
-
-        // Let's assume journalId on JournalPartnerLink is string (matching Journal.id)
-        // and you have a composite unique index: @@unique([journalId, partnerId])
-        journalId_partnerId: {
-          // This is the conventional name for the constraint
-          journalId: journalId,
-          partnerId: partnerId,
-        },
+        journalId: journalId,
+        partnerId: partnerId,
       },
     });
   },

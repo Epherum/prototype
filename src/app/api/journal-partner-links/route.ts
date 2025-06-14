@@ -11,7 +11,6 @@ import { authOptions, ExtendedSession } from "@/lib/authOptions";
 const createLinkSchema = z.object({
   journalId: z.string().min(1),
   partnerId: z.preprocess(
-    // Preprocess to convert string/number to BigInt for validation
     (val) =>
       typeof val === "string" || typeof val === "number" ? BigInt(val) : val,
     z.bigint()
@@ -36,16 +35,16 @@ const createLinkSchema = z.object({
 
 export async function POST(request: NextRequest) {
   console.log(
-    "Waiter (API /journal-partner-links): Customer wants to link a journal and partner."
+    "API /journal-partner-links: Received request to link journal and partner."
   );
   try {
     // --- AUTH ---
     const session = (await getServerSession(
       authOptions
     )) as ExtendedSession | null;
-    if (!session?.user?.id || !session?.user?.companyId) {
+    if (!session?.user?.id) {
       return NextResponse.json(
-        { message: "Unauthorized: Session or user details missing" },
+        { message: "Unauthorized: User session is missing." },
         { status: 401 }
       );
     }
@@ -57,37 +56,18 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json(
         {
-          message: "Link order is unclear.",
+          message: "Invalid link payload.",
           errors: validation.error.format(),
         },
         { status: 400 }
       );
     }
 
-    // Ensure BigInt conversion for partnerId if not handled by Zod preprocess perfectly
-    let {
-      journalId,
-      partnerId,
-      partnershipType,
-      exoneration,
-      periodType,
-      dateDebut,
-      dateFin,
-      documentReference,
-    } = validation.data;
-    if (typeof partnerId === "string" || typeof partnerId === "number") {
-      partnerId = BigInt(partnerId);
-    }
-    const validOrderData = {
-      journalId,
-      partnerId,
-      partnershipType: partnershipType ?? null,
-      exoneration: exoneration ?? null,
-      periodType: periodType ?? null,
-      dateDebut: dateDebut ?? null,
-      dateFin: dateFin ?? null,
-      documentReference: documentReference ?? null,
-      companyId: session.user.companyId,
+    // The validated data is ready for the service. No companyId needed.
+    const validOrderData: CreateJournalPartnerLinkData = {
+      journalId: validation.data.journalId,
+      partnerId: validation.data.partnerId,
+      ...validation.data,
     };
 
     const newLink = await journalPartnerLinkService.createLink(validOrderData);
@@ -99,7 +79,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const e = error as Error;
     console.error(
-      "Waiter (API /journal-partner-links): Chef couldn't create link!",
+      "API /journal-partner-links: Failed to create link!",
       e.message
     );
     if (e.message.includes("not found")) {
@@ -124,11 +104,8 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { message: "Chef couldn't create the link.", error: e.message },
+      { message: "An unexpected error occurred.", error: e.message },
       { status: 500 }
     );
   }
 }
-
-// Optional: GET all links (can be very large, use with caution or add pagination/filters)
-// export async function GET(request: NextRequest) { ... }

@@ -31,7 +31,6 @@ export type Partner = {
   bioFatherName?: string | null;
   bioMotherName?: string | null;
   additionalDetails?: any;
-  companyId: string;
   entityState: EntityState;
   approvalStatus: ApprovalStatus;
   createdById: string;
@@ -264,5 +263,4 @@ export interface RoleData {
   name: string;
   permissions: Array<{ action: string; resource: string }>;
   restrictedTopLevelJournalId?: string | null;
-  restrictedTopLevelJournalCompanyId?: string | null;
 }

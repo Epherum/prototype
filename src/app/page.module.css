@@ -58,8 +58,8 @@
 
 .sliderWrapper {
   flex: 1 1 350px; /* Allow sliders to have a base width and grow/shrink */
-  min-width: 320px; /* Prevent them from becoming too narrow */
-  max-width: 450px; /* Prevent them from becoming too wide on large screens */
+  /* min-width: 320px; Prevent them from becoming too narrow */
+  /* max-width: 450px; Prevent them from becoming too wide on large screens */
   background-color: var(--bg-card);
   border-radius: var(--border-radius-lg);
   box-shadow: 0 4px 12px var(--shadow-color);

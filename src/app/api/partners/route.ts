@@ -1,44 +1,38 @@
 // src/app/api/partners/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import partnerServiceImport, {
+import partnerService, {
   createPartnerSchema,
   GetAllPartnersOptions,
   CreatePartnerData as ServiceCreatePartnerData,
 } from "@/app/services/partnerService";
-import { Partner, PartnerType } from "@prisma/client";
+import { Partner } from "@prisma/client";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
 import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
 import { PartnerGoodFilterStatus } from "@/lib/types";
 
-const partnerService = partnerServiceImport;
-
 export async function GET(request: NextRequest) {
   const session = (await getServerSession(
     authOptions
   )) as ExtendedSession | null;
-  if (!session?.user?.id || !session?.user?.companyId) {
+  if (!session?.user?.id) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   const user = session.user as ExtendedUser;
   const currentUserId = user.id;
-  const companyId = user.companyId;
 
   const { searchParams } = new URL(request.url);
 
-  // --- Parse Parameters ---
   const limitParam = searchParams.get("limit");
   const offsetParam = searchParams.get("offset");
   const take = limitParam ? parseInt(limitParam, 10) : undefined;
   const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
 
-  // --- Parameters for standard J-P flow ---
   const filterStatusesParam = searchParams.get("filterStatuses");
   const contextJournalIdsParam = searchParams.get("contextJournalIds");
   const restrictedJournalId = searchParams.get("restrictedJournalId");
 
-  // --- Parameters for linking flows (J-G-P, G-J-P) ---
   const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds");
   const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
   const includeChildrenParam = searchParams.get("includeChildren");
@@ -46,9 +40,7 @@ export async function GET(request: NextRequest) {
   try {
     let partnersResult: { partners: Partner[]; totalCount: number };
 
-    // --- Build Service Call Options ---
     const serviceCallOptions: GetAllPartnersOptions = {
-      companyId,
       currentUserId,
       take,
       skip,
@@ -94,29 +86,20 @@ export async function GET(request: NextRequest) {
           filterStatusesParam || "none"
         }'`
       );
-
-      // ============================ THE FIX IS HERE ============================
-      // This logic correctly handles the parameters sent from the corrected frontend.
-
       const filterStatuses = filterStatusesParam
         ? (filterStatusesParam
             .split(",")
             .filter(Boolean) as PartnerGoodFilterStatus[])
         : [];
-
       const contextJournalIds =
         contextJournalIdsParam
           ?.split(",")
           .map((id) => id.trim())
           .filter(Boolean) || [];
 
-      // Pass all relevant parameters directly to the service.
-      // The service layer (`partnerService`) contains the complex logic
-      // for how to use these parameters. This API layer's job is just to pass them along.
       serviceCallOptions.filterStatuses = filterStatuses;
       serviceCallOptions.contextJournalIds = contextJournalIds;
       serviceCallOptions.restrictedJournalId = restrictedJournalId || null;
-      // ========================= END OF FIX ==========================
 
       partnersResult = await partnerService.getAllPartners(serviceCallOptions);
     }
@@ -143,45 +126,40 @@ export async function GET(request: NextRequest) {
     }
     console.error("API /partners GET Error:", e.message, e.stack);
     return NextResponse.json(
-      { message: "Chef couldn't get the partner list.", error: e.message },
+      { message: "Failed to retrieve partner list.", error: e.message },
       { status: 500 }
     );
   }
 }
 
-// ... (POST handler is unchanged)
 export async function POST(request: NextRequest) {
-  console.log("Waiter (API /partners): Customer wants to add a new partner.");
+  console.log("API /partners: Received request to add a new partner.");
   const session = (await getServerSession(
     authOptions
   )) as ExtendedSession | null;
-  if (!session?.user?.id || !session?.user?.companyId) {
+  if (!session?.user?.id) {
     return NextResponse.json(
-      { message: "Unauthorized: Session or user details missing" },
+      { message: "Unauthorized: User session is missing" },
       { status: 401 }
     );
   }
-  const companyId = session.user.companyId;
   const createdById = session.user.id;
   const createdByIp =
     request.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
 
   try {
     const rawOrder = await request.json();
-    console.log(
-      "Waiter (API /partners): Customer's raw order for new partner:",
-      rawOrder
-    );
+    console.log("API /partners: Raw payload for new partner:", rawOrder);
 
     const validation = createPartnerSchema.safeParse(rawOrder);
     if (!validation.success) {
       console.warn(
-        "Waiter (API /partners): Customer's order for new partner is unclear/invalid:",
+        "API /partners: Invalid payload for new partner:",
         validation.error.format()
       );
       return NextResponse.json(
         {
-          message: "Order for new partner is unclear.",
+          message: "Invalid partner payload.",
           errors: validation.error.format(),
         },
         { status: 400 }
@@ -189,16 +167,15 @@ export async function POST(request: NextRequest) {
     }
 
     const partnerDataForService: ServiceCreatePartnerData = validation.data;
+    console.log("API /partners: Payload is valid. Passing to service.");
 
-    console.log(
-      "Waiter (API /partners): Order for new partner is clear. Passing to Chef."
-    );
+    // Call the service without companyId
     const newPartner = await partnerService.createPartner(
       partnerDataForService,
-      companyId,
       createdById,
       createdByIp
     );
+
     const body = JSON.stringify(newPartner, jsonBigIntReplacer);
     return new NextResponse(body, {
       status: 201,
@@ -207,12 +184,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const e = error as Error;
     console.error(
-      "Waiter (API /partners): Chef couldn't add new partner!",
+      "API /partners: Failed to add new partner!",
       e.message,
       e.stack
     );
     return NextResponse.json(
-      { message: "Chef couldn't add the new partner.", error: e.message },
+      { message: "Failed to add the new partner.", error: e.message },
       { status: 500 }
     );
   }

@@ -1,42 +1,37 @@
 // File: src/app/api/journals/all-for-admin-selection/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession } from "@/lib/authOptions"; // Adjust path as needed
-import { journalService } from "@/app/services/journalService"; // Adjust path as needed
+import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+import { journalService } from "@/app/services/journalService";
 
 interface AuthenticatedUserContext {
-  companyId: string;
   userId: string;
 }
 
 const hasPermission = (
-  session: ExtendedSession | null,
-  permissionName: string
+  user: ExtendedUser | undefined,
+  permissionAction: string,
+  permissionResource: string
 ): boolean => {
-  if (!session || !session.user || !session.user.roles) return false;
-  const MANAGE_USERS_PERMISSION = "MANAGE_USERS";
-  return session.user.roles.some((role) =>
+  if (!user?.roles) return false;
+  return user.roles.some((role) =>
     role.permissions?.some(
-      (p) => `${p.action}_${p.resource}` === MANAGE_USERS_PERMISSION
+      (p) => p.action === permissionAction && p.resource === permissionResource
     )
   );
 };
 
-// THIS IS THE KEY PART
 export async function GET(request: NextRequest) {
-  // <--- Ensure this is correct
   const session = (await getServerSession(
     authOptions
   )) as ExtendedSession | null;
 
-  if (!session?.user?.id || !session?.user?.companyId) {
-    return NextResponse.json(
-      { message: "Unauthorized: Session or user details missing" },
-      { status: 401 }
-    );
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
 
-  if (!hasPermission(session, "MANAGE_USERS")) {
+  // Check for permission to manage users
+  if (!hasPermission(session.user as ExtendedUser, "MANAGE", "USERS")) {
     return NextResponse.json(
       { message: "Forbidden: Insufficient permissions" },
       { status: 403 }
@@ -45,16 +40,16 @@ export async function GET(request: NextRequest) {
 
   const userContext: AuthenticatedUserContext = {
     userId: session.user.id,
-    companyId: session.user.companyId,
   };
 
   try {
     console.log(
-      `API /journals/all-for-admin-selection GET (User: ${userContext.userId}, Company: ${userContext.companyId})`
+      `API /journals/all-for-admin-selection GET (User: ${userContext.userId})`
     );
-    const journals = await journalService.getAllJournalsForAdminSelection(
-      userContext
-    );
+
+    // The service no longer needs the context as it fetches all journals.
+    const journals = await journalService.getAllJournalsForAdminSelection();
+
     return NextResponse.json(journals);
   } catch (error) {
     const e = error as Error;

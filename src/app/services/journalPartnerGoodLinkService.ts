@@ -1,4 +1,4 @@
-// File: src/app/services/journalPartnerGoodLinkService.ts
+// src/app/services/journalPartnerGoodLinkService.ts
 import prisma from "@/app/utils/prisma";
 import {
   JournalPartnerGoodLink,
@@ -25,9 +25,8 @@ const CreateRawJPGLSchema = z.object({
 });
 export type CreateRawJPGLData = z.infer<typeof CreateRawJPGLSchema>;
 
-// Update the Zod Schema to include companyId
+// Update the Zod Schema to remove companyId
 export const OrchestratedCreateJPGLSchema = z.object({
-  companyId: z.string().min(1, "Company ID is required"), // Add companyId
   journalId: z.string().min(1, "Journal ID is required"),
   partnerId: z.bigint().positive("Partner ID must be a positive number"),
   goodId: z.bigint().positive("Good ID must be a positive number"),
@@ -45,9 +44,6 @@ const jpgLinkService = {
     data: OrchestratedCreateJPGLData
   ): Promise<JournalPartnerGoodLink> {
     const {
-      // --- Start of Changes ---
-      companyId, // Destructure companyId
-      // --- End of Changes ---
       journalId,
       partnerId,
       goodId,
@@ -57,16 +53,14 @@ const jpgLinkService = {
     } = OrchestratedCreateJPGLSchema.parse(data);
 
     console.log(
-      `Chef (JPGLService): Orchestrating 3-way link for C:'${companyId}', J:'${journalId}', P:'${partnerId}', G:'${goodId}', JPL Type:'${partnershipType}'.`
+      `Chef (JPGLService): Orchestrating 3-way link for J:'${journalId}', P:'${partnerId}', G:'${goodId}', JPL Type:'${partnershipType}'.`
     );
 
     // Step 1: Find or Create the JournalPartnerLink
-    // --- Start of Major Changes (The Core Fix) ---
     let journalPartnerLink = await prisma.journalPartnerLink.findUnique({
       where: {
-        // Use the CORRECT Prisma-generated compound key name
-        companyId_journalId_partnerId_partnershipType: {
-          companyId: companyId,
+        // Use the new compound key name based on the updated schema
+        journalId_partnerId_partnershipType: {
           journalId: journalId,
           partnerId: partnerId,
           partnershipType: partnershipType,
@@ -79,7 +73,7 @@ const jpgLinkService = {
       try {
         journalPartnerLink = await prisma.journalPartnerLink.create({
           data: {
-            companyId: companyId, // Pass companyId on creation
+            // No companyId needed
             journalId: journalId,
             partnerId: partnerId,
             partnershipType: partnershipType,
@@ -96,8 +90,7 @@ const jpgLinkService = {
           journalPartnerLink = await prisma.journalPartnerLink.findUnique({
             where: {
               // Use the correct compound key name here as well
-              companyId_journalId_partnerId_partnershipType: {
-                companyId,
+              journalId_partnerId_partnershipType: {
                 journalId,
                 partnerId,
                 partnershipType,
@@ -120,13 +113,10 @@ const jpgLinkService = {
         ` -> Found existing JournalPartnerLink with ID: ${journalPartnerLink.id}`
       );
     }
-    // --- End of Major Changes ---
 
     // Step 2: Create the JournalPartnerGoodLink
     const rawJpglData = {
-      // --- Start of Changes ---
-      companyId: companyId, // Pass companyId to the JPGL record as well
-      // --- End of Changes ---
+      // No companyId needed for the JPGL record either
       journalPartnerLinkId: journalPartnerLink.id,
       goodId: goodId,
       descriptiveText: descriptiveText,

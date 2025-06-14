@@ -1,38 +1,10 @@
 // File: src/app/api/journal-partner-good-links/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import jpgLinkService, {
-  CreateJPGLData,
-  OrchestratedCreateJPGLSchema,
-} from "@/app/services/journalPartnerGoodLinkService";
+import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { z } from "zod";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedUser } from "@/lib/authOptions"; // Import ExtendedUser from its actual location
-
-const createJPGLSchema = z.object({
-  journalPartnerLinkId: z.preprocess(
-    (val) =>
-      typeof val === "string" || typeof val === "number" ? BigInt(val) : val,
-    z.bigint()
-  ),
-  goodId: z.preprocess(
-    (val) =>
-      typeof val === "string" || typeof val === "number" ? BigInt(val) : val,
-    z.bigint()
-  ),
-  descriptiveText: z.string().optional().nullable(),
-  contextualTaxCodeId: z.number().int().positive().optional().nullable(),
-});
-
-// Zod schema for client-side numbers/strings that need to be BigInt for the service
-const ApiOrchestratedCreateJPGLSchema = OrchestratedCreateJPGLSchema.extend({
-  partnerId: z
-    .union([z.string(), z.number().int().positive()])
-    .transform((v) => BigInt(v)), // Allow string from client for partnerId
-  goodId: z
-    .union([z.string(), z.number().int().positive()])
-    .transform((v) => BigInt(v)), // Allow string from client for goodId
-});
+import { authOptions, ExtendedUser } from "@/lib/authOptions";
 
 // Define a schema for what we EXPECT FROM THE CLIENT.
 // It should NOT include server-side data like companyId.
@@ -53,42 +25,31 @@ export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   const user = session?.user as ExtendedUser | undefined;
 
-  if (!user?.companyId) {
-    return NextResponse.json(
-      { message: "Unauthorized or company not found for user" },
-      { status: 401 }
-    );
+  if (!user) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const companyId = user.companyId;
 
-  console.log(
-    "Waiter (API /jp-good-links): Customer wants to create a 3-way link (orchestrated)."
-  );
+  console.log("API /jp-good-links: Received request to create a 3-way link.");
   try {
     const rawOrder = await request.json();
 
-    // Validate the incoming payload against the client-only schema
     const validation = ClientPayloadSchema.safeParse(rawOrder);
 
     if (!validation.success) {
       console.error("Validation errors:", validation.error.format());
       return NextResponse.json(
         {
-          message: "3-way link order is unclear.",
+          message: "Invalid payload for 3-way link.",
           errors: validation.error.format(),
         },
         { status: 400 }
       );
     }
 
-    // Now, create the full data object for the service, combining client data with server data.
-    const serviceData = {
-      ...validation.data, // The clean, validated data from the client
-      companyId: companyId, // The secure, server-side companyId
-    };
+    // The service data is now just the validated client payload.
+    // The service will no longer expect a companyId.
+    const serviceData = validation.data;
 
-    // Pass the complete, correct object to the service.
-    // The service's internal validation will now pass.
     const newLink = await jpgLinkService.createFullJpgLink(serviceData);
 
     const body = JSON.stringify(newLink, jsonBigIntReplacer);
@@ -97,15 +58,13 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    // This error handling is now more robust because it can catch errors from the service layer too.
     const e = error as Error & { code?: string; meta?: any };
     console.error(
-      "Waiter (API /jp-good-links): Chef couldn't create 3-way link!",
+      "API /jp-good-links: Failed to create 3-way link!",
       e.message,
       e
     );
     if (e instanceof z.ZodError) {
-      // This would catch a mismatch between what the API sends and what the service expects.
       return NextResponse.json(
         { message: "Internal data shaping error.", error: e.format() },
         { status: 500 }
@@ -136,7 +95,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { message: "Chef couldn't create the 3-way link.", error: e.message },
+      { message: "An unexpected error occurred.", error: e.message },
       { status: 500 }
     );
   }
@@ -150,8 +109,8 @@ export async function GET(request: NextRequest) {
   if (jplIdStr) {
     try {
       const jplId = BigInt(jplIdStr);
-      // const goods = await jpgLinkService.getGoodsForJournalPartnerLink(jplId); // Just goods
-      const fullLinks = await jpgLinkService.getFullLinksForJPL(jplId); // Get full JPGL details for this JPL
+      // Assuming jpgLinkService is refactored and no longer needs company context
+      const fullLinks = await jpgLinkService.getFullLinksForJPL(jplId);
       const body = JSON.stringify(fullLinks, jsonBigIntReplacer);
       return new NextResponse(body, {
         status: 200,

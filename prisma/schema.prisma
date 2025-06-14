@@ -1,4 +1,5 @@
-//schema.prisma
+// schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,7 +16,6 @@ enum PartnerType {
   NATURAL_PERSON
 }
 
-// NEW Enums for Auditing and Workflow
 enum EntityState {
   ACTIVE    // Currently in use, latest version
   MODIFIED  // A previous version, superseded by a newer one
@@ -28,40 +28,14 @@ enum ApprovalStatus {
   REJECTED
 }
 
-// --- Core Auth & Multi-tenancy Models ---
-
-model Company {
-  id        String   @id @default(cuid())
-  name      String   @db.Text
-
-  users             User[]
-  roles             Role[]
-  journals          Journal[]
-  partners          Partner[]
-  taxCodes          TaxCode[]
-  unitsOfMeasure    UnitOfMeasure[]
-  goodsAndServices  GoodsAndService[]
-
-  journalPartnerLinks     JournalPartnerLink[]
-  journalGoodLinks        JournalGoodLink[]
-  journalPartnerGoodLinks JournalPartnerGoodLink[]
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("companies")
-}
+// --- Core Auth Models (Single-Tenant) ---
 
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
   name          String?
   passwordHash  String
-  // isActive has been replaced by entityState
-  // isActive      Boolean   @default(true) 
-  companyId     String    @map("company_id")
 
-  company       Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userRoles     UserRole[]
 
   // Audit and State Fields
@@ -73,48 +47,44 @@ model User {
   deletedAt     DateTime?   @map("deleted_at")
 
   // Versioning Fields
-  previousVersionId String?  @unique @map("previous_version_id") // User.id of the record this version superseded
-  nextVersionId     String?  @unique @map("next_version_id")     // User.id of the record that superseded this one
+  previousVersionId String?  @unique @map("previous_version_id")
+  nextVersionId     String?  @unique @map("next_version_id")
 
   // Relations for Audit/Versioning
   createdBy         User?    @relation("UserCreatedBy", fields: [createdById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   deletedBy         User?    @relation("UserDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  previousVersion   User?    @relation("UserPreviousVersion", fields: [previousVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction) // Can't delete a previous version if a next one points to it
-  nextVersion       User?    @relation("UserNextVersion", fields: [nextVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)     // Can't delete a next version if a previous one points to it
+  previousVersion   User?    @relation("UserPreviousVersion", fields: [previousVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  nextVersion       User?    @relation("UserNextVersion", fields: [nextVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   // Supporting relations for the above FKs (Prisma needs these defined for one-to-one)
   userCreatorOfUser       User[] @relation("UserCreatedBy")
   userDeleterOfUser       User[] @relation("UserDeletedBy")
-  userPreviousVersionOf   User?  @relation("UserNextVersion") // This is the 'other side' of the nextVersion relation
-  userNextVersionOf       User?  @relation("UserPreviousVersion") // This is the 'other side' of the previousVersion relation
+  userPreviousVersionOf   User?  @relation("UserNextVersion")
+  userNextVersionOf       User?  @relation("UserPreviousVersion")
 
   // Relations for other entities this user audited
   createdPartners         Partner[]       @relation("PartnerCreatedBy")
   deletedPartners         Partner[]       @relation("PartnerDeletedBy")
   createdGoodsAndServices GoodsAndService[] @relation("GoodsCreatedBy")
   deletedGoodsAndServices GoodsAndService[] @relation("GoodsDeletedBy")
-  // Note: "updatedBy" is implicitly the "createdBy" of the *new* version.
 
-  createdAt     DateTime  @default(now()) @map("created_at") // When this specific record/version was created
-  updatedAt     DateTime  @updatedAt @map("updated_at")      // When this specific record/version was last touched
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
 }
 
 model Role {
   id          String    @id @default(cuid())
-  name        String
+  name        String    @unique
   description String?   @db.Text
-  companyId   String    @map("company_id")
 
-  company       Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   userRoles     UserRole[]
   permissions   RolePermission[]
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([name, companyId], map: "uq_role_name_company")
   @@map("roles")
 }
 
@@ -122,11 +92,10 @@ model UserRole {
   userId                       String  @map("user_id")
   roleId                       String  @map("role_id")
   restrictedTopLevelJournalId  String? @map("restricted_top_level_journal_id")
-  restrictedTopLevelJournalCompanyId String? @map("restricted_top_level_journal_company_id")
 
   user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   role                       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  restrictedTopLevelJournal  Journal?  @relation("UserRoleRestrictedJournal", fields: [restrictedTopLevelJournalId, restrictedTopLevelJournalCompanyId], references: [id, companyId], onDelete: SetNull, onUpdate: Cascade)
+  restrictedTopLevelJournal  Journal?  @relation("UserRoleRestrictedJournal", fields: [restrictedTopLevelJournalId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   assignedAt                 DateTime  @default(now()) @map("assigned_at")
 
@@ -159,18 +128,16 @@ model RolePermission {
   @@map("role_permissions")
 }
 
-// --- Core Business Entity Models (Now with Company Scope & Auditing) ---
+// --- Core Business Entity Models (Now with Auditing) ---
 
 model Journal {
-  id                 String     @db.VarChar(100)
-  companyId          String    @map("company_id")
+  id                 String     @id @db.VarChar(100)
   name               String    @db.Text
   parentId           String?   @map("parent_id") @db.VarChar(100)
   isTerminal         Boolean   @default(false) @map("is_terminal")
   additionalDetails  Json?     @map("additional_details") @db.JsonB
 
-  company            Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  parent             Journal?  @relation("JournalHierarchy", fields: [parentId, companyId], references: [id, companyId], onDelete: Restrict, onUpdate: Cascade, map: "fk_journal_parent")
+  parent             Journal?  @relation("JournalHierarchy", fields: [parentId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "fk_journal_parent")
   children           Journal[] @relation("JournalHierarchy")
 
   journalPartnerLinks  JournalPartnerLink[]
@@ -180,13 +147,11 @@ model Journal {
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
-  @@id([id, companyId])
   @@map("journals")
 }
 
 model Partner {
   id                  BigInt        @id @default(autoincrement()) @db.BigInt
-  companyId           String        @map("company_id")
   partnerType         PartnerType   @map("partner_type")
   name                String        @db.Text
   notes               String?       @db.Text
@@ -199,13 +164,12 @@ model Partner {
   bioMotherName       String?       @map("bio_mother_name") @db.VarChar(100)
   additionalDetails   Json?         @map("additional_details") @db.JsonB
 
-  company             Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
   journalPartnerLinks JournalPartnerLink[]
 
   // Audit, State, and Workflow Fields
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
   approvalStatus    ApprovalStatus  @default(PENDING) @map("approval_status")
-  createdById       String          @map("created_by_id") // Who created this version
+  createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
   deletedByIp       String?         @map("deleted_by_ip") @db.VarChar(45)
@@ -216,57 +180,50 @@ model Partner {
   nextVersionId     BigInt?  @unique @map("next_version_id")
 
   // Relations for Audit/Versioning
-  createdBy         User     @relation("PartnerCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade) // Don't allow user deletion if they created active records. Manage via app logic.
+  createdBy         User     @relation("PartnerCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
   deletedBy         User?    @relation("PartnerDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
   previousVersion   Partner? @relation("PartnerPreviousVersion", fields: [previousVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   nextVersion       Partner? @relation("PartnerNextVersion", fields: [nextVersionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  
+
   partnerPreviousVersionOf   Partner?  @relation("PartnerNextVersion")
   partnerNextVersionOf       Partner?  @relation("PartnerPreviousVersion")
 
-  createdAt           DateTime      @default(now()) @map("created_at") // When this version was created
-  updatedAt           DateTime      @updatedAt @map("updated_at")      // When this version was last touched
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
   @@map("partners")
 }
 
 model TaxCode {
   id          Int     @id @default(autoincrement())
-  companyId   String  @map("company_id")
-  code        String  @db.VarChar(50)
+  code        String  @unique @db.VarChar(50)
   description String? @db.Text
   rate        Decimal @db.Decimal(5, 4)
 
-  company                 Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   goodsAndServices        GoodsAndService[]
   journalPartnerGoodLinks JournalPartnerGoodLink[] @relation("ContextualTaxForJPGLink")
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([code, companyId], map: "uq_taxcode_code_company")
   @@map("tax_codes")
 }
 
 model UnitOfMeasure {
   id        Int     @id @default(autoincrement())
-  companyId String  @map("company_id")
-  code      String  @db.VarChar(20)
+  code      String  @unique @db.VarChar(20)
   name      String  @db.VarChar(100)
 
-  company          Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   goodsAndServices GoodsAndService[]
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([code, companyId], map: "uq_uom_code_company")
   @@map("units_of_measure")
 }
 
 model GoodsAndService {
   id                    BigInt    @id @default(autoincrement()) @db.BigInt
-  companyId             String    @map("company_id")
   referenceCode         String?   @map("reference_code") @db.VarChar(50)
   barcode               String?   @db.VarChar(50)
   taxCodeId             Int?      @map("tax_code_id")
@@ -279,7 +236,6 @@ model GoodsAndService {
   photoUrl              String?   @map("photo_url") @db.VarChar(255)
   additionalDetails     Json?     @map("additional_details") @db.JsonB
 
-  company               Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   taxCode               TaxCode?        @relation(fields: [taxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   unitOfMeasure         UnitOfMeasure?  @relation(fields: [unitCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
@@ -289,7 +245,7 @@ model GoodsAndService {
   // Audit, State, and Workflow Fields
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
   approvalStatus    ApprovalStatus  @default(PENDING) @map("approval_status")
-  createdById       String          @map("created_by_id") // Who created this version
+  createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
   deletedByIp       String?         @map("deleted_by_ip") @db.VarChar(45)
@@ -309,17 +265,16 @@ model GoodsAndService {
   goodsNextVersionOf       GoodsAndService?  @relation("GoodsPreviousVersion")
 
 
-  createdAt             DateTime        @default(now()) @map("created_at") // When this version was created
-  updatedAt             DateTime        @updatedAt @map("updated_at")      // When this version was last touched
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
 
   @@map("goods_and_services")
 }
 
-// --- Linking Tables (Unchanged in this pass for auditing/versioning) ---
+// --- Linking Tables ---
 
 model JournalPartnerLink {
   id                  BigInt    @id @default(autoincrement()) @db.BigInt
-  companyId           String    @map("company_id")
   journalId           String    @map("journal_id") @db.VarChar(100)
   partnerId           BigInt    @map("partner_id") @db.BigInt
   partnershipType     String?   @map("partnership_type") @db.VarChar(50)
@@ -329,8 +284,7 @@ model JournalPartnerLink {
   dateFin             DateTime? @map("date_fin") @db.Date
   documentReference   String?   @map("document_reference") @db.VarChar(200)
 
-  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  journal             Journal   @relation(fields: [journalId, companyId], references: [id, companyId], onDelete: Cascade, onUpdate: Cascade)
+  journal             Journal   @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   journalPartnerGoodLinks JournalPartnerGoodLink[]
@@ -338,36 +292,32 @@ model JournalPartnerLink {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  @@unique([companyId, journalId, partnerId, partnershipType], map: "uq_comp_journal_partner_type")
+  @@unique([journalId, partnerId, partnershipType], map: "uq_journal_partner_type")
   @@map("journal_partner_links")
 }
 
 model JournalGoodLink {
   id          BigInt   @id @default(autoincrement()) @db.BigInt
-  companyId   String   @map("company_id")
   journalId   String   @map("journal_id") @db.VarChar(100)
   goodId      BigInt   @map("good_id") @db.BigInt
 
-  company     Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  journal     Journal         @relation(fields: [journalId, companyId], references: [id, companyId], onDelete: Cascade, onUpdate: Cascade)
+  journal     Journal         @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   good        GoodsAndService @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([companyId, journalId, goodId], map: "uq_comp_journal_good")
+  @@unique([journalId, goodId], map: "uq_journal_good")
   @@map("journal_good_links")
 }
 
 model JournalPartnerGoodLink {
   id                      BigInt    @id @default(autoincrement()) @db.BigInt
-  companyId               String    @map("company_id")
   journalPartnerLinkId    BigInt    @map("journal_partner_link_id") @db.BigInt
   goodId                  BigInt    @map("good_id") @db.BigInt
   descriptiveText         String?   @map("descriptive_text") @db.Text
   contextualTaxCodeId     Int?      @map("contextual_tax_code_id")
 
-  company                 Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
   journalPartnerLink      JournalPartnerLink @relation(fields: [journalPartnerLinkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   good                    GoodsAndService    @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   contextualTaxCode       TaxCode?           @relation("ContextualTaxForJPGLink", fields: [contextualTaxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
