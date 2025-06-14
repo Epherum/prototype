@@ -1,4 +1,3 @@
-//src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
@@ -46,7 +45,6 @@ export interface JournalSliderControllerRef {
   openJournalSelectorForGPG: () => void;
 }
 
-// --- NEW: Props for layout controls, passed from page.tsx ---
 interface LayoutControlProps {
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -62,6 +60,9 @@ export const JournalSliderController = forwardRef<
   JournalSliderControllerProps
 >(({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, isMoveDisabled }, ref) => {
   const journalManager = useJournalManager();
+  const restrictedJournalId = useAppStore(
+    (state) => state.auth.effectiveRestrictedJournalId
+  );
 
   // Store selections
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
@@ -75,6 +76,32 @@ export const JournalSliderController = forwardRef<
     ((node: AccountNodeData) => void) | null
   >(null);
   const [isGpgContextModalOpen, setIsGpgContextModalOpen] = useState(false);
+
+  const selectedL1Journal = useMemo(() => {
+    if (
+      !journalManager.isJournalSliderPrimary ||
+      !journalManager.selectedTopLevelJournalId
+    ) {
+      return null;
+    }
+    return findNodeById(
+      journalManager.hierarchyData,
+      journalManager.selectedTopLevelJournalId
+    );
+  }, [
+    journalManager.isJournalSliderPrimary,
+    journalManager.selectedTopLevelJournalId,
+    journalManager.hierarchyData,
+  ]);
+
+  // --- NEW: Callback to handle navigating up the hierarchy ---
+  const handleNavigateToRoot = useCallback(() => {
+    // The journalManager hook already knows how to handle the top-level selection.
+    // We pass it the user's effective root, which is either their restricted ID or the global root.
+    journalManager.handleSelectTopLevelJournal(
+      restrictedJournalId || ROOT_JOURNAL_ID
+    );
+  }, [journalManager, restrictedJournalId]);
 
   useImperativeHandle(ref, () => ({
     openJournalSelector: (callback) => {
@@ -131,8 +158,6 @@ export const JournalSliderController = forwardRef<
       if (onSelectForLinkingCallback) {
         onSelectForLinkingCallback(selectedNode);
       }
-      // Note: We don't close the modal, allowing for multiple selections.
-      // The user closes it by clicking "Done Selecting".
     },
     [onSelectForLinkingCallback]
   );
@@ -179,7 +204,7 @@ export const JournalSliderController = forwardRef<
             (useAppStore.getState().auth.effectiveRestrictedJournalId ||
               ROOT_JOURNAL_ID)
           }
-          onToggleFilter={handleToggleJournalRootFilter} // Using the new handler
+          onToggleFilter={handleToggleJournalRootFilter}
           activeFilters={
             journalManager.activeJournalRootFilters as PartnerGoodFilterStatus[]
           }
@@ -207,7 +232,7 @@ export const JournalSliderController = forwardRef<
           error={queryToUse.error}
           activeItemId={journalManager.selectedFlatJournalId}
           onSlideChange={journalManager.setSelectedFlatJournalId}
-          isAccordionOpen={false} // Accordion not used for flat journal view
+          isAccordionOpen={false}
           onToggleAccordion={() => {}}
         />
       );
@@ -230,7 +255,6 @@ export const JournalSliderController = forwardRef<
 
   return (
     <>
-      {/* --- NEW: The controller now renders the entire, correctly structured control bar --- */}
       <div className={styles.controls}>
         <div className={styles.controlsLeftGroup}>
           <button
@@ -240,7 +264,16 @@ export const JournalSliderController = forwardRef<
           >
             <IoOptionsOutline />
           </button>
-          {/* You can add any other Journal-specific controls here in the future */}
+
+          {journalManager.isJournalSliderPrimary && selectedL1Journal && (
+            <div
+              className={styles.journalParentInfo}
+              onDoubleClick={handleNavigateToRoot}
+              title="Double-click to go up to root view"
+            >
+              {selectedL1Journal.code} - {selectedL1Journal.name}
+            </div>
+          )}
         </div>
 
         <div className={styles.moveButtonGroup}>
@@ -267,15 +300,12 @@ export const JournalSliderController = forwardRef<
       {renderSlider()}
 
       {/* --- MODALS RENDERED BY THIS CONTROLLER --- */}
-
       <AddJournalModal
         isOpen={journalManager.isAddJournalModalOpen}
         onClose={journalManager.closeAddJournalModal}
         onSubmit={journalManager.createJournal}
         context={journalManager.addJournalContext}
       />
-
-      {/* This single JournalModal instance serves all three purposes */}
       <JournalModal
         isOpen={
           journalManager.isJournalNavModalOpen ||
@@ -297,14 +327,14 @@ export const JournalSliderController = forwardRef<
         }
         onConfirmSelection={
           isLinkingModalOpen
-            ? undefined // Navigation confirmation is disabled in linking mode
+            ? undefined
             : isGpgContextModalOpen
             ? handleGpgContextJournalSelected
             : journalManager.handleSelectTopLevelJournal
         }
         onSetShowRoot={
           isLinkingModalOpen || isGpgContextModalOpen
-            ? undefined // Not used in linking modes
+            ? undefined
             : () => journalManager.handleSelectTopLevelJournal(ROOT_JOURNAL_ID)
         }
         onSelectForLinking={
@@ -346,5 +376,4 @@ export const JournalSliderController = forwardRef<
   );
 });
 
-// Good practice for components using forwardRef
 JournalSliderController.displayName = "JournalSliderController";

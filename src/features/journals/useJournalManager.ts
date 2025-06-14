@@ -82,74 +82,82 @@ export const useJournalManager = () => {
     return topLevelNode ? topLevelNode.children || [] : [];
   }, [selectedTopLevelJournalId, hierarchyData, restrictedJournalId]);
 
-  // ==================================================================
-  // --- FINAL, REVISED LOGIC ---
-  // This version correctly handles the initial state and per-branch drill-down.
-  // ==================================================================
   const effectiveSelectedJournalIds = useMemo(() => {
-    // Guard Clause 1: If journal slider isn't primary, it's a flat list.
     if (!isJournalSliderPrimary) {
       return selectedFlatJournalId ? [selectedFlatJournalId] : [];
     }
-
-    // Guard Clause 2: If no root filter (e.g., "Affected") is active, drill-down is disabled.
-    // Return empty array so subsequent queries do not filter by journal.
     if (activeJournalRootFilters.length === 0) {
       return [];
     }
 
-    // *** THE CRITICAL FIX IS HERE ***
-    // Guard Clause 3: If a root filter IS active, but the user has not yet selected
-    // any L2 or L3 items, the context should be empty. This prevents the top-level
-    // ID from being used as a filter by default, fulfilling the user story.
+    // Per-branch multi-select logic (if any L2 or L3 items are checked)
     if (
-      selectedLevel2JournalIds.length === 0 &&
-      selectedLevel3JournalIds.length === 0
+      selectedLevel2JournalIds.length > 0 ||
+      selectedLevel3JournalIds.length > 0
     ) {
-      return [];
-    }
+      const finalIds = new Set<string>();
+      selectedLevel3JournalIds.forEach((id) => finalIds.add(id));
 
-    // --- Begin Per-Branch Replacement Algorithm ---
-    const finalIds = new Set<string>();
+      const l2ParentsOfSelectedL3s = new Set<string>();
+      if (selectedLevel3JournalIds.length > 0) {
+        selectedLevel3JournalIds.forEach((l3Id) => {
+          const parent = findParentOfNode(l3Id, hierarchyData);
+          if (parent) {
+            l2ParentsOfSelectedL3s.add(parent.id);
+          }
+        });
+      }
 
-    // Step 1: Add all L3 Selections. These are the most specific and always take precedence.
-    selectedLevel3JournalIds.forEach((id) => finalIds.add(id));
-
-    // Step 2: Identify the L2 parents of the L3 selections.
-    const l2ParentsOfSelectedL3s = new Set<string>();
-    if (selectedLevel3JournalIds.length > 0) {
-      selectedLevel3JournalIds.forEach((l3Id) => {
-        const parent = findParentOfNode(l3Id, hierarchyData);
-        if (parent) {
-          l2ParentsOfSelectedL3s.add(parent.id);
+      selectedLevel2JournalIds.forEach((l2Id) => {
+        if (!l2ParentsOfSelectedL3s.has(l2Id)) {
+          finalIds.add(l2Id);
         }
       });
+      return Array.from(finalIds);
     }
 
-    // Step 3: Add L2 Selections conditionally.
-    selectedLevel2JournalIds.forEach((l2Id) => {
-      // Add the L2 ID to the final set ONLY IF it is NOT already "represented" by a selected L3 child.
-      if (!l2ParentsOfSelectedL3s.has(l2Id)) {
-        finalIds.add(l2Id);
-      }
-    });
+    // NEW "Drilled-Down" Logic: If no L2/L3 are selected, the context IS the
+    // currently viewed top-level journal, as long as it's not the user's root.
+    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+    if (
+      selectedTopLevelJournalId &&
+      selectedTopLevelJournalId !== effectiveRootId
+    ) {
+      return [selectedTopLevelJournalId];
+    }
 
-    return Array.from(finalIds);
+    // Fallback: If we're at the root view with no selections, the context is empty.
+    return [];
   }, [
     isJournalSliderPrimary,
     selectedFlatJournalId,
     activeJournalRootFilters,
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
+    selectedTopLevelJournalId, // Added dependency
+    restrictedJournalId, // Added dependency
     hierarchyData,
   ]);
 
+  // The logic for what constitutes a "terminal" node for document creation is updated.
   const isTerminalJournalActive = useMemo(() => {
-    if (!isJournalSliderPrimary || effectiveSelectedJournalIds.length !== 1)
+    // The conditions to check remain the same: must be primary slider and only one effective ID.
+    if (!isJournalSliderPrimary || effectiveSelectedJournalIds.length !== 1) {
       return false;
+    }
+
     const singleSelectedId = effectiveSelectedJournalIds[0];
     const node = findNodeById(hierarchyData, singleSelectedId);
-    return !!node?.isTerminal;
+
+    // If for any reason the node isn't found, it cannot be terminal.
+    if (!node) {
+      return false;
+    }
+
+    // NEW, EXPANDED LOGIC:
+    // A node is "terminal" for document creation if it's explicitly flagged as such,
+    // OR if it simply has no children (i.e., it's at the end of its branch).
+    return !!node.isTerminal || !node.children || node.children.length === 0;
   }, [isJournalSliderPrimary, effectiveSelectedJournalIds, hierarchyData]);
 
   // --- Handlers ---

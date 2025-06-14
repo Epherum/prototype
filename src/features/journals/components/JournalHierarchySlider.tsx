@@ -32,7 +32,6 @@ interface JournalHierarchySliderProps {
   isLoading?: boolean;
   isError?: boolean;
   isRootView?: boolean;
-  // --- UPDATED PROPS ---
   activeFilters: ActivePartnerFilters;
   onToggleFilter: (status: PartnerGoodFilterStatus) => void;
 }
@@ -60,43 +59,22 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   const l3ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const l3ClickCountRef = useRef<number>(0);
 
-  console.log("[JHS] Props Received:", {
-    selectedTopLevelId,
-    selectedLevel2Ids,
-    restrictedJournalId,
-    rootJournalIdConst,
-  });
-  console.log("[JHS] hierarchyData length:", hierarchyData?.length);
-  console.log("[JHS] fullHierarchyData length:", fullHierarchyData?.length);
-
+  // ... (useMemo hooks for data calculation are unchanged) ...
   const currentL1ContextNode = useMemo(() => {
-    if (!selectedTopLevelId) {
-      console.log("[JHS] currentL1ContextNode: selectedTopLevelId is null");
-      return null;
-    }
+    if (!selectedTopLevelId) return null;
     if (
       selectedTopLevelId === rootJournalIdConst &&
       (!restrictedJournalId || restrictedJournalId === rootJournalIdConst)
     ) {
-      const rootNode = {
+      return {
         id: rootJournalIdConst,
-        name: "",
+        name: "Chart of Accounts",
         code: "Root",
         children: hierarchyData,
         isTerminal: false,
       } as AccountNodeData;
-      console.log(
-        "[JHS] currentL1ContextNode: Constructed True Root",
-        rootNode
-      );
-      return rootNode;
     }
-    const node = findNodeById(fullHierarchyData, selectedTopLevelId);
-    console.log(
-      `[JHS] currentL1ContextNode: Found node for ${selectedTopLevelId} in fullHierarchyData:`,
-      node
-    );
-    return node;
+    return findNodeById(fullHierarchyData, selectedTopLevelId);
   }, [
     selectedTopLevelId,
     hierarchyData,
@@ -106,125 +84,64 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   ]);
 
   const level2NodesForScroller = useMemo(() => {
-    if (!currentL1ContextNode) {
-      console.log("[JHS] level2NodesForScroller: currentL1ContextNode is null");
-      return [];
-    }
-    const children = (currentL1ContextNode.children || []).filter(
+    if (!currentL1ContextNode) return [];
+    return (currentL1ContextNode.children || []).filter(
       (node): node is AccountNodeData =>
         node && typeof node.id === "string" && node.id !== ""
     );
-    console.log(
-      "[JHS] level2NodesForScroller for L1",
-      currentL1ContextNode.id,
-      ":",
-      children.length,
-      "nodes"
-    );
-    return children;
   }, [currentL1ContextNode]);
 
   const level3NodesForScroller = useMemo(() => {
-    if (
-      !selectedLevel2Ids ||
-      selectedLevel2Ids.length === 0 ||
-      !level2NodesForScroller ||
-      level2NodesForScroller.length === 0
-    ) {
+    if (selectedLevel2Ids.length === 0 || level2NodesForScroller.length === 0)
       return [];
-    }
-    const l3nodes: AccountNodeData[] = [];
-    selectedLevel2Ids.forEach((l2Id) => {
+    const l3nodes = selectedLevel2Ids.flatMap((l2Id) => {
       const l2Node = findNodeById(level2NodesForScroller, l2Id);
-      if (l2Node && l2Node.children) {
-        l3nodes.push(
-          ...l2Node.children.filter(
-            (child): child is AccountNodeData =>
-              child && typeof child.id === "string" && child.id !== ""
-          )
-        );
-      }
+      return (
+        l2Node?.children?.filter(
+          (child): child is AccountNodeData =>
+            child && typeof child.id === "string" && child.id !== ""
+        ) || []
+      );
     });
-    const uniqueL3Nodes = Array.from(new Set(l3nodes.map((n) => n.id))).map(
+    return Array.from(new Set(l3nodes.map((n) => n.id))).map(
       (id) => l3nodes.find((n) => n.id === id)!
     );
-    console.log(
-      "[JHS] level3NodesForScroller for L2s",
-      selectedLevel2Ids,
-      ":",
-      uniqueL3Nodes.length,
-      "nodes"
-    );
-    return uniqueL3Nodes;
   }, [selectedLevel2Ids, level2NodesForScroller]);
 
   const navigateUp = (childToSelectInNewL2?: string | null) => {
-    console.log(
-      `[JHS] navigateUp called. Current L1: ${selectedTopLevelId}, ChildToSelect: ${childToSelectInNewL2}`
-    );
-    if (!selectedTopLevelId) {
-      console.error(
-        "[JHS] navigateUp: selectedTopLevelId is null, cannot navigate."
-      );
-      return;
-    }
-
     if (
-      selectedTopLevelId === restrictedJournalId &&
-      restrictedJournalId !== rootJournalIdConst
+      !selectedTopLevelId ||
+      selectedTopLevelId === rootJournalIdConst ||
+      selectedTopLevelId === restrictedJournalId
     ) {
       console.warn(
-        `[JHS] navigateUp: Cannot navigate above restricted root: ${restrictedJournalId}`
+        "[JHS] navigateUp: Cannot navigate up from root or restricted root."
       );
       return;
     }
-    if (selectedTopLevelId === rootJournalIdConst) {
-      console.warn(
-        "[JHS] navigateUp: Already at the true root. Cannot navigate up."
-      );
-      return;
-    }
-
     const parentOfCurrentL1 = findParentOfNode(
       selectedTopLevelId,
       fullHierarchyData
     );
-    console.log(
-      `[JHS] navigateUp: Parent of ${selectedTopLevelId} in fullHierarchyData:`,
-      parentOfCurrentL1
-    );
-
-    let newL1TargetId: string;
-    let actualChildToSelect = childToSelectInNewL2 || selectedTopLevelId; // Default to selecting current L1 in new L2 view
-
-    if (parentOfCurrentL1) {
-      newL1TargetId = parentOfCurrentL1.id;
-    } else {
-      // No parent found in fullHierarchyData means selectedTopLevelId is a root in this scope. Go to conceptual root.
-      newL1TargetId = rootJournalIdConst;
-    }
-
-    console.log(
-      `[JHS] navigateUp: Calling onSelectTopLevel('${newL1TargetId}', '${actualChildToSelect}')`
-    );
-    onSelectTopLevel(newL1TargetId, actualChildToSelect);
+    const newL1TargetId = parentOfCurrentL1
+      ? parentOfCurrentL1.id
+      : restrictedJournalId || rootJournalIdConst;
+    onSelectTopLevel(newL1TargetId, childToSelectInNewL2 || selectedTopLevelId);
   };
 
   const navigateDown = (newTopLevelId: string) => {
     console.log(`[JHS] navigateDown called. New L1 target: ${newTopLevelId}`);
     const targetNode = findNodeById(fullHierarchyData, newTopLevelId);
-    if (
-      !targetNode ||
-      !targetNode.children ||
-      targetNode.children.length === 0
-    ) {
-      console.warn(
-        `[JHS] navigateDown: Target node ${newTopLevelId} has no children or not found. Cannot navigate down.`
+
+    // We only need to ensure the target node actually exists in our data.
+    if (!targetNode) {
+      console.error(
+        `[JHS] navigateDown: Target node ${newTopLevelId} not found in fullHierarchyData.`
       );
-      // Optionally, toggle selection or do nothing
-      // onToggleLevel2Id(newTopLevelId); // Or onToggleLevel3Id if it was an L3
       return;
     }
+
+    // Proceed with navigation regardless of whether it has children.
     console.log(
       `[JHS] navigateDown: Calling onSelectTopLevel('${newTopLevelId}', null)`
     );
@@ -237,34 +154,17 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
     if (l2ClickCountRef.current === 1) {
       l2ClickTimeoutRef.current = setTimeout(() => {
+        // Single click still toggles selection
         console.log(`[JHS] L2 Single Click: ${l2ItemId}`);
         onToggleLevel2Id(l2ItemId);
         l2ClickCountRef.current = 0;
       }, DOUBLE_CLICK_DELAY);
     } else if (l2ClickCountRef.current === 2) {
-      console.log(`[JHS] L2 Double Click: ${l2ItemId}`);
-      const isSelected = selectedLevel2Ids.includes(l2ItemId);
-      const l2Node = findNodeById(level2NodesForScroller, l2ItemId);
-
-      if (!l2Node) {
-        console.error("[JHS] L2 node not found for double click:", l2ItemId);
-        l2ClickCountRef.current = 0;
-        return;
-      }
-
-      if (isSelected) {
-        // If L2 item IS selected
-        console.log(
-          `[JHS] L2 Double Click (Selected): ${l2ItemId}. Attempting to navigate down.`
-        );
-        navigateDown(l2ItemId); // Attempt to go "Down"
-      } else {
-        // If L2 item IS NOT selected
-        console.log(
-          `[JHS] L2 Double Click (Not Selected): ${l2ItemId}. Attempting to navigate up.`
-        );
-        navigateUp(selectedTopLevelId); // Go "Up" relative to current L1
-      }
+      // Double click ALWAYS means "drill down" into this item.
+      console.log(
+        `[JHS] L2 Double Click: Attempting to navigate DOWN into ${l2ItemId}`
+      );
+      navigateDown(l2ItemId);
       l2ClickCountRef.current = 0;
     }
   };
@@ -275,34 +175,17 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
     if (l3ClickCountRef.current === 1) {
       l3ClickTimeoutRef.current = setTimeout(() => {
+        // Single click still toggles selection
         console.log(`[JHS] L3 Single Click: ${l3ItemId}`);
         onToggleLevel3Id(l3ItemId);
         l3ClickCountRef.current = 0;
       }, DOUBLE_CLICK_DELAY);
     } else if (l3ClickCountRef.current === 2) {
-      console.log(`[JHS] L3 Double Click: ${l3ItemId}`);
-      const isSelected = selectedLevel3Ids.includes(l3ItemId);
-      const l3Node = findNodeById(level3NodesForScroller, l3ItemId);
-
-      if (!l3Node) {
-        console.error("[JHS] L3 node not found for double click:", l3ItemId);
-        l3ClickCountRef.current = 0;
-        return;
-      }
-
-      if (isSelected) {
-        // If L3 item IS selected
-        console.log(
-          `[JHS] L3 Double Click (Selected): ${l3ItemId}. Attempting to navigate down.`
-        );
-        navigateDown(l3ItemId); // Attempt to go "Down"
-      } else {
-        // If L3 item IS NOT selected
-        console.log(
-          `[JHS] L3 Double Click (Not Selected): ${l3ItemId}. Attempting to navigate up.`
-        );
-        navigateUp(selectedTopLevelId); // Go "Up" relative to current L1 (L3's grandparent)
-      }
+      // Double click ALWAYS means "drill down" into this item.
+      console.log(
+        `[JHS] L3 Double Click: Attempting to navigate DOWN into ${l3ItemId}`
+      );
+      navigateDown(l3ItemId);
       l3ClickCountRef.current = 0;
     }
   };

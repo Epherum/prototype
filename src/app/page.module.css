@@ -20,6 +20,14 @@
   cursor: pointer;
   white-space: nowrap;
   display: inline-block;
+
+  /* --- NEW: Prevent text selection on double-click (for PC) --- */
+  -webkit-user-select: none; /* Safari */
+  -ms-user-select: none; /* IE 10+ */
+  user-select: none; /* Standard syntax */
+
+  /* --- NEW: Prevent zoom on double-tap (for Mobile) --- */
+  touch-action: manipulation;
 }
 
 .controlsLeftGroup {
