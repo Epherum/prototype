@@ -1,35 +1,44 @@
+/* src/features/documents/components/DocumentCreationToolbar.module.css */
 .finishDocumentContainer {
   position: fixed;
   bottom: 0;
   left: 0;
   width: 100%;
-  padding: 16px;
-  background: linear-gradient(
-    to top,
-    rgba(255, 255, 255, 1),
-    rgba(255, 255, 255, 0.9)
-  );
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  padding: calc(var(--spacing-unit) * 2); /* Use spacing unit */
+  /* Use a gradient from your app's main background color */
+
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1001; /* Above sliders, below modals */
+  z-index: 1001;
 }
 
 .finishDocumentButton {
-  padding: 12px 24px;
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3); /* Use spacing unit */
   font-size: 1.1rem;
   font-weight: bold;
-  color: white;
-  background-color: #28a745; /* A nice green color */
+  color: var(
+    --text-on-danger
+  ); /* Use a consistent variable for text on colored buttons */
+  background-color: var(--accent-warm); /* Use your app's accent color */
   border: none;
-  border-radius: 8px;
+  border-radius: var(
+    --border-radius-pill
+  ); /* Use pill shape for a prominent action button */
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: background-color 0.2s, transform 0.2s;
+  box-shadow: 0 2px 4px var(--shadow-color);
+  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+  -webkit-tap-highlight-color: transparent; /* Good for mobile */
 }
 
 .finishDocumentButton:hover {
-  background-color: #218838;
-  transform: translateY(-1px);
+  /* Create a slightly darker version of the accent for hover. You might want to add this as a variable later e.g., --accent-warm-dark */
+  background-color: #d18f64; /* A slightly darker version of #e89f71 */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px var(--shadow-color);
+}
+
+.finishDocumentButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px var(--shadow-color);
 }

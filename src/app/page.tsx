@@ -1,3 +1,4 @@
+//src/app/page.tsx
 "use client";
 
 // React & Next.js Core
@@ -17,10 +18,7 @@ import { useAuthStoreInitializer } from "@/hooks/useAuthStoreInitializer";
 
 // Feature Controllers
 import { PartnerSliderController } from "@/features/partners/PartnerSliderController";
-import {
-  GoodsSliderController,
-  type GoodsSliderControllerRef,
-} from "@/features/goods/GoodsSliderController";
+import { GoodsSliderController } from "@/features/goods/GoodsSliderController";
 import {
   JournalSliderController,
   type JournalSliderControllerRef,
@@ -62,7 +60,6 @@ export default function Home() {
   );
 
   const journalControllerRef = useRef<JournalSliderControllerRef>(null);
-  const goodsControllerRef = useRef<GoodsSliderControllerRef>(null);
 
   const userManagement = useUserManagement();
   const jpqlLinking = useJournalPartnerGoodLinking();
@@ -77,10 +74,6 @@ export default function Home() {
 
   const openJournalSelectorForGPGContext = useCallback(() => {
     journalControllerRef.current?.openJournalSelectorForGPG();
-  }, []);
-
-  const handleStartDocumentCreation = useCallback(() => {
-    goodsControllerRef.current?.openDetailsAccordion();
   }, []);
 
   const visibleSliderOrder = useMemo(
@@ -113,7 +106,11 @@ export default function Home() {
           sliderConfigs={sliderConfigs}
         />
         <LayoutGroup id="main-sliders-layout-group">
-          <div className={styles.slidersArea}>
+          <div
+            className={`${styles.slidersArea} ${
+              isDocumentCreationMode ? styles.slidersAreaWithToolbar : ""
+            }`}
+          >
             <AnimatePresence initial={false}>
               {sliderOrder.map((sliderId) => {
                 if (!visibility[sliderId]) return null;
@@ -156,13 +153,11 @@ export default function Home() {
                         {...layoutControlProps}
                         onOpenJournalSelector={openJournalSelectorForLinking}
                         fullJournalHierarchy={journalManager.hierarchyData}
-                        onStartDocumentCreation={handleStartDocumentCreation}
                       />
                     )}
 
                     {sliderId === SLIDER_TYPES.GOODS && (
                       <GoodsSliderController
-                        ref={goodsControllerRef}
                         {...layoutControlProps}
                         onOpenJournalSelectorForLinking={
                           openJournalSelectorForLinking

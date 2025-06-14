@@ -1,4 +1,4 @@
-// src/components/modals/LinkPartnerToJournalsModal.tsx
+//src/features/linking/components/LinkPartnerToJournalsModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import type {
@@ -7,7 +7,7 @@ import type {
   CreateJournalPartnerLinkClientData,
 } from "@/lib/types";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
-import styles from "./LinkPartnerToJournalsModal.module.css"; // Create this CSS module
+import styles from "./LinkItemToJournalsModal.module.css"; // Create this CSS module
 
 interface LinkPartnerToJournalsModalProps {
   isOpen: boolean;

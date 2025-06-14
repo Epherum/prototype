@@ -11,6 +11,7 @@ import type { PartnerGoodFilterStatus } from "@/lib/types";
 // Define slider-specific types
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];
 export type SliderVisibility = Record<SliderType, boolean>;
+export type AccordionState = Partial<Record<SliderType, boolean>>;
 
 // --- State Slice Interfaces ---
 
@@ -46,7 +47,8 @@ interface SelectionsSlice {
 interface UiSlice {
   sliderOrder: SliderType[];
   visibility: SliderVisibility;
-  isCreatingDocument: boolean; // <<< NEW STATE
+  isCreatingDocument: boolean;
+  accordionState: AccordionState;
 }
 
 // --- Combined State and Actions ---
@@ -71,6 +73,7 @@ interface AppState {
   // +++ NEW ACTIONS +++
   enterDocumentCreationMode: () => void;
   exitDocumentCreationMode: () => void;
+  toggleAccordion: (sliderId: SliderType) => void;
 }
 
 // --- Helper Functions ---
@@ -114,6 +117,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [SLIDER_TYPES.DOCUMENT]: false,
     },
     isCreatingDocument: false, // <<< INITIALIZE NEW STATE
+    accordionState: {
+      [SLIDER_TYPES.PARTNER]: false, // Default to closed
+      [SLIDER_TYPES.GOODS]: false, // Default to closed
+    },
   },
   selections: getInitialSelections(),
 
@@ -290,5 +297,16 @@ export const useAppStore = create<AppState>()((set, get) => ({
   exitDocumentCreationMode: () =>
     set((state) => ({
       ui: { ...state.ui, isCreatingDocument: false },
+    })),
+
+  toggleAccordion: (sliderId) =>
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        accordionState: {
+          ...state.ui.accordionState,
+          [sliderId]: !state.ui.accordionState[sliderId],
+        },
+      },
     })),
 }));

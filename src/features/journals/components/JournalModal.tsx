@@ -171,7 +171,7 @@ function JournalModal({
 
   return (
     <motion.div
-      className={baseStyles.modalOverlay}
+      className={`${baseStyles.modalOverlay} ${styles.journalModalOverlay}`}
       onClick={onClose}
       key="journal-modal-overlay"
       initial="closed"

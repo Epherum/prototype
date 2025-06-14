@@ -1,7 +1,6 @@
-//src/features/partners/PartnerSliderController.tsx
 "use client";
 
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useState, useEffect } from "react"; // Added useState and useEffect
 import {
   IoOptionsOutline,
   IoAddCircleOutline,
@@ -13,7 +12,6 @@ import { usePartnerManager } from "./usePartnerManager";
 import { usePartnerJournalLinking } from "@/features/linking/usePartnerJournalLinking";
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
 import { fetchJournalLinksForPartner } from "@/services/clientJournalPartnerLinkService";
-// Import the new shared hook
 import { useSharedDocumentManager } from "@/features/documents/documentController";
 
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
@@ -41,7 +39,6 @@ export interface PartnerSliderControllerProps extends LayoutControlProps {
     onSelectCallback: (journalNode: AccountNodeData) => void
   ) => void;
   fullJournalHierarchy: AccountNodeData[];
-  onStartDocumentCreation: () => void;
 }
 
 export const PartnerSliderController: React.FC<
@@ -54,13 +51,67 @@ export const PartnerSliderController: React.FC<
   onMoveUp,
   onMoveDown,
   isMoveDisabled,
-  onStartDocumentCreation,
 }) => {
   const partnerManager = usePartnerManager();
   const partnerJournalLinking = usePartnerJournalLinking();
   const jpqlLinking = useJournalPartnerGoodLinking();
-  // Use the shared hook, which gets its value from the context in DocumentController
   const documentCreation = useSharedDocumentManager();
+
+  // --- START OF FIX: Add state and handlers for the accordion ---
+  const isDetailsAccordionOpen = useAppStore(
+    (state) => !!state.ui.accordionState[SLIDER_TYPES.PARTNER]
+  );
+  const toggleAccordion = useAppStore((state) => state.toggleAccordion);
+
+  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
+  const visibility = useAppStore((state) => state.ui.visibility);
+  const gpgContextJournalId = useAppStore(
+    (state) => state.selections.gpgContextJournalId
+  );
+  const selectedGoodsId = useAppStore((state) => state.selections.goods);
+
+  const isGPStartOrder = useMemo(() => {
+    const visibleSliders = sliderOrder.filter((id) => visibility[id]);
+    return (
+      visibleSliders.length >= 2 &&
+      visibleSliders[0] === SLIDER_TYPES.GOODS &&
+      visibleSliders[1] === SLIDER_TYPES.PARTNER
+    );
+  }, [sliderOrder, visibility]);
+
+  const handleCreateGPGLink = useCallback(() => {
+    if (
+      !gpgContextJournalId ||
+      !selectedGoodsId ||
+      !partnerManager.selectedPartnerId
+    )
+      return;
+    const linkData: CreateJournalPartnerGoodLinkClientData = {
+      journalId: gpgContextJournalId,
+      partnerId: partnerManager.selectedPartnerId,
+      goodId: selectedGoodsId,
+    };
+    jpqlLinking.createSimpleJPGL(linkData);
+  }, [
+    gpgContextJournalId,
+    selectedGoodsId,
+    partnerManager.selectedPartnerId,
+    jpqlLinking.createSimpleJPGL,
+  ]);
+
+  const canCreateGPGLink = useMemo(() => {
+    return (
+      isGPStartOrder &&
+      !!gpgContextJournalId &&
+      !!selectedGoodsId &&
+      !!partnerManager.selectedPartnerId
+    );
+  }, [
+    isGPStartOrder,
+    gpgContextJournalId,
+    selectedGoodsId,
+    partnerManager.selectedPartnerId,
+  ]);
 
   const isTerminalJournalActive = useAppStore(
     (state) => !!state.selections.journal.level3Ids.length
@@ -71,10 +122,7 @@ export const PartnerSliderController: React.FC<
       (p: Partner) => p.id === partnerManager.selectedPartnerId
     );
     if (selectedPartnerObject) {
-      documentCreation.handleStartDocumentCreation(
-        selectedPartnerObject,
-        onStartDocumentCreation
-      );
+      documentCreation.handleStartDocumentCreation(selectedPartnerObject);
     } else {
       alert("Cannot start document: Selected partner data not found.");
     }
@@ -92,6 +140,7 @@ export const PartnerSliderController: React.FC<
           >
             <IoOptionsOutline />
           </button>
+
           {isTerminalJournalActive &&
             !documentCreation.isDocumentCreationMode &&
             partnerManager.selectedPartnerId && (
@@ -103,6 +152,7 @@ export const PartnerSliderController: React.FC<
                 <IoAddCircleOutline /> Doc
               </button>
             )}
+
           {documentCreation.isDocumentCreationMode &&
             documentCreation.lockedPartnerId ===
               partnerManager.selectedPartnerId && (
@@ -115,6 +165,7 @@ export const PartnerSliderController: React.FC<
               </button>
             )}
         </div>
+
         <div className={styles.moveButtonGroup}>
           {canMoveUp && (
             <button
@@ -136,6 +187,7 @@ export const PartnerSliderController: React.FC<
           )}
         </div>
       </div>
+
       <DynamicSlider
         sliderId={SLIDER_TYPES.PARTNER}
         title="Partner"
@@ -153,12 +205,60 @@ export const PartnerSliderController: React.FC<
         error={partnerManager.partnerQuery.error}
         activeItemId={partnerManager.selectedPartnerId}
         onSlideChange={partnerManager.setSelectedPartnerId}
-        isAccordionOpen={false}
-        onToggleAccordion={() => {}}
+        isAccordionOpen={isDetailsAccordionOpen}
+        onToggleAccordion={() => toggleAccordion(SLIDER_TYPES.PARTNER)}
         isLocked={documentCreation.isDocumentCreationMode}
         isDocumentCreationMode={documentCreation.isDocumentCreationMode}
       />
-      {/* Modals are unchanged */}
+
+      <PartnerOptionsMenu
+        isOpen={partnerManager.isPartnerOptionsMenuOpen}
+        onClose={partnerManager.handleClosePartnerOptionsMenu}
+        anchorEl={partnerManager.partnerOptionsMenuAnchorEl}
+        selectedPartnerId={partnerManager.selectedPartnerId}
+        onAdd={partnerManager.handleOpenAddPartnerModal}
+        onEdit={partnerManager.handleOpenEditPartnerModal}
+        onDelete={partnerManager.handleDeleteCurrentPartner}
+        onLinkToJournals={partnerJournalLinking.openLinkModal}
+        onUnlinkFromJournals={partnerJournalLinking.openUnlinkModal}
+        onCreateGPGLink={canCreateGPGLink ? handleCreateGPGLink : undefined}
+      />
+      <AddEditPartnerModal
+        isOpen={partnerManager.isAddEditPartnerModalOpen}
+        onClose={partnerManager.handleCloseAddEditPartnerModal}
+        onSubmit={partnerManager.handleAddOrUpdatePartnerSubmit}
+        initialData={partnerManager.editingPartnerData}
+        isSubmitting={
+          partnerManager.createPartnerMutation.isPending ||
+          partnerManager.updatePartnerMutation.isPending
+        }
+      />
+      {partnerJournalLinking.isLinkModalOpen && (
+        <LinkPartnerToJournalsModal
+          isOpen={partnerJournalLinking.isLinkModalOpen}
+          onClose={partnerJournalLinking.closeLinkModal}
+          onSubmitLinks={partnerJournalLinking.submitLinks}
+          partnerToLink={partnerJournalLinking.partnerForLinking}
+          isSubmitting={partnerJournalLinking.isSubmittingLinks}
+          onOpenJournalSelector={onOpenJournalSelector}
+          fullJournalHierarchy={fullJournalHierarchy}
+        />
+      )}
+      {partnerJournalLinking.isUnlinkModalOpen &&
+        partnerJournalLinking.partnerForUnlinking && (
+          <UnlinkPartnerFromJournalsModal
+            isOpen={partnerJournalLinking.isUnlinkModalOpen}
+            onClose={partnerJournalLinking.closeUnlinkModal}
+            partner={partnerJournalLinking.partnerForUnlinking}
+            onUnlink={partnerJournalLinking.submitUnlink}
+            fetchLinksFn={() =>
+              fetchJournalLinksForPartner(
+                partnerJournalLinking.partnerForUnlinking!.id
+              )
+            }
+            isUnlinking={partnerJournalLinking.isSubmittingUnlink}
+          />
+        )}
     </>
   );
 };

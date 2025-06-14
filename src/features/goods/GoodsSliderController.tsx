@@ -76,27 +76,10 @@ export const GoodsSliderController = forwardRef<
     const goodJournalLinking = useGoodJournalLinking();
     const documentCreation = useSharedDocumentManager();
 
-    // DO NOT call useDocumentCreation() here anymore
-
-    const [isDetailsAccordionOpen, setIsDetailsAccordionOpen] = useState(false);
-
-    useImperativeHandle(ref, () => ({
-      openDetailsAccordion: () => {
-        setIsDetailsAccordionOpen(true);
-      },
-    }));
-
-    useEffect(() => {
-      if (!documentCreation.isDocumentCreationMode) {
-        setIsDetailsAccordionOpen(false);
-      }
-    }, [documentCreation.isDocumentCreationMode]);
-
-    useEffect(() => {
-      if (!documentCreation.isDocumentCreationMode) {
-        setIsDetailsAccordionOpen(false);
-      }
-    }, [goodManager.selectedGoodsId, documentCreation.isDocumentCreationMode]);
+    const isDetailsAccordionOpen = useAppStore(
+      (state) => !!state.ui.accordionState[SLIDER_TYPES.GOODS]
+    );
+    const toggleAccordion = useAppStore((state) => state.toggleAccordion);
 
     const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
     const visibility = useAppStore((state) => state.ui.visibility);
@@ -287,7 +270,7 @@ export const GoodsSliderController = forwardRef<
           activeItemId={goodManager.selectedGoodsId}
           onSlideChange={goodManager.setSelectedGoodsId}
           isAccordionOpen={isDetailsAccordionOpen}
-          onToggleAccordion={() => setIsDetailsAccordionOpen((p) => !p)}
+          onToggleAccordion={() => toggleAccordion(SLIDER_TYPES.GOODS)}
           isDocumentCreationMode={documentCreation.isDocumentCreationMode}
           selectedGoodsForDoc={selectedGoodsForDocAdapter}
           onToggleGoodForDoc={handleToggleGoodForDocAdapter}

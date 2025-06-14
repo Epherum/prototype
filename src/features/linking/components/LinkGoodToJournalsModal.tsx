@@ -1,4 +1,4 @@
-// src/components/modals/LinkGoodToJournalsModal.tsx
+// src/features/linking/components/LinkPartnerToJournalsModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import type {
@@ -10,7 +10,7 @@ import baseStyles from "@/features/shared/components/ModalBase.module.css"; // A
 
 // Reusing the CSS module from partner linking for similar structure.
 // You can create a dedicated one if distinctions grow.
-import linkStyles from "./LinkPartnerToJournalsModal.module.css";
+import linkStyles from "./LinkItemToJournalsModal.module.css";
 
 interface LinkGoodToJournalsModalProps {
   isOpen: boolean;
