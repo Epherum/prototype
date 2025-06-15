@@ -1,4 +1,4 @@
-//src/features/shared/components/DynamicSlider.tsx
+// src/features/shared/components/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import {
@@ -6,24 +6,27 @@ import {
   IoAddCircleOutline,
   IoFilterCircleOutline,
   IoCloseCircleOutline,
-} from "react-icons/io5"; // Added icons
+} from "react-icons/io5";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./DynamicSlider.module.css";
 import { SLIDER_TYPES } from "@/lib/constants";
+
+// Import Swiper styles
+import "swiper/css";
+import "swiper/css/navigation";
+import "swiper/css/pagination"; // <-- ADDED THIS LINE
 
 interface DynamicSliderItem {
   id: string;
   name: string;
   code?: string;
   unit_code?: string;
-  // Allow any other properties that might come from different data sources
   [key: string]: any;
 }
 
-// Type for GPG Context Journal Info passed from page.tsx
 interface GPGContextJournalInfo {
   id: string;
-  name: string | undefined; // Name might be undefined if still fetching
+  name: string | undefined;
   onClear: () => void;
 }
 
@@ -38,12 +41,7 @@ interface DynamicSliderProps {
   isLoading?: boolean;
   isError?: boolean;
   error?: Error | null;
-  onOpenModal?: () => void; // For entity options menu
-
-  // Props primarily for Partner Slider
   isLocked?: boolean;
-
-  // Props for Goods slider in Document Creation mode
   isDocumentCreationMode?: boolean;
   selectedGoodsForDoc?: Array<
     DynamicSliderItem & { quantity?: number; price?: number }
@@ -53,13 +51,10 @@ interface DynamicSliderProps {
     itemId: string,
     detail: { quantity?: number; price?: number }
   ) => void;
-
-  // +++ New Props for GPG Context Journal Filtering (for GPG Slider 1) +++
-  showContextJournalFilterButton?: boolean; // True if GPG S1 and no context journal selected
-  onOpenContextJournalFilterModal?: () => void; // Callback to open the journal selector modal
-  gpgContextJournalInfo?: GPGContextJournalInfo | null; // Info about the selected GPG context journal
-
-  placeholderMessage?: string; // New prop
+  showContextJournalFilterButton?: boolean;
+  onOpenContextJournalFilterModal?: () => void;
+  gpgContextJournalInfo?: GPGContextJournalInfo | null;
+  placeholderMessage?: string;
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -72,18 +67,15 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   onToggleAccordion,
   isLoading,
   isError,
-  // error, // error prop not explicitly used in JSX, but good to have for debugging
-  // onOpenModal, // This is handled by page.tsx controls, not directly by slider content typically
   isLocked,
   isDocumentCreationMode,
-  selectedGoodsForDoc = [], // Default to empty array
+  selectedGoodsForDoc = [],
   onToggleGoodForDoc,
   onUpdateGoodDetailForDoc,
-  // +++ Destructure GPG props +++
   showContextJournalFilterButton,
   onOpenContextJournalFilterModal,
   gpgContextJournalInfo,
-  placeholderMessage, // Default placeholder message
+  placeholderMessage,
 }) => {
   const initialSlideIndex = Math.max(
     0,
@@ -91,7 +83,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   );
 
   const handleSwiperChange = (swiper: any) => {
-    // Added type for swiper
     if (isLocked) return;
     const currentRealIndex = swiper.activeIndex;
     if (data && data.length > currentRealIndex && data[currentRealIndex]) {
@@ -119,7 +110,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
     activeItemId &&
     !isLoading &&
     !isError &&
-    selectedGoodsForDoc // Ensure selectedGoodsForDoc is defined
+    selectedGoodsForDoc
       ? selectedGoodsForDoc.find((g) => g.id === activeItemId)
       : null;
 
@@ -130,17 +121,14 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
       {showContextJournalFilterButton && onOpenContextJournalFilterModal && (
         <button
           onClick={onOpenContextJournalFilterModal}
-          className={styles.gpgFilterButton} // Uses the class
+          className={styles.gpgFilterButton}
           title="Filter goods by a specific journal context for G-P-G view"
         >
-          <IoFilterCircleOutline /> Filter by Journal for G-P{" "}
-          {/* Updated text slightly */}
+          <IoFilterCircleOutline /> Filter by Journal for G-P
         </button>
       )}
       {gpgContextJournalInfo && (
         <div className={styles.gpgContextDisplay}>
-          {" "}
-          {/* Uses the class */}
           <span>
             Filtered by:{" "}
             <strong>
@@ -151,7 +139,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
           <button
             onClick={gpgContextJournalInfo.onClear}
             title="Clear G-P journal filter"
-            className={styles.gpgClearButton} // Uses the class
+            className={styles.gpgClearButton}
           >
             <IoCloseCircleOutline /> Clear
           </button>
@@ -179,6 +167,8 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
           spaceBetween={20}
           slidesPerView={1}
           navigation={data.length > 1 && !isLocked}
+          // The pagination prop was already here and configured correctly.
+          // It will now be visible because we imported the CSS.
           pagination={
             data.length > 1 && !isLocked ? { clickable: true } : false
           }
@@ -273,7 +263,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                         <strong>ID:</strong> {currentItemForAccordion.id}
                       </p>
                     )}
-                    {/* Displaying other known common fields dynamically for flexibility */}
                     {Object.entries(currentItemForAccordion).map(
                       ([key, value]) => {
                         if (
