@@ -137,45 +137,39 @@ export const useJournalManager = () => {
 
   // The logic for what constitutes a "terminal" node for document creation is updated.
   const isTerminalJournalActive = useMemo(() => {
+    // The button should appear if and only if the user has "drilled down" into a
+    // specific L1-level journal context, and that journal has no children.
+
+    // Condition 1: Journal slider must be in the primary position.
     if (!isJournalSliderPrimary) {
       return false;
     }
 
-    // First, determine if there is a single, focused journal ID.
-    let focusedJournalId: string | null = null;
-    const hasCheckboxSelections =
-      selectedLevel2JournalIds.length > 0 ||
-      selectedLevel3JournalIds.length > 0;
-
-    if (hasCheckboxSelections) {
-      // If checkboxes are used, the button is active only if EXACTLY ONE
-      // journal is selected across all visible levels.
-      const allSelectedIds = [
-        ...selectedLevel2JournalIds,
-        ...selectedLevel3JournalIds,
-      ];
-      if (allSelectedIds.length === 1) {
-        focusedJournalId = allSelectedIds[0];
-      }
-    } else {
-      // If no checkboxes are checked, the context is the "drilled-down" journal itself.
-      const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
-      if (
-        selectedTopLevelJournalId &&
-        selectedTopLevelJournalId !== effectiveRootId
-      ) {
-        focusedJournalId = selectedTopLevelJournalId;
-      }
-    }
-
-    // If we couldn't determine a single focused journal, the button is not active.
-    if (!focusedJournalId) {
+    // Condition 2: The user must be drilled-down into a specific journal, not at the root.
+    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+    if (
+      !selectedTopLevelJournalId ||
+      selectedTopLevelJournalId === effectiveRootId
+    ) {
       return false;
     }
 
-    // Finally, check if this single focused journal is a terminal node (has no children).
-    const node = findNodeById(hierarchyData, focusedJournalId);
-    return !!node && (!node.children || node.children.length === 0);
+    // Condition 3: No L2 or L3 items can be selected. The context is the L1 container itself.
+    if (
+      selectedLevel2JournalIds.length > 0 ||
+      selectedLevel3JournalIds.length > 0
+    ) {
+      return false;
+    }
+
+    // Condition 4: Find the node for the drilled-down journal.
+    const focusedNode = findNodeById(hierarchyData, selectedTopLevelJournalId);
+
+    // Condition 5: The node must exist and be terminal (no children).
+    return (
+      !!focusedNode &&
+      (!focusedNode.children || focusedNode.children.length === 0)
+    );
   }, [
     isJournalSliderPrimary,
     hierarchyData,

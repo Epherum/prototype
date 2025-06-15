@@ -1,7 +1,7 @@
-//src/features/partners/PartnerSliderController.tsx
+// src/features/partners/PartnerSliderController.tsx
 "use client";
 
-import React, { useMemo, useCallback, useState, useEffect } from "react"; // Added useState and useEffect
+import React, { useMemo, useCallback, useState, useEffect } from "react";
 import {
   IoOptionsOutline,
   IoAddCircleOutline,
@@ -58,7 +58,6 @@ export const PartnerSliderController: React.FC<
   const jpqlLinking = useJournalPartnerGoodLinking();
   const documentCreation = useSharedDocumentManager();
 
-  // --- START OF FIX: Add state and handlers for the accordion ---
   const isDetailsAccordionOpen = useAppStore(
     (state) => !!state.ui.accordionState[SLIDER_TYPES.PARTNER]
   );
@@ -114,9 +113,8 @@ export const PartnerSliderController: React.FC<
     partnerManager.selectedPartnerId,
   ]);
 
-  const isTerminalJournalActive = useAppStore(
-    (state) => !!state.selections.journal.level3Ids.length
-  );
+  // FIX: Get the correct state from the manager hook, not the global store.
+  const { isTerminalJournalActive } = partnerManager;
 
   const handleStartDoc = () => {
     const selectedPartnerObject = (partnerManager.partnersForSlider || []).find(

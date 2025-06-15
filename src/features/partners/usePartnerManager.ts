@@ -41,9 +41,12 @@ export const usePartnerManager = () => {
     partner: selectedPartnerId,
   } = selections;
 
-  // --- Consume the specialist hook for derived journal data ---
-  const { effectiveSelectedJournalIds, isJournalSliderPrimary } =
-    useJournalManager();
+  // --- FIX: Consume the specialist hook for derived journal data ONCE at the top level ---
+  const {
+    effectiveSelectedJournalIds,
+    isJournalSliderPrimary,
+    isTerminalJournalActive,
+  } = useJournalManager();
 
   // --- Local UI state for modals/menus ---
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
@@ -69,12 +72,11 @@ export const usePartnerManager = () => {
     const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
 
     // --- KEY FIX 1: ALWAYS apply general filters first. ---
-    // This ensures "unaffected" and "inProcess" work regardless of slider order.
     params.filterStatuses = journalSelections.rootFilter;
     params.restrictedJournalId = effectiveRestrictedJournalId;
 
     // --- KEY FIX 2: ONLY add the specific `contextJournalIds` when needed. ---
-    // This is an additional parameter just for the "affected" case in the J-P flow.
+    // USE the variables from the top-level hook call, DO NOT call the hook here.
     if (
       isJournalSliderPrimary &&
       journalSelections.rootFilter.includes("affected")
@@ -99,10 +101,10 @@ export const usePartnerManager = () => {
     sliderOrder,
     journalSelections.rootFilter,
     journalSelections.flatId,
-    effectiveSelectedJournalIds,
+    effectiveSelectedJournalIds, // Dependency added
     effectiveRestrictedJournalId,
     selectedGoodsId,
-    isJournalSliderPrimary,
+    isJournalSliderPrimary, // Dependency added
   ]);
 
   const partnerQueryKey = useMemo(
@@ -304,6 +306,7 @@ export const usePartnerManager = () => {
     createPartnerMutation,
     updatePartnerMutation,
     deletePartnerMutation,
+    isTerminalJournalActive, // This is now correctly sourced
     handleOpenPartnerOptionsMenu,
     handleClosePartnerOptionsMenu,
     handleOpenAddPartnerModal,
