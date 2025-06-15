@@ -11,38 +11,39 @@ export const journalKeys = {
   flatListByGood: (goodId: string | null) =>
     ["flatJournalsFilteredByGood", goodId] as const,
 };
-
 export const partnerKeys = {
   all: ["partners"] as const,
-  lists: () => [...partnerKeys.all, "list"] as const, // For consistency, let's add this level
+  lists: () => [...partnerKeys.all, "list"] as const,
   list: (params: FetchPartnersParams) =>
     [...partnerKeys.lists(), params] as const,
   details: () => [...partnerKeys.all, "detail"] as const,
-  detail: (id: string) => [...partnerKeys.details(), id] as const,
+  detail: (id: string | null | undefined) =>
+    [...partnerKeys.details(), id] as const, // Allow null/undefined
 };
 
 export const goodKeys = {
   all: ["mainGoods"] as const,
-  lists: () => [...goodKeys.all, "list"] as const, // For consistency
+  lists: () => [...goodKeys.all, "list"] as const,
   list: (params: FetchGoodsParams) => [...goodKeys.lists(), params] as const,
   details: () => [...goodKeys.all, "detail"] as const,
-  detail: (id: string) => [...goodKeys.details(), id] as const,
+  detail: (id: string | null | undefined) =>
+    [...goodKeys.details(), id] as const, // Allow null/undefined
 };
 
 // Keys for Journal <-> Partner Links
 export const journalPartnerLinkKeys = {
   all: ["journalPartnerLinks"] as const,
   lists: () => [...journalPartnerLinkKeys.all, "list"] as const,
-  listForPartner: (partnerId: string) =>
-    [...journalPartnerLinkKeys.lists(), "byPartner", partnerId] as const,
+  listForPartner: (partnerId: string | null | undefined) =>
+    [...journalPartnerLinkKeys.lists(), "byPartner", partnerId] as const, // Allow null/undefined
 };
 
 // Keys for Journal <-> Good Links
 export const journalGoodLinkKeys = {
   all: ["journalGoodLinks"] as const,
   lists: () => [...journalGoodLinkKeys.all, "list"] as const,
-  listForGood: (goodId: string) =>
-    [...journalGoodLinkKeys.lists(), "byGood", goodId] as const,
+  listForGood: (goodId: string | null | undefined) =>
+    [...journalGoodLinkKeys.lists(), "byGood", goodId] as const, // Allow null/undefined
 };
 
 // Keys for Journal <-> Partner <-> Good Links

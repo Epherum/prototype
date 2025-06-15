@@ -34,7 +34,7 @@ export const useGoodJournalLinking = () => {
     JournalGoodLinkWithDetails[],
     Error
   >({
-    queryKey: journalGoodLinkKeys.listForGood(goodForAction!.id),
+    queryKey: journalGoodLinkKeys.listForGood(goodForAction?.id),
     queryFn: () => fetchJournalLinksForGood(goodForAction!.id),
     enabled: !!goodForAction && isUnlinkModalOpen,
   });

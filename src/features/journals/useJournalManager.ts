@@ -230,7 +230,6 @@ export const useJournalManager = () => {
   const handleToggleLevel2JournalId = useCallback(
     (level2IdToToggle: string) => {
       if (useAppStore.getState().selections.journal.rootFilter.length === 0) {
-        alert("Please select a filter like 'Affected' to enable drill-down.");
         return;
       }
 
@@ -258,7 +257,6 @@ export const useJournalManager = () => {
   const handleToggleLevel3JournalId = useCallback(
     (level3IdToToggle: string) => {
       if (useAppStore.getState().selections.journal.rootFilter.length === 0) {
-        alert("Please select a filter like 'Affected' to enable drill-down.");
         return;
       }
 

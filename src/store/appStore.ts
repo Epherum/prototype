@@ -78,7 +78,7 @@ const getInitialSelections = (
     level2Ids: [],
     level3Ids: [],
     flatId: null,
-    rootFilter: [],
+    rootFilter: ["affected"], // Set "affected" as the default filter
   },
   partner: null,
   goods: null,

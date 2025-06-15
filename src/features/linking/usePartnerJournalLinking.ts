@@ -42,7 +42,7 @@ export const usePartnerJournalLinking = () => {
     JournalPartnerLinkWithDetails[],
     Error
   >({
-    queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction!.id),
+    queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction?.id),
     queryFn: () => fetchJournalLinksForPartner(partnerForAction!.id),
     enabled: !!partnerForAction && isUnlinkModalOpen,
   });
@@ -87,8 +87,6 @@ export const usePartnerJournalLinking = () => {
   const getPartnerDetails = useCallback(
     async (partnerId: string): Promise<Partner | null> => {
       try {
-        // <<-- FIX: The generic arguments for fetchQuery are corrected.
-        // It should be <TQueryFnData, TError>. TQueryData defaults to TQueryFnData.
         const partner = await queryClient.fetchQuery<Partner, Error>({
           queryKey: partnerKeys.detail(partnerId),
           queryFn: () => fetchPartnerById(partnerId),
