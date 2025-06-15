@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { permissionKeys, roleKeys } from "@/lib/queryKeys";
+
 import {
   createRole,
   updateRole,
@@ -57,14 +59,14 @@ export function useRoleManagement({
   }, [roleIdToEdit, allRoles]);
 
   const { data: allPermissions, isLoading: isLoadingPermissions } = useQuery({
-    queryKey: ["allPermissions"],
+    queryKey: permissionKeys.all,
     queryFn: fetchAllPermissions,
     staleTime: Infinity,
   });
 
   const mutationOptions = {
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["allRoles"] });
+      queryClient.invalidateQueries({ queryKey: roleKeys.all });
       onSuccess(); // The controller will handle closing the modal
     },
     onError: (error: Error) => {

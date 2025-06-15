@@ -3,6 +3,8 @@
 
 import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { goodKeys, journalGoodLinkKeys, journalKeys } from "@/lib/queryKeys";
+
 import {
   createJournalGoodLink,
   deleteJournalGoodLink,
@@ -32,7 +34,7 @@ export const useGoodJournalLinking = () => {
     JournalGoodLinkWithDetails[],
     Error
   >({
-    queryKey: ["goodJournalLinks", goodForAction?.id],
+    queryKey: journalGoodLinkKeys.listForGood(goodForAction!.id),
     queryFn: () => fetchJournalLinksForGood(goodForAction!.id),
     enabled: !!goodForAction && isUnlinkModalOpen,
   });
@@ -40,12 +42,12 @@ export const useGoodJournalLinking = () => {
   const createJGLMutation = useMutation({
     mutationFn: createJournalGoodLink,
     onSuccess: (newLink) => {
-      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      queryClient.invalidateQueries({ queryKey: goodKeys.all });
       queryClient.invalidateQueries({
-        queryKey: ["flatJournalsFilteredByGood", newLink.goodId],
+        queryKey: journalKeys.flatListByGood(newLink.goodId),
       });
       queryClient.invalidateQueries({
-        queryKey: ["goodJournalLinks", newLink.goodId],
+        queryKey: journalGoodLinkKeys.listForGood(newLink.goodId),
       });
     },
     onError: (error: Error) => {
@@ -59,12 +61,12 @@ export const useGoodJournalLinking = () => {
     onSuccess: (data) => {
       alert(data.message || `Link unlinked successfully!`);
       queryClient.invalidateQueries({
-        queryKey: ["goodJournalLinks", goodForAction?.id],
+        queryKey: journalGoodLinkKeys.listForGood(goodForAction!.id),
       });
-      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      queryClient.invalidateQueries({ queryKey: goodKeys.all });
       if (goodForAction?.id) {
         queryClient.invalidateQueries({
-          queryKey: ["flatJournalsFilteredByGood", goodForAction.id],
+          queryKey: journalKeys.flatListByGood(goodForAction.id),
         });
       }
     },
@@ -77,9 +79,8 @@ export const useGoodJournalLinking = () => {
   const getGoodDetails = useCallback(
     async (goodId: string): Promise<Good | null> => {
       try {
-        // <<-- FIX: The generic arguments for fetchQuery are corrected.
         const good = await queryClient.fetchQuery<Good, Error>({
-          queryKey: ["goodDetails", goodId],
+          queryKey: goodKeys.detail(goodId),
           queryFn: () => fetchGoodById(goodId),
           staleTime: 5 * 60 * 1000,
         });

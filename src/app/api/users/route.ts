@@ -1,7 +1,7 @@
 // src/app/api/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
-import { ExtendedSession } from "@/lib/authOptions";
+import { ExtendedSession } from "@/lib/auth/authOptions";
 import { UserService, CreateUserPayload } from "@/app/services/userService";
 import { isDescendantOf } from "@/app/services/journalService"; // <-- IMPORT HELPER
 import prisma from "@/app/utils/prisma";

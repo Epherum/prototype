@@ -9,6 +9,7 @@ import React, {
   useImperativeHandle,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { journalKeys } from "@/lib/queryKeys";
 
 import { IoOptionsOutline } from "react-icons/io5";
 import styles from "@/app/page.module.css";
@@ -150,13 +151,13 @@ export const JournalSliderController = forwardRef<
   );
 
   const flatJournalsByPartnerQuery = useQuery<Journal[], Error>({
-    queryKey: ["flatJournalsFilteredByPartner", selectedPartnerId],
+    queryKey: journalKeys.flatListByPartner(selectedPartnerId),
     queryFn: () => fetchJournalsLinkedToPartner(selectedPartnerId!),
     enabled: isJournalAfterPartner && !!selectedPartnerId,
   });
 
   const flatJournalsByGoodQuery = useQuery<Journal[], Error>({
-    queryKey: ["flatJournalsFilteredByGood", selectedGoodsId],
+    queryKey: journalKeys.flatListByGood(selectedGoodsId),
     queryFn: () => fetchJournalsLinkedToGood(selectedGoodsId!),
     enabled: isJournalAfterGood && !!selectedGoodsId,
   });

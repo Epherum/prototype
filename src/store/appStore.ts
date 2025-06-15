@@ -3,7 +3,7 @@
 import { create } from "zustand";
 import { type Session } from "next-auth";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
-import type { ExtendedUser } from "@/lib/authOptions";
+import type { ExtendedUser } from "@/lib/auth/authOptions";
 
 // Define slider-specific types
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];

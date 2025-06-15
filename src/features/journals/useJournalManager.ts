@@ -3,6 +3,8 @@
 
 import { useState, useCallback, useMemo } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { journalKeys } from "@/lib/queryKeys";
+
 import {
   fetchJournalHierarchy,
   createJournalEntry as serverCreateJournalEntry,
@@ -60,7 +62,7 @@ export const useJournalManager = () => {
   );
 
   const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
-    queryKey: ["journalHierarchy", restrictedJournalId],
+    queryKey: journalKeys.hierarchy(restrictedJournalId),
     queryFn: () => fetchJournalHierarchy(restrictedJournalId),
     staleTime: 5 * 60 * 1000,
     enabled: visibility[SLIDER_TYPES.JOURNAL],
@@ -281,7 +283,7 @@ export const useJournalManager = () => {
     mutationFn: (data) => serverCreateJournalEntry(data),
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["journalHierarchy", restrictedJournalId],
+        queryKey: journalKeys.hierarchy(restrictedJournalId),
       });
       closeAddJournalModal();
     },
@@ -292,7 +294,7 @@ export const useJournalManager = () => {
       mutationFn: (journalId) => serverDeleteJournalEntry(journalId),
       onSuccess: () => {
         queryClient.invalidateQueries({
-          queryKey: ["journalHierarchy", restrictedJournalId],
+          queryKey: journalKeys.hierarchy(restrictedJournalId),
         });
         resetJournalSelections();
       },

@@ -3,6 +3,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { partnerKeys } from "@/lib/queryKeys";
 import { useAppStore } from "@/store/appStore";
 import { SLIDER_TYPES } from "@/lib/constants";
 import { getFirstId } from "@/lib/helpers";
@@ -146,7 +147,7 @@ export const usePartnerManager = () => {
   ]);
 
   const partnerQuery = useQuery<{ data: Partner[] }>({
-    queryKey: partnerQueryKey,
+    queryKey: partnerKeys.list(partnerQueryKeyParamsStructure),
     queryFn: () => fetchPartners(partnerQueryKeyParamsStructure),
     enabled: isPartnerQueryEnabled,
   });
@@ -179,7 +180,7 @@ export const usePartnerManager = () => {
   >({
     mutationFn: createPartner,
     onSuccess: (newPartner) => {
-      queryClient.invalidateQueries({ queryKey: ["partners"] });
+      queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
       setEditingPartnerData(null);
       alert(`Partner '${newPartner.name}' created successfully!`);
@@ -198,7 +199,7 @@ export const usePartnerManager = () => {
   >({
     mutationFn: (variables) => updatePartner(variables.id, variables.data),
     onSuccess: (updatedPartner) => {
-      queryClient.invalidateQueries({ queryKey: ["partners"] });
+      queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
       setEditingPartnerData(null);
       alert(`Partner '${updatedPartner.name}' updated successfully!`);
@@ -213,7 +214,7 @@ export const usePartnerManager = () => {
     {
       mutationFn: deletePartner,
       onSuccess: (response, deletedPartnerId) => {
-        queryClient.invalidateQueries({ queryKey: ["partners"] });
+        queryClient.invalidateQueries({ queryKey: partnerKeys.all });
         alert(
           response.message ||
             `Partner ${deletedPartnerId} deleted successfully!`

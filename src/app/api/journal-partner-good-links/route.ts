@@ -4,7 +4,7 @@ import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { z } from "zod";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedUser } from "@/lib/authOptions";
+import { authOptions, ExtendedUser } from "@/lib/auth/authOptions";
 
 // Define a schema for what we EXPECT FROM THE CLIENT.
 // It should NOT include server-side data like companyId.

@@ -6,7 +6,7 @@ import journalPartnerLinkService, {
 import { z } from "zod";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession } from "@/lib/authOptions";
+import { authOptions, ExtendedSession } from "@/lib/auth/authOptions";
 
 const createLinkSchema = z.object({
   journalId: z.string().min(1),

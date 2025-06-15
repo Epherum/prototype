@@ -5,7 +5,7 @@ import NextAuth, {
   Session,
 } from "next-auth";
 import { JWT } from "next-auth/jwt";
-import { authOptions } from "@/lib/authOptions";
+import { authOptions } from "@/lib/auth/authOptions";
 
 // REFACTORED: Role definition is simpler
 type Role = {

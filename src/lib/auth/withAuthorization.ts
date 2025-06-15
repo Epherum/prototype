@@ -1,7 +1,11 @@
 // src/lib/auth/withAuthorization.ts
 import { type NextRequest, type NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+import {
+  authOptions,
+  ExtendedSession,
+  ExtendedUser,
+} from "@/lib/auth/authOptions";
 
 type PermissionObject = {
   action: string;

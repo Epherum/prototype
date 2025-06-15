@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { userKeys, roleKeys } from "@/lib/queryKeys";
+
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 import {
@@ -85,14 +87,14 @@ export function useUserManagement(
   }, [fullJournalHierarchy, isCurrentUserRestricted, currentUser]);
 
   const { data: userToEditData, isLoading: isLoadingUserToEdit } = useQuery({
-    queryKey: ["user", userIdToEdit],
+    queryKey: userKeys.detail(userIdToEdit!),
     queryFn: () => fetchUserById(userIdToEdit!),
     enabled: isEditMode,
   });
 
   // Now fetching roles is part of this hook's responsibility
   const { data: assignableRoles, isLoading: isLoadingRoles } = useQuery({
-    queryKey: ["allRoles"],
+    queryKey: roleKeys.all,
     queryFn: fetchAllRoles,
   });
 
@@ -106,9 +108,11 @@ export function useUserManagement(
         : createUser(data.payload as CreateUserClientPayload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
       if (userIdToEdit) {
-        queryClient.invalidateQueries({ queryKey: ["user", userIdToEdit] });
+        queryClient.invalidateQueries({
+          queryKey: userKeys.detail(userIdToEdit),
+        });
       }
       onSuccess?.();
     },

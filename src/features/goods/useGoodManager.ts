@@ -4,6 +4,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 // No need to import UseQueryResult if we let TypeScript infer it from the hook usage.
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { goodKeys } from "@/lib/queryKeys";
+
 import {
   fetchGoods,
   createGood,
@@ -160,7 +162,7 @@ export const useGoodManager = () => {
 
   // <<< --- START OF FIX --- >>>
   const mainGoodsQuery = useQuery<Good[], Error>({
-    queryKey: ["mainGoods", mainGoodsQueryKeyParams],
+    queryKey: goodKeys.list(mainGoodsQueryKeyParams),
     // FIX 1: Provide an explicit return type for the query function.
     // This resolves the "not assignable" error by creating a clear contract.
     queryFn: async (): Promise<Good[]> => {
@@ -212,7 +214,7 @@ export const useGoodManager = () => {
   const createGoodMutation = useMutation<Good, Error, CreateGoodClientData>({
     mutationFn: createGood,
     onSuccess: (newGood) => {
-      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      queryClient.invalidateQueries({ queryKey: goodKeys.all });
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${newGood.label}' created successfully!`);
@@ -231,7 +233,7 @@ export const useGoodManager = () => {
   >({
     mutationFn: (variables) => updateGood(variables.id, variables.data),
     onSuccess: (updatedGood) => {
-      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      queryClient.invalidateQueries({ queryKey: goodKeys.all });
       setIsAddEditGoodModalOpen(false);
       setEditingGoodData(null);
       alert(`Good/Service '${updatedGood.label}' updated successfully!`);
@@ -245,7 +247,7 @@ export const useGoodManager = () => {
   const deleteGoodMutation = useMutation<{ message: string }, Error, string>({
     mutationFn: deleteGood,
     onSuccess: (response, deletedGoodId) => {
-      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
+      queryClient.invalidateQueries({ queryKey: goodKeys.all });
       alert(
         response.message ||
           `Good/Service ${deletedGoodId} deleted successfully!`

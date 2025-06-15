@@ -4,6 +4,12 @@
 import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  partnerKeys,
+  journalPartnerLinkKeys,
+  journalKeys,
+} from "@/lib/queryKeys";
+
+import {
   createJournalPartnerLink,
   deleteJournalPartnerLink,
   fetchJournalLinksForPartner,
@@ -36,7 +42,7 @@ export const usePartnerJournalLinking = () => {
     JournalPartnerLinkWithDetails[],
     Error
   >({
-    queryKey: ["partnerJournalLinks", partnerForAction?.id],
+    queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction!.id),
     queryFn: () => fetchJournalLinksForPartner(partnerForAction!.id),
     enabled: !!partnerForAction && isUnlinkModalOpen,
   });
@@ -44,12 +50,12 @@ export const usePartnerJournalLinking = () => {
   const createJPLMutation = useMutation({
     mutationFn: createJournalPartnerLink,
     onSuccess: (newLink) => {
-      queryClient.invalidateQueries({ queryKey: ["partners"] });
+      queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       queryClient.invalidateQueries({
-        queryKey: ["flatJournalsFilteredByPartner", newLink.partnerId],
+        queryKey: journalKeys.flatListByPartner(newLink.partnerId),
       });
       queryClient.invalidateQueries({
-        queryKey: ["partnerJournalLinks", newLink.partnerId],
+        queryKey: journalPartnerLinkKeys.listForPartner(newLink.partnerId),
       });
     },
     onError: (error: Error) => {
@@ -63,12 +69,12 @@ export const usePartnerJournalLinking = () => {
     onSuccess: (data) => {
       alert(data.message || `Link unlinked successfully!`);
       queryClient.invalidateQueries({
-        queryKey: ["partnerJournalLinks", partnerForAction?.id],
+        queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction!.id),
       });
-      queryClient.invalidateQueries({ queryKey: ["partners"] });
+      queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       if (partnerForAction?.id) {
         queryClient.invalidateQueries({
-          queryKey: ["flatJournalsFilteredByPartner", partnerForAction.id],
+          queryKey: journalKeys.flatListByPartner(partnerForAction.id),
         });
       }
     },
@@ -84,7 +90,7 @@ export const usePartnerJournalLinking = () => {
         // <<-- FIX: The generic arguments for fetchQuery are corrected.
         // It should be <TQueryFnData, TError>. TQueryData defaults to TQueryFnData.
         const partner = await queryClient.fetchQuery<Partner, Error>({
-          queryKey: ["partnerDetails", partnerId],
+          queryKey: partnerKeys.detail(partnerId),
           queryFn: () => fetchPartnerById(partnerId),
           staleTime: 5 * 60 * 1000,
         });

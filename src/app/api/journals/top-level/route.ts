@@ -1,7 +1,11 @@
 // src/app/api/journals/top-level/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+import {
+  authOptions,
+  ExtendedSession,
+  ExtendedUser,
+} from "@/lib/auth/authOptions";
 import { journalService } from "@/app/services/journalService";
 
 function hasPermission(

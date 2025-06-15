@@ -8,7 +8,7 @@ import { z } from "zod";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedUser } from "@/lib/authOptions"; // Assuming this is the correct path post-refactor
+import { authOptions, ExtendedUser } from "@/lib/auth/authOptions"; // Assuming this is the correct path post-refactor
 import { PartnerGoodFilterStatus } from "@/lib/types";
 
 const createGoodsSchema = z.object({

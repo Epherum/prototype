@@ -9,7 +9,11 @@ import { Partner } from "@prisma/client";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
 import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+import {
+  authOptions,
+  ExtendedSession,
+  ExtendedUser,
+} from "@/lib/auth/authOptions";
 import { PartnerGoodFilterStatus } from "@/lib/types";
 
 export async function GET(request: NextRequest) {

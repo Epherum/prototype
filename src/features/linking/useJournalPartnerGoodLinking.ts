@@ -4,6 +4,13 @@
 import { useState, useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  journalKeys,
+  jpgLinkKeys,
+  goodKeys,
+  partnerKeys,
+} from "@/lib/queryKeys";
+
+import {
   createJournalPartnerGoodLink,
   deleteJournalPartnerGoodLink,
   fetchJpgLinksForGoodAndJournalContext,
@@ -39,7 +46,7 @@ export const useJournalPartnerGoodLinking = () => {
 
   // Fetch the journal hierarchy data using a simplified query key
   const { data: hierarchyData } = useQuery<AccountNodeData[], Error>({
-    queryKey: ["journalHierarchy", restrictedJournalId],
+    queryKey: journalKeys.hierarchy(restrictedJournalId),
     queryFn: () => fetchJournalHierarchy(restrictedJournalId),
     staleTime: Infinity,
   });
@@ -69,7 +76,9 @@ export const useJournalPartnerGoodLinking = () => {
   // Fetch partners for the "Link Good to Partners via Journal" modal
   const { data: partnersForJpgModal, isLoading: isLoadingPartnersForJpgModal } =
     useQuery<Partner[], Error>({
-      queryKey: ["partnersForJpgModal", targetJournalForJpgLinking?.id ?? null],
+      queryKey: jpgLinkKeys.partnersForJpgModal(
+        targetJournalForJpgLinking?.id ?? null
+      ),
       queryFn: () =>
         fetchPartnersLinkedToJournals([targetJournalForJpgLinking!.id], false),
       enabled: !!targetJournalForJpgLinking && isLinkModalOpen,
@@ -80,11 +89,10 @@ export const useJournalPartnerGoodLinking = () => {
     data: existingJpgLinksForModal,
     isLoading: isLoadingJpgLinksForModal,
   } = useQuery<JournalPartnerGoodLinkClient[], Error>({
-    queryKey: [
-      "jpgLinksForContext",
-      goodForUnlinkingContext?.id ?? null,
-      journalForUnlinkingContext?.id ?? null,
-    ],
+    queryKey: jpgLinkKeys.listForContext(
+      goodForUnlinkingContext?.id ?? "",
+      journalForUnlinkingContext?.id ?? ""
+    ),
     queryFn: () =>
       fetchJpgLinksForGoodAndJournalContext(
         goodForUnlinkingContext!.id,
@@ -103,9 +111,9 @@ export const useJournalPartnerGoodLinking = () => {
   >({
     mutationFn: createJournalPartnerGoodLink,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["mainGoods"] });
-      queryClient.invalidateQueries({ queryKey: ["partners"] });
-      queryClient.invalidateQueries({ queryKey: ["jpgLinksForContext"] });
+      queryClient.invalidateQueries({ queryKey: goodKeys.all });
+      queryClient.invalidateQueries({ queryKey: partnerKeys.all });
+      queryClient.invalidateQueries({ queryKey: jpgLinkKeys.all });
     },
     onError: (error: Error) => {
       console.error("Failed to create 3-way link:", error);
@@ -117,11 +125,10 @@ export const useJournalPartnerGoodLinking = () => {
     mutationFn: deleteJournalPartnerGoodLink,
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [
-          "jpgLinksForContext",
-          goodForUnlinkingContext?.id,
-          journalForUnlinkingContext?.id,
-        ],
+        queryKey: jpgLinkKeys.listForContext(
+          goodForUnlinkingContext!.id,
+          journalForUnlinkingContext!.id
+        ),
       });
     },
     onError: (error: Error, linkId) => {
@@ -145,7 +152,7 @@ export const useJournalPartnerGoodLinking = () => {
     }
 
     const good = await queryClient.fetchQuery<Good>({
-      queryKey: ["goodDetails", selectedGoodsId],
+      queryKey: goodKeys.detail(selectedGoodsId),
       queryFn: () => fetchGoodById(selectedGoodsId),
     });
     const targetJournalNode = findNodeById(
@@ -214,7 +221,7 @@ export const useJournalPartnerGoodLinking = () => {
     }
 
     const good = await queryClient.fetchQuery<Good>({
-      queryKey: ["goodDetails", selectedGoodsId],
+      queryKey: goodKeys.detail(selectedGoodsId),
       queryFn: () => fetchGoodById(selectedGoodsId),
     });
     const journalNode = findNodeById(safeHierarchyData, contextJournalId);

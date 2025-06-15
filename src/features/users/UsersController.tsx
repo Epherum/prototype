@@ -5,6 +5,7 @@
 import React, { useImperativeHandle, forwardRef } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { roleKeys } from "@/lib/queryKeys";
 
 import { useUserManager } from "./useUserManager";
 import { useRoleManagement } from "./useRoleManagement"; // <-- Import the hook
@@ -30,7 +31,7 @@ export const UsersController = forwardRef<UsersControllerRef>((_props, ref) => {
   // Fetch all roles once here, so both modals can use the data.
   // The User modal needs it for the list, the Role modal needs it for editing.
   const { data: allRoles } = useQuery({
-    queryKey: ["allRoles"],
+    queryKey: roleKeys.all,
     queryFn: fetchAllRoles,
   });
 

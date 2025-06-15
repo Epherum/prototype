@@ -6,7 +6,7 @@ import {
 } from "@/app/services/journalService";
 import { z } from "zod";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession } from "@/lib/authOptions";
+import { authOptions, ExtendedSession } from "@/lib/auth/authOptions";
 
 const updateJournalSchema = z
   .object({

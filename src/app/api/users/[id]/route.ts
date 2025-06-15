@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/utils/prisma";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
-import { ExtendedSession } from "@/lib/authOptions";
+import { ExtendedSession } from "@/lib/auth/authOptions";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { isDescendantOf } from "@/app/services/journalService"; // <-- IMPORT HELPER

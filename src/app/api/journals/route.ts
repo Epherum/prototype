@@ -1,7 +1,7 @@
 // src/app/api/journals/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession } from "@/lib/authOptions";
+import { authOptions, ExtendedSession } from "@/lib/auth/authOptions";
 import {
   journalService,
   CreateJournalData,
