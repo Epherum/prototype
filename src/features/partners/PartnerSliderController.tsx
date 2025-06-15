@@ -1,3 +1,4 @@
+//src/features/partners/PartnerSliderController.tsx
 "use client";
 
 import React, { useMemo, useCallback, useState, useEffect } from "react"; // Added useState and useEffect

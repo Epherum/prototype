@@ -1,62 +1,27 @@
-// File: src/app/api/journals/all-for-admin-selection/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+// src/app/api/journals/all-for-admin-selection/route.ts
+import { NextResponse } from "next/server";
+import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { journalService } from "@/app/services/journalService";
+import prisma from "@/app/utils/prisma";
+import { stringify as jsonBigIntStringify } from "@/app/utils/jsonBigInt";
 
-interface AuthenticatedUserContext {
-  userId: string;
-}
-
-const hasPermission = (
-  user: ExtendedUser | undefined,
-  permissionAction: string,
-  permissionResource: string
-): boolean => {
-  if (!user?.roles) return false;
-  return user.roles.some((role) =>
-    role.permissions?.some(
-      (p) => p.action === permissionAction && p.resource === permissionResource
-    )
-  );
-};
-
-export async function GET(request: NextRequest) {
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-
-  // Check for permission to manage users
-  if (!hasPermission(session.user as ExtendedUser, "MANAGE", "USERS")) {
-    return NextResponse.json(
-      { message: "Forbidden: Insufficient permissions" },
-      { status: 403 }
-    );
-  }
-
-  const userContext: AuthenticatedUserContext = {
-    userId: session.user.id,
-  };
-
+// This is the core logic of your handler. It no longer needs to worry about auth.
+const getHandler = async () => {
   try {
-    console.log(
-      `API /journals/all-for-admin-selection GET (User: ${userContext.userId})`
-    );
-
-    // The service no longer needs the context as it fetches all journals.
+    // Note: The new JournalService from the plan might not have this exact method name.
+    // For now, let's assume it exists or create it. A simple fetch is also fine.
     const journals = await journalService.getAllJournalsForAdminSelection();
 
-    return NextResponse.json(journals);
+    const jsonResult = jsonBigIntStringify(journals);
+    return new NextResponse(jsonResult, {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (error) {
     const e = error as Error;
     console.error(
       `API /journals/all-for-admin-selection GET Error:`,
-      e.message,
-      e.stack
+      e.message
     );
     return NextResponse.json(
       {
@@ -66,4 +31,12 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+};
+
+// This is the key change. We wrap the handler with our authorization HOF.
+// It will automatically handle 401/403 errors if the user is not logged in
+// or doesn't have the 'MANAGE' permission on the 'USERS' resource.
+export const GET = withAuthorization(getHandler, {
+  action: "MANAGE",
+  resource: "USERS",
+});

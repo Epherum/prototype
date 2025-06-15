@@ -86,9 +86,6 @@ export const useJournalManager = () => {
     if (!isJournalSliderPrimary) {
       return selectedFlatJournalId ? [selectedFlatJournalId] : [];
     }
-    if (activeJournalRootFilters.length === 0) {
-      return [];
-    }
 
     // Per-branch multi-select logic (if any L2 or L3 items are checked)
     if (
@@ -131,34 +128,62 @@ export const useJournalManager = () => {
   }, [
     isJournalSliderPrimary,
     selectedFlatJournalId,
-    activeJournalRootFilters,
     selectedLevel2JournalIds,
     selectedLevel3JournalIds,
-    selectedTopLevelJournalId, // Added dependency
-    restrictedJournalId, // Added dependency
+    selectedTopLevelJournalId,
+    restrictedJournalId,
     hierarchyData,
   ]);
 
   // The logic for what constitutes a "terminal" node for document creation is updated.
   const isTerminalJournalActive = useMemo(() => {
-    // The conditions to check remain the same: must be primary slider and only one effective ID.
-    if (!isJournalSliderPrimary || effectiveSelectedJournalIds.length !== 1) {
+    if (!isJournalSliderPrimary) {
       return false;
     }
 
-    const singleSelectedId = effectiveSelectedJournalIds[0];
-    const node = findNodeById(hierarchyData, singleSelectedId);
+    // First, determine if there is a single, focused journal ID.
+    let focusedJournalId: string | null = null;
+    const hasCheckboxSelections =
+      selectedLevel2JournalIds.length > 0 ||
+      selectedLevel3JournalIds.length > 0;
 
-    // If for any reason the node isn't found, it cannot be terminal.
-    if (!node) {
+    if (hasCheckboxSelections) {
+      // If checkboxes are used, the button is active only if EXACTLY ONE
+      // journal is selected across all visible levels.
+      const allSelectedIds = [
+        ...selectedLevel2JournalIds,
+        ...selectedLevel3JournalIds,
+      ];
+      if (allSelectedIds.length === 1) {
+        focusedJournalId = allSelectedIds[0];
+      }
+    } else {
+      // If no checkboxes are checked, the context is the "drilled-down" journal itself.
+      const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+      if (
+        selectedTopLevelJournalId &&
+        selectedTopLevelJournalId !== effectiveRootId
+      ) {
+        focusedJournalId = selectedTopLevelJournalId;
+      }
+    }
+
+    // If we couldn't determine a single focused journal, the button is not active.
+    if (!focusedJournalId) {
       return false;
     }
 
-    // NEW, EXPANDED LOGIC:
-    // A node is "terminal" for document creation if it's explicitly flagged as such,
-    // OR if it simply has no children (i.e., it's at the end of its branch).
-    return !!node.isTerminal || !node.children || node.children.length === 0;
-  }, [isJournalSliderPrimary, effectiveSelectedJournalIds, hierarchyData]);
+    // Finally, check if this single focused journal is a terminal node (has no children).
+    const node = findNodeById(hierarchyData, focusedJournalId);
+    return !!node && (!node.children || node.children.length === 0);
+  }, [
+    isJournalSliderPrimary,
+    hierarchyData,
+    selectedLevel2JournalIds,
+    selectedLevel3JournalIds,
+    selectedTopLevelJournalId,
+    restrictedJournalId,
+  ]);
 
   // --- Handlers ---
   const handleToggleJournalRootFilter = useCallback(
@@ -253,8 +278,6 @@ export const useJournalManager = () => {
     },
     [setSelection]
   );
-
-  // ... rest of the file is unchanged ...
 
   const createJournalMutation = useMutation<
     Journal,

@@ -1,4 +1,4 @@
-// schema.prisma
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -35,6 +35,10 @@ model User {
   email         String    @unique
   name          String?
   passwordHash  String
+
+  // NEW: The journal restriction is now directly on the user.
+  restrictedTopLevelJournalId String? @map("restricted_top_level_journal_id")
+  restrictedTopLevelJournal   Journal?  @relation("UserRestrictedJournal", fields: [restrictedTopLevelJournalId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   userRoles     UserRole[]
 
@@ -91,11 +95,9 @@ model Role {
 model UserRole {
   userId                       String  @map("user_id")
   roleId                       String  @map("role_id")
-  restrictedTopLevelJournalId  String? @map("restricted_top_level_journal_id")
 
   user                       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   role                       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  restrictedTopLevelJournal  Journal?  @relation("UserRoleRestrictedJournal", fields: [restrictedTopLevelJournalId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   assignedAt                 DateTime  @default(now()) @map("assigned_at")
 
@@ -142,7 +144,9 @@ model Journal {
 
   journalPartnerLinks  JournalPartnerLink[]
   journalGoodLinks     JournalGoodLink[]
-  userRoleRestrictions UserRole[]         @relation("UserRoleRestrictedJournal")
+  
+  // Back-relation for user-level restrictions
+  userRestrictions User[] @relation("UserRestrictedJournal")
 
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")

@@ -304,6 +304,41 @@ async function getAllJournalsForAdminSelection(): Promise<
   return allJournals;
 }
 
+/**
+ * Checks if a given journal ID is a descendant of (or the same as) a potential ancestor journal ID.
+ * This is crucial for security checks involving restricted admins.
+ *
+ * @param {string} descendantId - The ID of the journal to check (e.g., the one being assigned to a new user).
+ * @param {string} ancestorId - The ID of the root of the tree to check against (e.g., the admin's own restriction).
+ * @returns {Promise<boolean>} - True if descendantId is in the ancestorId's hierarchy, false otherwise.
+ */
+export async function isDescendantOf(
+  descendantId: string,
+  ancestorId: string
+): Promise<boolean> {
+  if (descendantId === ancestorId) {
+    return true;
+  }
+
+  // Use a recursive Common Table Expression (CTE) to traverse the hierarchy upwards from the descendant.
+  // This is the most efficient way to do this in a single database query.
+  const result = await prisma.$queryRaw<Array<{ id: string }>>`
+    WITH RECURSIVE "JournalHierarchy" AS (
+      SELECT id, "parent_id"
+      FROM "journals"
+      WHERE id = ${descendantId}
+      UNION ALL
+      SELECT j.id, j."parent_id"
+      FROM "journals" j
+      INNER JOIN "JournalHierarchy" jh ON j.id = jh."parent_id"
+    )
+    SELECT id FROM "JournalHierarchy" WHERE id = ${ancestorId};
+  `;
+
+  // If the ancestorId is found in the recursive query result, it means it's an ancestor.
+  return result.length > 0;
+}
+
 export const journalService = {
   getDescendantJournalIds,
   getRootJournals,
@@ -316,4 +351,5 @@ export const journalService = {
   getTopLevelJournals,
   getJournalSubHierarchy,
   getAllJournalsForAdminSelection,
+  isDescendantOf,
 };

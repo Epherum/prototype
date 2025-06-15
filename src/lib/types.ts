@@ -259,8 +259,8 @@ export interface JournalPartnerGoodLinkClient {
   } | null;
 }
 
+// REFACTORED: RoleData no longer contains restriction info
 export interface RoleData {
   name: string;
   permissions: Array<{ action: string; resource: string }>;
-  restrictedTopLevelJournalId?: string | null;
 }

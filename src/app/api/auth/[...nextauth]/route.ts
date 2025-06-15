@@ -7,16 +7,17 @@ import NextAuth, {
 import { JWT } from "next-auth/jwt";
 import { authOptions } from "@/lib/authOptions";
 
-// Note: The PrismaClient and bcrypt imports are typically used in authOptions.ts,
-// but are kept here for context if this file were to expand.
+// REFACTORED: Role definition is simpler
+type Role = {
+  name: string;
+  permissions: Array<{ action: string; resource: string }>;
+};
 
+// REFACTORED: User has a top-level restriction
 interface ExtendedUser extends NextAuthUser {
   id: string;
-  roles: Array<{
-    name: string;
-    permissions: Array<{ action: string; resource: string }>;
-    restrictedTopLevelJournalId?: string | null;
-  }>;
+  roles: Role[];
+  restrictedTopLevelJournalId: string | null;
 }
 
 interface ExtendedSession extends Session {
@@ -24,13 +25,11 @@ interface ExtendedSession extends Session {
   accessToken?: string;
 }
 
+// REFACTORED: JWT has a top-level restriction
 interface ExtendedJWT extends JWT {
   id: string;
-  roles: Array<{
-    name: string;
-    permissions: Array<{ action: string; resource: string }>;
-    restrictedTopLevelJournalId?: string | null;
-  }>;
+  roles: Role[];
+  restrictedTopLevelJournalId: string | null;
   name?: string | null;
   email?: string | null;
   picture?: string | null;

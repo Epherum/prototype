@@ -1,0 +1,59 @@
+/* src/features/users/components/ManageRoleModal.module.css */
+
+.roleModalContent {
+  width: 95vw;
+  max-width: 700px; /* Adjusted for better grid layout */
+}
+
+.permissionsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-unit);
+  max-height: 45vh;
+  overflow-y: auto;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  padding: calc(var(--spacing-unit) * 1.5);
+}
+
+@media (min-width: 550px) {
+  .permissionsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+/* Inheriting from ManageUserModal for this, but could be specific if needed */
+.permissionsGrid .roleCheckboxWrapper {
+  padding: calc(var(--spacing-unit) * 1.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  background-color: var(--bg-card);
+}
+
+.permissionsGrid .roleCheckboxWrapper:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px var(--shadow-color);
+  background-color: var(--bg-card); /* Keep background white on hover */
+}
+
+/* Styling for the permission text itself */
+.permissionLabel {
+  display: flex;
+  align-items: baseline; /* Aligns ACTION and resource nicely */
+}
+
+.actionText {
+  color: var(--accent-warm);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.5px;
+  min-width: 60px; /* Ensures alignment */
+}
+
+.resourceText {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-left: var(--spacing-unit);
+  text-transform: capitalize;
+}

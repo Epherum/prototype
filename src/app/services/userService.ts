@@ -10,35 +10,22 @@ interface AdminSessionUser {
     name: string;
     permissions: Array<{ action: string; resource: string }>;
   }>;
+  // The admin's own restriction for security checks (handled in API layer per spec)
+  restrictedTopLevelJournalId: string | null;
 }
 
-// Helper to check permissions
-function hasGlobalPermission(
-  sessionUser: AdminSessionUser,
-  permissionIdentifier: string // e.g., "MANAGE_USERS"
-): boolean {
-  if (!sessionUser || !sessionUser.roles) {
-    return false;
-  }
-  return sessionUser.roles.some((role) =>
-    role.permissions.some(
-      (p) => `${p.action}_${p.resource}` === permissionIdentifier
-    )
-  );
-}
-
-// Payload for individual role assignments
+// REFACTORED: Role assignment is just the ID
 export interface CreateUserPayloadRoleAssignment {
   roleId: string;
-  restrictedTopLevelJournalId?: string | null;
 }
 
-// Overall payload for user creation
+// REFACTORED: Overall payload is flatter
 export interface CreateUserPayload {
   name: string;
   email: string;
   password: string; // Plain text password
   roleAssignments: CreateUserPayloadRoleAssignment[];
+  restrictedTopLevelJournalId: string | null;
 }
 
 export class UserService {
@@ -49,7 +36,7 @@ export class UserService {
   }
 
   /**
-   * Creates a new user, assigns them to roles, and optionally restricts their journal access per role.
+   * REFACTORED: Creates a new user with a single, optional journal restriction and assigns them to roles.
    * @param payload - The user creation data.
    * @param adminSessionUser - The authenticated admin user performing the action.
    * @returns The newly created User object (excluding passwordHash).
@@ -59,17 +46,15 @@ export class UserService {
     payload: CreateUserPayload,
     adminSessionUser: AdminSessionUser
   ): Promise<Omit<User, "passwordHash">> {
-    // 1. Permission Check
-    if (!hasGlobalPermission(adminSessionUser, "MANAGE_USERS")) {
-      console.warn(
-        `User ${adminSessionUser.id} attempted to create user without MANAGE_USERS permission.`
-      );
-      throw new Error("Forbidden: You do not have permission to manage users.");
-    }
+    const {
+      name,
+      email,
+      password,
+      roleAssignments,
+      restrictedTopLevelJournalId,
+    } = payload;
 
-    const { name, email, password, roleAssignments } = payload;
-
-    // 2. Input Validation (Basic)
+    // Basic Input Validation
     if (!name || !email || !password) {
       throw new Error("Name, email, and password are required.");
     }
@@ -80,84 +65,50 @@ export class UserService {
       throw new Error("At least one role assignment is required.");
     }
 
-    // 3. Password Hashing
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const passwordHash = await bcrypt.hash(password, 10);
 
-    // 4. Prisma Transaction
     try {
       const newUser = await this.prisma.$transaction(
         async (tx: Prisma.TransactionClient) => {
-          // 4a. Check if user with this email already exists (email is globally unique)
-          const existingUserByEmail = await tx.user.findUnique({
-            where: { email },
-          });
-          if (existingUserByEmail) {
+          // Check for existing user
+          const existingUser = await tx.user.findUnique({ where: { email } });
+          if (existingUser) {
             throw new Error(`User with email ${email} already exists.`);
           }
 
-          // 4b. Create the User
+          // Validate journal if a restriction is provided
+          if (restrictedTopLevelJournalId) {
+            const journalExists = await tx.journal.findUnique({
+              where: { id: restrictedTopLevelJournalId },
+            });
+            if (!journalExists) {
+              throw new Error(
+                `Journal with ID ${restrictedTopLevelJournalId} not found.`
+              );
+            }
+          }
+
+          // Create the User with the top-level restriction
           const createdUser = await tx.user.create({
             data: {
               name,
               email,
               passwordHash,
-              createdById: adminSessionUser.id, // Audit who created this user
+              createdById: adminSessionUser.id,
+              restrictedTopLevelJournalId: restrictedTopLevelJournalId,
             },
           });
-          console.log(`User ${createdUser.id} created successfully.`);
 
-          // 4c. Process Role Assignments
-          for (const assignment of roleAssignments) {
-            const { roleId, restrictedTopLevelJournalId } = assignment;
+          // Create the UserRole links
+          const userRoleData = roleAssignments.map((assignment) => ({
+            userId: createdUser.id,
+            roleId: assignment.roleId,
+          }));
 
-            // Validate role exists
-            const role = await tx.role.findUnique({
-              where: { id: roleId },
-            });
-            if (!role) {
-              console.warn(
-                `Role with ID ${roleId} not found during user creation.`
-              );
-              throw new Error(`Role with ID ${roleId} not found.`);
-            }
+          await tx.userRole.createMany({
+            data: userRoleData,
+          });
 
-            let finalRestrictedJournalId: string | null = null;
-
-            if (restrictedTopLevelJournalId) {
-              // Validate the journal exists
-              const journalForRestriction = await tx.journal.findUnique({
-                where: { id: restrictedTopLevelJournalId },
-              });
-
-              if (!journalForRestriction) {
-                console.warn(
-                  `Journal with ID ${restrictedTopLevelJournalId} not found during user creation.`
-                );
-                throw new Error(
-                  `Journal with ID ${restrictedTopLevelJournalId} not found.`
-                );
-              }
-              finalRestrictedJournalId = journalForRestriction.id;
-            }
-
-            // Create UserRole entry
-            await tx.userRole.create({
-              data: {
-                userId: createdUser.id,
-                roleId: role.id,
-                restrictedTopLevelJournalId: finalRestrictedJournalId,
-              },
-            });
-            console.log(
-              `Assigned role ${role.id} to user ${
-                createdUser.id
-              } with journal restriction ID: ${
-                finalRestrictedJournalId || "None"
-              }.`
-            );
-          }
-          // Exclude passwordHash from the returned object
           const { passwordHash: _, ...userWithoutPassword } = createdUser;
           return userWithoutPassword;
         }
@@ -165,17 +116,11 @@ export class UserService {
 
       return newUser;
     } catch (error: any) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      ) {
-        const target = error.meta?.target as string[] | undefined;
-        if (target && target.includes("email")) {
-          console.warn(`Attempt to create user with existing email: ${email}`);
-          throw new Error(`User with email ${email} already exists.`);
-        }
-      }
       console.error("Error in createUserAndAssignRoles transaction:", error);
+      // Re-throw specific, client-friendly errors
+      if (error.message.includes("already exists")) {
+        throw new Error(`User with email ${email} already exists.`);
+      }
       throw new Error(
         error.message || "An unexpected error occurred while creating the user."
       );

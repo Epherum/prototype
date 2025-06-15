@@ -1,4 +1,4 @@
-//src/features/journals/components/JournalHierarchySlider.tsx
+// src/features/journals/components/JournalHierarchySlider.tsx
 import React, { useRef, useMemo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
@@ -59,7 +59,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   const l3ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const l3ClickCountRef = useRef<number>(0);
 
-  // ... (useMemo hooks for data calculation are unchanged) ...
   const currentL1ContextNode = useMemo(() => {
     if (!selectedTopLevelId) return null;
     if (
@@ -108,43 +107,14 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     );
   }, [selectedLevel2Ids, level2NodesForScroller]);
 
-  const navigateUp = (childToSelectInNewL2?: string | null) => {
-    if (
-      !selectedTopLevelId ||
-      selectedTopLevelId === rootJournalIdConst ||
-      selectedTopLevelId === restrictedJournalId
-    ) {
-      console.warn(
-        "[JHS] navigateUp: Cannot navigate up from root or restricted root."
-      );
-      return;
-    }
-    const parentOfCurrentL1 = findParentOfNode(
-      selectedTopLevelId,
-      fullHierarchyData
-    );
-    const newL1TargetId = parentOfCurrentL1
-      ? parentOfCurrentL1.id
-      : restrictedJournalId || rootJournalIdConst;
-    onSelectTopLevel(newL1TargetId, childToSelectInNewL2 || selectedTopLevelId);
-  };
-
   const navigateDown = (newTopLevelId: string) => {
-    console.log(`[JHS] navigateDown called. New L1 target: ${newTopLevelId}`);
     const targetNode = findNodeById(fullHierarchyData, newTopLevelId);
-
-    // We only need to ensure the target node actually exists in our data.
     if (!targetNode) {
       console.error(
-        `[JHS] navigateDown: Target node ${newTopLevelId} not found in fullHierarchyData.`
+        `[JHS] navigateDown: Target node ${newTopLevelId} not found.`
       );
       return;
     }
-
-    // Proceed with navigation regardless of whether it has children.
-    console.log(
-      `[JHS] navigateDown: Calling onSelectTopLevel('${newTopLevelId}', null)`
-    );
     onSelectTopLevel(newTopLevelId, null);
   };
 
@@ -154,16 +124,10 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
     if (l2ClickCountRef.current === 1) {
       l2ClickTimeoutRef.current = setTimeout(() => {
-        // Single click still toggles selection
-        console.log(`[JHS] L2 Single Click: ${l2ItemId}`);
         onToggleLevel2Id(l2ItemId);
         l2ClickCountRef.current = 0;
       }, DOUBLE_CLICK_DELAY);
     } else if (l2ClickCountRef.current === 2) {
-      // Double click ALWAYS means "drill down" into this item.
-      console.log(
-        `[JHS] L2 Double Click: Attempting to navigate DOWN into ${l2ItemId}`
-      );
       navigateDown(l2ItemId);
       l2ClickCountRef.current = 0;
     }
@@ -175,17 +139,14 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
     if (l3ClickCountRef.current === 1) {
       l3ClickTimeoutRef.current = setTimeout(() => {
-        // Single click still toggles selection
-        console.log(`[JHS] L3 Single Click: ${l3ItemId}`);
         onToggleLevel3Id(l3ItemId);
         l3ClickCountRef.current = 0;
       }, DOUBLE_CLICK_DELAY);
     } else if (l3ClickCountRef.current === 2) {
-      // Double click ALWAYS means "drill down" into this item.
-      console.log(
-        `[JHS] L3 Double Click: Attempting to navigate DOWN into ${l3ItemId}`
-      );
-      navigateDown(l3ItemId);
+      const parentNode = findParentOfNode(l3ItemId, fullHierarchyData);
+      if (parentNode) {
+        navigateDown(parentNode.id);
+      }
       l3ClickCountRef.current = 0;
     }
   };
@@ -214,7 +175,8 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   return (
     <>
       {/* --- ROW 2: Filter Buttons --- */}
-      {isRootView && onToggleFilter && (
+      {/* FIX: Removed 'isRootView' condition to make filters always visible */}
+      {onToggleFilter && (
         <div className={styles.headerFilterRow}>
           <div className={styles.rootFilterControls}>
             <button
@@ -291,7 +253,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                     }`}
                     title={`${l2Node.code} - ${
                       l2Node.name || "Unnamed"
-                    }. Double-click behavior depends on selection.`}
+                    }. Double-click to drill down.`}
                   >
                     {l2Node.code || "N/A"}
                   </button>
@@ -357,7 +319,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                     }`}
                     title={`${l3Node.code} - ${
                       l3Node.name || "Unnamed"
-                    }. Double-click behavior depends on selection.`}
+                    }. Double-click to drill up.`}
                   >
                     {l3Node.code || "N/A"}
                   </button>

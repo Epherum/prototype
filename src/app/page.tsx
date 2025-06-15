@@ -23,8 +23,11 @@ import {
   JournalSliderController,
   type JournalSliderControllerRef,
 } from "@/features/journals/JournalSliderController";
-// Import the new top-level DocumentController, which now wraps everything.
 import { DocumentController } from "@/features/documents/documentController";
+import {
+  UsersController,
+  type UsersControllerRef,
+} from "@/features/users/UsersController";
 
 // Layout Components
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
@@ -32,13 +35,11 @@ import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
 
 // Cross-cutting Hooks
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
-import { useUserManagement } from "@/hooks/useUserManagement";
 
-// Manager Hooks (Only for props passed to controllers)
+// Manager Hooks
 import { useJournalManager } from "@/features/journals/useJournalManager";
 
-// Global Modals (DocumentConfirmationModal is no longer needed here)
-import CreateUserModal from "@/components/modals/CreateUserModal";
+// Global Modals
 import LinkGoodToPartnersViaJournalModal from "@/features/linking/components/LinkGoodToPartnersViaJournalModal";
 import UnlinkGoodFromPartnersViaJournalModal from "@/features/linking/components/UnlinkGoodFromPartnersViaJournalModal";
 
@@ -48,23 +49,27 @@ import type { AccountNodeData } from "@/lib/types";
 export default function Home() {
   useAuthStoreInitializer();
 
+  // --- REFS FOR CONTROLLERS ---
+  const usersControllerRef = useRef<UsersControllerRef>(null);
+  const journalControllerRef = useRef<JournalSliderControllerRef>(null);
+
+  // --- APP STATE ---
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
   const moveSlider = useAppStore((state) => state.moveSlider);
   const toggleSliderVisibility = useAppStore(
     (state) => state.toggleSliderVisibility
   );
-  // This is still useful for disabling the move buttons globally
   const isDocumentCreationMode = useAppStore(
     (state) => state.ui.isCreatingDocument
   );
 
-  const journalControllerRef = useRef<JournalSliderControllerRef>(null);
-
-  const userManagement = useUserManagement();
-  const jpqlLinking = useJournalPartnerGoodLinking();
+  // --- MANAGER HOOKS ---
+  // This is the SINGLE, authoritative instance of the journal manager hook.
   const journalManager = useJournalManager();
+  const jpqlLinking = useJournalPartnerGoodLinking();
 
+  // --- CALLBACKS for cross-feature communication ---
   const openJournalSelectorForLinking = useCallback(
     (callback: (node: AccountNodeData) => void) => {
       journalControllerRef.current?.openJournalSelector(callback);
@@ -76,6 +81,7 @@ export default function Home() {
     journalControllerRef.current?.openJournalSelectorForGPG();
   }, []);
 
+  // --- DERIVED STATE ---
   const visibleSliderOrder = useMemo(
     () => sliderOrder.filter((id) => visibility[id]),
     [sliderOrder, visibility]
@@ -90,13 +96,14 @@ export default function Home() {
   };
 
   return (
-    // The new DocumentController wraps the entire page content.
-    // This provides the shared context to all child components that need it.
-    <DocumentController>
+    // Pass the single journalManager instance to the DocumentController
+    <DocumentController journalManager={journalManager}>
       <div className={styles.pageContainer}>
+        <UsersController ref={usersControllerRef} />
+
         <h1 className={styles.title}>ERP Application Interface</h1>
         <UserAuthDisplay
-          onOpenCreateUserModal={userManagement.openCreateUserModal}
+          onOpenCreateUserModal={() => usersControllerRef.current?.open()}
         />
         <StickyHeaderControls
           visibility={visibility}
@@ -181,16 +188,7 @@ export default function Home() {
           </div>
         </LayoutGroup>
 
-        {/* The document UI (toolbar, modals) is now handled inside DocumentController.
-            page.tsx is clean and only responsible for layout and other global modals. */}
         <AnimatePresence>
-          {userManagement.isCreateUserModalOpen && (
-            <CreateUserModal
-              isOpen={userManagement.isCreateUserModalOpen}
-              onClose={userManagement.closeCreateUserModal}
-            />
-          )}
-
           {jpqlLinking.isLinkModalOpen && (
             <LinkGoodToPartnersViaJournalModal
               isOpen={jpqlLinking.isLinkModalOpen}

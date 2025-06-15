@@ -1,10 +1,11 @@
-//src/features/documents/useDocumentManager.ts
+//src/features/partners/PartnerSliderController.tsx
 "use client";
 
 import { useState, useCallback } from "react";
 import { useAppStore } from "@/store/appStore";
-import { SLIDER_TYPES } from "@/lib/constants"; // Import slider types
+import { SLIDER_TYPES } from "@/lib/constants";
 import type { Partner, Good } from "@/lib/types";
+import { useJournalManager } from "@/features/journals/useJournalManager";
 
 export interface GoodForDocument extends Good {
   quantity: number;
@@ -12,8 +13,18 @@ export interface GoodForDocument extends Good {
   amount: number;
 }
 
-export function useDocumentManager() {
-  // Get state from the store
+// The hook now accepts the journalManager instance as a required prop.
+interface UseDocumentManagerProps {
+  journalManager: ReturnType<typeof useJournalManager>;
+}
+
+export function useDocumentManager({
+  journalManager,
+}: UseDocumentManagerProps) {
+  // Get state from the injected journal manager hook
+  const { isTerminalJournalActive } = journalManager;
+
+  // Get global state from the store
   const isDocumentCreationMode = useAppStore(
     (state) => state.ui.isCreatingDocument
   );
@@ -39,6 +50,18 @@ export function useDocumentManager() {
   const [lockedPartnerDetails, setLockedPartnerDetails] =
     useState<Partner | null>(null);
 
+  // NEW HANDLER: For the journal-first workflow initiated by the +doc button.
+  const handleEnterJournalCreationMode = useCallback(() => {
+    if (isTerminalJournalActive) {
+      enterDocumentCreationMode();
+    } else {
+      console.warn(
+        "Attempted to enter document creation mode without a valid terminal journal."
+      );
+    }
+  }, [isTerminalJournalActive, enterDocumentCreationMode]);
+
+  // This handler is for the partner-first workflow (if it still exists)
   const handleStartDocumentCreation = useCallback(
     (partnerToLock: Partner | null) => {
       if (!partnerToLock) {
@@ -47,30 +70,20 @@ export function useDocumentManager() {
         );
         return false;
       }
-      // Set the global mode
       enterDocumentCreationMode();
-
-      // --- START OF FIX: Automatically open the Goods accordion ---
-      // If the accordion isn't already open when we start, open it.
-      // This happens only once at the beginning of the process.
       if (!isGoodsAccordionOpen) {
         toggleAccordion(SLIDER_TYPES.GOODS);
       }
-      // --- END OF FIX ---
-
-      // Set the local state for this document creation session
       setLockedPartnerId(partnerToLock.id);
       setLockedPartnerDetails(partnerToLock);
       setSelectedGoodsForDocument([]);
-
       return true;
     },
-    [enterDocumentCreationMode, isGoodsAccordionOpen, toggleAccordion] // Add dependencies
+    [enterDocumentCreationMode, isGoodsAccordionOpen, toggleAccordion]
   );
 
   const handleCancelDocumentCreation = useCallback(() => {
     exitDocumentCreationMode();
-    // If the accordion is open, close it.
     if (isGoodsAccordionOpen) {
       toggleAccordion(SLIDER_TYPES.GOODS);
     }
@@ -132,7 +145,8 @@ export function useDocumentManager() {
       return false;
     }
     if (!lockedPartnerId) {
-      return false;
+      // In journal-first flow, we might not have a partner yet.
+      // This logic might need to adapt based on full workflow.
     }
     setIsConfirmationModalOpen(true);
     return true;
@@ -145,7 +159,6 @@ export function useDocumentManager() {
   const resetDocumentCreationState = useCallback(() => {
     setIsConfirmationModalOpen(false);
     exitDocumentCreationMode();
-    // If the accordion is open, close it.
     if (isGoodsAccordionOpen) {
       toggleAccordion(SLIDER_TYPES.GOODS);
     }
@@ -169,6 +182,11 @@ export function useDocumentManager() {
   ]);
 
   return {
+    // NEW properties for journal-first workflow
+    isTerminalJournalActive,
+    handleEnterJournalCreationMode,
+
+    // Existing properties
     isDocumentCreationMode,
     lockedPartnerId,
     selectedGoodsForDocument,

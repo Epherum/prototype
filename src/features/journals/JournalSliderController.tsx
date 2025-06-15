@@ -1,3 +1,4 @@
+//src/features/partners/PartnerSliderController.tsx
 "use client";
 
 import React, {
@@ -23,7 +24,7 @@ import {
 } from "@/services/clientJournalService";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 
-import { findNodeById } from "@/lib/helpers";
+import { findNodeById, findParentOfNode } from "@/lib/helpers";
 
 // UI Components
 import JournalHierarchySlider from "@/features/journals/components/JournalHierarchySlider";
@@ -94,12 +95,26 @@ export const JournalSliderController = forwardRef<
     journalManager.hierarchyData,
   ]);
 
-  // --- NEW: Callback to handle navigating up the hierarchy ---
-  const handleNavigateToRoot = useCallback(() => {
-    // The journalManager hook already knows how to handle the top-level selection.
-    // We pass it the user's effective root, which is either their restricted ID or the global root.
+  // --- Callback to handle navigating up the hierarchy one level at a time ---
+  const handleNavigateUpOneLevel = useCallback(() => {
+    const currentTopLevelId = journalManager.selectedTopLevelJournalId;
+    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+
+    if (!currentTopLevelId || currentTopLevelId === effectiveRootId) {
+      return; // Already at root, do nothing.
+    }
+
+    const parent = findParentOfNode(
+      currentTopLevelId,
+      journalManager.hierarchyData
+    );
+    const newTopLevelId = parent ? parent.id : effectiveRootId;
+
+    // Pre-select the journal we just navigated up from for better UX
     journalManager.handleSelectTopLevelJournal(
-      restrictedJournalId || ROOT_JOURNAL_ID
+      newTopLevelId,
+      undefined,
+      currentTopLevelId
     );
   }, [journalManager, restrictedJournalId]);
 
@@ -268,8 +283,8 @@ export const JournalSliderController = forwardRef<
           {journalManager.isJournalSliderPrimary && selectedL1Journal && (
             <div
               className={styles.journalParentInfo}
-              onDoubleClick={handleNavigateToRoot}
-              title="Double-click to go up to root view"
+              onDoubleClick={handleNavigateUpOneLevel}
+              title="Double-click to navigate up one level"
             >
               {selectedL1Journal.code} - {selectedL1Journal.name}
             </div>

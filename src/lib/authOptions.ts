@@ -11,25 +11,28 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import type { JWT } from "next-auth/jwt";
 import prisma from "@/app/utils/prisma";
 
-// Define your interfaces here, now without companyId
+// REFACTORED: RoleData is simplified
 export interface RoleData {
   name: string;
   permissions: Array<{ action: string; resource: string }>;
-  restrictedTopLevelJournalId?: string | null;
 }
 
+// REFACTORED: ExtendedUser now has the top-level restriction
 export interface ExtendedUser extends NextAuthUser {
   id: string;
   roles: RoleData[];
+  restrictedTopLevelJournalId: string | null;
 }
 
 export interface ExtendedSession extends Session {
   user?: ExtendedUser;
 }
 
+// REFACTORED: JWT mirrors the new ExtendedUser structure
 export interface ExtendedJWT extends JWT {
   id: string;
   roles: RoleData[];
+  restrictedTopLevelJournalId: string | null;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -88,10 +91,10 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        // REFACTORED: Permissions are mapped, but restriction is handled separately.
         const rolesWithPermissions: RoleData[] = user.userRoles.map(
           (userRole) => ({
             name: userRole.role.name,
-            restrictedTopLevelJournalId: userRole.restrictedTopLevelJournalId,
             permissions: userRole.role.permissions.map((rp) => ({
               action: rp.permission.action,
               resource: rp.permission.resource,
@@ -99,11 +102,13 @@ export const authOptions: NextAuthOptions = {
           })
         );
 
+        // REFACTORED: The user object passed to JWT/Session now includes the direct restriction.
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           roles: rolesWithPermissions,
+          restrictedTopLevelJournalId: user.restrictedTopLevelJournalId,
         };
       },
     }),
@@ -117,6 +122,8 @@ export const authOptions: NextAuthOptions = {
         token.roles = u.roles;
         token.name = u.name;
         token.email = u.email;
+        // REFACTORED: Pass restriction to the JWT token
+        token.restrictedTopLevelJournalId = u.restrictedTopLevelJournalId;
       }
       return token;
     },
@@ -127,6 +134,9 @@ export const authOptions: NextAuthOptions = {
 
         sessionUser.id = extendedToken.id;
         sessionUser.roles = extendedToken.roles;
+        // REFACTORED: Pass restriction from the token to the final session object
+        sessionUser.restrictedTopLevelJournalId =
+          extendedToken.restrictedTopLevelJournalId;
       }
       return session;
     },

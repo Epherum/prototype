@@ -1,75 +1,31 @@
-// File: src/app/api/users/route.ts
+// src/app/api/users/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession, ExtendedUser } from "@/lib/authOptions";
+import { withAuthorization } from "@/lib/auth/withAuthorization";
+import { ExtendedSession } from "@/lib/authOptions";
 import { UserService, CreateUserPayload } from "@/app/services/userService";
+import { isDescendantOf } from "@/app/services/journalService"; // <-- IMPORT HELPER
 import prisma from "@/app/utils/prisma";
 import { z } from "zod";
-
-// Zod schema for validating the incoming payload for user creation
-const roleAssignmentApiSchema = z.object({
-  roleId: z.string().min(1, "Role ID is required"),
-  restrictedTopLevelJournalId: z.string().nullable().optional(),
-});
 
 const createUserApiPayloadSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email format"),
   password: z.string().min(6, "Password must be at least 6 characters long"),
   roleAssignments: z
-    .array(roleAssignmentApiSchema)
+    .array(z.object({ roleId: z.string().min(1) }))
     .min(1, "At least one role assignment is required"),
+  restrictedTopLevelJournalId: z.string().nullable(),
 });
 
-function hasApiPermission(
-  sessionUser: ExtendedUser,
-  permissionIdentifier: string
-): boolean {
-  if (!sessionUser?.roles) {
-    return false;
-  }
-  return sessionUser.roles.some((role) =>
-    role.permissions.some(
-      (p) =>
-        `${p.action.toUpperCase()}_${p.resource.toUpperCase()}` ===
-        permissionIdentifier.toUpperCase()
-    )
-  );
-}
-
-export async function POST(request: NextRequest) {
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-
-  if (!session?.user?.id || !session?.user?.roles) {
-    return NextResponse.json(
-      { message: "Unauthorized: Session or user details missing" },
-      { status: 401 }
-    );
-  }
-
-  if (!hasApiPermission(session.user as ExtendedUser, "MANAGE_USERS")) {
-    console.warn(
-      `User ${session.user.id} without MANAGE_USERS permission tried to create a user.`
-    );
-    return NextResponse.json(
-      { message: "Forbidden: Insufficient permissions" },
-      { status: 403 }
-    );
-  }
-
-  const adminUserContextForService = {
-    id: session.user.id,
-    roles: session.user.roles.map((role) => ({
-      name: role.name,
-      permissions: role.permissions || [],
-    })),
-  };
-
+const postHandler = async (
+  req: NextRequest,
+  context: object,
+  session: ExtendedSession
+) => {
+  const adminUser = session.user!;
   let rawPayload;
   try {
-    rawPayload = await request.json();
+    rawPayload = await req.json();
   } catch (error) {
     return NextResponse.json(
       { message: "Invalid JSON payload" },
@@ -87,35 +43,68 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+  const newUserData = validation.data as CreateUserPayload;
+
+  // --- REFINED SECURITY CHECK FOR SUB-ADMINS ---
+  const adminRestrictionId = adminUser.restrictedTopLevelJournalId;
+  if (adminRestrictionId) {
+    const newRestrictionId = newUserData.restrictedTopLevelJournalId;
+
+    // A restricted admin CANNOT create an unrestricted user.
+    if (!newRestrictionId) {
+      return NextResponse.json(
+        {
+          message: "Forbidden: You cannot create a user with 'No Restriction'.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // The new user's restriction must be a descendant of the admin's own restriction.
+    const isAllowed = await isDescendantOf(
+      newRestrictionId,
+      adminRestrictionId
+    );
+    if (!isAllowed) {
+      return NextResponse.json(
+        {
+          message:
+            "Forbidden: You can only assign a journal restriction that is within your own hierarchy.",
+        },
+        { status: 403 }
+      );
+    }
+  }
 
   const userService = new UserService(prisma);
+  const adminContextForService = {
+    id: adminUser.id,
+    roles: adminUser.roles,
+    restrictedTopLevelJournalId: adminUser.restrictedTopLevelJournalId,
+  };
 
   try {
     const newUser = await userService.createUserAndAssignRoles(
-      validation.data as CreateUserPayload,
-      adminUserContextForService
+      newUserData,
+      adminContextForService
     );
     return NextResponse.json(newUser, { status: 201 });
   } catch (error: any) {
     console.error(
-      `API /users POST (Admin: ${adminUserContextForService.id}) Error:`,
+      `API /users POST (Admin: ${adminUser.id}) Error:`,
       error.message
     );
-    if (error.message.startsWith("Forbidden:")) {
-      return NextResponse.json({ message: error.message }, { status: 403 });
-    }
     if (error.message.includes("already exists")) {
       return NextResponse.json({ message: error.message }, { status: 409 });
-    }
-    if (
-      error.message.includes("not found") ||
-      error.message.includes("Invalid journal")
-    ) {
-      return NextResponse.json({ message: error.message }, { status: 400 });
     }
     return NextResponse.json(
       { message: error.message || "Failed to create user" },
       { status: 500 }
     );
   }
-}
+};
+
+export const POST = withAuthorization(postHandler, {
+  action: "MANAGE",
+  resource: "USERS",
+});

@@ -26,32 +26,28 @@ type SeedJournalInput = Omit<
  */
 async function deleteAllData() {
   console.log("--- Deleting all existing data... ---");
-  // Use a transaction to ensure all deletions succeed or none do.
   await prisma.$transaction([
     prisma.journalPartnerGoodLink.deleteMany({}),
     prisma.rolePermission.deleteMany({}),
     prisma.userRole.deleteMany({}),
     prisma.journalPartnerLink.deleteMany({}),
     prisma.journalGoodLink.deleteMany({}),
-    prisma.permission.deleteMany({}),
-    prisma.role.deleteMany({}),
-    // Order matters: Delete entities that are referenced by others last.
     prisma.goodsAndService.deleteMany({}),
     prisma.partner.deleteMany({}),
     prisma.taxCode.deleteMany({}),
     prisma.unitOfMeasure.deleteMany({}),
     prisma.user.deleteMany({}),
+    prisma.role.deleteMany({}),
+    prisma.permission.deleteMany({}),
   ]);
   console.log(
     "Deleted linking tables, auth models, and core business entities."
   );
 
-  // Iterative deletion for self-referencing journals is a good strategy.
   let journalsCount = await prisma.journal.count();
   let pass = 0;
   while (journalsCount > 0 && pass < 20) {
     pass++;
-    // Delete journals that are not parents to any other journal.
     const { count } = await prisma.journal.deleteMany({
       where: { children: { none: {} } },
     });
@@ -166,46 +162,76 @@ async function main() {
   await deleteAllData();
   console.log(`--- Start seeding... ---`);
 
-  // --- 1. Create Permissions & Roles (without user assignment yet) ---
-  const permissionsData = [
-    { action: "MANAGE", resource: "USERS" },
-    { action: "MANAGE", resource: "ROLES" },
-    { action: "CREATE", resource: "PARTNER" },
-    { action: "READ", resource: "PARTNER" },
-    { action: "UPDATE", resource: "PARTNER" },
-    { action: "DELETE", resource: "PARTNER" },
-    { action: "APPROVE", resource: "PARTNER" },
-    { action: "READ_HISTORY", resource: "PARTNER" },
-    { action: "CREATE", resource: "GOODS_AND_SERVICE" },
-    { action: "READ", resource: "GOODS_AND_SERVICE" },
-    { action: "UPDATE", resource: "GOODS_AND_SERVICE" },
-    { action: "DELETE", resource: "GOODS_AND_SERVICE" },
-    { action: "APPROVE", resource: "GOODS_AND_SERVICE" },
-    { action: "READ_HISTORY", resource: "GOODS_AND_SERVICE" },
-    { action: "READ", resource: "JOURNAL" },
-    { action: "MANAGE", resource: "JOURNAL" },
-    { action: "LINK", resource: "PARTNER_JOURNAL" },
-    { action: "LINK", resource: "GOOD_JOURNAL" },
-    { action: "LINK", resource: "GOOD_PARTNER_JOURNAL" },
-    { action: "CREATE", resource: "DOCUMENT" },
+  // --- 1. Create ALL Permissions using upsert for safety ---
+  console.log("Upserting permissions...");
+  const permissionsToCreate = [
+    {
+      action: "MANAGE",
+      resource: "USERS",
+      description: "Can create, view, edit, and assign roles to users",
+    },
+    {
+      action: "READ",
+      resource: "ROLE",
+      description: "Can view role list and permissions",
+    },
+    {
+      action: "CREATE",
+      resource: "ROLE",
+      description: "Can create, edit, and delete roles",
+    },
+    {
+      action: "CREATE",
+      resource: "PARTNER",
+      description: "Can create new partners",
+    },
+    {
+      action: "READ",
+      resource: "PARTNER",
+      description: "Can read partner data",
+    },
+    {
+      action: "UPDATE",
+      resource: "PARTNER",
+      description: "Can update partner data",
+    },
+    {
+      action: "CREATE",
+      resource: "GOODS",
+      description: "Can create new goods/services",
+    },
+    {
+      action: "READ",
+      resource: "GOODS",
+      description: "Can read goods/services data",
+    },
+    {
+      action: "READ",
+      resource: "JOURNAL",
+      description: "Can read journal data",
+    },
   ];
-  await prisma.permission.createMany({
-    data: permissionsData,
-    skipDuplicates: true,
-  });
-  const allPermissions = await prisma.permission.findMany();
-  const permMap = allPermissions.reduce(
-    (acc, p) => ({ ...acc, [`${p.action}_${p.resource}`]: p.id }),
-    {} as Record<string, string>
-  );
+  for (const p of permissionsToCreate) {
+    await prisma.permission.upsert({
+      where: { action_resource: { action: p.action, resource: p.resource } },
+      update: {},
+      create: p,
+    });
+  }
+  console.log("Permissions upserted successfully.");
 
+  // --- 2. Create Roles and connect permissions ---
   const adminRole = await prisma.role.create({
     data: {
       name: "Admin",
       description: "Full access to all application data and settings.",
       permissions: {
-        create: Object.values(permMap).map((permissionId) => ({
-          permissionId,
+        create: permissionsToCreate.map((p) => ({
+          permission: {
+            connect: {
+              action_resource: { action: p.action, resource: p.resource },
+            },
+          },
         })),
       },
     },
@@ -214,21 +240,44 @@ async function main() {
   const salesManagerRole = await prisma.role.create({
     data: {
       name: "Sales Manager",
-      description:
-        "Manages customers, sales-related goods, and can create documents. View is restricted to Revenue journals.",
+      description: "Manages customers and sales-related goods.",
       permissions: {
         create: [
-          { permissionId: permMap["CREATE_PARTNER"] },
-          { permissionId: permMap["READ_PARTNER"] },
-          { permissionId: permMap["UPDATE_PARTNER"] },
-          { permissionId: permMap["CREATE_GOODS_AND_SERVICE"] },
-          { permissionId: permMap["READ_GOODS_AND_SERVICE"] },
-          { permissionId: permMap["UPDATE_GOODS_AND_SERVICE"] },
-          { permissionId: permMap["READ_JOURNAL"] },
-          { permissionId: permMap["LINK_PARTNER_JOURNAL"] },
-          { permissionId: permMap["LINK_GOOD_JOURNAL"] },
-          { permissionId: permMap["LINK_GOOD_PARTNER_JOURNAL"] },
-          { permissionId: permMap["CREATE_DOCUMENT"] },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "CREATE", resource: "PARTNER" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "READ", resource: "PARTNER" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "UPDATE", resource: "PARTNER" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "READ", resource: "GOODS" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "READ", resource: "JOURNAL" },
+              },
+            },
+          },
         ],
       },
     },
@@ -237,25 +286,44 @@ async function main() {
   const procurementRole = await prisma.role.create({
     data: {
       name: "Procurement Specialist",
-      description:
-        "Manages suppliers and ingredients. View is restricted to Expense journals.",
+      description: "Manages suppliers and ingredients.",
       permissions: {
         create: [
-          { permissionId: permMap["CREATE_PARTNER"] },
-          { permissionId: permMap["READ_PARTNER"] },
-          { permissionId: permMap["UPDATE_PARTNER"] },
-          { permissionId: permMap["APPROVE_PARTNER"] }, // Can approve new suppliers
-          { permissionId: permMap["READ_GOODS_AND_SERVICE"] },
-          { permissionId: permMap["READ_JOURNAL"] },
-          { permissionId: permMap["LINK_PARTNER_JOURNAL"] },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "CREATE", resource: "PARTNER" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "READ", resource: "PARTNER" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "READ", resource: "GOODS" },
+              },
+            },
+          },
+          {
+            permission: {
+              connect: {
+                action_resource: { action: "READ", resource: "JOURNAL" },
+              },
+            },
+          },
         ],
       },
     },
   });
   console.log("Created Roles: Admin, Sales Manager, Procurement Specialist");
 
-  // --- 2. Create Journals (MOVED UP) ---
-  // This MUST be done before creating users that have journal restrictions.
+  // --- 3. Create Journals ---
   const journalsStructure: SeedJournalInput[] = [
     {
       id: "1",
@@ -359,64 +427,55 @@ async function main() {
   await createJournals(journalsStructure);
   console.log("Expanded Journals seeded.");
 
-  // --- 3. Create Users ---
-  // Now that journals exist, these foreign key relations will be valid.
+  // --- 4. Create Users ---
   const adminUser = await prisma.user.create({
     data: {
       email: "admin@bakerydemo.com",
       name: "Admin User",
       passwordHash: await bcrypt.hash("admin123", 10),
-      userRoles: { create: { roleId: adminRole.id } }, // No journal restriction
+      // This admin is unrestricted, so restrictedTopLevelJournalId is null (default)
+      userRoles: { create: { roleId: adminRole.id } },
     },
   });
-
   const salesUser = await prisma.user.create({
     data: {
       email: "sales.manager@bakerydemo.com",
       name: "Sales Manager Sam",
       passwordHash: await bcrypt.hash("sales123", 10),
+      // REFACTORED: Restriction is now at the User level
+      restrictedTopLevelJournalId: "4",
       userRoles: {
         create: {
           roleId: salesManagerRole.id,
-          restrictedTopLevelJournalId: "4", // RESTRICTED to the 'Revenue' branch
         },
       },
     },
   });
-
   const procurementUser = await prisma.user.create({
     data: {
       email: "procurement.specialist@bakerydemo.com",
       name: "Procurement Specialist Pat",
       passwordHash: await bcrypt.hash("procurement123", 10),
+      // REFACTORED: Restriction is now at the User level
+      restrictedTopLevelJournalId: "5",
       userRoles: {
         create: {
           roleId: procurementRole.id,
-          restrictedTopLevelJournalId: "5", // RESTRICTED to the 'Expenses' branch
         },
       },
     },
   });
-
   console.log(
     `Created Users: Admin (unrestricted), Sales Manager (restricted to journal '4'), Procurement Specialist (restricted to journal '5')`
   );
-  const defaultCreatorId = salesUser.id; // Use Sales Manager as the default creator for most data.
+  const defaultCreatorId = salesUser.id;
 
-  // --- 4. Create Tax Codes & Units of Measure ---
+  // --- 5. Create Tax Codes & Units of Measure ---
   const taxStd = await prisma.taxCode.create({
-    data: {
-      code: "STD20",
-      description: "Standard 20%",
-      rate: 0.2,
-    },
+    data: { code: "STD20", description: "Standard 20%", rate: 0.2 },
   });
   const taxExempt = await prisma.taxCode.create({
-    data: {
-      code: "EXEMPT",
-      description: "Tax Exempt",
-      rate: 0,
-    },
+    data: { code: "EXEMPT", description: "Tax Exempt", rate: 0 },
   });
   const uomEach = await prisma.unitOfMeasure.create({
     data: { code: "EA", name: "Each" },
@@ -428,7 +487,7 @@ async function main() {
     data: { code: "BOX", name: "Box" },
   });
 
-  // --- 5. Create Partners (Customers & Suppliers) ---
+  // --- 6. Create Partners (Customers & Suppliers) ---
   console.log("\nCreating partners...");
   const pSupplierFlourMart = await prisma.partner.create({
     data: {
@@ -457,7 +516,6 @@ async function main() {
       entityState: EntityState.ACTIVE,
     },
   });
-
   const pCustomerCafeA = await prisma.partner.create({
     data: {
       name: "The Cozy Cafe",
@@ -497,7 +555,7 @@ async function main() {
     },
   });
 
-  // --- 6. Create Goods & Services ---
+  // --- 7. Create Goods & Services ---
   console.log("\nCreating goods & services...");
   const gGoodFlour = await prisma.goodsAndService.create({
     data: {
@@ -532,7 +590,6 @@ async function main() {
       unitCodeId: uomBox.id,
     },
   });
-
   const gGoodChocolateCake = await prisma.goodsAndService.create({
     data: {
       label: "Classic Chocolate Cake",
@@ -567,7 +624,7 @@ async function main() {
     },
   });
 
-  // --- 7. Create Links (Partner-Journal & Good-Journal) with Hierarchy ---
+  // --- 8. Create Links (Partner-Journal & Good-Journal) with Hierarchy ---
   console.log("\nLinking entities with hierarchy...");
   await linkPartnerToJournalWithHierarchy(
     pSupplierFlourMart.id,
@@ -594,7 +651,6 @@ async function main() {
     "4101",
     "CUSTOMER"
   );
-
   await linkGoodToJournalWithHierarchy(gGoodFlour.id, "5001");
   await linkGoodToJournalWithHierarchy(gGoodSugar.id, "5002");
   await linkGoodToJournalWithHierarchy(gGoodChocolateCake.id, "4001");
@@ -602,7 +658,7 @@ async function main() {
   await linkGoodToJournalWithHierarchy(gGoodCatering.id, "4101");
   console.log("Hierarchical Partner-Journal and Good-Journal links created.");
 
-  // --- 8. Create Tri-partite Links (Journal-Partner-Good) ---
+  // --- 9. Create Tri-partite Links (Journal-Partner-Good) ---
   console.log("\nCreating tri-partite Journal-Partner-Good links...");
   const jplCafeCakes = await prisma.journalPartnerLink.findFirstOrThrow({
     where: { partnerId: pCustomerCafeA.id, journalId: "4001" },
@@ -614,7 +670,6 @@ async function main() {
       descriptiveText: "Weekly standing order for chocolate cakes.",
     },
   });
-
   const jplCafePastries = await prisma.journalPartnerLink.findFirstOrThrow({
     where: { partnerId: pCustomerCafeA.id, journalId: "4003" },
   });
@@ -625,7 +680,6 @@ async function main() {
       descriptiveText: "Daily delivery of 50 croissants.",
     },
   });
-
   const jplMegaCorpCatering = await prisma.journalPartnerLink.findFirstOrThrow({
     where: { partnerId: pCustomerMegaCorp.id, journalId: "4101" },
   });

@@ -126,15 +126,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
           user.roles?.some((role) => role.name.toUpperCase() === "ADMIN") ??
           false;
 
-        if (user.roles && user.roles.length > 0) {
-          const roleWithRestriction = user.roles.find(
-            (role) => !!role.restrictedTopLevelJournalId
-          );
-          if (roleWithRestriction) {
-            restrictedId =
-              roleWithRestriction.restrictedTopLevelJournalId ||
-              ROOT_JOURNAL_ID;
-          }
+        if (user.restrictedTopLevelJournalId) {
+          restrictedId = user.restrictedTopLevelJournalId;
         }
 
         return {

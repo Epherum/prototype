@@ -1,0 +1,247 @@
+/* src/features/users/components/ManageUserModal.module.css */
+
+/* --- Layout & Form Overrides --- */
+.createUserModalContent {
+  width: 95vw;
+  max-width: 850px; /* Slightly wider for better spacing */
+}
+
+.createUserForm {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding-right: var(--spacing-unit);
+  margin-right: calc(-1 * var(--spacing-unit));
+}
+
+.formColumns {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: calc(var(--spacing-unit) * 4);
+}
+
+@media (min-width: 768px) {
+  .formColumns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* --- Section Styling --- */
+.leftColumn,
+.rightColumn {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 3);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 2);
+}
+
+.sectionHeader {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding-bottom: var(--spacing-unit);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--spacing-unit);
+}
+
+/* --- Input Group Styling --- */
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+}
+
+.formGroup label {
+  font-weight: 500; /* Slightly less bold */
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.formGroup input,
+.formGroup select,
+.formGroup textarea {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 1.5);
+  border: 1px solid #dcdcdc; /* A slightly more visible border */
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-card);
+  font-size: 1rem;
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.formGroup input:focus,
+.formGroup select:focus,
+.formGroup textarea:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 3px var(--accent-warm-light);
+}
+
+.passwordInputContainer {
+  position: relative;
+  display: flex;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: none;
+  border: none;
+  padding: 0 calc(var(--spacing-unit) * 1.5);
+  cursor: pointer;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  font-size: 1.2rem;
+  transition: color 0.2s;
+}
+.passwordToggle:hover {
+  color: var(--accent-warm);
+}
+
+/* --- Role Management Section --- */
+.roleHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.roleHeader > label {
+  margin: 0;
+  font-weight: 600; /* Make section sub-headers bold */
+  color: var(--text-primary);
+}
+
+.createRoleButton {
+  background-color: transparent;
+  color: var(--accent-warm);
+  border: 1px solid var(--accent-warm-light);
+  padding: 6px 12px;
+  border-radius: var(--border-radius-pill);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.createRoleButton:hover {
+  background-color: var(--accent-warm-light);
+  border-color: var(--accent-warm);
+}
+
+.rolesContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Tighter gap between roles */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-unit);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.roleCheckboxWrapper {
+  display: flex;
+  align-items: center;
+  padding: calc(var(--spacing-unit) * 1.25);
+  border-radius: var(--border-radius-sm);
+  transition: background-color 0.2s;
+}
+
+.roleCheckboxWrapper:hover {
+  background-color: var(--accent-slider);
+}
+
+.roleCheckboxWrapper input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  cursor: pointer;
+  accent-color: var(--accent-warm);
+  margin-right: calc(var(--spacing-unit) * 1.5);
+}
+
+.roleCheckboxWrapper > label {
+  flex-grow: 1;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin: 0;
+}
+
+.roleActions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+  margin-left: auto;
+  opacity: 0;
+  transform: translateX(10px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+@media (max-width: 767px) {
+  .roleActions {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.roleCheckboxWrapper:hover .roleActions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.roleActions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: var(--spacing-unit);
+  display: flex;
+  font-size: 0.9rem;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.roleActions button:hover {
+  color: var(--text-primary);
+  background-color: #e0e0e0;
+  transform: scale(1.1);
+}
+
+.roleActions .deleteButton:hover {
+  color: var(--danger-color);
+  background-color: var(--danger-color-light-bg);
+}
+
+/* --- Helper & Error Text Styling --- */
+.restrictionNotice {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background-color: var(--accent-slider);
+  padding: calc(var(--spacing-unit) * 1.5);
+  border-radius: var(--border-radius-sm);
+  margin-top: var(--spacing-unit);
+  border-left: 3px solid var(--accent-warm);
+}
+
+.errorMessage {
+  color: var(--danger-color-hover);
+  background-color: var(--danger-color-light-bg);
+  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+  border-radius: var(--border-radius-sm);
+  margin-top: calc(var(--spacing-unit) * 2);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid var(--danger-color);
+}
