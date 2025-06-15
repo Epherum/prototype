@@ -16,7 +16,7 @@ import { useAppStore } from "@/store/appStore";
 import { useGoodManager } from "./useGoodManager";
 import { useGoodJournalLinking } from "@/features/linking/useGoodJournalLinking";
 import { fetchJournalLinksForGood } from "@/services/clientJournalGoodLinkService";
-import { useSharedDocumentManager } from "@/features/documents/documentController";
+import { useSharedDocumentManager } from "@/features/documents/DocumentController";
 
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import GoodsOptionsMenu from "@/features/goods/components/GoodsOptionsMenu";

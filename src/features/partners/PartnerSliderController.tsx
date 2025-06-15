@@ -13,7 +13,7 @@ import { usePartnerManager } from "./usePartnerManager";
 import { usePartnerJournalLinking } from "@/features/linking/usePartnerJournalLinking";
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
 import { fetchJournalLinksForPartner } from "@/services/clientJournalPartnerLinkService";
-import { useSharedDocumentManager } from "@/features/documents/documentController";
+import { useSharedDocumentManager } from "@/features/documents/DocumentController";
 
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import PartnerOptionsMenu from "@/features/partners/components/PartnerOptionsMenu";

@@ -24,7 +24,7 @@ import {
   JournalSliderController,
   type JournalSliderControllerRef,
 } from "@/features/journals/JournalSliderController";
-import { DocumentController } from "@/features/documents/documentController";
+import { DocumentController } from "@/features/documents/DocumentController";
 import {
   UsersController,
   type UsersControllerRef,
