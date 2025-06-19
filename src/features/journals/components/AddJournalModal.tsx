@@ -122,7 +122,7 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
       exit="closed"
       variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
-      style={{ zIndex: 1001 }} // zIndex might be better handled in the CSS if consistent
+      style={{ zIndex: 2001 }} // zIndex might be better handled in the CSS if consistent
     >
       <motion.div
         className={baseStyles.modalContent} // Use baseStyles
