@@ -1,11 +1,32 @@
-// src/features/journals/components/JournalModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./JournalModal.module.css";
-import AccountNode from "./AccountNode"; // Assuming AccountNodeData type is implicitly handled or defined elsewhere
-import { ROOT_JOURNAL_ID } from "@/lib/constants"; // Assuming this is your actual root ID constant
-import { findNodeById } from "@/lib/helpers"; // If needed for getting selected node details
+import AccountNode from "./AccountNode";
+import { ROOT_JOURNAL_ID } from "@/lib/constants";
+import { findNodeById } from "@/lib/helpers";
+import { AccountNodeData } from "@/lib/types";
+
+// Define props interface for better type checking and to make certain props optional.
+interface JournalModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  modalTitle?: string;
+  hierarchy?: (AccountNodeData & {
+    isConceptualRoot?: boolean;
+    children?: AccountNodeData[];
+  })[];
+  isLoading?: boolean;
+  zIndex?: number;
+  onConfirmSelection?: (
+    nodeId: string,
+    childToSelectInL2?: string | null
+  ) => void;
+  onSetShowRoot?: () => void;
+  onDeleteAccount?: (accountId: string) => void;
+  onTriggerAddChild?: (parentId: string, parentCode: string) => void;
+  onSelectForLinking?: (node: AccountNodeData) => void;
+}
 
 function JournalModal({
   isOpen,
@@ -16,158 +37,125 @@ function JournalModal({
   onDeleteAccount,
   onTriggerAddChild,
   isLoading,
-  onSelectForLinking, // New prop
+  onSelectForLinking,
   modalTitle,
-}) {
-  const [openNodes, setOpenNodes] = useState({});
-  const [selectedAccountId, setSelectedAccountId] = useState(null);
-  const conceptualRootId = hierarchy[0]?.id; // The ID of the conceptual root node passed in
+  zIndex,
+}: JournalModalProps) {
+  const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({});
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null
+  );
+  const conceptualRootId = hierarchy[0]?.id;
 
   useEffect(() => {
     if (!isOpen) {
       setOpenNodes({});
       setSelectedAccountId(null);
     } else {
-      // Auto-open and select the conceptual root when modal opens
-      if (hierarchy.length > 0 && hierarchy[0]?.isConceptualRoot) {
+      if (hierarchy.length > 0 && (hierarchy[0] as any)?.isConceptualRoot) {
         setOpenNodes({ [hierarchy[0].id]: true });
-        // Don't auto-select the conceptual root for actual selection, let user click
         setSelectedAccountId(null);
       }
     }
   }, [isOpen, hierarchy]);
 
-  const toggleNode = useCallback((nodeId) => {
+  const toggleNode = useCallback((nodeId: string) => {
     setOpenNodes((prev) => ({ ...prev, [nodeId]: !prev[nodeId] }));
   }, []);
 
-  const handleSelectNode = useCallback((nodeId, node) => {
-    if (node?.isConceptualRoot) {
-      setSelectedAccountId(null);
-      return;
-    }
-    setSelectedAccountId(nodeId);
-    console.log(
-      "JournalModal: Single Click - Selected Account Node ID:",
-      nodeId
-    );
-  }, []);
+  const handleSelectNode = useCallback(
+    (nodeId: string, node?: AccountNodeData) => {
+      if ((node as any)?.isConceptualRoot) {
+        setSelectedAccountId(null);
+        return;
+      }
+      setSelectedAccountId(nodeId);
+    },
+    []
+  );
 
   const handleDoubleClickNode = useCallback(
-    (nodeId, nodeIsConceptualRoot, nodeIsActualL1, node) => {
-      // Pass the full node object
-      console.log(
-        "JournalModal: Double Click on Node ID:",
-        nodeId,
-        "Is Linking:",
-        !!onSelectForLinking
-      );
-
+    (
+      nodeId: string,
+      nodeIsConceptualRoot: boolean,
+      nodeIsActualL1: boolean,
+      node: AccountNodeData
+    ) => {
       if (nodeIsConceptualRoot) {
-        // Double-clicking "Show All" / Conceptual Root
-        if (onSelectForLinking) {
-          // In linking mode, double-clicking conceptual root does nothing for selection
-          return;
-        }
-        if (onSetShowRoot) onSetShowRoot(); // For navigation, go to actual root
+        if (onSelectForLinking) return;
+        if (onSetShowRoot) onSetShowRoot();
         onClose();
         return;
       }
 
-      // If a valid node (not conceptual root) is double-clicked
       if (onSelectForLinking) {
-        // In linking mode, a double click is treated like a selection and confirm
         if (node) {
-          // Ensure node object is available
           onSelectForLinking(node);
-          setSelectedAccountId(null); // Reset for next potential selection
-          // Do NOT close the modal, allow multiple selections
+          setSelectedAccountId(null);
         }
-      } else {
-        // In navigation mode, a double click confirms selection and closes
-        if (onConfirmSelection) {
-          onConfirmSelection(nodeId);
-        }
+      } else if (onConfirmSelection) {
+        onConfirmSelection(nodeId);
         onClose();
       }
     },
     [onSetShowRoot, onConfirmSelection, onClose, onSelectForLinking]
   );
 
-  // New handler for the main action button
   const handleConfirmOrAddToList = useCallback(() => {
     if (onSelectForLinking) {
       if (selectedAccountId) {
-        // Find the node from the already-fetched hierarchy
-        const actualHierarchy = hierarchy[0]?.isConceptualRoot
-          ? hierarchy[0].children
-          : hierarchy;
-        const selectedNode = findNodeById(actualHierarchy, selectedAccountId); // Keep using findNodeById here is okay
-
-        if (selectedNode && !selectedNode.isConceptualRoot) {
-          onSelectForLinking(selectedNode);
-          setSelectedAccountId(null);
-          // Don't close modal here, parent decides
-          return;
-        } else {
-          // Selected item was conceptual root or not found (should be prevented by handleSelectNode)
-          alert("Please select a valid journal account.");
-          return; // Prevent further action
-        }
-      } else {
-        // `onSelectForLinking` is active, but no item is currently single-clicked selected.
-        // The "Add/Use Selected Journal" button might be disabled, or we can alert.
-        alert(
-          "Please click on a journal account in the list first to select it."
-        );
-        return; // Prevent further action
-      }
-    }
-
-    // Scenario 2: Navigation mode (`onSelectForLinking` is NOT provided)
-    // This button acts as "Confirm Selection" for navigation.
-    if (onConfirmSelection) {
-      if (selectedAccountId) {
-        // If a specific node was single-clicked, confirm that one.
-        const actualHierarchy = hierarchy[0]?.isConceptualRoot
+        const actualHierarchy = (hierarchy[0] as any)?.isConceptualRoot
           ? hierarchy[0].children
           : hierarchy;
         const selectedNode = findNodeById(
           actualHierarchy || [],
           selectedAccountId
         );
-        if (selectedNode && !selectedNode.isConceptualRoot) {
-          onConfirmSelection(selectedAccountId, null); // Second arg for childToSelectInL2, null here
+
+        if (selectedNode && !(selectedNode as any).isConceptualRoot) {
+          onSelectForLinking(selectedNode);
+          setSelectedAccountId(null);
+          return;
         } else {
-          // Fallback or if conceptual root was somehow selected for navigation (unlikely path)
-          // Decide what ROOT_JOURNAL_ID means in your context if it's not part of hierarchyData
-          // For safety, confirm the selectedTopLevelJournalId from journalManager if no specific node chosen
-          // However, onConfirmSelection typically expects a node ID.
-          // If `page.tsx` passes ROOT_JOURNAL_ID, that's what it'll use.
-          onConfirmSelection(ROOT_JOURNAL_ID, null); // Default to root if no valid selection
+          alert("Please select a valid journal account.");
+          return;
         }
       } else {
-        // No specific node single-clicked, confirm the "current view" or root.
-        // The parent component (page.tsx's journalManager) usually handles what this means.
-        // Often, it means confirming the current top-level selection or ROOT_JOURNAL_ID.
-        onConfirmSelection(ROOT_JOURNAL_ID, null); // Default to root or current top-level view
+        alert(
+          "Please click on a journal account in the list first to select it."
+        );
+        return;
       }
     }
-    onClose(); // Close the modal in navigation mode after confirming
+
+    if (onConfirmSelection) {
+      if (selectedAccountId) {
+        const actualHierarchy = (hierarchy[0] as any)?.isConceptualRoot
+          ? hierarchy[0].children
+          : hierarchy;
+        const selectedNode = findNodeById(
+          actualHierarchy || [],
+          selectedAccountId
+        );
+        if (selectedNode && !(selectedNode as any).isConceptualRoot) {
+          onConfirmSelection(selectedAccountId, null);
+        } else {
+          onConfirmSelection(ROOT_JOURNAL_ID, null);
+        }
+      } else {
+        onConfirmSelection(ROOT_JOURNAL_ID, null);
+      }
+    }
+    onClose();
   }, [
     selectedAccountId,
     onSelectForLinking,
     onConfirmSelection,
     onClose,
     hierarchy,
-    // ROOT_JOURNAL_ID, // If used as a fallback
   ]);
 
   if (!isOpen) return null;
-  console.log(
-    "[JournalModal] Rendering because isOpen is true. Hierarchy length:",
-    hierarchy?.length
-  ); // <<< ADD LOG
 
   return (
     <motion.div
@@ -178,10 +166,11 @@ function JournalModal({
       animate="open"
       exit="closed"
       variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
+      style={zIndex ? { zIndex } : {}}
       transition={{ duration: 0.2 }}
     >
       <motion.div
-        className={`${baseStyles.modalContent} ${styles.journalModalContentSizing}`} // Added specific sizing class
+        className={`${baseStyles.modalContent} ${styles.journalModalContentSizing}`}
         onClick={(e) => e.stopPropagation()}
         key="journal-modal-content"
         initial={{ opacity: 0, scale: 0.95, y: "2%" }}
@@ -197,7 +186,6 @@ function JournalModal({
           ×
         </button>
         <h2 className={baseStyles.modalTitle}>
-          {/* Use custom title if provided, else default based on mode */}
           {modalTitle
             ? modalTitle
             : onSelectForLinking
@@ -211,31 +199,21 @@ function JournalModal({
         {!isLoading && (
           <div className={styles.accountHierarchyContainer}>
             {hierarchy.length > 0 ? (
-              hierarchy.map(
-                (
-                  conceptualRootNode // Assumes hierarchy[0] is conceptual root
-                ) => (
-                  <AccountNode
-                    key={conceptualRootNode.id}
-                    node={conceptualRootNode}
-                    level={0}
-                    openNodes={openNodes}
-                    toggleNode={toggleNode}
-                    selectedAccountId={selectedAccountId}
-                    onSelectNode={(nodeId, nodeObj) =>
-                      handleSelectNode(nodeId, nodeObj)
-                    } // Pass full node
-                    onDoubleClickNode={(nodeId, isConceptual, isL1, nodeObj) =>
-                      handleDoubleClickNode(nodeId, isConceptual, isL1, nodeObj)
-                    } // Pass full node
-                    onTriggerAddChildToNode={onTriggerAddChild}
-                    onDeleteNode={onDeleteAccount}
-                    conceptualRootId={conceptualRootId}
-                    // Pass onSelectForLinking to AccountNode if it needs to change its behavior/appearance in linking mode
-                    // isLinkingMode={!!onSelectForLinking}
-                  />
-                )
-              )
+              hierarchy.map((conceptualRootNode) => (
+                <AccountNode
+                  key={conceptualRootNode.id}
+                  node={conceptualRootNode}
+                  level={0}
+                  openNodes={openNodes}
+                  toggleNode={toggleNode}
+                  selectedAccountId={selectedAccountId}
+                  onSelectNode={handleSelectNode}
+                  onDoubleClickNode={handleDoubleClickNode}
+                  onTriggerAddChildToNode={onTriggerAddChild}
+                  onDeleteNode={onDeleteAccount}
+                  conceptualRootId={conceptualRootId}
+                />
+              ))
             ) : (
               <p className={styles.noAccountsMessage}>
                 No accounts to display.
@@ -244,15 +222,14 @@ function JournalModal({
           </div>
         )}
 
-        {/* Action Buttons Area */}
         {!isLoading && (
           <div className={baseStyles.modalActions}>
             <button
               type="button"
-              onClick={onClose} // This button now consistently means "Cancel" or "Done with this modal view"
+              onClick={onClose}
               className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
             >
-              {onSelectForLinking ? "Done Selecting" : "Cancel"}
+              {onSelectForLinking ? "Done" : "Cancel"}
             </button>
             <button
               type="button"

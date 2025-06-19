@@ -342,11 +342,14 @@ export const JournalSliderController = forwardRef<
             : "Manage & Select Journals"
         }
         onConfirmSelection={
-          isLinkingModalOpen
+          isLinkingModalOpen || isGpgContextModalOpen
             ? undefined
-            : isGpgContextModalOpen
-            ? handleGpgContextJournalSelected
-            : journalManager.handleSelectTopLevelJournal
+            : (nodeId: string, childToSelectInL2?: string) =>
+                journalManager.handleSelectTopLevelJournal(
+                  nodeId,
+                  undefined,
+                  childToSelectInL2
+                )
         }
         onSetShowRoot={
           isLinkingModalOpen || isGpgContextModalOpen
