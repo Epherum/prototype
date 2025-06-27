@@ -34,6 +34,7 @@ interface JournalHierarchySliderProps {
   isRootView?: boolean;
   activeFilters: ActivePartnerFilters;
   onToggleFilter: (status: PartnerGoodFilterStatus) => void;
+  isLocked?: boolean;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
@@ -53,6 +54,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   isRootView,
   activeFilters,
   onToggleFilter,
+  isLocked,
 }) => {
   const l2ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const l2ClickCountRef = useRef<number>(0);

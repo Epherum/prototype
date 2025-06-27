@@ -1,110 +1,109 @@
-// src/app/api/partners/[partnerId]/goods-via-jpgl/route.ts
+//src/app/api/partners/[id]/goods-via-jpgl/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import jpgLinkService from "@/app/services/journalPartnerGoodLinkService"; // Ensure path is correct
-import goodsService from "@/app/services/goodsService"; // Ensure path is correct & service exists
-import prisma from "@/app/utils/prisma"; // Assuming direct Prisma client usage here
-import { parseBigIntParam, jsonBigIntReplacer } from "@/app/utils/jsonBigInt"; // Ensure path is correct
-import type { Good as ClientGood } from "@/lib/types"; // To map Prisma Good to ClientGood
+import { parseBigIntParam, jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
+import prisma from "@/app/utils/prisma";
 
 export async function GET(
-  _request: NextRequest,
-  // Corrected typing for params as a Promise for dynamic route segments
-  { params: paramsPromise }: { params: Promise<{ partnerId: string }> }
+  request: NextRequest,
+  { params }: { params: { id: string } } // Corrected to use 'id'
 ) {
-  const resolvedParams = await paramsPromise;
-  const partnerIdStr = resolvedParams.partnerId;
+  const partnerIdStr = params.id; // Corrected to use 'id'
+
+  const { searchParams } = new URL(request.url);
+  const journalId = searchParams.get("journalId"); // Get the string value
 
   console.log(
-    `API GET /api/partners/${partnerIdStr}/goods-via-jpgl: Request received.`
+    `[API /goods-via-jpgl] Received request for PartnerID: ${partnerIdStr}, JournalID: '${journalId}'`
   );
 
-  const partnerIdBigInt = parseBigIntParam(partnerIdStr, "partner ID");
+  if (!journalId) {
+    return NextResponse.json(
+      { message: "Missing required 'journalId' query parameter." },
+      { status: 400 }
+    );
+  }
 
+  // --- REVERTING THE PREVIOUS FIX ---
+  // The Prisma error clearly states it expects a String for journalId.
+  // We will no longer parse it to an Int.
+  // The 'journalId' variable from searchParams is already a string, which is correct.
+
+  const partnerIdBigInt = parseBigIntParam(partnerIdStr, "partnerId");
   if (partnerIdBigInt === null) {
     return NextResponse.json(
-      { message: "Invalid Partner ID format." }, // More specific message
+      { message: "Invalid Partner ID format." },
       { status: 400 }
     );
   }
 
   try {
-    // Step 1: Get good IDs linked to this partner via any JournalPartnerGoodLink
-    const goodIds = await jpgLinkService.getGoodIdsForPartner(partnerIdBigInt);
+    const journalPartnerLink = await prisma.journalPartnerLink.findFirst({
+      where: {
+        partnerId: partnerIdBigInt,
+        journalId: journalId, // --- USE THE ORIGINAL STRING VALUE ---
+      },
+      select: {
+        id: true,
+      },
+    });
 
-    if (!goodIds || goodIds.length === 0) {
-      // Return structure consistent with PaginatedGoodsResponse (empty)
+    if (!journalPartnerLink) {
+      console.log(
+        `[API /goods-via-jpgl] Could not find a JournalPartnerLink for partner ${partnerIdStr} and journal ${journalId}. Returning empty array.`
+      );
+      // This is a valid state, not an error. It means no goods are linked in this specific context.
       return new NextResponse(
         JSON.stringify({ data: [], total: 0 }, jsonBigIntReplacer),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        }
+        { status: 200, headers: { "Content-Type": "application/json" } }
       );
     }
 
-    // Step 2: Fetch full details for these good IDs
-    // Assuming goodsService.getAllGoods returns an object like { data: GoodsAndService[], total: number }
-    // or directly fetches based on IDs and you construct the paginated-like response.
-    // For clarity, let's assume it fetches just the goods matching the IDs.
-    const goodsFromService = await prisma.goodsAndService.findMany({
-      // Or use your goodsService.getGoodsByIds(goodIds)
-      where: { id: { in: goodIds } },
-      include: {
-        // Include relations needed for the ClientGood type
-        taxCode: true,
-        unitOfMeasure: true,
+    console.log(
+      `[API /goods-via-jpgl] Found journalPartnerLink with ID: ${journalPartnerLink.id}`
+    );
+
+    const linksWithGoods = await prisma.journalPartnerGoodLink.findMany({
+      where: {
+        journalPartnerLinkId: journalPartnerLink.id,
       },
-      orderBy: { label: "asc" },
+      include: {
+        good: {
+          include: {
+            taxCode: true,
+            unitOfMeasure: true,
+          },
+        },
+      },
+      orderBy: {
+        good: {
+          label: "asc",
+        },
+      },
     });
 
-    // Map Prisma GoodsAndService to ClientGood type
-    const clientFriendlyGoods: ClientGood[] = goodsFromService.map((g) => ({
-      id: g.id.toString(),
-      label: g.label,
-      referenceCode: g.referenceCode,
-      barcode: g.barcode,
-      taxCodeId: g.taxCodeId,
-      typeCode: g.typeCode,
-      description: g.description,
-      unitCodeId: g.unitCodeId,
-      stockTrackingMethod: g.stockTrackingMethod,
-      packagingTypeCode: g.packagingTypeCode,
-      photoUrl: g.photoUrl,
-      additionalDetails: g.additionalDetails, // Consider if this needs specific parsing/typing
-      price: g.price ? parseFloat(g.price.toString()) : undefined, // Assuming price is Decimal
-      taxCode: g.taxCode
-        ? {
-            id: g.taxCode.id,
-            code: g.taxCode.code,
-            rate: parseFloat(g.taxCode.rate.toString()),
-            description: g.taxCode.description,
-          }
-        : null,
-      unitOfMeasure: g.unitOfMeasure
-        ? {
-            id: g.unitOfMeasure.id,
-            code: g.unitOfMeasure.code,
-            name: g.unitOfMeasure.name,
-          }
-        : null,
-      // For DynamicSlider compatibility if needed
-      name: g.label,
-      code: g.referenceCode || g.id.toString(),
-      unit_code: g.unitOfMeasure?.code || undefined,
-    }));
+    const clientFriendlyGoods = linksWithGoods.map((link) => {
+      const goodWithJpglId = {
+        ...link.good,
+        jpqLinkId: link.id.toString(),
+      };
 
-    // Construct the PaginatedGoodsResponse-like structure
+      return {
+        ...goodWithJpglId,
+        id: link.good.id.toString(),
+        label: link.good.label,
+        name: link.good.label,
+        code: link.good.referenceCode || link.good.id.toString(),
+      };
+    });
+
     const responsePayload = {
       data: clientFriendlyGoods,
-      total: clientFriendlyGoods.length, // Or totalCount if your service provides it differently
+      total: clientFriendlyGoods.length,
     };
 
     return new NextResponse(
       JSON.stringify(responsePayload, jsonBigIntReplacer),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { "Content-Type": "application/json" } }
     );
   } catch (error) {
     const e = error as Error;
@@ -114,7 +113,7 @@ export async function GET(
     );
     return NextResponse.json(
       {
-        message: "Could not fetch goods for partner via JPGL.",
+        message: "Could not fetch goods for partner in journal context.",
         error: e.message,
       },
       { status: 500 }

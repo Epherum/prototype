@@ -1,5 +1,3 @@
-//src/app/page.tsx
-//
 "use client";
 
 // React & Next.js Core
@@ -34,11 +32,10 @@ import {
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
 import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
 
-// Cross-cutting Hooks
+// Cross-cutting Hooks & Manager Hooks
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
-
-// Manager Hooks
 import { useJournalManager } from "@/features/journals/useJournalManager";
+import { useDocumentManager } from "@/features/documents/useDocumentManager";
 
 // Global Modals
 import LinkGoodToPartnersViaJournalModal from "@/features/linking/components/LinkGoodToPartnersViaJournalModal";
@@ -50,27 +47,23 @@ import type { AccountNodeData } from "@/lib/types";
 export default function Home() {
   useAuthStoreInitializer();
 
-  // --- REFS FOR CONTROLLERS ---
   const usersControllerRef = useRef<UsersControllerRef>(null);
   const journalControllerRef = useRef<JournalSliderControllerRef>(null);
 
-  // --- APP STATE ---
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
   const moveSlider = useAppStore((state) => state.moveSlider);
   const toggleSliderVisibility = useAppStore(
     (state) => state.toggleSliderVisibility
   );
-  const isDocumentCreationMode = useAppStore(
-    (state) => state.ui.isCreatingDocument
-  );
 
-  // --- MANAGER HOOKS ---
-  // This is the SINGLE, authoritative instance of the journal manager hook.
+  // The single, authoritative instance for all document logic.
+  const docManager = useDocumentManager();
+  const isDocumentCreationMode = docManager.isCreating;
+
   const journalManager = useJournalManager();
   const jpqlLinking = useJournalPartnerGoodLinking();
 
-  // --- CALLBACKS for cross-feature communication ---
   const openJournalSelectorForLinking = useCallback(
     (callback: (node: AccountNodeData) => void) => {
       journalControllerRef.current?.openJournalSelector(callback);
@@ -82,7 +75,6 @@ export default function Home() {
     journalControllerRef.current?.openJournalSelectorForGPG();
   }, []);
 
-  // --- DERIVED STATE ---
   const visibleSliderOrder = useMemo(
     () => sliderOrder.filter((id) => visibility[id]),
     [sliderOrder, visibility]
@@ -92,136 +84,151 @@ export default function Home() {
     [SLIDER_TYPES.JOURNAL]: { title: "Journal" },
     [SLIDER_TYPES.PARTNER]: { title: "Partner" },
     [SLIDER_TYPES.GOODS]: { title: "Goods" },
-    [SLIDER_TYPES.PROJECT]: { title: "Project (Future)" },
-    [SLIDER_TYPES.DOCUMENT]: { title: "Document (Future)" },
+    [SLIDER_TYPES.DOCUMENT]: { title: "Document" },
   };
 
   return (
-    // Pass the single journalManager instance to the DocumentController
-    <DocumentController journalManager={journalManager}>
-      <div className={styles.pageContainer}>
-        <UsersController ref={usersControllerRef} />
+    <div className={styles.pageContainer}>
+      <UsersController ref={usersControllerRef} />
 
-        <h1 className={styles.title}>ERP Application Interface</h1>
-        <UserAuthDisplay
-          onOpenCreateUserModal={() => usersControllerRef.current?.open()}
-        />
-        <StickyHeaderControls
-          visibility={visibility}
-          onToggleVisibility={toggleSliderVisibility}
-          allSliderIds={INITIAL_ORDER}
-          visibleSliderOrder={visibleSliderOrder}
-          sliderConfigs={sliderConfigs}
-        />
-        <LayoutGroup id="main-sliders-layout-group">
-          <div
-            className={`${styles.slidersArea} ${
-              isDocumentCreationMode ? styles.slidersAreaWithToolbar : ""
-            }`}
-          >
-            <AnimatePresence initial={false}>
-              {sliderOrder.map((sliderId) => {
-                if (!visibility[sliderId]) return null;
+      <h1 className={styles.title}>ERP Application Interface</h1>
+      <UserAuthDisplay
+        onOpenCreateUserModal={() => usersControllerRef.current?.open()}
+      />
+      <StickyHeaderControls
+        visibility={visibility}
+        onToggleVisibility={toggleSliderVisibility}
+        allSliderIds={INITIAL_ORDER}
+        visibleSliderOrder={visibleSliderOrder}
+        sliderConfigs={sliderConfigs}
+      />
+      <LayoutGroup id="main-sliders-layout-group">
+        <div
+          className={`${styles.slidersArea} ${
+            isDocumentCreationMode ? styles.slidersAreaWithToolbar : ""
+          }`}
+        >
+          <AnimatePresence initial={false}>
+            {sliderOrder.map((sliderId) => {
+              if (!visibility[sliderId]) return null;
 
-                const currentVisibleIndex =
-                  visibleSliderOrder.indexOf(sliderId);
-                const layoutControlProps = {
-                  canMoveUp: currentVisibleIndex > 0,
-                  canMoveDown:
-                    currentVisibleIndex < visibleSliderOrder.length - 1,
-                  onMoveUp: () => moveSlider(sliderId, "up"),
-                  onMoveDown: () => moveSlider(sliderId, "down"),
-                  isMoveDisabled: isDocumentCreationMode,
-                };
+              const currentVisibleIndex = visibleSliderOrder.indexOf(sliderId);
+              const isMoveDisabledForThisSlider = isDocumentCreationMode;
 
-                return (
-                  <motion.div
-                    key={sliderId}
-                    layoutId={sliderId}
-                    layout
-                    style={{ order: currentVisibleIndex }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{
-                      duration: 0.3,
-                      layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
-                    }}
-                    className={styles.sliderWrapper}
-                  >
-                    {sliderId === SLIDER_TYPES.JOURNAL && (
-                      <JournalSliderController
-                        ref={journalControllerRef}
-                        {...layoutControlProps}
-                      />
-                    )}
+              const layoutControlProps = {
+                canMoveUp: currentVisibleIndex > 0,
+                canMoveDown:
+                  currentVisibleIndex < visibleSliderOrder.length - 1,
+                onMoveUp: () => moveSlider(sliderId, "up"),
+                onMoveDown: () => moveSlider(sliderId, "down"),
+                isMoveDisabled: isMoveDisabledForThisSlider,
+              };
+              return (
+                <motion.div
+                  key={sliderId}
+                  layoutId={sliderId}
+                  layout
+                  style={{ order: currentVisibleIndex }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{
+                    duration: 0.3,
+                    layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
+                  }}
+                  className={styles.sliderWrapper}
+                >
+                  {sliderId === SLIDER_TYPES.JOURNAL && (
+                    <JournalSliderController
+                      ref={journalControllerRef}
+                      {...layoutControlProps}
+                    />
+                  )}
 
-                    {sliderId === SLIDER_TYPES.PARTNER && (
-                      <PartnerSliderController
-                        {...layoutControlProps}
-                        onOpenJournalSelector={openJournalSelectorForLinking}
-                        fullJournalHierarchy={journalManager.hierarchyData}
-                      />
-                    )}
+                  {sliderId === SLIDER_TYPES.PARTNER && (
+                    <PartnerSliderController
+                      {...layoutControlProps}
+                      onOpenJournalSelector={openJournalSelectorForLinking}
+                      fullJournalHierarchy={journalManager.hierarchyData}
+                    />
+                  )}
 
-                    {sliderId === SLIDER_TYPES.GOODS && (
-                      <GoodsSliderController
-                        {...layoutControlProps}
-                        onOpenJournalSelectorForLinking={
-                          openJournalSelectorForLinking
-                        }
-                        onOpenJournalSelectorForGPGContext={
-                          openJournalSelectorForGPGContext
-                        }
-                        fullJournalHierarchy={journalManager.hierarchyData}
-                        onOpenLinkGoodToPartnersModal={
-                          jpqlLinking.openLinkModal
-                        }
-                        onOpenUnlinkGoodFromPartnersModal={
-                          jpqlLinking.openUnlinkModal
-                        }
-                      />
-                    )}
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        </LayoutGroup>
+                  {sliderId === SLIDER_TYPES.GOODS && (
+                    <GoodsSliderController
+                      {...layoutControlProps}
+                      onToggleGoodForDocument={docManager.handleAddOrRemoveGood}
+                      isGoodInDocument={docManager.isGoodInDocument}
+                      documentLines={docManager.lines}
+                      onUpdateLineForDocument={docManager.handleUpdateLine}
+                      onOpenJournalSelectorForLinking={
+                        openJournalSelectorForLinking
+                      }
+                      onOpenJournalSelectorForGPGContext={
+                        openJournalSelectorForGPGContext
+                      }
+                      fullJournalHierarchy={journalManager.hierarchyData}
+                      onOpenLinkGoodToPartnersModal={jpqlLinking.openLinkModal}
+                      onOpenUnlinkGoodFromPartnersModal={
+                        jpqlLinking.openUnlinkModal
+                      }
+                    />
+                  )}
 
-        <AnimatePresence>
-          {jpqlLinking.isLinkModalOpen && (
-            <LinkGoodToPartnersViaJournalModal
-              isOpen={jpqlLinking.isLinkModalOpen}
-              onClose={jpqlLinking.closeLinkModal}
-              onSubmitLinks={jpqlLinking.submitLinks}
-              goodToLink={jpqlLinking.goodForJpgLinking}
-              targetJournal={jpqlLinking.targetJournalForJpgLinking}
-              availablePartners={jpqlLinking.partnersForJpgModal}
-              isSubmitting={
-                jpqlLinking.isSubmittingLinkJPGL ||
-                jpqlLinking.isLoadingPartnersForJpgModal
-              }
-            />
-          )}
+                  {sliderId === SLIDER_TYPES.DOCUMENT && (
+                    <DocumentController
+                      {...layoutControlProps}
+                      isCreating={docManager.isCreating}
+                      canCreateDocument={docManager.canCreateDocument}
+                      lines={docManager.lines}
+                      documentsForSlider={docManager.documentsForSlider}
+                      isLoading={docManager.documentsQuery.isLoading}
+                      isFetching={docManager.documentsQuery.isFetching}
+                      isError={docManager.documentsQuery.isError}
+                      error={docManager.documentsQuery.error}
+                      handleStartCreation={docManager.handleStartCreation}
+                      handleCancelCreation={docManager.handleCancelCreation}
+                      handleSubmit={docManager.handleSubmit}
+                    />
+                  )}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+      </LayoutGroup>
 
-          {jpqlLinking.isUnlinkModalOpen && (
-            <UnlinkGoodFromPartnersViaJournalModal
-              isOpen={jpqlLinking.isUnlinkModalOpen}
-              onClose={jpqlLinking.closeUnlinkModal}
-              onConfirmUnlink={jpqlLinking.submitUnlink}
-              goodToUnlink={jpqlLinking.goodForUnlinkingContext}
-              contextJournal={jpqlLinking.journalForUnlinkingContext}
-              existingLinks={jpqlLinking.existingJpgLinksForModal}
-              isSubmitting={
-                jpqlLinking.isSubmittingUnlinkJPGL ||
-                jpqlLinking.isLoadingJpgLinksForModal
-              }
-              isLoadingLinks={jpqlLinking.isLoadingJpgLinksForModal}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-    </DocumentController>
+      {/* Global linking modals */}
+      <AnimatePresence>
+        {jpqlLinking.isLinkModalOpen && (
+          <LinkGoodToPartnersViaJournalModal
+            isOpen={jpqlLinking.isLinkModalOpen}
+            onClose={jpqlLinking.closeLinkModal}
+            onSubmitLinks={jpqlLinking.submitLinks}
+            goodToLink={jpqlLinking.goodForJpgLinking}
+            targetJournal={jpqlLinking.targetJournalForJpgLinking}
+            availablePartners={jpqlLinking.partnersForJpgModal}
+            isSubmitting={
+              jpqlLinking.isSubmittingLinkJPGL ||
+              jpqlLinking.isLoadingPartnersForJpgModal
+            }
+          />
+        )}
+        {jpqlLinking.isUnlinkModalOpen && (
+          <UnlinkGoodFromPartnersViaJournalModal
+            isOpen={jpqlLinking.isUnlinkModalOpen}
+            onClose={jpqlLinking.closeUnlinkModal}
+            onConfirmUnlink={jpqlLinking.submitUnlink}
+            goodToUnlink={jpqlLinking.goodForUnlinkingContext}
+            contextJournal={jpqlLinking.journalForUnlinkingContext}
+            existingLinks={jpqlLinking.existingJpgLinksForModal}
+            isSubmitting={
+              jpqlLinking.isSubmittingUnlinkJPGL ||
+              jpqlLinking.isLoadingJpgLinksForModal
+            }
+            isLoadingLinks={jpqlLinking.isLoadingJpgLinksForModal}
+          />
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

@@ -50,9 +50,15 @@ export const journalGoodLinkKeys = {
 export const jpgLinkKeys = {
   all: ["jpgLinks"] as const,
   lists: () => [...jpgLinkKeys.all, "list"] as const,
+  // --- ADD THIS NEW KEY ---
+  listForDocumentContext: (
+    partnerId: string | null,
+    journalId: string | null
+  ) =>
+    [...jpgLinkKeys.lists(), "forDocument", { partnerId, journalId }] as const,
+  // ---
   listForContext: (goodId: string, journalId: string) =>
     [...jpgLinkKeys.lists(), "byContext", goodId, journalId] as const,
-  // Key for the special query in useJournalPartnerGoodLinking
   partnersForJpgModal: (journalId: string | null) =>
     ["partnersForJpgModal", journalId] as const,
 };
@@ -72,4 +78,16 @@ export const roleKeys = {
 // Keys for Permissions
 export const permissionKeys = {
   all: ["allPermissions"] as const,
+};
+
+// Add this to the end of the file, before the closing brace if any.
+
+export const documentKeys = {
+  all: ["documents"] as const,
+  lists: () => [...documentKeys.all, "list"] as const,
+  list: (partnerId: string | null) =>
+    [...documentKeys.lists(), { partnerId }] as const,
+  details: () => [...documentKeys.all, "detail"] as const,
+  detail: (id: string | null | undefined) =>
+    [...documentKeys.details(), id] as const,
 };

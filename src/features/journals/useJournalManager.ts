@@ -84,6 +84,69 @@ export const useJournalManager = () => {
     return topLevelNode ? topLevelNode.children || [] : [];
   }, [selectedTopLevelJournalId, hierarchyData, restrictedJournalId]);
 
+  const selectedJournalId = useMemo((): string | null => {
+    // If the journal slider is not primary, the flat selection is the only possibility.
+    if (!isJournalSliderPrimary) {
+      return selectedFlatJournalId;
+    }
+
+    // --- HIERARCHICAL SELECTION LOGIC ---
+    // The user has selected exactly one L3 item. This is the most specific context.
+    if (
+      selectedLevel3JournalIds.length === 1 &&
+      selectedLevel2JournalIds.length === 0
+    ) {
+      return selectedLevel3JournalIds[0];
+    }
+
+    // The user has selected exactly one L2 item and no L3 items.
+    if (
+      selectedLevel2JournalIds.length === 1 &&
+      selectedLevel3JournalIds.length === 0
+    ) {
+      return selectedLevel2JournalIds[0];
+    }
+
+    // The user has drilled down into an L1 item and has not selected any children.
+    // This is only a valid single selection if they are NOT at the root.
+    if (
+      selectedLevel2JournalIds.length === 0 &&
+      selectedLevel3JournalIds.length === 0
+    ) {
+      const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+      if (
+        selectedTopLevelJournalId &&
+        selectedTopLevelJournalId !== effectiveRootId
+      ) {
+        return selectedTopLevelJournalId;
+      }
+    }
+
+    // In all other cases (multiple selections, no selection), there is no single context.
+    return null;
+  }, [
+    isJournalSliderPrimary,
+    selectedFlatJournalId,
+    selectedLevel2JournalIds,
+    selectedLevel3JournalIds,
+    selectedTopLevelJournalId,
+    restrictedJournalId,
+  ]);
+
+  const isTerminal = useMemo((): boolean => {
+    // If no single journal is selected, it can't be terminal.
+    if (!selectedJournalId) {
+      return false;
+    }
+
+    // Find the selected node in the full hierarchy.
+    const node = findNodeById(hierarchyData, selectedJournalId);
+
+    // A node is terminal if it exists and either has no `children` property
+    // or its `children` array is empty.
+    return !!node && (!node.children || node.children.length === 0);
+  }, [selectedJournalId, hierarchyData]);
+
   const effectiveSelectedJournalIds = useMemo(() => {
     if (!isJournalSliderPrimary) {
       return selectedFlatJournalId ? [selectedFlatJournalId] : [];
@@ -375,5 +438,7 @@ export const useJournalManager = () => {
     resetJournalSelections,
     setSelectedFlatJournalId,
     handleToggleJournalRootFilter,
+    selectedJournalId, // The ID of the single selected journal, or null.
+    isTerminal,
   };
 };

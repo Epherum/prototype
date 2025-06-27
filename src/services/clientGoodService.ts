@@ -229,11 +229,67 @@ export async function fetchGoodsLinkedToPartnerViaJPGL(
     }));
     throw new Error(errorData.message || "Failed to fetch goods");
   }
+
   const result: PaginatedGoodsResponse = await response.json(); // Assuming it returns PaginatedGoodsResponse
+
+  console.log(`[clientGoodService] Parsed response data:`, result.data);
+
   return result.data.map((g) => ({
     ...g,
     id: String(g.id),
     taxCodeId: g.taxCodeId ?? null,
     unitCodeId: g.unitCodeId ?? null,
   }));
+}
+
+/**
+ * Fetches goods specifically for the document creation context by hitting the
+ * endpoint that is guaranteed to return the `jpqLinkId`.
+ * @param partnerId The ID of the selected partner.
+ * @param journalId The ID of the selected journal.
+ * @returns A promise that resolves to a paginated list of goods, annotated with jpqLinkId.
+ */
+/**
+ */
+export async function fetchGoodsForDocumentContext(
+  partnerId: string,
+  journalId: string
+): Promise<PaginatedGoodsResponse> {
+  // --- BULLETPROOF GUARD AND LOGGING ---
+  console.log(
+    `[clientGoodService] fetchGoodsForDocumentContext called with: partnerId='${partnerId}' (type: ${typeof partnerId}), journalId='${journalId}'`
+  );
+
+  // This is the most important guard. It prevents the API call if the data is invalid.
+  if (!partnerId || partnerId === "undefined" || !journalId) {
+    const errorMessage = `[clientGoodService] Invalid arguments provided. Aborting fetch. PartnerID: ${partnerId}, JournalID: ${journalId}`;
+    console.error(errorMessage);
+    // Throw an error to stop the React Query from proceeding.
+    throw new Error(errorMessage);
+  }
+
+  // Construct the final URL.
+  const apiUrl = `/api/partners/${partnerId}/goods-via-jpgl?journalId=${journalId}`;
+
+  console.log(`[clientGoodService] Making fetch request to: ${apiUrl}`);
+  // --- END BULLETPROOF GUARD ---
+
+  const response = await fetch(apiUrl); // Use the constructed apiUrl variable
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(
+      errorData.message || `Failed to fetch goods for document context`
+    );
+  }
+
+  const result: PaginatedGoodsResponse = await response.json();
+  result.data = result.data.map((good) => ({
+    ...good,
+    id: String(good.id),
+    // The backend is now responsible for adding `jpqLinkId` to each good object.
+  }));
+  return result;
 }

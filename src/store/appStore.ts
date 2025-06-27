@@ -37,10 +37,16 @@ interface SelectionsSlice {
   gpgContextJournalId: string | null;
 }
 
+interface DocumentCreationSlice {
+  isCreating: boolean;
+  lockedPartnerId: string | null; // Using string to match BigInt string representation
+  lockedJournalId: string | null; // The journal context for the partner link
+}
+
 interface UiSlice {
   sliderOrder: SliderType[];
   visibility: SliderVisibility;
-  isCreatingDocument: boolean;
+  documentCreationState: DocumentCreationSlice; // NEW
   accordionState: AccordionState;
 }
 
@@ -63,8 +69,8 @@ interface AppState {
     value: any
   ) => void;
   resetSelections: () => void;
-  enterDocumentCreationMode: () => void;
-  exitDocumentCreationMode: () => void;
+  startDocumentCreation: (partnerId: string, journalId: string) => void; // NEW
+  cancelDocumentCreation: () => void; // NEW
   toggleAccordion: (sliderId: SliderType) => void;
 }
 
@@ -104,14 +110,20 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [SLIDER_TYPES.PARTNER]: true,
       [SLIDER_TYPES.GOODS]: true,
       [SLIDER_TYPES.PROJECT]: false,
-      [SLIDER_TYPES.DOCUMENT]: false,
+      [SLIDER_TYPES.DOCUMENT]: true,
     },
-    isCreatingDocument: false,
+    documentCreationState: {
+      // NEW
+      isCreating: false,
+      lockedPartnerId: null,
+      lockedJournalId: null,
+    },
     accordionState: {
       [SLIDER_TYPES.PARTNER]: false,
       [SLIDER_TYPES.GOODS]: false,
     },
   },
+
   selections: getInitialSelections(),
 
   // --- Actions Implementation ---
@@ -257,18 +269,46 @@ export const useAppStore = create<AppState>()((set, get) => ({
       selections: getInitialSelections(state.auth.effectiveRestrictedJournalId),
     })),
 
-  enterDocumentCreationMode: () =>
-    set((state) => ({
-      ui: { ...state.ui, isCreatingDocument: true },
-      selections: {
-        ...state.selections,
-        goods: null,
-      },
-    })),
+  startDocumentCreation: (partnerId, journalId) => {
+    // --- THIS IS THE DEFINITIVE FIX & DIAGNOSTIC ---
+    // The store now protects itself from being put into a corrupted state.
+    if (!partnerId || partnerId === "undefined" || !journalId) {
+      console.error(
+        `CRITICAL: startDocumentCreation called with invalid arguments. Aborting state change.`,
+        { partnerId, journalId }
+      );
+      // By returning here, we PREVENT the bad state from ever being set.
+      return;
+    }
 
-  exitDocumentCreationMode: () =>
+    console.log(
+      `[appStore] Starting document creation with lockedPartnerId: ${partnerId}, lockedJournalId: ${journalId}`
+    );
+
     set((state) => ({
-      ui: { ...state.ui, isCreatingDocument: false },
+      ui: {
+        ...state.ui,
+        documentCreationState: {
+          isCreating: true,
+          lockedPartnerId: partnerId,
+          lockedJournalId: journalId,
+        },
+      },
+      // Reset goods selection when starting a new doc
+      selections: { ...state.selections, goods: null },
+    }));
+  },
+
+  cancelDocumentCreation: () =>
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        documentCreationState: {
+          isCreating: false,
+          lockedPartnerId: null,
+          lockedJournalId: null,
+        },
+      },
     })),
 
   toggleAccordion: (sliderId) =>

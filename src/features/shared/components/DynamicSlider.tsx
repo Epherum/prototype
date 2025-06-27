@@ -1,4 +1,3 @@
-// src/features/shared/components/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import {
@@ -10,15 +9,17 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./DynamicSlider.module.css";
 import { SLIDER_TYPES } from "@/lib/constants";
+import type { DocumentLineClientData } from "@/lib/types";
 
 // Import Swiper styles
 import "swiper/css";
 import "swiper/css/navigation";
-import "swiper/css/pagination"; // <-- ADDED THIS LINE
+import "swiper/css/pagination";
 
 interface DynamicSliderItem {
   id: string;
-  name: string;
+  label: string;
+  jpqLinkId?: string;
   code?: string;
   unit_code?: string;
   [key: string]: any;
@@ -43,13 +44,12 @@ interface DynamicSliderProps {
   error?: Error | null;
   isLocked?: boolean;
   isDocumentCreationMode?: boolean;
-  selectedGoodsForDoc?: Array<
-    DynamicSliderItem & { quantity?: number; price?: number }
-  >;
+  documentLines?: DocumentLineClientData[];
   onToggleGoodForDoc?: (item: DynamicSliderItem) => void;
-  onUpdateGoodDetailForDoc?: (
+  isGoodInDocument?: (item: DynamicSliderItem) => boolean;
+  onUpdateLineForDocument?: (
     itemId: string,
-    detail: { quantity?: number; price?: number }
+    detail: { quantity?: number; unitPrice?: number }
   ) => void;
   showContextJournalFilterButton?: boolean;
   onOpenContextJournalFilterModal?: () => void;
@@ -69,9 +69,10 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   isError,
   isLocked,
   isDocumentCreationMode,
-  selectedGoodsForDoc = [],
+  documentLines,
   onToggleGoodForDoc,
-  onUpdateGoodDetailForDoc,
+  isGoodInDocument,
+  onUpdateLineForDocument,
   showContextJournalFilterButton,
   onOpenContextJournalFilterModal,
   gpgContextJournalInfo,
@@ -91,6 +92,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   };
 
   let currentItemForAccordion: DynamicSliderItem | undefined;
+
   if (!isLoading && !isError && data.length > 0) {
     currentItemForAccordion = data.find((item) => item?.id === activeItemId);
     if (
@@ -103,16 +105,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   }
 
   const swiperKey = `${sliderId}-len${data.length}-active${activeItemId}-locked${isLocked}-load${isLoading}-err${isError}-gpgCtx${gpgContextJournalInfo?.id}`;
-
-  const currentGoodInDocument =
-    isDocumentCreationMode &&
-    sliderId === SLIDER_TYPES.GOODS &&
-    activeItemId &&
-    !isLoading &&
-    !isError &&
-    selectedGoodsForDoc
-      ? selectedGoodsForDoc.find((g) => g.id === activeItemId)
-      : null;
 
   return (
     <>
@@ -167,8 +159,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
           spaceBetween={20}
           slidesPerView={1}
           navigation={data.length > 1 && !isLocked}
-          // The pagination prop was already here and configured correctly.
-          // It will now be visible because we imported the CSS.
           pagination={
             data.length > 1 && !isLocked ? { clickable: true } : false
           }
@@ -182,10 +172,9 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
         >
           {data.map((item) => {
             if (!item) return null;
-            const isSelectedForDocument =
-              isDocumentCreationMode &&
-              sliderId === SLIDER_TYPES.GOODS &&
-              selectedGoodsForDoc.some((g) => g.id === item.id);
+            const isSelectedForDocument = isGoodInDocument
+              ? isGoodInDocument(item)
+              : false;
 
             return (
               <SwiperSlide
@@ -196,7 +185,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
               >
                 <div className={styles.slideTextContent}>
                   <span className={styles.slideName}>
-                    {item.name || item.id || "Unnamed Item"}
+                    {item.label || item.id || "Unnamed Item"}
                   </span>
                   {(item.code || item.unit_code) && (
                     <span className={styles.slideSubText}>
@@ -226,10 +215,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
               aria-expanded={isAccordionOpen}
             >
               Details
-              {isDocumentCreationMode &&
-                sliderId === SLIDER_TYPES.GOODS &&
-                currentGoodInDocument &&
-                " (Editing for Doc)"}
               <span
                 className={`${styles.accordionIcon} ${
                   isAccordionOpen ? styles.accordionIconOpen : ""
@@ -253,9 +238,9 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                   className={styles.detailsContentWrapper}
                 >
                   <div className={styles.detailsContent}>
-                    {currentItemForAccordion.name && (
+                    {currentItemForAccordion.label && (
                       <p>
-                        <strong>Name:</strong> {currentItemForAccordion.name}
+                        <strong>Name:</strong> {currentItemForAccordion.label}
                       </p>
                     )}
                     {currentItemForAccordion.id && (
@@ -268,6 +253,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                         if (
                           [
                             "id",
+                            "label",
                             "name",
                             "children",
                             "code",
@@ -293,100 +279,105 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                     {isDocumentCreationMode &&
                       sliderId === SLIDER_TYPES.GOODS &&
                       onToggleGoodForDoc &&
-                      onUpdateGoodDetailForDoc && (
+                      onUpdateLineForDocument && (
                         <div className={styles.documentGoodDetails}>
                           <h4>
                             Document Specifics for{" "}
-                            {currentItemForAccordion.name}:
+                            {currentItemForAccordion.label}:
                           </h4>
                           <button
                             onClick={() =>
                               onToggleGoodForDoc(currentItemForAccordion)
                             }
                             className={`${styles.modalActionButton} ${
-                              currentGoodInDocument
+                              isGoodInDocument &&
+                              isGoodInDocument(currentItemForAccordion)
                                 ? styles.removeButton
                                 : styles.addButton
                             }`}
                           >
-                            {currentGoodInDocument ? (
+                            {isGoodInDocument &&
+                            isGoodInDocument(currentItemForAccordion) ? (
                               <IoTrashBinOutline />
                             ) : (
                               <IoAddCircleOutline />
                             )}
-                            {currentGoodInDocument
+                            {isGoodInDocument &&
+                            isGoodInDocument(currentItemForAccordion)
                               ? "Remove from Document"
                               : "Add to Document"}
                           </button>
-                          {currentGoodInDocument && (
-                            <>
-                              <div className={styles.formGroup}>
-                                <label
-                                  htmlFor={`qty-${currentItemForAccordion.id}`}
-                                >
-                                  Quantity:
-                                </label>
-                                <input
-                                  type="number"
-                                  id={`qty-${currentItemForAccordion.id}`}
-                                  value={currentGoodInDocument.quantity ?? ""}
-                                  onChange={(e) =>
-                                    onUpdateGoodDetailForDoc(
-                                      currentItemForAccordion.id,
-                                      {
-                                        quantity:
-                                          parseFloat(e.target.value) || 0,
-                                      }
-                                    )
-                                  }
-                                  min="0"
-                                  className={styles.formInputSmall}
-                                />
-                              </div>
-                              <div className={styles.formGroup}>
-                                <label
-                                  htmlFor={`price-${currentItemForAccordion.id}`}
-                                >
-                                  Price per unit:
-                                </label>
-                                <input
-                                  type="number"
-                                  id={`price-${currentItemForAccordion.id}`}
-                                  value={currentGoodInDocument.price ?? ""}
-                                  onChange={(e) =>
-                                    onUpdateGoodDetailForDoc(
-                                      currentItemForAccordion.id,
-                                      { price: parseFloat(e.target.value) || 0 }
-                                    )
-                                  }
-                                  min="0"
-                                  step="0.01"
-                                  className={styles.formInputSmall}
-                                />
-                              </div>
-                              <div className={styles.formGroup}>
-                                <label
-                                  htmlFor={`amount-${currentItemForAccordion.id}`}
-                                >
-                                  Total Amount:
-                                </label>
-                                <input
-                                  type="number"
-                                  id={`amount-${currentItemForAccordion.id}`}
-                                  value={
-                                    currentGoodInDocument.quantity != null &&
-                                    currentGoodInDocument.price != null
-                                      ? currentGoodInDocument.quantity *
-                                        currentGoodInDocument.price
-                                      : ""
-                                  }
-                                  readOnly
-                                  disabled
-                                  className={styles.formInputSmall}
-                                />
-                              </div>
-                            </>
-                          )}
+                          {isGoodInDocument &&
+                            isGoodInDocument(currentItemForAccordion) &&
+                            currentItemForAccordion.jpqLinkId && (
+                              <>
+                                <div className={styles.formGroup}>
+                                  <label
+                                    htmlFor={`qty-${currentItemForAccordion.id}`}
+                                  >
+                                    Quantity:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    id={`qty-${currentItemForAccordion.id}`}
+                                    // --- FIX 1: Allow the input to be empty if the value is 0 ---
+                                    value={
+                                      documentLines?.find(
+                                        (l) =>
+                                          l.journalPartnerGoodLinkId ===
+                                          currentItemForAccordion.jpqLinkId
+                                      )?.quantity || ""
+                                    }
+                                    onChange={(e) => {
+                                      // --- FIX 2: If the input is cleared, send 0. Otherwise, send the parsed number. ---
+                                      const value =
+                                        e.target.value === ""
+                                          ? 0
+                                          : parseFloat(e.target.value);
+                                      onUpdateLineForDocument(
+                                        currentItemForAccordion.jpqLinkId!,
+                                        { quantity: value }
+                                      );
+                                    }}
+                                    min="0"
+                                    className={styles.formInputSmall}
+                                  />
+                                </div>
+                                <div className={styles.formGroup}>
+                                  <label
+                                    htmlFor={`price-${currentItemForAccordion.id}`}
+                                  >
+                                    Price per unit:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    id={`price-${currentItemForAccordion.id}`}
+                                    // --- FIX 1: Allow the input to be empty if the value is 0 ---
+                                    value={
+                                      documentLines?.find(
+                                        (l) =>
+                                          l.journalPartnerGoodLinkId ===
+                                          currentItemForAccordion.jpqLinkId
+                                      )?.unitPrice || ""
+                                    }
+                                    onChange={(e) => {
+                                      // --- FIX 2: If the input is cleared, send 0. Otherwise, send the parsed number. ---
+                                      const value =
+                                        e.target.value === ""
+                                          ? 0
+                                          : parseFloat(e.target.value);
+                                      onUpdateLineForDocument(
+                                        currentItemForAccordion.jpqLinkId!,
+                                        { unitPrice: value }
+                                      );
+                                    }}
+                                    min="0"
+                                    step="0.01"
+                                    className={styles.formInputSmall}
+                                  />
+                                </div>
+                              </>
+                            )}
                         </div>
                       )}
                   </div>

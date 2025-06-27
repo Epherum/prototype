@@ -1,4 +1,4 @@
-// src/components/modals/DocumentConfirmationModal.tsx
+// src/features/documents/components/DocumentConfirmationModal.tsx
 import { motion } from "framer-motion";
 
 // Import BOTH style modules

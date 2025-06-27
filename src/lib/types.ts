@@ -115,6 +115,7 @@ export interface Good {
   name?: string;
   code?: string;
   unit_code?: string;
+  jpqLinkId?: string; // BigInt as string. Represents the JournalPartnerGoodLink ID.
 }
 
 export type PaginatedGoodsResponse = { data: Good[]; total: number };
@@ -144,6 +145,11 @@ export interface FetchGoodsParams {
 
   // Common parameter for hierarchical journal selections
   includeJournalChildren?: boolean;
+
+  context?: {
+    partnerId: string;
+    journalId: string;
+  };
 }
 
 export type CreatePartnerClientData = {
@@ -263,4 +269,47 @@ export interface JournalPartnerGoodLinkClient {
 export interface RoleData {
   name: string;
   permissions: Array<{ action: string; resource: string }>;
+}
+
+// Represents a Document from the backend, with BigInts as strings for client-side safety
+export interface Document {
+  id: string; // BigInt as string
+  refDoc: string;
+  type: "INVOICE" | "QUOTE" | "PURCHASE_ORDER" | "CREDIT_NOTE";
+  date: string; // ISO Date string
+  state: "DRAFT" | "FINALIZED" | "PAID" | "VOID";
+  partnerId: string; // BigInt as string
+  totalHT: number;
+  totalTax: number;
+  totalTTC: number;
+  balance: number;
+  // ... include any other fields from the Prisma schema that you need on the client
+}
+
+// Represents the shape of the paginated response for documents.
+export interface PaginatedDocumentsResponse {
+  data: Document[];
+  total: number;
+}
+
+// Represents a single line item being prepared on the client for creation.
+// This is the "shopping cart" item.
+export interface DocumentLineClientData {
+  // This is the critical link to the Good in its specific Journal-Partner context.
+  // It MUST be a string to match the `Good.jpqLinkId`.
+  journalPartnerGoodLinkId: string;
+  designation: string;
+  quantity: number;
+  unitPrice: number;
+  taxRate: number;
+  // ... other fields needed for calculation, e.g., discountPercentage
+}
+
+// Represents the final payload sent to the backend API to create a new document.
+export interface CreateDocumentClientData {
+  refDoc: string;
+  type: Document["type"];
+  date: Date; // The final modal will provide a Date object.
+  partnerId: string; // The locked partner ID from the global store.
+  lines: DocumentLineClientData[];
 }

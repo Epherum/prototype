@@ -1,4 +1,4 @@
-//src/features/partners/PartnerSliderController.tsx
+//src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
@@ -24,7 +24,6 @@ import {
   fetchJournalsLinkedToPartner,
 } from "@/services/clientJournalService";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
-
 import { findNodeById, findParentOfNode } from "@/lib/helpers";
 
 // UI Components
@@ -40,6 +39,7 @@ import type {
   PartnerGoodFilterStatus,
 } from "@/lib/types";
 
+// --- Interface and Props remain the same ---
 export interface JournalSliderControllerRef {
   openJournalSelector: (
     onSelectCallback: (node: AccountNodeData) => void
@@ -62,17 +62,20 @@ export const JournalSliderController = forwardRef<
   JournalSliderControllerProps
 >(({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, isMoveDisabled }, ref) => {
   const journalManager = useJournalManager();
+
+  // --- Read the global document creation state ---
+  const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
+
+  // Other store selections
   const restrictedJournalId = useAppStore(
     (state) => state.auth.effectiveRestrictedJournalId
   );
-
-  // Store selections
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const selectedPartnerId = useAppStore((state) => state.selections.partner);
   const selectedGoodsId = useAppStore((state) => state.selections.goods);
   const setSelection = useAppStore((state) => state.setSelection);
 
-  // Modal state
+  // Modal state remains the same
   const [isLinkingModalOpen, setIsLinkingModalOpen] = useState(false);
   const [onSelectForLinkingCallback, setOnSelectForLinkingCallback] = useState<
     ((node: AccountNodeData) => void) | null
@@ -198,6 +201,9 @@ export const JournalSliderController = forwardRef<
     if (journalManager.isJournalSliderPrimary) {
       return (
         <JournalHierarchySlider
+          // --- Pass the isLocked prop ---
+          isLocked={isCreating}
+          // All other props remain the same
           sliderId={SLIDER_TYPES.JOURNAL}
           hierarchyData={journalManager.currentHierarchy}
           fullHierarchyData={journalManager.hierarchyData}
@@ -228,7 +234,6 @@ export const JournalSliderController = forwardRef<
       );
     }
 
-    // Logic for Flat View
     let queryToUse = null;
     if (isJournalAfterPartner) queryToUse = flatJournalsByPartnerQuery;
     else if (isJournalAfterGood) queryToUse = flatJournalsByGoodQuery;
@@ -236,6 +241,9 @@ export const JournalSliderController = forwardRef<
     if (queryToUse) {
       return (
         <DynamicSlider
+          // --- Pass the isLocked prop ---
+          isLocked={isCreating}
+          // All other props remain the same
           sliderId={SLIDER_TYPES.JOURNAL}
           title="Journal (Filtered)"
           data={(queryToUse.data || []).map((j) => ({
@@ -256,6 +264,8 @@ export const JournalSliderController = forwardRef<
 
     return (
       <DynamicSlider
+        // No need to lock this as it's a placeholder
+        isLocked={false}
         sliderId={SLIDER_TYPES.JOURNAL}
         title="Journal"
         data={[]}
@@ -277,6 +287,8 @@ export const JournalSliderController = forwardRef<
             onClick={journalManager.openJournalNavModal}
             className={`${styles.controlButton} ${styles.editButton}`}
             aria-label="Options for Journal"
+            // Disable options when creating a document
+            disabled={isCreating}
           >
             <IoOptionsOutline />
           </button>
@@ -297,7 +309,8 @@ export const JournalSliderController = forwardRef<
             <button
               onClick={onMoveUp}
               className={styles.controlButton}
-              disabled={isMoveDisabled}
+              // Disable move buttons when creating
+              disabled={isMoveDisabled || isCreating}
             >
               ▲ Up
             </button>
@@ -306,7 +319,8 @@ export const JournalSliderController = forwardRef<
             <button
               onClick={onMoveDown}
               className={styles.controlButton}
-              disabled={isMoveDisabled}
+              // Disable move buttons when creating
+              disabled={isMoveDisabled || isCreating}
             >
               ▼ Down
             </button>

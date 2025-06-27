@@ -2,12 +2,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-// No need to import UseQueryResult if we let TypeScript infer it from the hook usage.
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { goodKeys } from "@/lib/queryKeys";
+import { goodKeys, jpgLinkKeys } from "@/lib/queryKeys";
 
 import {
   fetchGoods,
+  fetchGoodsForDocumentContext,
   createGood,
   updateGood,
   deleteGood,
@@ -16,49 +16,108 @@ import { getFirstId } from "@/lib/helpers";
 import { SLIDER_TYPES } from "@/lib/constants";
 import { useAppStore } from "@/store/appStore";
 
-// Import types
 import type {
   Good,
   CreateGoodClientData,
   UpdateGoodClientData,
   FetchGoodsParams,
 } from "@/lib/types";
+import { useJournalManager } from "../journals/useJournalManager";
 
 export const useGoodManager = () => {
   const queryClient = useQueryClient();
 
+  // --- Global State ---
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
-  const effectiveRestrictedJournalId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalId
+  const { partner: selectedPartnerId, goods: selectedGoodsId } = useAppStore(
+    (state) => state.selections
   );
-  const selections = useAppStore((state) => state.selections);
+  const { isCreating, lockedPartnerId, lockedJournalId } = useAppStore(
+    (state) => state.ui.documentCreationState
+  );
   const setSelection = useAppStore((state) => state.setSelection);
+  const { effectiveSelectedJournalIds } = useJournalManager();
 
-  const isCreatingDocument = useAppStore(
-    (state) => state.ui.isCreatingDocument
-  );
-
-  const {
-    journal: journalSelections,
-    partner: selectedPartnerId,
-    goods: selectedGoodsId,
-    gpgContextJournalId,
-  } = selections;
-
-  const effectiveSelectedJournalIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (journalSelections.topLevelId) ids.add(journalSelections.topLevelId);
-    journalSelections.level2Ids.forEach((id) => ids.add(id));
-    journalSelections.level3Ids.forEach((id) => ids.add(id));
-    return Array.from(ids);
-  }, [journalSelections]);
-
+  // --- Local UI State ---
   const [isGoodsOptionsMenuOpen, setIsGoodsOptionsMenuOpen] = useState(false);
   const [goodsOptionsMenuAnchorEl, setGoodsOptionsMenuAnchorEl] =
     useState<HTMLElement | null>(null);
   const [isAddEditGoodModalOpen, setIsAddEditGoodModalOpen] = useState(false);
   const [editingGoodData, setEditingGoodData] = useState<Good | null>(null);
+
+  const isDocumentContextActive = isCreating;
+
+  const mainGoodsQueryParams = useMemo((): FetchGoodsParams => {
+    let params: FetchGoodsParams = { limit: 1000, offset: 0 };
+    const orderString = sliderOrder.join("-");
+
+    if (
+      (orderString.includes(
+        `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}`
+      ) ||
+        orderString.includes(
+          `${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.JOURNAL}`
+        )) &&
+      effectiveSelectedJournalIds.length > 0 &&
+      selectedPartnerId
+    ) {
+      params.forJournalIds = effectiveSelectedJournalIds;
+      params.forPartnerId = selectedPartnerId;
+      params.includeJournalChildren = true;
+    }
+
+    return params;
+  }, [sliderOrder, effectiveSelectedJournalIds, selectedPartnerId]);
+
+  const mainGoodsQuery = useQuery({
+    queryKey: goodKeys.list(mainGoodsQueryParams),
+    queryFn: () => fetchGoods(mainGoodsQueryParams),
+    enabled: !isDocumentContextActive && visibility[SLIDER_TYPES.GOODS],
+  });
+
+  const documentContextGoodsQuery = useQuery({
+    queryKey: jpgLinkKeys.listForDocumentContext(
+      lockedPartnerId,
+      lockedJournalId
+    ),
+    queryFn: () =>
+      fetchGoodsForDocumentContext(lockedPartnerId!, lockedJournalId!),
+    // --- THIS IS THE FIX ---
+    // The enabled flag is now more robust. It checks for a non-falsy value
+    // AND ensures the value is not the literal string "undefined".
+    enabled:
+      isDocumentContextActive &&
+      !!lockedPartnerId &&
+      lockedPartnerId !== "undefined" &&
+      !!lockedJournalId,
+  });
+
+  const goodsForSlider = useMemo(() => {
+    if (isDocumentContextActive) {
+      return documentContextGoodsQuery.data?.data || [];
+    }
+    return mainGoodsQuery.data?.data || [];
+  }, [
+    isDocumentContextActive,
+    documentContextGoodsQuery.data,
+    mainGoodsQuery.data,
+  ]);
+
+  const goodsQueryState = {
+    isLoading: isDocumentContextActive
+      ? documentContextGoodsQuery.isLoading
+      : mainGoodsQuery.isLoading,
+    isError: isDocumentContextActive
+      ? documentContextGoodsQuery.isError
+      : mainGoodsQuery.isError,
+    error: isDocumentContextActive
+      ? documentContextGoodsQuery.error
+      : mainGoodsQuery.error,
+    isFetching: isDocumentContextActive
+      ? documentContextGoodsQuery.isFetching
+      : mainGoodsQuery.isFetching,
+  };
 
   const setSelectedGoodsId = useCallback(
     (id: string | null) => {
@@ -67,149 +126,31 @@ export const useGoodManager = () => {
     [setSelection]
   );
 
-  const goodsSliderIndex = useMemo(
-    () => sliderOrder.indexOf(SLIDER_TYPES.GOODS),
-    [sliderOrder]
-  );
-
-  const isGPContextActive = useMemo(() => {
-    const visibleSliders = sliderOrder.filter((id) => visibility[id]);
-    return (
-      visibleSliders.length >= 2 &&
-      visibleSliders[0] === SLIDER_TYPES.GOODS &&
-      visibleSliders[1] === SLIDER_TYPES.PARTNER
-    );
-  }, [sliderOrder, visibility]);
-
-  const mainGoodsQueryKeyParams = useMemo((): FetchGoodsParams => {
-    let params: FetchGoodsParams = { limit: 1000, offset: 0 };
-    const currentOrderString = sliderOrder.join("-");
-
-    if (isGPContextActive && goodsSliderIndex === 0) {
-      if (gpgContextJournalId) {
-        params.linkedToJournalIds = [gpgContextJournalId];
-      }
-    } else if (goodsSliderIndex === 0) {
-      // Default case
-    } else if (
-      currentOrderString.startsWith(
-        `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}`
-      )
-    ) {
-      params.filterStatuses = journalSelections.rootFilter;
-      params.restrictedJournalId = effectiveRestrictedJournalId;
-      if (journalSelections.rootFilter.includes("affected")) {
-        params.contextJournalIds = effectiveSelectedJournalIds;
-      }
-    } else if (
-      currentOrderString.startsWith(
-        `${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.GOODS}`
-      )
-    ) {
-      if (selectedPartnerId && effectiveSelectedJournalIds.length > 0) {
-        params.forPartnerId = selectedPartnerId;
-        params.forJournalIds = [...effectiveSelectedJournalIds];
-      } else {
-        params.forPartnerId = "__IMPOSSIBLE_JPGL_CONTEXT__";
-      }
-    } else if (
-      currentOrderString.startsWith(
-        `${SLIDER_TYPES.PARTNER}-${SLIDER_TYPES.JOURNAL}-${SLIDER_TYPES.GOODS}`
-      )
-    ) {
-      if (selectedPartnerId && journalSelections.flatId) {
-        params.forPartnerId = selectedPartnerId;
-        params.forJournalIds = [journalSelections.flatId];
-      } else {
-        params.forPartnerId = "__IMPOSSIBLE_PJGL_CONTEXT__";
-      }
-    }
-    return params;
-  }, [
-    sliderOrder,
-    goodsSliderIndex,
-    isGPContextActive,
-    gpgContextJournalId,
-    journalSelections.rootFilter,
-    journalSelections.flatId,
-    effectiveRestrictedJournalId,
-    effectiveSelectedJournalIds,
-    selectedPartnerId,
-  ]);
-
-  const isBaseGoodsQueryEnabled = useMemo(() => {
-    if (!visibility[SLIDER_TYPES.GOODS]) return false;
-    const params = mainGoodsQueryKeyParams;
-    if (goodsSliderIndex === 0) return true;
-    if (sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0) {
-      if (params.filterStatuses?.length === 0) return false;
-      if (
-        params.filterStatuses?.includes("affected") &&
-        params.contextJournalIds?.length === 0
-      ) {
-        return params.filterStatuses.some((f) => f !== "affected");
-      }
-      return true;
-    }
-    if (
-      params.forPartnerId &&
-      !params.forPartnerId.startsWith("__IMPOSSIBLE")
-    ) {
-      return true;
-    }
-    return false;
-  }, [visibility, goodsSliderIndex, sliderOrder, mainGoodsQueryKeyParams]);
-
-  // <<< --- START OF FIX --- >>>
-  const mainGoodsQuery = useQuery<Good[], Error>({
-    queryKey: goodKeys.list(mainGoodsQueryKeyParams),
-    // FIX 1: Provide an explicit return type for the query function.
-    // This resolves the "not assignable" error by creating a clear contract.
-    queryFn: async (): Promise<Good[]> => {
-      if (mainGoodsQueryKeyParams.forPartnerId?.startsWith("__IMPOSSIBLE")) {
-        return [];
-      }
-      const result = await fetchGoods(mainGoodsQueryKeyParams);
-      // Ensure the fetched data conforms to the Good type
-      return result.data.map(
-        (g: any): Good => ({
-          ...g,
-          id: String(g.id),
-          taxCodeId: g.taxCodeId ?? null,
-          unitCodeId: g.unitCodeId ?? null,
-        })
-      );
-    },
-    // FIX: The query should remain enabled during document creation
-    // so the user can see and select goods. The context from the
-    // locked-in partner selection (Step 1) will ensure the correct
-    // goods are fetched.
-    enabled: isBaseGoodsQueryEnabled,
-    placeholderData: (previousData) => previousData,
-  });
-  // <<< --- END OF FIX --- >>>
-
-  const goodsData = useMemo(
-    () => mainGoodsQuery.data || [],
-    [mainGoodsQuery.data]
-  );
-
   useEffect(() => {
-    if (mainGoodsQuery.isSuccess && goodsData) {
+    const isSuccess = isDocumentContextActive
+      ? documentContextGoodsQuery.isSuccess
+      : mainGoodsQuery.isSuccess;
+
+    if (isSuccess && goodsForSlider) {
       const currentSelectionInList =
-        selectedGoodsId && goodsData.some((g) => g.id === selectedGoodsId);
-      if (goodsData.length > 0 && !currentSelectionInList) {
-        setSelectedGoodsId(getFirstId(goodsData));
-      } else if (goodsData.length === 0 && selectedGoodsId !== null) {
+        selectedGoodsId && goodsForSlider.some((g) => g.id === selectedGoodsId);
+
+      if (goodsForSlider.length > 0 && !currentSelectionInList) {
+        setSelectedGoodsId(getFirstId(goodsForSlider));
+      } else if (goodsForSlider.length === 0 && selectedGoodsId !== null) {
         setSelectedGoodsId(null);
       }
     }
   }, [
-    goodsData,
+    goodsForSlider,
+    isDocumentContextActive,
     mainGoodsQuery.isSuccess,
+    documentContextGoodsQuery.isSuccess,
     selectedGoodsId,
     setSelectedGoodsId,
   ]);
+
+  // --- Mutations and Handlers (No changes needed here) ---
 
   const createGoodMutation = useMutation<Good, Error, CreateGoodClientData>({
     mutationFn: createGood,
@@ -269,21 +210,18 @@ export const useGoodManager = () => {
     },
     []
   );
-
   const handleCloseGoodsOptionsMenu = useCallback(() => {
     setIsGoodsOptionsMenuOpen(false);
     setGoodsOptionsMenuAnchorEl(null);
   }, []);
-
   const handleOpenAddGoodModal = useCallback(() => {
     setEditingGoodData(null);
     setIsAddEditGoodModalOpen(true);
     handleCloseGoodsOptionsMenu();
   }, [handleCloseGoodsOptionsMenu]);
-
   const handleOpenEditGoodModal = useCallback(() => {
-    if (selectedGoodsId && goodsData) {
-      const goodToEdit = goodsData.find((g) => g.id === selectedGoodsId);
+    if (selectedGoodsId && goodsForSlider) {
+      const goodToEdit = goodsForSlider.find((g) => g.id === selectedGoodsId);
       if (goodToEdit) {
         setEditingGoodData(goodToEdit);
         setIsAddEditGoodModalOpen(true);
@@ -292,13 +230,11 @@ export const useGoodManager = () => {
       }
     }
     handleCloseGoodsOptionsMenu();
-  }, [selectedGoodsId, goodsData, handleCloseGoodsOptionsMenu]);
-
+  }, [selectedGoodsId, goodsForSlider, handleCloseGoodsOptionsMenu]);
   const handleCloseAddEditGoodModal = useCallback(() => {
     setIsAddEditGoodModalOpen(false);
     setEditingGoodData(null);
   }, []);
-
   const handleAddOrUpdateGoodSubmit = useCallback(
     (
       dataFromModal: CreateGoodClientData | UpdateGoodClientData,
@@ -315,7 +251,6 @@ export const useGoodManager = () => {
     },
     [editingGoodData, createGoodMutation, updateGoodMutation]
   );
-
   const handleDeleteCurrentGood = useCallback(() => {
     if (selectedGoodsId) {
       if (
@@ -332,19 +267,12 @@ export const useGoodManager = () => {
   return {
     selectedGoodsId,
     setSelectedGoodsId,
+    goodsForSlider,
+    goodsQueryState,
     isGoodsOptionsMenuOpen,
     goodsOptionsMenuAnchorEl,
     isAddEditGoodModalOpen,
     editingGoodData,
-    goodsForSlider: goodsData,
-    goodsQueryState: {
-      isLoading: mainGoodsQuery.isLoading,
-      isError: mainGoodsQuery.isError,
-      error: mainGoodsQuery.error,
-      data: goodsData,
-      refetch: mainGoodsQuery.refetch,
-      isFetching: mainGoodsQuery.isFetching,
-    },
     createGoodMutation,
     updateGoodMutation,
     deleteGoodMutation,

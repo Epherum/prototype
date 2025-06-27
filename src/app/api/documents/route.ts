@@ -133,5 +133,5 @@ const postHandler = async (
 // Wrap the handler with authorization
 export const POST = withAuthorization(postHandler, {
   action: "CREATE",
-  resource: "DOCUMENT",
+  resource: "PARTNER",
 });

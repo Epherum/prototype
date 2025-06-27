@@ -1,203 +1,208 @@
-//src/features/partners/PartnerSliderController.tsx
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
-import { SLIDER_TYPES } from "@/lib/constants";
-import type { Partner, Good } from "@/lib/types";
+import { documentKeys } from "@/lib/queryKeys";
+import {
+  createDocument,
+  fetchDocuments,
+} from "@/services/clientDocumentService";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 
-export interface GoodForDocument extends Good {
-  quantity: number;
-  price: number;
-  amount: number;
-}
+import type {
+  Document,
+  DocumentLineClientData,
+  CreateDocumentClientData,
+  Good,
+} from "@/lib/types";
 
-// The hook now accepts the journalManager instance as a required prop.
-interface UseDocumentManagerProps {
-  journalManager: ReturnType<typeof useJournalManager>;
-}
-
-export function useDocumentManager({
-  journalManager,
-}: UseDocumentManagerProps) {
-  // Get state from the injected journal manager hook
-  const { isTerminalJournalActive } = journalManager;
-
-  // Get global state from the store
-  const isDocumentCreationMode = useAppStore(
-    (state) => state.ui.isCreatingDocument
+export const useDocumentManager = () => {
+  const queryClient = useQueryClient();
+  const { isTerminal, selectedJournalId } = useJournalManager();
+  const { partner: selectedPartnerId } = useAppStore(
+    (state) => state.selections
   );
-  const isGoodsAccordionOpen = useAppStore(
-    (state) => !!state.ui.accordionState[SLIDER_TYPES.GOODS]
+  const { isCreating, lockedPartnerId } = useAppStore(
+    (state) => state.ui.documentCreationState
+  );
+  const startDocumentCreation = useAppStore(
+    (state) => state.startDocumentCreation
+  );
+  const cancelDocumentCreation = useAppStore(
+    (state) => state.cancelDocumentCreation
   );
 
-  // Get actions from the store
-  const enterDocumentCreationMode = useAppStore(
-    (state) => state.enterDocumentCreationMode
-  );
-  const exitDocumentCreationMode = useAppStore(
-    (state) => state.exitDocumentCreationMode
-  );
-  const toggleAccordion = useAppStore((state) => state.toggleAccordion);
+  const [lines, setLines] = useState<DocumentLineClientData[]>([]);
+  const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
 
-  // Local state for the hook remains the same
-  const [lockedPartnerId, setLockedPartnerId] = useState<string | null>(null);
-  const [selectedGoodsForDocument, setSelectedGoodsForDocument] = useState<
-    GoodForDocument[]
-  >([]);
-  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
-  const [lockedPartnerDetails, setLockedPartnerDetails] =
-    useState<Partner | null>(null);
-
-  // NEW HANDLER: For the journal-first workflow initiated by the +doc button.
-  const handleEnterJournalCreationMode = useCallback(() => {
-    if (isTerminalJournalActive) {
-      enterDocumentCreationMode();
-    } else {
-      console.warn(
-        "Attempted to enter document creation mode without a valid terminal journal."
-      );
-    }
-  }, [isTerminalJournalActive, enterDocumentCreationMode]);
-
-  // This handler is for the partner-first workflow (if it still exists)
-  const handleStartDocumentCreation = useCallback(
-    (partnerToLock: Partner | null) => {
-      if (!partnerToLock) {
-        console.warn(
-          "useDocumentManager: Partner object is required to start."
-        );
-        return false;
+  const documentsQuery = useQuery({
+    queryKey: documentKeys.list(selectedPartnerId),
+    queryFn: () => {
+      if (!selectedPartnerId || selectedPartnerId === "undefined") {
+        return Promise.resolve({ data: [], total: 0 });
       }
-      enterDocumentCreationMode();
-      if (!isGoodsAccordionOpen) {
-        toggleAccordion(SLIDER_TYPES.GOODS);
-      }
-      setLockedPartnerId(partnerToLock.id);
-      setLockedPartnerDetails(partnerToLock);
-      setSelectedGoodsForDocument([]);
-      return true;
+      return fetchDocuments(selectedPartnerId);
     },
-    [enterDocumentCreationMode, isGoodsAccordionOpen, toggleAccordion]
-  );
+    enabled:
+      !!selectedPartnerId && selectedPartnerId !== "undefined" && !isCreating,
+  });
 
-  const handleCancelDocumentCreation = useCallback(() => {
-    exitDocumentCreationMode();
-    if (isGoodsAccordionOpen) {
-      toggleAccordion(SLIDER_TYPES.GOODS);
+  const canCreateDocument = useMemo(() => {
+    const isPartnerValid =
+      !!selectedPartnerId && selectedPartnerId !== "undefined";
+    return isPartnerValid && isTerminal;
+  }, [selectedPartnerId, isTerminal]);
+
+  const handleStartCreation = useCallback(() => {
+    if (!canCreateDocument || !selectedPartnerId || !selectedJournalId) {
+      alert(
+        "Please select a valid Partner and a single, terminal Journal account to proceed."
+      );
+      return;
     }
-    setLockedPartnerId(null);
-    setLockedPartnerDetails(null);
-    setSelectedGoodsForDocument([]);
-    setIsConfirmationModalOpen(false);
-  }, [exitDocumentCreationMode, isGoodsAccordionOpen, toggleAccordion]);
+    startDocumentCreation(selectedPartnerId, selectedJournalId);
+    setLines([]);
+  }, [
+    canCreateDocument,
+    selectedPartnerId,
+    selectedJournalId,
+    startDocumentCreation,
+  ]);
 
-  const handleToggleGoodForDocument = useCallback((goodItem: Good) => {
-    setSelectedGoodsForDocument((prev) => {
-      const existingGoodIndex = prev.findIndex((g) => g.id === goodItem.id);
-      if (existingGoodIndex > -1) {
-        return prev.filter((g) => g.id !== goodItem.id);
+  const handleCancelCreation = useCallback(() => {
+    cancelDocumentCreation();
+    setLines([]);
+  }, [cancelDocumentCreation]);
+
+  const handleAddOrRemoveGood = useCallback((good: Good) => {
+    if (!good.jpqLinkId) {
+      console.error("Attempted to add a good without a jpqLinkId:", good);
+      alert("This good cannot be added to a document in the current context.");
+      return;
+    }
+    setLines((currentLines) => {
+      const existingLineIndex = currentLines.findIndex(
+        (line) => line.journalPartnerGoodLinkId === good.jpqLinkId
+      );
+      if (existingLineIndex > -1) {
+        return currentLines.filter((_, index) => index !== existingLineIndex);
       } else {
-        const newGoodEntry: GoodForDocument = {
-          ...goodItem,
-          id: goodItem.id,
-          name: goodItem.name || goodItem.label || "Unnamed Good",
-          code:
-            goodItem.referenceCode ||
-            goodItem.code ||
-            (goodItem as any).unit_code ||
-            (goodItem as any).unit ||
-            goodItem.id,
+        const newLine: DocumentLineClientData = {
+          journalPartnerGoodLinkId: good.jpqLinkId,
+          designation: good.label,
           quantity: 1,
-          price: goodItem.price || 0,
-          amount: 1 * (goodItem.price || 0),
+          unitPrice: 0,
+          taxRate: 0.2,
         };
-        return [...prev, newGoodEntry];
+        return [...currentLines, newLine];
       }
     });
   }, []);
 
-  const handleUpdateGoodDetailForDocument = useCallback(
-    (goodId: string, field: "quantity" | "price", value: number) => {
-      setSelectedGoodsForDocument((prev) =>
-        prev.map((g) => {
-          if (g.id === goodId) {
-            const updatedGood = { ...g, [field]: value };
-            if (
-              typeof updatedGood.quantity === "number" &&
-              typeof updatedGood.price === "number"
-            ) {
-              updatedGood.amount = updatedGood.quantity * updatedGood.price;
-            }
-            return updatedGood;
+  // --- THIS IS THE FIX ---
+  const handleUpdateLine = useCallback(
+    (jpqLinkId: string, details: { quantity?: number; unitPrice?: number }) => {
+      setLines((currentLines) =>
+        currentLines.map((line) => {
+          if (line.journalPartnerGoodLinkId === jpqLinkId) {
+            const newQuantity = details.quantity;
+            const newUnitPrice = details.unitPrice;
+
+            return {
+              ...line,
+              // Only update if the new value is a valid number
+              quantity:
+                newQuantity !== undefined && !isNaN(newQuantity)
+                  ? newQuantity
+                  : line.quantity,
+              unitPrice:
+                newUnitPrice !== undefined && !isNaN(newUnitPrice)
+                  ? newUnitPrice
+                  : line.unitPrice,
+            };
           }
-          return g;
+          return line;
         })
       );
     },
     []
   );
 
-  const handleFinishDocument = useCallback(() => {
-    if (selectedGoodsForDocument.length === 0) {
-      alert("Please select at least one good for the document.");
-      return false;
+  const handleOpenFinalizeModal = () => {
+    if (lines.length === 0) {
+      alert("Please add at least one item to the document.");
+      return;
     }
-    if (!lockedPartnerId) {
-      // In journal-first flow, we might not have a partner yet.
-      // This logic might need to adapt based on full workflow.
-    }
-    setIsConfirmationModalOpen(true);
-    return true;
-  }, [selectedGoodsForDocument, lockedPartnerId]);
+    setIsFinalizeModalOpen(true);
+  };
 
-  const closeConfirmationModal = useCallback(() => {
-    setIsConfirmationModalOpen(false);
-  }, []);
+  const createDocumentMutation = useMutation({
+    mutationFn: (data: CreateDocumentClientData) => createDocument(data),
+    onSuccess: (newDocument) => {
+      queryClient.invalidateQueries({
+        queryKey: documentKeys.list(lockedPartnerId),
+      });
+      alert(`Document '${newDocument.refDoc}' created successfully!`);
+      handleCancelCreation();
+    },
+    onError: (error: Error) => {
+      console.error("Failed to create document:", error);
+      alert(`Error creating document: ${error.message}`);
+    },
+    onSettled: () => {
+      setIsFinalizeModalOpen(false);
+    },
+  });
 
-  const resetDocumentCreationState = useCallback(() => {
-    setIsConfirmationModalOpen(false);
-    exitDocumentCreationMode();
-    if (isGoodsAccordionOpen) {
-      toggleAccordion(SLIDER_TYPES.GOODS);
-    }
-    setLockedPartnerId(null);
-    setLockedPartnerDetails(null);
-    setSelectedGoodsForDocument([]);
-  }, [exitDocumentCreationMode, isGoodsAccordionOpen, toggleAccordion]);
+  const handleSubmit = useCallback(
+    (headerData: { refDoc: string; date: Date; type: Document["type"] }) => {
+      if (!lockedPartnerId) {
+        alert(
+          "Critical Error: Locked partner ID is missing. Cannot save document."
+        );
+        return;
+      }
+      const finalPayload: CreateDocumentClientData = {
+        ...headerData,
+        partnerId: lockedPartnerId,
+        lines: lines,
+      };
+      createDocumentMutation.mutate(finalPayload);
+    },
+    [lockedPartnerId, lines, createDocumentMutation]
+  );
 
-  const handleValidateDocument = useCallback(async () => {
-    console.log("VALIDATING DOCUMENT WITH:", {
-      partner: lockedPartnerDetails,
-      goods: selectedGoodsForDocument,
-      journalContext: useAppStore.getState().selections.journal,
-    });
-    resetDocumentCreationState();
-    return true;
-  }, [
-    resetDocumentCreationState,
-    lockedPartnerDetails,
-    selectedGoodsForDocument,
-  ]);
+  const documentsForSlider = useMemo(
+    () => documentsQuery.data?.data || [],
+    [documentsQuery.data]
+  );
+
+  const isGoodInDocument = useCallback(
+    (good: Good): boolean => {
+      if (!good.jpqLinkId) return false;
+      return lines.some(
+        (line) => line.journalPartnerGoodLinkId === good.jpqLinkId
+      );
+    },
+    [lines]
+  );
 
   return {
-    // NEW properties for journal-first workflow
-    isTerminalJournalActive,
-    handleEnterJournalCreationMode,
-
-    // Existing properties
-    isDocumentCreationMode,
-    lockedPartnerId,
-    selectedGoodsForDocument,
-    isConfirmationModalOpen,
-    lockedPartnerDetails,
-    handleStartDocumentCreation,
-    handleCancelDocumentCreation,
-    handleToggleGoodForDocument,
-    handleUpdateGoodDetailForDocument,
-    handleFinishDocument,
-    closeConfirmationModal,
-    handleValidateDocument,
+    isCreating,
+    lines,
+    documentsForSlider,
+    documentsQuery,
+    createDocumentMutation,
+    isFinalizeModalOpen,
+    canCreateDocument,
+    handleStartCreation,
+    handleCancelCreation,
+    handleAddOrRemoveGood,
+    handleUpdateLine,
+    handleOpenFinalizeModal,
+    handleSubmit,
+    isGoodInDocument,
+    setIsFinalizeModalOpen,
   };
-}
+};
