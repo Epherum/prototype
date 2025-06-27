@@ -1,5 +1,4 @@
-// src/store/appStore.ts
-
+//src/store/appStore.ts
 import { create } from "zustand";
 import { type Session } from "next-auth";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
@@ -173,36 +172,91 @@ export const useAppStore = create<AppState>()((set, get) => ({
   moveSlider: (sliderId, direction) =>
     set((state) => {
       const { sliderOrder, visibility } = state.ui;
-      const visibleOrderedIds = sliderOrder.filter((id) => visibility[id]);
-      const currentIndex = visibleOrderedIds.indexOf(sliderId);
 
+      // 1. Operate on the list of *visible* sliders
+      const oldVisibleOrder = sliderOrder.filter((id) => visibility[id]);
+      const currentIndex = oldVisibleOrder.indexOf(sliderId);
+
+      // Guard clause: cannot move if at the edge or not found
       if (
+        currentIndex === -1 ||
         (direction === "up" && currentIndex <= 0) ||
-        (direction === "down" && currentIndex >= visibleOrderedIds.length - 1)
+        (direction === "down" && currentIndex >= oldVisibleOrder.length - 1)
       ) {
-        return state;
+        return state; // No change
       }
 
-      const newOrderedVisibleIds = [...visibleOrderedIds];
+      // 2. Calculate the new order of visible sliders
+      const newVisibleOrder = [...oldVisibleOrder];
       const targetIndex =
         direction === "up" ? currentIndex - 1 : currentIndex + 1;
-      [newOrderedVisibleIds[currentIndex], newOrderedVisibleIds[targetIndex]] =
-        [newOrderedVisibleIds[targetIndex], newOrderedVisibleIds[currentIndex]];
+      // Perform the swap
+      [newVisibleOrder[currentIndex], newVisibleOrder[targetIndex]] = [
+        newVisibleOrder[targetIndex],
+        newVisibleOrder[currentIndex],
+      ];
 
-      const newSliderOrder = [...sliderOrder];
+      // 3. Reconstruct the full sliderOrder array to respect the new visible order
+      const newFullSliderOrder = [...sliderOrder];
       let visibleIndex = 0;
-      for (let i = 0; i < newSliderOrder.length; i++) {
-        if (visibility[newSliderOrder[i]]) {
-          newSliderOrder[i] = newOrderedVisibleIds[visibleIndex];
+      for (let i = 0; i < newFullSliderOrder.length; i++) {
+        if (visibility[newFullSliderOrder[i]]) {
+          newFullSliderOrder[i] = newVisibleOrder[visibleIndex];
           visibleIndex++;
         }
       }
 
+      // --- INTELLIGENT SELECTION RESET LOGIC ---
+
+      // 4. Find the first index where the visible order has changed (the "breakpoint").
+      let breakPointIndex = -1;
+      for (let i = 0; i < newVisibleOrder.length; i++) {
+        if (newVisibleOrder[i] !== oldVisibleOrder[i]) {
+          breakPointIndex = i;
+          break;
+        }
+      }
+
+      // If no change was detected, just update the order and do nothing to selections.
+      if (breakPointIndex === -1) {
+        return {
+          ui: { ...state.ui, sliderOrder: newFullSliderOrder },
+        };
+      }
+
+      // 5. Get the list of all sliders from the breakpoint onwards. These need their selections reset.
+      const slidersToReset = newVisibleOrder.slice(breakPointIndex);
+
+      // 6. Start with a copy of current selections to modify.
+      const newSelections = { ...state.selections };
+
+      // Get a clean slate for selections to copy from.
+      const initialSelectionsForReset = getInitialSelections(
+        state.auth.effectiveRestrictedJournalId
+      );
+
+      // 7. Iterate over the sliders that need resetting and revert them to their initial state.
+      slidersToReset.forEach((sliderIdToReset) => {
+        const key = sliderIdToReset.toLowerCase() as keyof SelectionsSlice;
+
+        if (key === "journal") {
+          // Journal is a complex object, so reset the whole thing.
+          newSelections.journal = initialSelectionsForReset.journal;
+        } else if (key in newSelections) {
+          // For simple key-value selections (partner, goods, etc.), reset to the initial value (which is typically null).
+          (newSelections[
+            key as keyof Omit<SelectionsSlice, "journal">
+          ] as any) =
+            initialSelectionsForReset[
+              key as keyof Omit<SelectionsSlice, "journal">
+            ];
+        }
+      });
+
+      // 8. Return the new state with the updated order and the intelligently modified selections.
       return {
-        ui: { ...state.ui, sliderOrder: newSliderOrder },
-        selections: getInitialSelections(
-          state.auth.effectiveRestrictedJournalId
-        ),
+        ui: { ...state.ui, sliderOrder: newFullSliderOrder },
+        selections: newSelections,
       };
     }),
 

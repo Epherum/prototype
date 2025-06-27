@@ -1,3 +1,4 @@
+//src/features/goods/useGoodManager.ts
 "use client";
 
 import React, { useMemo, useCallback } from "react";

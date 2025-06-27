@@ -1,3 +1,4 @@
+//src/app/page.tsx
 "use client";
 
 // React & Next.js Core

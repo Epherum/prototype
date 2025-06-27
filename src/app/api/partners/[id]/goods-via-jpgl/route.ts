@@ -5,9 +5,12 @@ import prisma from "@/app/utils/prisma";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } } // Corrected to use 'id'
+  // By explicitly typing the 'context' object instead of inline destructuring,
+  // we resolve the TypeScript inference issue.
+  context: { params: Promise<{ id: string }> }
 ) {
-  const partnerIdStr = params.id; // Corrected to use 'id'
+  // We now access 'id' from the 'context.params' object and await it.
+  const { id: partnerIdStr } = await context.params;
 
   const { searchParams } = new URL(request.url);
   const journalId = searchParams.get("journalId"); // Get the string value
@@ -22,11 +25,6 @@ export async function GET(
       { status: 400 }
     );
   }
-
-  // --- REVERTING THE PREVIOUS FIX ---
-  // The Prisma error clearly states it expects a String for journalId.
-  // We will no longer parse it to an Int.
-  // The 'journalId' variable from searchParams is already a string, which is correct.
 
   const partnerIdBigInt = parseBigIntParam(partnerIdStr, "partnerId");
   if (partnerIdBigInt === null) {
