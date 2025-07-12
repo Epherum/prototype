@@ -1,7 +1,10 @@
+// src/services/clientDocumentService.ts
+
 import type {
   PaginatedDocumentsResponse,
   Document,
   CreateDocumentClientData,
+  UpdateDocumentClientData, // --- NEW --- Assuming this type will be added to lib/types.ts
 } from "@/lib/types";
 
 /**
@@ -71,4 +74,79 @@ export async function createDocument(
   // The backend returns the complete new Document object upon success.
   const newDocument: Document = await response.json();
   return newDocument;
+}
+
+// --- NEW ---
+
+/**
+ * Fetches a single document by its ID.
+ * @param id The ID of the document to fetch.
+ * @returns A promise that resolves to the document details.
+ */
+export async function getDocumentById(id: string): Promise<Document> {
+  const response = await fetch(`/api/documents/${id}`);
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Unknown error fetching document details" }));
+    throw new Error(
+      errorData.message ||
+        `Failed to fetch document details: ${response.statusText}`
+    );
+  }
+  return response.json();
+}
+
+/**
+ * Sends a request to the backend to update an existing document.
+ * @param id The ID of the document to update.
+ * @param data The fields to be updated.
+ * @returns A promise that resolves to the updated document.
+ */
+export async function updateDocument({
+  id,
+  data,
+}: {
+  id: string;
+  data: UpdateDocumentClientData;
+}): Promise<Document> {
+  const response = await fetch(`/api/documents/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Unknown error updating document" }));
+    throw new Error(
+      errorData.message || `Failed to update document: ${response.statusText}`
+    );
+  }
+  return response.json();
+}
+
+/**
+ * Sends a request to the backend to delete a document.
+ * @param id The ID of the document to delete.
+ * @returns A promise that resolves to true if deletion was successful.
+ */
+export async function deleteDocument(id: string): Promise<boolean> {
+  const response = await fetch(`/api/documents/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Unknown error deleting document" }));
+    throw new Error(
+      errorData.message || `Failed to delete document: ${response.statusText}`
+    );
+  }
+
+  // A 204 No Content response means success.
+  return true;
 }

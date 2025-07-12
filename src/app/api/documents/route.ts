@@ -1,5 +1,3 @@
-// src/app/api/documents/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import {
@@ -8,20 +6,15 @@ import {
   ExtendedUser,
 } from "@/lib/auth/authOptions";
 import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
-import { withAuthorization } from "@/lib/auth/withAuthorization";
+// REMOVED: withAuthorization is no longer used here.
 import documentService, {
   createDocumentSchema,
 } from "@/app/services/documentService";
 import { ZodError } from "zod";
 
-// --- GET Handler: List Documents ---
+// --- GET Handler (Now Fully Public) ---
 export async function GET(request: NextRequest) {
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
+  // REMOVED: Manual session check is gone.
 
   const { searchParams } = new URL(request.url);
   const partnerIdStr = searchParams.get("partnerId");
@@ -60,41 +53,32 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// --- POST Handler: Create a New Document ---
-const postHandler = async (
-  request: NextRequest,
-  context: {}, // No params here, but needed for HOF
-  session: ExtendedSession
-) => {
-  const createdById = (session.user as ExtendedUser).id;
+// --- POST Handler (Requires Authentication, Not Authorization) ---
+export async function POST(request: NextRequest) {
+  // MODIFIED: Manually get session for authentication.
+  const session = (await getServerSession(
+    authOptions
+  )) as ExtendedSession | null;
+
+  // This check is for AUTHENTICATION, which is required.
+  if (!session?.user?.id) {
+    return NextResponse.json(
+      { message: "Authentication is required to perform this action." },
+      { status: 401 }
+    );
+  }
+
+  const createdById = session.user.id;
   const createdByIp =
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
+    request.headers.get("x-forwarded-for") ||
+    request.headers.get("x-real-ip") ||
+    "unknown";
 
   try {
     const rawData = await request.json();
+    const validation = createDocumentSchema.safeParse(rawData);
 
-    // Use a reviver to handle BigInts from JSON string
-    const dataWithBigInts = JSON.parse(
-      JSON.stringify(rawData),
-      (key, value) => {
-        if (key === "partnerId" || key === "journalPartnerGoodLinkId") {
-          try {
-            return BigInt(value);
-          } catch (e) {
-            // Let Zod handle the error for better reporting
-            return value;
-          }
-        }
-        return value;
-      }
-    );
-
-    const validation = createDocumentSchema.safeParse(dataWithBigInts);
     if (!validation.success) {
-      console.warn(
-        "API /documents: Invalid payload for new document:",
-        validation.error.format()
-      );
       return NextResponse.json(
         {
           message: "Invalid document payload.",
@@ -128,10 +112,4 @@ const postHandler = async (
       { status: 500 }
     );
   }
-};
-
-// Wrap the handler with authorization
-export const POST = withAuthorization(postHandler, {
-  action: "CREATE",
-  resource: "PARTNER",
-});
+}

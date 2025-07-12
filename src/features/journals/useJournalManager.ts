@@ -1,4 +1,3 @@
-// src/features/journals/useJournalManager.ts
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -84,31 +83,28 @@ export const useJournalManager = () => {
     return topLevelNode ? topLevelNode.children || [] : [];
   }, [selectedTopLevelJournalId, hierarchyData, restrictedJournalId]);
 
+  // --- MODIFICATION: Corrected logic for finding the single selected journal ---
   const selectedJournalId = useMemo((): string | null => {
     // If the journal slider is not primary, the flat selection is the only possibility.
     if (!isJournalSliderPrimary) {
       return selectedFlatJournalId;
     }
 
-    // --- HIERARCHICAL SELECTION LOGIC ---
-    // The user has selected exactly one L3 item. This is the most specific context.
-    if (
-      selectedLevel3JournalIds.length === 1 &&
-      selectedLevel2JournalIds.length === 0
-    ) {
+    // Priority 1: A single L3 item is selected. This is the most specific context.
+    if (selectedLevel3JournalIds.length === 1) {
       return selectedLevel3JournalIds[0];
     }
 
-    // The user has selected exactly one L2 item and no L3 items.
+    // Priority 2: No L3s are selected, but a single L2 item is.
     if (
-      selectedLevel2JournalIds.length === 1 &&
-      selectedLevel3JournalIds.length === 0
+      selectedLevel3JournalIds.length === 0 &&
+      selectedLevel2JournalIds.length === 1
     ) {
       return selectedLevel2JournalIds[0];
     }
 
-    // The user has drilled down into an L1 item and has not selected any children.
-    // This is only a valid single selection if they are NOT at the root.
+    // Priority 3: No L2s or L3s are selected. The context is the L1 container itself,
+    // but ONLY if the user has drilled down (i.e., it's not the root).
     if (
       selectedLevel2JournalIds.length === 0 &&
       selectedLevel3JournalIds.length === 0
@@ -122,7 +118,7 @@ export const useJournalManager = () => {
       }
     }
 
-    // In all other cases (multiple selections, no selection), there is no single context.
+    // In all other cases (multiple selections at the lowest level, no selection), there is no single context.
     return null;
   }, [
     isJournalSliderPrimary,
@@ -133,6 +129,7 @@ export const useJournalManager = () => {
     restrictedJournalId,
   ]);
 
+  // This `isTerminal` check now works correctly because `selectedJournalId` is calculated correctly.
   const isTerminal = useMemo((): boolean => {
     // If no single journal is selected, it can't be terminal.
     if (!selectedJournalId) {
@@ -142,8 +139,7 @@ export const useJournalManager = () => {
     // Find the selected node in the full hierarchy.
     const node = findNodeById(hierarchyData, selectedJournalId);
 
-    // A node is terminal if it exists and either has no `children` property
-    // or its `children` array is empty.
+    // A node is terminal if it exists and is marked as such (e.g., no children).
     return !!node && (!node.children || node.children.length === 0);
   }, [selectedJournalId, hierarchyData]);
 
@@ -152,7 +148,6 @@ export const useJournalManager = () => {
       return selectedFlatJournalId ? [selectedFlatJournalId] : [];
     }
 
-    // Per-branch multi-select logic (if any L2 or L3 items are checked)
     if (
       selectedLevel2JournalIds.length > 0 ||
       selectedLevel3JournalIds.length > 0
@@ -178,8 +173,6 @@ export const useJournalManager = () => {
       return Array.from(finalIds);
     }
 
-    // NEW "Drilled-Down" Logic: If no L2/L3 are selected, the context IS the
-    // currently viewed top-level journal, as long as it's not the user's root.
     const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
     if (
       selectedTopLevelJournalId &&
@@ -188,7 +181,6 @@ export const useJournalManager = () => {
       return [selectedTopLevelJournalId];
     }
 
-    // Fallback: If we're at the root view with no selections, the context is empty.
     return [];
   }, [
     isJournalSliderPrimary,
@@ -200,51 +192,7 @@ export const useJournalManager = () => {
     hierarchyData,
   ]);
 
-  // The logic for what constitutes a "terminal" node for document creation is updated.
-  const isTerminalJournalActive = useMemo(() => {
-    // The button should appear if and only if the user has "drilled down" into a
-    // specific L1-level journal context, and that journal has no children.
-
-    // Condition 1: Journal slider must be in the primary position.
-    if (!isJournalSliderPrimary) {
-      return false;
-    }
-
-    // Condition 2: The user must be drilled-down into a specific journal, not at the root.
-    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
-    if (
-      !selectedTopLevelJournalId ||
-      selectedTopLevelJournalId === effectiveRootId
-    ) {
-      return false;
-    }
-
-    // Condition 3: No L2 or L3 items can be selected. The context is the L1 container itself.
-    if (
-      selectedLevel2JournalIds.length > 0 ||
-      selectedLevel3JournalIds.length > 0
-    ) {
-      return false;
-    }
-
-    // Condition 4: Find the node for the drilled-down journal.
-    const focusedNode = findNodeById(hierarchyData, selectedTopLevelJournalId);
-
-    // Condition 5: The node must exist and be terminal (no children).
-    return (
-      !!focusedNode &&
-      (!focusedNode.children || focusedNode.children.length === 0)
-    );
-  }, [
-    isJournalSliderPrimary,
-    hierarchyData,
-    selectedLevel2JournalIds,
-    selectedLevel3JournalIds,
-    selectedTopLevelJournalId,
-    restrictedJournalId,
-  ]);
-
-  // --- Handlers ---
+  // --- Handlers (No changes below this line) ---
   const handleToggleJournalRootFilter = useCallback(
     (filterToToggle: PartnerGoodFilterStatus) => {
       setSelection("journal.rootFilter", filterToToggle);
@@ -419,7 +367,6 @@ export const useJournalManager = () => {
     selectedFlatJournalId,
     activeJournalRootFilters,
     effectiveSelectedJournalIds,
-    isTerminalJournalActive,
     isJournalSliderPrimary,
     isAddJournalModalOpen,
     addJournalContext,
@@ -438,7 +385,7 @@ export const useJournalManager = () => {
     resetJournalSelections,
     setSelectedFlatJournalId,
     handleToggleJournalRootFilter,
-    selectedJournalId, // The ID of the single selected journal, or null.
-    isTerminal,
+    selectedJournalId,
+    isTerminal, // This is now correctly calculated and is the single source of truth.
   };
 };

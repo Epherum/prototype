@@ -1,4 +1,3 @@
-//src/app/page.tsx
 "use client";
 
 // React & Next.js Core
@@ -28,6 +27,7 @@ import {
   UsersController,
   type UsersControllerRef,
 } from "@/features/users/UsersController";
+import { ProjectSliderController } from "@/features/projects/ProjectSliderController";
 
 // Layout Components
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
@@ -48,6 +48,7 @@ import type { AccountNodeData } from "@/lib/types";
 export default function Home() {
   useAuthStoreInitializer();
 
+  const documentControllerRef = useRef(null);
   const usersControllerRef = useRef<UsersControllerRef>(null);
   const journalControllerRef = useRef<JournalSliderControllerRef>(null);
 
@@ -58,7 +59,6 @@ export default function Home() {
     (state) => state.toggleSliderVisibility
   );
 
-  // The single, authoritative instance for all document logic.
   const docManager = useDocumentManager();
   const isDocumentCreationMode = docManager.isCreating;
 
@@ -85,6 +85,7 @@ export default function Home() {
     [SLIDER_TYPES.JOURNAL]: { title: "Journal" },
     [SLIDER_TYPES.PARTNER]: { title: "Partner" },
     [SLIDER_TYPES.GOODS]: { title: "Goods" },
+    [SLIDER_TYPES.PROJECT]: { title: "Project" },
     [SLIDER_TYPES.DOCUMENT]: { title: "Document" },
   };
 
@@ -175,20 +176,15 @@ export default function Home() {
                     />
                   )}
 
+                  {sliderId === SLIDER_TYPES.PROJECT && (
+                    <ProjectSliderController {...layoutControlProps} />
+                  )}
+
                   {sliderId === SLIDER_TYPES.DOCUMENT && (
                     <DocumentController
+                      ref={documentControllerRef}
                       {...layoutControlProps}
-                      isCreating={docManager.isCreating}
-                      canCreateDocument={docManager.canCreateDocument}
-                      lines={docManager.lines}
-                      documentsForSlider={docManager.documentsForSlider}
-                      isLoading={docManager.documentsQuery.isLoading}
-                      isFetching={docManager.documentsQuery.isFetching}
-                      isError={docManager.documentsQuery.isError}
-                      error={docManager.documentsQuery.error}
-                      handleStartCreation={docManager.handleStartCreation}
-                      handleCancelCreation={docManager.handleCancelCreation}
-                      handleSubmit={docManager.handleSubmit}
+                      manager={docManager} // <<< --- FIX: Pass the single manager instance
                     />
                   )}
                 </motion.div>
@@ -197,8 +193,6 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </LayoutGroup>
-
-      {/* Global linking modals */}
       <AnimatePresence>
         {jpqlLinking.isLinkModalOpen && (
           <LinkGoodToPartnersViaJournalModal

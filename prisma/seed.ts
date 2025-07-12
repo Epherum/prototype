@@ -6,6 +6,8 @@ import {
   Journal as PrismaJournal,
   ApprovalStatus,
   EntityState,
+  DocumentType,
+  DocumentState,
   Prisma,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -27,11 +29,17 @@ type SeedJournalInput = Omit<
 async function deleteAllData() {
   console.log("--- Deleting all existing data... ---");
   await prisma.$transaction([
+    // *** START MODIFICATION ***
+    prisma.documentLine.deleteMany({}),
+    // *** END MODIFICATION ***
     prisma.journalPartnerGoodLink.deleteMany({}),
     prisma.rolePermission.deleteMany({}),
     prisma.userRole.deleteMany({}),
     prisma.journalPartnerLink.deleteMany({}),
     prisma.journalGoodLink.deleteMany({}),
+    // *** START MODIFICATION ***
+    prisma.document.deleteMany({}),
+    // *** END MODIFICATION ***
     prisma.goodsAndService.deleteMany({}),
     prisma.partner.deleteMany({}),
     prisma.taxCode.deleteMany({}),
@@ -210,6 +218,36 @@ async function main() {
       resource: "JOURNAL",
       description: "Can read journal data",
     },
+    {
+      action: "READ",
+      resource: "JOURNAL",
+      description: "Can read journal data",
+    },
+    {
+      action: "MANAGE",
+      resource: "DOCUMENT",
+      description: "Can create, read, update, and delete documents",
+    },
+    {
+      action: "CREATE",
+      resource: "DOCUMENT",
+      description: "Can create new documents",
+    },
+    {
+      action: "READ",
+      resource: "DOCUMENT",
+      description: "Can read document data",
+    },
+    {
+      action: "UPDATE",
+      resource: "DOCUMENT",
+      description: "Can update document data",
+    },
+    {
+      action: "DELETE",
+      resource: "DOCUMENT",
+      description: "Can delete documents",
+    },
   ];
   for (const p of permissionsToCreate) {
     await prisma.permission.upsert({
@@ -221,12 +259,27 @@ async function main() {
   console.log("Permissions upserted successfully.");
 
   // --- 2. Create Roles and connect permissions ---
+  const adminRolePermissions = [
+    { action: "MANAGE", resource: "USERS" },
+    { action: "MANAGE", resource: "DOCUMENT" }, // Give full control over documents
+    { action: "CREATE", resource: "ROLE" }, // Roles don't have a "MANAGE" action in your setup
+    { action: "READ", resource: "ROLE" },
+    // NOTE: We can omit the granular permissions for resources covered by "MANAGE"
+    // unless a specific check requires them. For simplicity and power, MANAGE is best.
+    { action: "CREATE", resource: "PARTNER" },
+    { action: "READ", resource: "PARTNER" },
+    { action: "UPDATE", resource: "PARTNER" },
+    { action: "CREATE", resource: "GOODS" },
+    { action: "READ", resource: "GOODS" },
+    { action: "READ", resource: "JOURNAL" },
+  ];
+
   const adminRole = await prisma.role.create({
     data: {
       name: "Admin",
       description: "Full access to all application data and settings.",
       permissions: {
-        create: permissionsToCreate.map((p) => ({
+        create: adminRolePermissions.map((p) => ({
           permission: {
             connect: {
               action_resource: { action: p.action, resource: p.resource },
@@ -691,6 +744,48 @@ async function main() {
     },
   });
   console.log("Tri-partite links created successfully.");
+
+  // --- 10. Create Sample Documents ---
+  console.log("\nCreating sample documents...");
+
+  // Create an INVOICE for 'The Cozy Cafe' (Partner linked to journal 4001)
+  await prisma.document.create({
+    data: {
+      refDoc: "INV-2025-001",
+      type: DocumentType.INVOICE,
+      date: new Date("2025-06-15T10:00:00Z"),
+      state: DocumentState.FINALIZED,
+      description: "Invoice for weekly pastry delivery.",
+      partnerId: pCustomerCafeA.id, // pCustomerCafeA is linked to journal 4001
+      createdById: defaultCreatorId, // Created by 'Sales Manager Sam'
+      totalHT: new Prisma.Decimal(150.0),
+      totalTax: new Prisma.Decimal(30.0),
+      totalTTC: new Prisma.Decimal(180.0),
+      balance: new Prisma.Decimal(180.0),
+      approvalStatus: ApprovalStatus.APPROVED,
+    },
+  });
+
+  // Create a DRAFT QUOTE for 'MegaCorp Events' (Partner linked to journal 4101)
+  // This demonstrates creating a document for another partner in the revenue hierarchy.
+  await prisma.document.create({
+    data: {
+      refDoc: "QT-2025-002",
+      type: DocumentType.QUOTE,
+      date: new Date("2025-07-01T14:30:00Z"),
+      state: DocumentState.DRAFT,
+      description: "Quote for annual gala catering.",
+      partnerId: pCustomerMegaCorp.id,
+      createdById: defaultCreatorId, // Created by 'Sales Manager Sam'
+      totalHT: new Prisma.Decimal(5000.0),
+      totalTax: new Prisma.Decimal(1000.0),
+      totalTTC: new Prisma.Decimal(6000.0),
+      balance: new Prisma.Decimal(6000.0),
+      approvalStatus: ApprovalStatus.PENDING,
+    },
+  });
+
+  console.log("Sample documents created successfully.");
 
   console.log("\n--- Seeding finished successfully! ---");
 }

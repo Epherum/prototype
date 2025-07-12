@@ -1,3 +1,4 @@
+//src/lib/constants.js
 import {
   IoCartOutline,
   IoPricetagOutline,

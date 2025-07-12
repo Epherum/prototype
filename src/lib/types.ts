@@ -313,3 +313,10 @@ export interface CreateDocumentClientData {
   partnerId: string; // The locked partner ID from the global store.
   lines: DocumentLineClientData[];
 }
+
+export type UpdateDocumentClientData = {
+  refDoc?: string;
+  date?: string; // Or Date
+  description?: string | null;
+  paymentMode?: string | null;
+};

@@ -88,6 +88,5 @@ export const documentKeys = {
   list: (partnerId: string | null) =>
     [...documentKeys.lists(), { partnerId }] as const,
   details: () => [...documentKeys.all, "detail"] as const,
-  detail: (id: string | null | undefined) =>
-    [...documentKeys.details(), id] as const,
+  detail: (id: string | null) => [...documentKeys.details(), id] as const,
 };

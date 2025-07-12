@@ -1,3 +1,5 @@
+// src/features/documents/useDocumentManager.ts
+
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
@@ -7,6 +9,9 @@ import { documentKeys } from "@/lib/queryKeys";
 import {
   createDocument,
   fetchDocuments,
+  getDocumentById, // --- NEW ---
+  updateDocument, // --- NEW ---
+  deleteDocument, // --- NEW ---
 } from "@/services/clientDocumentService";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 
@@ -14,6 +19,7 @@ import type {
   Document,
   DocumentLineClientData,
   CreateDocumentClientData,
+  UpdateDocumentClientData, // --- NEW ---
   Good,
 } from "@/lib/types";
 
@@ -33,9 +39,17 @@ export const useDocumentManager = () => {
     (state) => state.cancelDocumentCreation
   );
 
+  // --- EXISTING STATE FOR CREATION ---
   const [lines, setLines] = useState<DocumentLineClientData[]>([]);
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
 
+  // --- NEW STATE FOR EDIT/DELETE MODALS ---
+  const [modalState, setModalState] = useState<{
+    view: "closed" | "edit" | "delete" | "view";
+    documentId: string | null;
+  }>({ view: "closed", documentId: null });
+
+  // --- EXISTING QUERY FOR DOCUMENT LIST ---
   const documentsQuery = useQuery({
     queryKey: documentKeys.list(selectedPartnerId),
     queryFn: () => {
@@ -48,6 +62,81 @@ export const useDocumentManager = () => {
       !!selectedPartnerId && selectedPartnerId !== "undefined" && !isCreating,
   });
 
+  // --- NEW QUERY FOR A SINGLE (ACTIVE) DOCUMENT FOR THE MODAL ---
+  const {
+    data: activeDocument,
+    isLoading: isLoadingActiveDocument,
+    isError: isErrorActiveDocument,
+  } = useQuery({
+    queryKey: documentKeys.detail(modalState.documentId),
+    queryFn: () => getDocumentById(modalState.documentId!),
+    enabled: modalState.documentId !== null && modalState.view !== "closed",
+    // Do not refetch when the window is refocused, to avoid closing the modal unexpectedly
+    refetchOnWindowFocus: false,
+  });
+
+  // --- NEW MUTATION FOR UPDATING A DOCUMENT ---
+  const updateDocumentMutation = useMutation({
+    mutationFn: (vars: { id: string; data: UpdateDocumentClientData }) =>
+      updateDocument(vars),
+    onSuccess: (updatedDocument) => {
+      // Invalidate both the list of documents and the specific document detail query
+      queryClient.invalidateQueries({
+        queryKey: documentKeys.list(selectedPartnerId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: documentKeys.detail(updatedDocument.id),
+      });
+      alert("Document updated successfully!");
+      closeModal(); // Close the edit modal on success
+    },
+    onError: (error: Error) => {
+      console.error("Failed to update document:", error);
+      alert(`Error updating document: ${error.message}`);
+    },
+  });
+
+  // --- NEW MUTATION FOR DELETING A DOCUMENT ---
+  const deleteDocumentMutation = useMutation({
+    mutationFn: (id: string) => deleteDocument(id),
+    onSuccess: () => {
+      // Invalidate the list of documents to remove the deleted one
+      queryClient.invalidateQueries({
+        queryKey: documentKeys.list(selectedPartnerId),
+      });
+      alert("Document deleted successfully.");
+      closeModal(); // Close the confirmation modal
+    },
+    onError: (error: Error) => {
+      console.error("Failed to delete document:", error);
+      alert(`Error deleting document: ${error.message}`);
+    },
+  });
+
+  // --- NEW HANDLERS FOR MODALS ---
+  const openEditModal = (documentId: string) => {
+    setModalState({ view: "edit", documentId });
+  };
+
+  const openDeleteModal = (documentId: string) => {
+    setModalState({ view: "delete", documentId });
+  };
+
+  const openViewModal = (documentId: string) => {
+    setModalState({ view: "view", documentId });
+  };
+
+  const closeModal = () => {
+    setModalState({ view: "closed", documentId: null });
+  };
+
+  const handleConfirmDelete = () => {
+    if (modalState.documentId) {
+      deleteDocumentMutation.mutate(modalState.documentId);
+    }
+  };
+
+  // --- EXISTING LOGIC (UNCHANGED) ---
   const canCreateDocument = useMemo(() => {
     const isPartnerValid =
       !!selectedPartnerId && selectedPartnerId !== "undefined";
@@ -100,7 +189,6 @@ export const useDocumentManager = () => {
     });
   }, []);
 
-  // --- THIS IS THE FIX ---
   const handleUpdateLine = useCallback(
     (jpqLinkId: string, details: { quantity?: number; unitPrice?: number }) => {
       setLines((currentLines) =>
@@ -111,7 +199,6 @@ export const useDocumentManager = () => {
 
             return {
               ...line,
-              // Only update if the new value is a valid number
               quantity:
                 newQuantity !== undefined && !isNaN(newQuantity)
                   ? newQuantity
@@ -188,7 +275,9 @@ export const useDocumentManager = () => {
     [lines]
   );
 
+  // --- RETURN NEW AND EXISTING VALUES ---
   return {
+    // Existing values for Creation
     isCreating,
     lines,
     documentsForSlider,
@@ -204,5 +293,18 @@ export const useDocumentManager = () => {
     handleSubmit,
     isGoodInDocument,
     setIsFinalizeModalOpen,
+
+    // --- NEW --- Values for Edit/Delete/View
+    modalState,
+    activeDocument,
+    isLoadingActiveDocument,
+    isErrorActiveDocument,
+    updateDocumentMutation,
+    deleteDocumentMutation,
+    openEditModal,
+    openDeleteModal,
+    openViewModal,
+    closeModal,
+    handleConfirmDelete,
   };
 };

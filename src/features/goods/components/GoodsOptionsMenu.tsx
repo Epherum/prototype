@@ -1,3 +1,4 @@
+//src/features/goods/components/GoodsOptionsMenu.tsx
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "@/features/shared/components/OptionsMenu.module.css";

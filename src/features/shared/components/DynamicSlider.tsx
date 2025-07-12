@@ -1,4 +1,3 @@
-//src/features/shared/components/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import {
@@ -56,6 +55,7 @@ interface DynamicSliderProps {
   onOpenContextJournalFilterModal?: () => void;
   gpgContextJournalInfo?: GPGContextJournalInfo | null;
   placeholderMessage?: string;
+  onItemClick?: (id: string) => void;
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -78,6 +78,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   onOpenContextJournalFilterModal,
   gpgContextJournalInfo,
   placeholderMessage,
+  onItemClick,
 }) => {
   const initialSlideIndex = Math.max(
     0,
@@ -87,7 +88,12 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   const handleSwiperChange = (swiper: any) => {
     if (isLocked) return;
     const currentRealIndex = swiper.activeIndex;
-    if (data && data.length > currentRealIndex && data[currentRealIndex]) {
+    if (
+      data &&
+      data.length > currentRealIndex &&
+      data[currentRealIndex] &&
+      typeof onSlideChange === "function" // Defensive check
+    ) {
       onSlideChange(data[currentRealIndex].id);
     }
   };
@@ -183,6 +189,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                 className={`${styles.slide} ${
                   isSelectedForDocument ? styles.slideSelectedForDocument : ""
                 }`}
+                onClick={() => onItemClick && onItemClick(item.id)}
               >
                 <div className={styles.slideTextContent}>
                   <span className={styles.slideName}>
@@ -194,11 +201,13 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                     </span>
                   )}
                 </div>
+
                 {isSelectedForDocument && (
                   <div className={styles.selectedGoodIndicator}>
                     ✓ In Document
                   </div>
                 )}
+                {/* --- FIX: The options button is no longer rendered here --- */}
               </SwiperSlide>
             );
           })}
@@ -321,7 +330,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                   <input
                                     type="number"
                                     id={`qty-${currentItemForAccordion.id}`}
-                                    // --- FIX 1: Allow the input to be empty if the value is 0 ---
                                     value={
                                       documentLines?.find(
                                         (l) =>
@@ -330,7 +338,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                       )?.quantity || ""
                                     }
                                     onChange={(e) => {
-                                      // --- FIX 2: If the input is cleared, send 0. Otherwise, send the parsed number. ---
                                       const value =
                                         e.target.value === ""
                                           ? 0
@@ -353,7 +360,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                   <input
                                     type="number"
                                     id={`price-${currentItemForAccordion.id}`}
-                                    // --- FIX 1: Allow the input to be empty if the value is 0 ---
                                     value={
                                       documentLines?.find(
                                         (l) =>
@@ -362,7 +368,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                                       )?.unitPrice || ""
                                     }
                                     onChange={(e) => {
-                                      // --- FIX 2: If the input is cleared, send 0. Otherwise, send the parsed number. ---
                                       const value =
                                         e.target.value === ""
                                           ? 0

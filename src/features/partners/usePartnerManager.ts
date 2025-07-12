@@ -43,11 +43,8 @@ export const usePartnerManager = () => {
   } = selections;
 
   // --- FIX: Consume the specialist hook for derived journal data ONCE at the top level ---
-  const {
-    effectiveSelectedJournalIds,
-    isJournalSliderPrimary,
-    isTerminalJournalActive,
-  } = useJournalManager();
+  const { effectiveSelectedJournalIds, isJournalSliderPrimary, isTerminal } =
+    useJournalManager();
 
   // --- Local UI state for modals/menus ---
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
@@ -307,7 +304,7 @@ export const usePartnerManager = () => {
     createPartnerMutation,
     updatePartnerMutation,
     deletePartnerMutation,
-    isTerminalJournalActive, // This is now correctly sourced
+    isTerminal, // This is now correctly sourced
     handleOpenPartnerOptionsMenu,
     handleClosePartnerOptionsMenu,
     handleOpenAddPartnerModal,
