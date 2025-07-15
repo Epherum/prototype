@@ -113,8 +113,8 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [SLIDER_TYPES.JOURNAL]: true,
       [SLIDER_TYPES.PARTNER]: true,
       [SLIDER_TYPES.GOODS]: true,
-      [SLIDER_TYPES.PROJECT]: true,
       [SLIDER_TYPES.DOCUMENT]: true,
+      [SLIDER_TYPES.PROJECT]: false,
     },
     documentCreationState: getInitialDocumentCreationState(),
     accordionState: {
