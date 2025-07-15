@@ -226,6 +226,77 @@ const goodsService = {
       return null;
     }
   },
+
+  // Add this function to your existing goodsService.ts file
+
+  /**
+   * Finds goods that are linked to ALL specified partners within a given journal context.
+   * @param partnerIds - An array of Partner IDs.
+   * @param journalId - The Journal ID context.
+   * @returns A paginated response of goods that are common to all partners.
+   */
+  async findGoodsForPartnersIntersection(
+    partnerIds: bigint[],
+    journalId: string
+  ): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
+    if (partnerIds.length === 0) {
+      return { goods: [], totalCount: 0 };
+    }
+
+    // Find the JournalPartnerLink IDs for the given journal and partners.
+    const journalPartnerLinks = await prisma.journalPartnerLink.findMany({
+      where: {
+        journalId: journalId,
+        partnerId: { in: partnerIds },
+      },
+      select: { id: true, partnerId: true },
+    });
+
+    // Early exit if not all partners are even linked to the journal.
+    const uniquePartnerIdsInLinks = new Set(
+      journalPartnerLinks.map((l) => l.partnerId.toString())
+    );
+    if (uniquePartnerIdsInLinks.size < partnerIds.length) {
+      return { goods: [], totalCount: 0 };
+    }
+
+    const journalPartnerLinkIds = journalPartnerLinks.map((jpl) => jpl.id);
+
+    // Group by goodId, and only return those that are linked to a number of
+    // JournalPartnerLinks equal to the number of partners we're searching for.
+    const goodIdGroups = await prisma.journalPartnerGoodLink.groupBy({
+      by: ["goodId"],
+      where: {
+        journalPartnerLinkId: { in: journalPartnerLinkIds },
+      },
+      _count: {
+        journalPartnerLinkId: true,
+      },
+      having: {
+        journalPartnerLinkId: {
+          _count: {
+            equals: partnerIds.length,
+          },
+        },
+      },
+    });
+
+    const intersectingGoodIds = goodIdGroups.map((group) => group.goodId);
+
+    if (intersectingGoodIds.length === 0) {
+      return { goods: [], totalCount: 0 };
+    }
+
+    // Fetch the actual good data based on the resulting IDs.
+    const totalCount = intersectingGoodIds.length;
+    const goods = await prisma.goodsAndService.findMany({
+      where: {
+        id: { in: intersectingGoodIds },
+      },
+    });
+
+    return { goods, totalCount };
+  },
 };
 
 export default goodsService;

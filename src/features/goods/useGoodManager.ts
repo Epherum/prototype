@@ -1,11 +1,7 @@
 // src/features/goods/useGoodManager.ts
 "use client";
 
-// --- ADDED THIS FOR LOGGING ---
-import { useEffect } from "react";
-// ------------------------------
-
-import { useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   useQuery,
   useMutation,
@@ -13,14 +9,14 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
-import { goodKeys, jpgLinkKeys } from "@/lib/queryKeys";
+import { goodKeys } from "@/lib/queryKeys";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import {
   fetchGoods,
-  fetchGoodsForDocumentContext,
   createGood,
   updateGood,
   deleteGood,
+  fetchIntersectionOfGoods,
 } from "@/services/clientGoodService";
 import type {
   Good,
@@ -47,125 +43,143 @@ export const useGoodManager = () => {
   const [goodsOptionsMenuAnchorEl, setGoodsOptionsMenuAnchorEl] =
     useState<null | HTMLElement>(null);
 
-  const documentContextQuery = useQuery({
-    queryKey: jpgLinkKeys.listForDocumentContext(
-      documentCreationState.lockedPartnerId,
-      documentCreationState.lockedJournalId
-    ),
-    queryFn: () =>
-      fetchGoodsForDocumentContext(
-        documentCreationState.lockedPartnerId!,
-        documentCreationState.lockedJournalId!
-      ),
-    enabled:
-      documentCreationState.isCreating &&
-      !!documentCreationState.lockedPartnerId &&
-      !!documentCreationState.lockedJournalId,
-    staleTime: Infinity,
-  });
+  // --- DATA FETCHING LOGIC ---
 
-  const queryParams: FetchGoodsParams | null = useMemo(() => {
-    if (documentCreationState.isCreating) {
-      return null;
-    }
-
+  // Query 1: For normal, non-document-creation operation (Unchanged)
+  const normalGoodsQueryParams: FetchGoodsParams | null = useMemo(() => {
     const { journal, partner } = selections;
     const visibleOrder = sliderOrder.filter((id) => visibility[id]);
     const goodsIndex = visibleOrder.indexOf(SLIDER_TYPES.GOODS);
-
-    if (goodsIndex === -1) {
-      return null;
-    }
-
-    // --- NEW, MORE ACCURATE DEFINITION OF "SELECTED" ---
-    // A user has made a selection only if they have drilled down beyond the initial top-level.
+    if (goodsIndex === -1) return null;
+    const journalIndex = visibleOrder.indexOf(SLIDER_TYPES.JOURNAL);
+    const partnerIndex = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
     const hasActiveJournalSelection =
       journal.level2Ids.length > 0 ||
       journal.level3Ids.length > 0 ||
       !!journal.flatId;
-
-    // The IDs to be used for filtering, if a selection has been made.
     const filteringJournalIds = [
       journal.topLevelId,
       ...journal.level2Ids,
       ...journal.level3Ids,
       journal.flatId,
     ].filter((id): id is string => !!id && id !== ROOT_JOURNAL_ID);
-    // --------------------------------------------------------
-
-    const precedingSliders = visibleOrder.slice(0, goodsIndex);
-    const hasJournalPreceding = precedingSliders.includes(SLIDER_TYPES.JOURNAL);
-    const hasPartnerPreceding = precedingSliders.includes(SLIDER_TYPES.PARTNER);
-
-    // --- The Gatekeeper (now using the new definition) ---
-    if (hasJournalPreceding && !hasActiveJournalSelection) {
-      return null; // DO NOT FETCH
-    }
-
-    // --- Mutually Exclusive Scenarios ---
-    if (hasJournalPreceding && hasPartnerPreceding && partner) {
+    if (goodsIndex === 0)
+      return { restrictedJournalId: auth.effectiveRestrictedJournalId };
+    if (journalIndex < goodsIndex && !hasActiveJournalSelection) return null;
+    if (journalIndex < goodsIndex && partnerIndex < goodsIndex && partner) {
       return {
         forJournalIds: filteringJournalIds,
         forPartnerId: partner,
         includeJournalChildren: true,
       };
-    } else if (hasJournalPreceding) {
-      return {
-        linkedToJournalIds: filteringJournalIds,
-        includeJournalChildren: true,
-      };
-    } else if (goodsIndex === 0 || !hasJournalPreceding) {
-      // This case is for when Goods is the first slider. It fetches a broad list.
+    } else if (journalIndex < goodsIndex) {
       return {
         filterStatuses: journal.rootFilter as PartnerGoodFilterStatus[],
-        // We pass the root journal as context, but this does not imply a selection.
-        contextJournalIds: [journal.topLevelId].filter(
-          (id) => id !== ROOT_JOURNAL_ID
-        ),
+        contextJournalIds: filteringJournalIds,
+        includeJournalChildren: true,
         restrictedJournalId: auth.effectiveRestrictedJournalId,
       };
     }
-
     return null;
-  }, [
-    selections,
-    sliderOrder,
-    visibility,
-    documentCreationState.isCreating,
-    auth.effectiveRestrictedJournalId,
-  ]);
-
-  // --- LOGGING HOOK ---
-  // This effect will run ONLY when queryParams changes, giving a clean log.
-  useEffect(() => {
-    console.log(
-      `%c[useGoodManager] Final queryParams object for TanStack Query:`,
-      "color: blue; font-weight: bold;",
-      queryParams
-    );
-  }, [queryParams]);
-  // --------------------
+  }, [selections, sliderOrder, visibility, auth.effectiveRestrictedJournalId]);
 
   const normalGoodsQuery = useQuery({
-    queryKey: goodKeys.list(queryParams!),
-    queryFn: () => {
-      // Log right before the fetch happens
-      console.log(
-        `%c[useGoodManager] EXECUTING FETCH with params:`,
-        "color: red; font-weight: bold;",
-        queryParams
-      );
-      return fetchGoods(queryParams!);
-    },
-    enabled: !documentCreationState.isCreating && !!queryParams,
+    queryKey: goodKeys.list(normalGoodsQueryParams!),
+    queryFn: () => fetchGoods(normalGoodsQueryParams!),
+    enabled:
+      (!documentCreationState.isCreating ||
+        (documentCreationState.isCreating &&
+          (documentCreationState.mode === "INTERSECT_FROM_GOOD" ||
+            documentCreationState.mode === "LOCK_GOOD" ||
+            documentCreationState.mode === "SINGLE_ITEM"))) &&
+      !!normalGoodsQueryParams,
     staleTime: 5 * 60 * 1000,
-    placeholderData: (previousData) => previousData,
   });
 
-  const activeQuery: UseQueryResult<PaginatedGoodsResponse, Error> =
-    documentCreationState.isCreating ? documentContextQuery : normalGoodsQuery;
+  const goodsForSinglePartnerQuery = useQuery({
+    queryKey: goodKeys.list({
+      forPartnerId: documentCreationState.lockedPartnerIds[0],
+      forJournalIds: [documentCreationState.lockedJournalId!],
+    }),
+    queryFn: () =>
+      fetchGoods({
+        forPartnerId: documentCreationState.lockedPartnerIds[0],
+        forJournalIds: [documentCreationState.lockedJournalId!],
+        includeJournalChildren: true,
+      }),
+    enabled:
+      documentCreationState.isCreating &&
+      // ✅ Enable this query in two scenarios:
+      (documentCreationState.mode === "LOCK_PARTNER" ||
+        (documentCreationState.mode === "INTERSECT_FROM_PARTNER" &&
+          documentCreationState.lockedPartnerIds.length === 1)) &&
+      documentCreationState.lockedPartnerIds.length > 0 &&
+      !!documentCreationState.lockedJournalId,
+    staleTime: Infinity,
+  });
 
-  // ... rest of the file is unchanged ...
+  // 3. Query for the INTERSECTION of MULTIPLE selected partners (2 or more)
+  const intersectionGoodsQuery = useQuery({
+    queryKey: goodKeys.list({
+      forPartnersIntersection: documentCreationState.lockedPartnerIds,
+      journalId: documentCreationState.lockedJournalId,
+    }),
+    queryFn: () =>
+      fetchIntersectionOfGoods(
+        documentCreationState.lockedPartnerIds,
+        documentCreationState.lockedJournalId!
+      ),
+    // ✅ FIX: This query should ONLY be enabled when there are 2 OR MORE partners selected.
+    enabled:
+      documentCreationState.isCreating &&
+      documentCreationState.mode === "INTERSECT_FROM_PARTNER" &&
+      documentCreationState.lockedPartnerIds.length > 1 && // The key change is from `> 0` to `> 1`
+      !!documentCreationState.lockedJournalId,
+    staleTime: Infinity,
+  });
+
+  // === ACTIVE QUERY SELECTOR (THE CORE FIX) ===
+  const activeQuery: UseQueryResult<PaginatedGoodsResponse, Error> =
+    useMemo(() => {
+      const { isCreating, mode, lockedPartnerIds } = documentCreationState;
+
+      if (!isCreating) {
+        return normalGoodsQuery;
+      }
+
+      switch (mode) {
+        // This is the flow we are fixing (J -> D -> P -> G)
+        case "INTERSECT_FROM_PARTNER":
+          // If 1 partner is selected, show all their goods.
+          if (lockedPartnerIds.length === 1) {
+            return goodsForSinglePartnerQuery;
+          }
+          // If 2 or more partners are selected, show the intersection.
+          if (lockedPartnerIds.length > 1) {
+            return intersectionGoodsQuery;
+          }
+          // If 0 partners are selected, show nothing.
+          return { data: { data: [], total: 0 }, status: "success" } as any;
+
+        // This flow (J -> P -> D -> G) correctly uses the single partner query.
+        case "LOCK_PARTNER":
+          return goodsForSinglePartnerQuery;
+
+        // In these modes, the Goods slider is the *source* of the selection.
+        case "INTERSECT_FROM_GOOD":
+        case "LOCK_GOOD":
+        case "SINGLE_ITEM":
+          return normalGoodsQuery;
+
+        default:
+          return { data: { data: [], total: 0 }, status: "success" } as any;
+      }
+    }, [
+      documentCreationState,
+      normalGoodsQuery,
+      goodsForSinglePartnerQuery, // Renamed from documentContextQuery for clarity
+      intersectionGoodsQuery,
+    ]);
 
   const createGoodMutation = useMutation({
     mutationFn: (data: Omit<Good, "id" | "createdAt" | "updatedAt">) =>
@@ -205,23 +219,19 @@ export const useGoodManager = () => {
   }, [activeQuery.data]);
 
   useEffect(() => {
-    // This effect handles auto-selecting a good when the list changes.
     const isReadyForSelection =
       !activeQuery.isLoading && !activeQuery.isFetching;
-    if (!isReadyForSelection) return;
-
+    if (!isReadyForSelection || documentCreationState.isCreating) return;
     const selectedExists = goodsForSlider.some((g) => g.id === selectedGoodsId);
-
-    // Case 1: The list is not empty, but nothing is selected. Select the first item.
     if (!selectedGoodsId && goodsForSlider.length > 0) {
       setSelectedGoodsId(goodsForSlider[0].id);
-    }
-    // Case 2: The currently selected item is no longer in the list. Select the new first item.
-    else if (selectedGoodsId && !selectedExists && goodsForSlider.length > 0) {
+    } else if (
+      selectedGoodsId &&
+      !selectedExists &&
+      goodsForSlider.length > 0
+    ) {
       setSelectedGoodsId(goodsForSlider[0].id);
-    }
-    // Case 3: The list has become empty, but something is still selected. Clear the selection.
-    else if (goodsForSlider.length === 0 && selectedGoodsId) {
+    } else if (goodsForSlider.length === 0 && selectedGoodsId) {
       setSelectedGoodsId(null);
     }
   }, [
@@ -230,6 +240,7 @@ export const useGoodManager = () => {
     setSelectedGoodsId,
     activeQuery.isLoading,
     activeQuery.isFetching,
+    documentCreationState.isCreating,
   ]);
 
   const handleOpenAddGoodModal = () => {
@@ -237,7 +248,6 @@ export const useGoodManager = () => {
     setAddEditGoodModalOpen(true);
     setGoodsOptionsMenuOpen(false);
   };
-
   const handleOpenEditGoodModal = () => {
     if (!selectedGoodsId) return;
     const goodToEdit = activeQuery.data?.data?.find(
@@ -249,7 +259,6 @@ export const useGoodManager = () => {
       setGoodsOptionsMenuOpen(false);
     }
   };
-
   const handleDeleteCurrentGood = () => {
     if (
       selectedGoodsId &&
@@ -259,9 +268,7 @@ export const useGoodManager = () => {
       setGoodsOptionsMenuOpen(false);
     }
   };
-
   const handleCloseAddEditGoodModal = () => setAddEditGoodModalOpen(false);
-
   const handleAddOrUpdateGoodSubmit = (
     data: Omit<Good, "id" | "createdAt" | "updatedAt">
   ) => {
@@ -271,12 +278,10 @@ export const useGoodManager = () => {
       createGoodMutation.mutate(data);
     }
   };
-
   const handleOpenGoodsOptionsMenu = (event: React.MouseEvent<HTMLElement>) => {
     setGoodsOptionsMenuAnchorEl(event.currentTarget);
     setGoodsOptionsMenuOpen(true);
   };
-
   const handleCloseGoodsOptionsMenu = () => setGoodsOptionsMenuOpen(false);
 
   return {

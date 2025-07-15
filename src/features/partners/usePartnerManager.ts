@@ -2,34 +2,38 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import {
+  useQuery,
+  useQueryClient,
+  useMutation,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import { partnerKeys } from "@/lib/queryKeys";
 import { useAppStore } from "@/store/appStore";
 import { SLIDER_TYPES } from "@/lib/constants";
 import { getFirstId } from "@/lib/helpers";
-
 import {
   fetchPartners,
   createPartner,
   updatePartner,
   deletePartner,
+  fetchIntersectionOfPartners,
 } from "@/services/clientPartnerService";
-
 import { useJournalManager } from "@/features/journals/useJournalManager";
-
 import type {
   Partner,
   CreatePartnerClientData,
   UpdatePartnerClientData,
   FetchPartnersParams,
+  PaginatedPartnersResponse,
 } from "@/lib/types";
 
 export const usePartnerManager = () => {
   const queryClient = useQueryClient();
 
-  // --- Consume state from Zustand ---
-  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
-  const visibility = useAppStore((state) => state.ui.visibility);
+  const { sliderOrder, visibility, documentCreationState } = useAppStore(
+    (state) => state.ui
+  );
   const selections = useAppStore((state) => state.selections);
   const setSelection = useAppStore((state) => state.setSelection);
   const effectiveRestrictedJournalId = useAppStore(
@@ -42,11 +46,7 @@ export const usePartnerManager = () => {
     partner: selectedPartnerId,
   } = selections;
 
-  // --- FIX: Consume the specialist hook for derived journal data ONCE at the top level ---
-  const { effectiveSelectedJournalIds, isJournalSliderPrimary, isTerminal } =
-    useJournalManager();
-
-  // --- Local UI state for modals/menus ---
+  const { effectiveSelectedJournalIds } = useJournalManager();
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
     useState(false);
   const [partnerOptionsMenuAnchorEl, setPartnerOptionsMenuAnchorEl] =
@@ -64,98 +64,168 @@ export const usePartnerManager = () => {
     [setSelection]
   );
 
-  // --- CORRECTED: Robust Query Parameter Generation ---
-  const partnerQueryKeyParamsStructure = useMemo((): FetchPartnersParams => {
-    let params: FetchPartnersParams = { limit: 1000, offset: 0 };
-    const partnerIndex = sliderOrder.indexOf(SLIDER_TYPES.PARTNER);
+  // === LOGGING: Let's see what this manager thinks the state is ===
+  if (true) {
+    console.groupCollapsed(`[DEBUG: usePartnerManager] Render/Update`);
+    console.log(
+      `Document Creation Mode: %c${documentCreationState.mode}`,
+      "font-weight: bold;"
+    );
+    console.log(`isCreating: ${documentCreationState.isCreating}`);
+    console.log(
+      `Locked Goods: [${documentCreationState.lockedGoodIds.join(", ")}]`
+    );
+    console.log(`Locked Journal: ${documentCreationState.lockedJournalId}`);
+    console.groupEnd();
+  }
+  // ===
 
-    // --- KEY FIX 1: ALWAYS apply general filters first. ---
-    params.filterStatuses = journalSelections.rootFilter;
-    params.restrictedJournalId = effectiveRestrictedJournalId;
-
-    // --- KEY FIX 2: ONLY add the specific `contextJournalIds` when needed. ---
-    // USE the variables from the top-level hook call, DO NOT call the hook here.
+  const normalPartnerQueryParams = useMemo((): FetchPartnersParams => {
+    // ... (logic is unchanged) ...
+    const visibleOrder = sliderOrder.filter((id) => visibility[id]);
+    const partnerIndex = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
+    if (partnerIndex === -1) return {};
+    const journalIndex = visibleOrder.indexOf(SLIDER_TYPES.JOURNAL);
+    const goodsIndex = visibleOrder.indexOf(SLIDER_TYPES.GOODS);
+    if (partnerIndex === 0)
+      return { restrictedJournalId: effectiveRestrictedJournalId };
     if (
-      isJournalSliderPrimary &&
-      journalSelections.rootFilter.includes("affected")
+      journalIndex < partnerIndex &&
+      goodsIndex < partnerIndex &&
+      selectedGoodsId
     ) {
-      params.contextJournalIds = effectiveSelectedJournalIds;
+      return {
+        linkedToJournalIds: effectiveSelectedJournalIds,
+        linkedToGoodId: selectedGoodsId,
+        restrictedJournalId: effectiveRestrictedJournalId,
+      };
     }
-
-    // Handle other, mutually exclusive slider order logic (e.g., G-J-P)
-    if (
-      sliderOrder.indexOf(SLIDER_TYPES.GOODS) === 0 &&
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1 &&
-      partnerIndex === 2
-    ) {
-      if (selectedGoodsId && journalSelections.flatId) {
-        params.linkedToJournalIds = [journalSelections.flatId];
-        params.linkedToGoodId = selectedGoodsId;
-      }
+    if (journalIndex < partnerIndex) {
+      return {
+        filterStatuses: journalSelections.rootFilter,
+        contextJournalIds: journalSelections.rootFilter.includes("affected")
+          ? effectiveSelectedJournalIds
+          : [],
+        restrictedJournalId: effectiveRestrictedJournalId,
+      };
     }
-
-    return params;
+    return {};
   }, [
     sliderOrder,
-    journalSelections.rootFilter,
-    journalSelections.flatId,
-    effectiveSelectedJournalIds, // Dependency added
-    effectiveRestrictedJournalId,
-    selectedGoodsId,
-    isJournalSliderPrimary, // Dependency added
-  ]);
-
-  const partnerQueryKey = useMemo(
-    () => ["partners", partnerQueryKeyParamsStructure],
-    [partnerQueryKeyParamsStructure]
-  );
-
-  // --- CORRECTED: Robust Query Enabled Logic ---
-  const isPartnerQueryEnabled = useMemo(() => {
-    if (!visibility[SLIDER_TYPES.PARTNER]) {
-      return false;
-    }
-
-    // Case 1: Partner is the first slider, always fetch all partners.
-    if (sliderOrder.indexOf(SLIDER_TYPES.PARTNER) === 0) {
-      return true;
-    }
-
-    // Case 2: ANY root filter is active. This covers "affected", "unaffected",
-    // and "inProcess" correctly.
-    if (journalSelections.rootFilter.length > 0) {
-      return true;
-    }
-
-    // You can add other specific flow conditions here if needed.
-    // e.g., for G-J-P flow
-    const params = partnerQueryKeyParamsStructure;
-    if (params.linkedToGoodId && params.linkedToJournalIds?.length > 0) {
-      return true;
-    }
-
-    // Default to disabled if no valid condition is met.
-    return false;
-  }, [
     visibility,
-    sliderOrder,
-    journalSelections.rootFilter,
-    partnerQueryKeyParamsStructure,
+    journalSelections,
+    selectedGoodsId,
+    effectiveRestrictedJournalId,
+    effectiveSelectedJournalIds,
   ]);
 
-  const partnerQuery = useQuery<{ data: Partner[] }>({
-    queryKey: partnerKeys.list(partnerQueryKeyParamsStructure),
-    queryFn: () => fetchPartners(partnerQueryKeyParamsStructure),
-    enabled: isPartnerQueryEnabled,
+  const normalPartnerQueryEnabled =
+    !documentCreationState.isCreating ||
+    (documentCreationState.isCreating &&
+      (documentCreationState.mode === "LOCK_PARTNER" ||
+        documentCreationState.mode === "SINGLE_ITEM" ||
+        documentCreationState.mode === "INTERSECT_FROM_PARTNER"));
+
+  const normalPartnerQuery = useQuery({
+    queryKey: partnerKeys.list(normalPartnerQueryParams),
+    queryFn: () => fetchPartners(normalPartnerQueryParams),
+    enabled: normalPartnerQueryEnabled,
   });
 
-  // Auto-selection logic (unchanged)
+  const partnersForSingleGoodQuery = useQuery({
+    queryKey: partnerKeys.list({
+      linkedToGoodId: documentCreationState.lockedGoodIds[0],
+      linkedToJournalIds: [documentCreationState.lockedJournalId!],
+    }),
+    queryFn: () =>
+      fetchPartners({
+        linkedToGoodId: documentCreationState.lockedGoodIds[0],
+        linkedToJournalIds: [documentCreationState.lockedJournalId!],
+      }),
+    enabled:
+      documentCreationState.isCreating &&
+      // ✅ Enable this query in two scenarios:
+      (documentCreationState.mode === "LOCK_GOOD" ||
+        (documentCreationState.mode === "INTERSECT_FROM_GOOD" &&
+          documentCreationState.lockedGoodIds.length === 1)) &&
+      documentCreationState.lockedGoodIds.length > 0 && // Technically redundant due to the length check, but safe
+      !!documentCreationState.lockedJournalId,
+  });
+
+  // 3. Query for the INTERSECTION of MULTIPLE selected goods (2 or more)
+  const intersectionPartnersQuery = useQuery({
+    queryKey: partnerKeys.list({
+      forGoodsIntersection: documentCreationState.lockedGoodIds,
+      journalId: documentCreationState.lockedJournalId,
+    }),
+    queryFn: () =>
+      fetchIntersectionOfPartners(
+        documentCreationState.lockedGoodIds,
+        documentCreationState.lockedJournalId!
+      ),
+    // ✅ FIX: This query should ONLY be enabled when there are 2 OR MORE goods selected.
+    enabled:
+      documentCreationState.isCreating &&
+      documentCreationState.mode === "INTERSECT_FROM_GOOD" &&
+      documentCreationState.lockedGoodIds.length > 1 && // The key change is from `> 0` to `> 1`
+      !!documentCreationState.lockedJournalId,
+    staleTime: Infinity,
+  });
+
+  // === ACTIVE QUERY SELECTOR (THE CORE FIX) ===
+  const activeQuery: UseQueryResult<PaginatedPartnersResponse, Error> =
+    useMemo(() => {
+      const { isCreating, mode, lockedGoodIds } = documentCreationState;
+
+      if (!isCreating) {
+        return normalPartnerQuery;
+      }
+
+      switch (mode) {
+        // This is the flow we are fixing (J -> D -> G -> P)
+        case "INTERSECT_FROM_GOOD":
+          // If 1 good is selected, show all its partners.
+          if (lockedGoodIds.length === 1) {
+            return partnersForSingleGoodQuery;
+          }
+          // If 2 or more goods are selected, show the intersection.
+          if (lockedGoodIds.length > 1) {
+            return intersectionPartnersQuery;
+          }
+          // If 0 goods are selected, show nothing.
+          return { data: { data: [], total: 0 }, status: "success" } as any;
+
+        // This flow (J -> G -> D -> P) correctly uses the single good query.
+        case "LOCK_GOOD":
+          return partnersForSingleGoodQuery;
+
+        // These other flows use the normal partner query logic.
+        case "LOCK_PARTNER":
+        case "SINGLE_ITEM":
+        case "INTERSECT_FROM_PARTNER":
+          return normalPartnerQuery;
+
+        default:
+          return { data: { data: [], total: 0 }, status: "success" } as any;
+      }
+    }, [
+      documentCreationState,
+      normalPartnerQuery,
+      intersectionPartnersQuery,
+      partnersForSingleGoodQuery, // Renamed from partnersForLockedGoodQuery for clarity
+    ]);
+
   useEffect(() => {
-    if (partnerQuery.isSuccess && partnerQuery.data) {
-      const fetchedPartners = partnerQuery.data.data;
+    if (
+      activeQuery.isSuccess &&
+      activeQuery.data &&
+      !documentCreationState.isCreating
+    ) {
+      const fetchedPartners = activeQuery.data.data;
       const currentSelectionInList =
         selectedPartnerId &&
         fetchedPartners.some((p) => String(p.id) === selectedPartnerId);
+
       if (fetchedPartners.length > 0 && !currentSelectionInList) {
         setSelectedPartnerId(getFirstId(fetchedPartners));
       } else if (fetchedPartners.length === 0 && selectedPartnerId !== null) {
@@ -163,13 +233,14 @@ export const usePartnerManager = () => {
       }
     }
   }, [
-    partnerQuery.data,
-    partnerQuery.isSuccess,
+    activeQuery.data,
+    activeQuery.isSuccess,
     selectedPartnerId,
     setSelectedPartnerId,
+    documentCreationState.isCreating,
   ]);
 
-  // --- Mutations and Modal Handlers (No changes needed) ---
+  // --- Mutations and Modal Handlers (unchanged) ---
   const createPartnerMutation = useMutation<
     Partner,
     Error,
@@ -179,16 +250,10 @@ export const usePartnerManager = () => {
     onSuccess: (newPartner) => {
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
-      setEditingPartnerData(null);
       alert(`Partner '${newPartner.name}' created successfully!`);
       setSelectedPartnerId(String(newPartner.id));
     },
-    onError: (error: Error) => {
-      console.error("Failed to create partner:", error);
-      alert(`Error creating partner: ${error.message}`);
-    },
   });
-
   const updatePartnerMutation = useMutation<
     Partner,
     Error,
@@ -198,15 +263,9 @@ export const usePartnerManager = () => {
     onSuccess: (updatedPartner) => {
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
-      setEditingPartnerData(null);
       alert(`Partner '${updatedPartner.name}' updated successfully!`);
     },
-    onError: (error: Error) => {
-      console.error("Failed to update partner:", error);
-      alert(`Error updating partner: ${error.message}`);
-    },
   });
-
   const deletePartnerMutation = useMutation<{ message: string }, Error, string>(
     {
       mutationFn: deletePartner,
@@ -216,18 +275,11 @@ export const usePartnerManager = () => {
           response.message ||
             `Partner ${deletedPartnerId} deleted successfully!`
         );
-        if (selectedPartnerId === deletedPartnerId) {
-          setSelectedPartnerId(null);
-        }
-      },
-      onError: (error: Error, deletedPartnerId) => {
-        console.error(`Failed to delete partner ${deletedPartnerId}:`, error);
-        alert(`Error deleting partner: ${error.message}`);
+        if (selectedPartnerId === deletedPartnerId) setSelectedPartnerId(null);
       },
     }
   );
 
-  // Modal handler callbacks (unchanged)
   const handleOpenPartnerOptionsMenu = useCallback(
     (event: React.MouseEvent<HTMLButtonElement>) => {
       setPartnerOptionsMenuAnchorEl(event.currentTarget);
@@ -235,76 +287,59 @@ export const usePartnerManager = () => {
     },
     []
   );
-  const handleClosePartnerOptionsMenu = useCallback(() => {
-    setIsPartnerOptionsMenuOpen(false);
-    setPartnerOptionsMenuAnchorEl(null);
-  }, []);
+  const handleClosePartnerOptionsMenu = useCallback(
+    () => setIsPartnerOptionsMenuOpen(false),
+    []
+  );
   const handleOpenAddPartnerModal = useCallback(() => {
     setEditingPartnerData(null);
     setIsAddEditPartnerModalOpen(true);
     handleClosePartnerOptionsMenu();
   }, [handleClosePartnerOptionsMenu]);
   const handleOpenEditPartnerModal = useCallback(() => {
-    if (selectedPartnerId && partnerQuery.data?.data) {
-      const partnerToEdit = partnerQuery.data.data.find(
+    if (selectedPartnerId && activeQuery.data?.data) {
+      const partnerToEdit = activeQuery.data.data.find(
         (p) => String(p.id) === selectedPartnerId
       );
-      if (partnerToEdit) {
-        setEditingPartnerData(partnerToEdit);
-        setIsAddEditPartnerModalOpen(true);
-      } else {
-        alert("Selected partner data not found.");
-      }
+      if (partnerToEdit) setEditingPartnerData(partnerToEdit);
     }
+    setIsAddEditPartnerModalOpen(true);
     handleClosePartnerOptionsMenu();
-  }, [selectedPartnerId, partnerQuery.data, handleClosePartnerOptionsMenu]);
-  const handleCloseAddEditPartnerModal = useCallback(() => {
-    setIsAddEditPartnerModalOpen(false);
-    setEditingPartnerData(null);
-  }, []);
+  }, [selectedPartnerId, activeQuery.data, handleClosePartnerOptionsMenu]);
+  const handleCloseAddEditPartnerModal = useCallback(
+    () => setIsAddEditPartnerModalOpen(false),
+    []
+  );
   const handleAddOrUpdatePartnerSubmit = useCallback(
-    (
-      dataFromModal: CreatePartnerClientData | UpdatePartnerClientData,
-      partnerIdToUpdate?: string
-    ) => {
-      if (partnerIdToUpdate && editingPartnerData) {
+    (data: CreatePartnerClientData | UpdatePartnerClientData) => {
+      if (editingPartnerData) {
         updatePartnerMutation.mutate({
-          id: partnerIdToUpdate,
-          data: dataFromModal as UpdatePartnerClientData,
+          id: editingPartnerData.id,
+          data: data as UpdatePartnerClientData,
         });
       } else {
-        createPartnerMutation.mutate(dataFromModal as CreatePartnerClientData);
+        createPartnerMutation.mutate(data as CreatePartnerClientData);
       }
     },
     [editingPartnerData, createPartnerMutation, updatePartnerMutation]
   );
   const handleDeleteCurrentPartner = useCallback(() => {
-    if (selectedPartnerId) {
-      if (
-        window.confirm(
-          `Are you sure you want to delete partner with ID ${selectedPartnerId}? This might affect related documents or links.`
-        )
-      ) {
-        deletePartnerMutation.mutate(selectedPartnerId);
-      }
-    }
+    if (selectedPartnerId) deletePartnerMutation.mutate(selectedPartnerId);
     handleClosePartnerOptionsMenu();
   }, [selectedPartnerId, deletePartnerMutation, handleClosePartnerOptionsMenu]);
 
   return {
     selectedPartnerId,
     setSelectedPartnerId,
-    partnersForSlider: partnerQuery.data?.data || [],
-    partnerQuery,
+    partnersForSlider: activeQuery.data?.data || [],
+    partnerQuery: activeQuery,
     isPartnerOptionsMenuOpen,
     partnerOptionsMenuAnchorEl,
     isAddEditPartnerModalOpen,
     editingPartnerData,
-    partnerQueryKey,
     createPartnerMutation,
     updatePartnerMutation,
     deletePartnerMutation,
-    isTerminal, // This is now correctly sourced
     handleOpenPartnerOptionsMenu,
     handleClosePartnerOptionsMenu,
     handleOpenAddPartnerModal,

@@ -205,3 +205,41 @@ export async function fetchPartnersLinkedToJournalsAndGood(
   });
   return result.data;
 }
+
+// Add this function to the end of your src/services/clientPartnerService.ts file
+
+/**
+ * Fetches partners that are common to a given set of goods within a journal context.
+ * Calls the dedicated intersection endpoint.
+ * @param goodIds - An array of good IDs to find the intersection for.
+ * @param journalId - The journal context ID.
+ * @returns A promise that resolves to a paginated response of common partners.
+ */
+export const fetchIntersectionOfPartners = async (
+  goodIds: string[],
+  journalId: string
+): Promise<PaginatedPartnersResponse> => {
+  if (goodIds.length === 0 || !journalId) {
+    return { data: [], total: 0 };
+  }
+
+  const params = new URLSearchParams({
+    goodIds: goodIds.join(","),
+    journalId: journalId,
+  });
+
+  const response = await fetch(
+    `/api/partners/for-goods-intersection?${params.toString()}`
+  );
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      errorData.message || "Failed to fetch intersection of partners"
+    );
+  }
+
+  const result: PaginatedPartnersResponse = await response.json();
+  result.data = result.data.map((p) => ({ ...p, id: String(p.id) }));
+  return result;
+};

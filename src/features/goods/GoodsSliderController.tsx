@@ -1,4 +1,4 @@
-//src/features/goods/useGoodManager.ts
+// src/features/goods/GoodsSliderController.tsx
 "use client";
 
 import React, { useMemo, useCallback, forwardRef } from "react";
@@ -9,51 +9,35 @@ import { useAppStore } from "@/store/appStore";
 import { useGoodManager } from "./useGoodManager";
 import { useGoodJournalLinking } from "@/features/linking/useGoodJournalLinking";
 import { fetchJournalLinksForGood } from "@/services/clientJournalGoodLinkService";
-
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
-import GoodsOptionsMenu from "@/features/goods/components/GoodsOptionsMenu";
-import AddEditGoodModal from "@/features/goods/components/AddEditGoodModal";
+import GoodsOptionsMenu from "./components/GoodsOptionsMenu";
+import AddEditGoodModal from "./components/AddEditGoodModal";
 import LinkGoodToJournalsModal from "@/features/linking/components/LinkGoodToJournalsModal";
 import UnlinkGoodFromJournalsModal from "@/features/linking/components/UnlinkGoodFromJournalsModal";
 import { SLIDER_TYPES } from "@/lib/constants";
-import type {
-  AccountNodeData,
-  Good,
-  DocumentLineClientData,
-} from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types";
 
-interface LayoutControlProps {
+export interface GoodsSliderControllerProps {
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
   onMoveDown: () => void;
   isMoveDisabled: boolean;
-}
-export interface GoodsSliderControllerProps extends LayoutControlProps {
   onOpenJournalSelectorForLinking: (
-    onSelectCallback: (journalNode: AccountNodeData) => void
+    cb: (node: AccountNodeData) => void
   ) => void;
   onOpenJournalSelectorForGPGContext: () => void;
   fullJournalHierarchy: AccountNodeData[];
   onOpenLinkGoodToPartnersModal?: () => void;
   onOpenUnlinkGoodFromPartnersModal?: () => void;
-
-  // --- PROPS FOR DOCUMENT CREATION ---
-  documentLines?: DocumentLineClientData[];
-  onToggleGoodForDocument?: (good: Good) => void;
-  isGoodInDocument?: (good: Good) => boolean;
-  onUpdateLineForDocument?: (
-    jpqLinkId: string,
-    details: { quantity?: number; unitPrice?: number }
-  ) => void;
-}
-
-export interface GoodsSliderControllerRef {
-  openDetailsAccordion: () => void;
+  isLocked: boolean;
+  isMultiSelect: boolean;
+  selectedGoodIdsForDoc: string[];
+  onToggleGoodForDoc: (goodId: string) => void;
 }
 
 export const GoodsSliderController = forwardRef<
-  GoodsSliderControllerRef,
+  any,
   GoodsSliderControllerProps
 >(
   (
@@ -68,31 +52,34 @@ export const GoodsSliderController = forwardRef<
       onMoveUp,
       onMoveDown,
       isMoveDisabled,
-      // Destructure the props directly
-      documentLines,
-      onToggleGoodForDocument,
-      isGoodInDocument,
-      onUpdateLineForDocument,
+      isLocked,
+      isMultiSelect,
+      selectedGoodIdsForDoc,
+      onToggleGoodForDoc,
     },
     ref
   ) => {
     const goodManager = useGoodManager();
     const goodJournalLinking = useGoodJournalLinking();
-
     const { isCreating } = useAppStore(
       (state) => state.ui.documentCreationState
     );
-
     const isDetailsAccordionOpen = useAppStore(
       (state) => !!state.ui.accordionState[SLIDER_TYPES.GOODS]
     );
     const toggleAccordion = useAppStore((state) => state.toggleAccordion);
+    const { sliderOrder, visibility } = useAppStore((state) => state.ui);
+    const { journal: journalSelections, gpgContextJournalId } = useAppStore(
+      (state) => state.selections
+    );
 
-    const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
-    const visibility = useAppStore((state) => state.ui.visibility);
-    const selections = useAppStore((state) => state.selections);
-
-    const { journal: journalSelections, gpgContextJournalId } = selections;
+    const handleItemClick = (id: string) => {
+      if (isMultiSelect) {
+        onToggleGoodForDoc(id);
+      } else {
+        goodManager.setSelectedGoodsId(id);
+      }
+    };
 
     const canLinkGoodToPartnersViaJournal = useMemo(() => {
       const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
@@ -102,7 +89,6 @@ export const GoodsSliderController = forwardRef<
         ...journalSelections.level2Ids,
         ...journalSelections.level3Ids,
       ].filter(Boolean);
-
       return (
         visibility[SLIDER_TYPES.JOURNAL] &&
         visibility[SLIDER_TYPES.GOODS] &&
@@ -126,14 +112,10 @@ export const GoodsSliderController = forwardRef<
         ...journalSelections.level2Ids,
         ...journalSelections.level3Ids,
       ].filter(Boolean);
-
-      let journalContextAvailable = false;
-      if (journalIndex === 0) {
-        journalContextAvailable = effectiveJournalIds.length > 0;
-      } else {
-        journalContextAvailable = !!journalSelections.flatId;
-      }
-
+      let journalContextAvailable =
+        journalIndex === 0
+          ? effectiveJournalIds.length > 0
+          : !!journalSelections.flatId;
       return (
         visibility[SLIDER_TYPES.GOODS] &&
         goodsIndex !== -1 &&
@@ -171,15 +153,6 @@ export const GoodsSliderController = forwardRef<
       return undefined;
     }, [isGPStartOrder, gpgContextJournalId, fullJournalHierarchy]);
 
-    const handleSlideClick = useCallback(
-      (id: string | null) => {
-        if (id) {
-          goodManager.setSelectedGoodsId(id);
-        }
-      },
-      [goodManager.setSelectedGoodsId]
-    );
-
     return (
       <>
         <div className={styles.controls}>
@@ -188,11 +161,11 @@ export const GoodsSliderController = forwardRef<
               onClick={goodManager.handleOpenGoodsOptionsMenu}
               className={`${styles.controlButton} ${styles.editButton}`}
               aria-label="Options for Goods"
+              disabled={isCreating}
             >
               <IoOptionsOutline />
             </button>
           </div>
-
           <div className={styles.moveButtonGroup}>
             {canMoveUp && (
               <button
@@ -200,7 +173,7 @@ export const GoodsSliderController = forwardRef<
                 className={styles.controlButton}
                 disabled={isMoveDisabled}
               >
-                ▲ Up
+                ▲
               </button>
             )}
             {canMoveDown && (
@@ -209,12 +182,11 @@ export const GoodsSliderController = forwardRef<
                 className={styles.controlButton}
                 disabled={isMoveDisabled}
               >
-                ▼ Down
+                ▼
               </button>
             )}
           </div>
         </div>
-
         <DynamicSlider
           sliderId={SLIDER_TYPES.GOODS}
           title="Goods"
@@ -226,14 +198,20 @@ export const GoodsSliderController = forwardRef<
           isError={goodManager.goodsQueryState.isError}
           error={goodManager.goodsQueryState.error}
           activeItemId={goodManager.selectedGoodsId}
-          onSlideChange={handleSlideClick}
+          onSlideChange={
+            isMultiSelect ? () => {} : goodManager.setSelectedGoodsId
+          }
+          onItemClick={handleItemClick}
+          isItemSelected={(item) => selectedGoodIdsForDoc.includes(item.id)}
+          isLocked={isLocked}
+          isMultiSelect={isMultiSelect}
+          placeholderMessage={
+            isCreating
+              ? "Select partners to see common goods."
+              : "No goods match criteria."
+          }
           isAccordionOpen={isDetailsAccordionOpen}
           onToggleAccordion={() => toggleAccordion(SLIDER_TYPES.GOODS)}
-          isDocumentCreationMode={isCreating}
-          documentLines={documentLines}
-          onToggleGoodForDoc={onToggleGoodForDocument}
-          isGoodInDocument={isGoodInDocument}
-          onUpdateLineForDocument={onUpdateLineForDocument}
           showContextJournalFilterButton={
             isGPStartOrder && !gpgContextJournalId
           }
@@ -248,7 +226,6 @@ export const GoodsSliderController = forwardRef<
               : undefined
           }
         />
-
         <GoodsOptionsMenu
           isOpen={goodManager.isGoodsOptionsMenuOpen}
           onClose={goodManager.handleCloseGoodsOptionsMenu}
@@ -305,5 +282,4 @@ export const GoodsSliderController = forwardRef<
     );
   }
 );
-
 GoodsSliderController.displayName = "GoodsSliderController";

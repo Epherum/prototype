@@ -1,26 +1,21 @@
-//src/store/appStore.ts
+// src/store/appStore.ts
 import { create } from "zustand";
 import { type Session } from "next-auth";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
 import type { ExtendedUser } from "@/lib/auth/authOptions";
+import type { DocumentCreationMode, DocumentItem, Good } from "@/lib/types";
 
-// Define slider-specific types
+// --- (Interfaces are unchanged) ---
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];
 export type SliderVisibility = Record<SliderType, boolean>;
 export type AccordionState = Partial<Record<SliderType, boolean>>;
-
-// --- State Slice Interfaces ---
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
-
 interface AuthSlice {
   sessionStatus: SessionStatus;
   user: Partial<ExtendedUser>;
-  /** The most specific journal ID a user is allowed to see as their root. */
   effectiveRestrictedJournalId: string;
-  /** A derived boolean for easy admin checks across the app. */
   isAdmin: boolean;
 }
-
 interface SelectionsSlice {
   journal: {
     topLevelId: string;
@@ -35,22 +30,20 @@ interface SelectionsSlice {
   document: string | null;
   gpgContextJournalId: string | null;
 }
-
 interface DocumentCreationSlice {
   isCreating: boolean;
-  lockedPartnerId: string | null; // Using string to match BigInt string representation
-  lockedJournalId: string | null; // The journal context for the partner link
+  mode: DocumentCreationMode;
+  lockedPartnerIds: string[];
+  lockedGoodIds: string[];
+  lockedJournalId: string | null;
+  items: DocumentItem[];
 }
-
 interface UiSlice {
   sliderOrder: SliderType[];
   visibility: SliderVisibility;
-  documentCreationState: DocumentCreationSlice; // NEW
+  documentCreationState: DocumentCreationSlice;
   accordionState: AccordionState;
 }
-
-// --- Combined State and Actions ---
-
 interface AppState {
   auth: AuthSlice;
   ui: UiSlice;
@@ -68,12 +61,17 @@ interface AppState {
     value: any
   ) => void;
   resetSelections: () => void;
-  startDocumentCreation: (partnerId: string, journalId: string) => void; // NEW
-  cancelDocumentCreation: () => void; // NEW
+  startDocumentCreation: (
+    mode: DocumentCreationMode,
+    initialState: Partial<DocumentCreationSlice>
+  ) => void;
+  cancelDocumentCreation: () => void;
+  toggleEntityForDocument: (type: "partner" | "good", id: string) => void;
+  updateDocumentItem: (goodId: string, updates: Partial<DocumentItem>) => void;
+  setDocumentItems: (items: DocumentItem[]) => void;
   toggleAccordion: (sliderId: SliderType) => void;
+  prepareDocumentForFinalization: (allGoodsInSlider: Good[]) => boolean;
 }
-
-// --- Helper Functions ---
 
 const getInitialSelections = (
   restrictedJournalId = ROOT_JOURNAL_ID
@@ -83,7 +81,7 @@ const getInitialSelections = (
     level2Ids: [],
     level3Ids: [],
     flatId: null,
-    rootFilter: ["affected"], // Set "affected" as the default filter
+    rootFilter: ["affected"],
   },
   partner: null,
   goods: null,
@@ -92,10 +90,17 @@ const getInitialSelections = (
   gpgContextJournalId: null,
 });
 
-// --- Zustand Store Definition ---
+const getInitialDocumentCreationState = (): DocumentCreationSlice => ({
+  isCreating: false,
+  mode: "IDLE",
+  lockedPartnerIds: [],
+  lockedGoodIds: [],
+  lockedJournalId: null,
+  items: [],
+});
 
 export const useAppStore = create<AppState>()((set, get) => ({
-  // --- Initial State ---
+  // --- (Initial State and other actions are unchanged) ---
   auth: {
     sessionStatus: "loading",
     user: {},
@@ -111,36 +116,25 @@ export const useAppStore = create<AppState>()((set, get) => ({
       [SLIDER_TYPES.PROJECT]: true,
       [SLIDER_TYPES.DOCUMENT]: true,
     },
-    documentCreationState: {
-      // NEW
-      isCreating: false,
-      lockedPartnerId: null,
-      lockedJournalId: null,
-    },
+    documentCreationState: getInitialDocumentCreationState(),
     accordionState: {
       [SLIDER_TYPES.PARTNER]: false,
       [SLIDER_TYPES.GOODS]: false,
     },
   },
-
   selections: getInitialSelections(),
-
-  // --- Actions Implementation ---
 
   setAuth: (session, status) =>
     set(() => {
       if (status === "authenticated" && session?.user) {
         const user = session.user as ExtendedUser;
         let restrictedId = ROOT_JOURNAL_ID;
-
         const userIsAdmin =
           user.roles?.some((role) => role.name.toUpperCase() === "ADMIN") ??
           false;
-
         if (user.restrictedTopLevelJournalId) {
           restrictedId = user.restrictedTopLevelJournalId;
         }
-
         return {
           auth: {
             sessionStatus: "authenticated",
@@ -151,7 +145,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
           selections: getInitialSelections(restrictedId),
         };
       }
-      // Handle loading and unauthenticated states
       return {
         auth: {
           sessionStatus: "loading",
@@ -172,31 +165,25 @@ export const useAppStore = create<AppState>()((set, get) => ({
   moveSlider: (sliderId, direction) =>
     set((state) => {
       const { sliderOrder, visibility } = state.ui;
-
-      // 1. Operate on the list of *visible* sliders
       const oldVisibleOrder = sliderOrder.filter((id) => visibility[id]);
       const currentIndex = oldVisibleOrder.indexOf(sliderId);
 
-      // Guard clause: cannot move if at the edge or not found
       if (
         currentIndex === -1 ||
         (direction === "up" && currentIndex <= 0) ||
         (direction === "down" && currentIndex >= oldVisibleOrder.length - 1)
       ) {
-        return state; // No change
+        return state;
       }
 
-      // 2. Calculate the new order of visible sliders
       const newVisibleOrder = [...oldVisibleOrder];
       const targetIndex =
         direction === "up" ? currentIndex - 1 : currentIndex + 1;
-      // Perform the swap
       [newVisibleOrder[currentIndex], newVisibleOrder[targetIndex]] = [
         newVisibleOrder[targetIndex],
         newVisibleOrder[currentIndex],
       ];
 
-      // 3. Reconstruct the full sliderOrder array to respect the new visible order
       const newFullSliderOrder = [...sliderOrder];
       let visibleIndex = 0;
       for (let i = 0; i < newFullSliderOrder.length; i++) {
@@ -206,9 +193,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       }
 
-      // --- INTELLIGENT SELECTION RESET LOGIC ---
-
-      // 4. Find the first index where the visible order has changed (the "breakpoint").
       let breakPointIndex = -1;
       for (let i = 0; i < newVisibleOrder.length; i++) {
         if (newVisibleOrder[i] !== oldVisibleOrder[i]) {
@@ -217,33 +201,23 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       }
 
-      // If no change was detected, just update the order and do nothing to selections.
       if (breakPointIndex === -1) {
         return {
           ui: { ...state.ui, sliderOrder: newFullSliderOrder },
         };
       }
 
-      // 5. Get the list of all sliders from the breakpoint onwards. These need their selections reset.
       const slidersToReset = newVisibleOrder.slice(breakPointIndex);
-
-      // 6. Start with a copy of current selections to modify.
       const newSelections = { ...state.selections };
-
-      // Get a clean slate for selections to copy from.
       const initialSelectionsForReset = getInitialSelections(
         state.auth.effectiveRestrictedJournalId
       );
 
-      // 7. Iterate over the sliders that need resetting and revert them to their initial state.
       slidersToReset.forEach((sliderIdToReset) => {
         const key = sliderIdToReset.toLowerCase() as keyof SelectionsSlice;
-
         if (key === "journal") {
-          // Journal is a complex object, so reset the whole thing.
           newSelections.journal = initialSelectionsForReset.journal;
         } else if (key in newSelections) {
-          // For simple key-value selections (partner, goods, etc.), reset to the initial value (which is typically null).
           (newSelections[
             key as keyof Omit<SelectionsSlice, "journal">
           ] as any) =
@@ -253,12 +227,60 @@ export const useAppStore = create<AppState>()((set, get) => ({
         }
       });
 
-      // 8. Return the new state with the updated order and the intelligently modified selections.
       return {
         ui: { ...state.ui, sliderOrder: newFullSliderOrder },
         selections: newSelections,
       };
     }),
+
+  prepareDocumentForFinalization: (allGoodsInSlider) => {
+    const { mode, lockedGoodIds } = get().ui.documentCreationState;
+    let itemsToFinalize: DocumentItem[] = [];
+    if (
+      mode === "LOCK_PARTNER" ||
+      mode === "INTERSECT_FROM_PARTNER" ||
+      mode === "INTERSECT_FROM_GOOD"
+    ) {
+      itemsToFinalize = lockedGoodIds.map((goodId) => {
+        const goodData = allGoodsInSlider.find((g) => g.id === goodId);
+        return {
+          goodId: goodId,
+          goodLabel: goodData?.name || "Unknown Good",
+          quantity: 1,
+          unitPrice: goodData?.price || 0,
+          journalPartnerGoodLinkId: goodData?.jpqLinkId,
+        };
+      });
+    } else if (mode === "LOCK_GOOD") {
+      const lockedGoodId = lockedGoodIds[0];
+      const goodData = allGoodsInSlider.find((g) => g.id === lockedGoodId);
+      if (lockedGoodId && goodData) {
+        itemsToFinalize = [
+          {
+            goodId: lockedGoodId,
+            goodLabel: goodData.name || "Unknown Good",
+            quantity: 1,
+            unitPrice: goodData.price || 0,
+            journalPartnerGoodLinkId: goodData.jpqLinkId,
+          },
+        ];
+      }
+    }
+    if (itemsToFinalize.length === 0) {
+      alert("No items have been selected for the document.");
+      return false;
+    }
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        documentCreationState: {
+          ...state.ui.documentCreationState,
+          items: itemsToFinalize,
+        },
+      },
+    }));
+    return true;
+  },
 
   setSliderVisibility: (visibility) =>
     set((state) => ({ ui: { ...state.ui, visibility } })),
@@ -323,47 +345,115 @@ export const useAppStore = create<AppState>()((set, get) => ({
       selections: getInitialSelections(state.auth.effectiveRestrictedJournalId),
     })),
 
-  startDocumentCreation: (partnerId, journalId) => {
-    // --- THIS IS THE DEFINITIVE FIX & DIAGNOSTIC ---
-    // The store now protects itself from being put into a corrupted state.
-    if (!partnerId || partnerId === "undefined" || !journalId) {
-      console.error(
-        `CRITICAL: startDocumentCreation called with invalid arguments. Aborting state change.`,
-        { partnerId, journalId }
-      );
-      // By returning here, we PREVENT the bad state from ever being set.
-      return;
-    }
+  startDocumentCreation: (mode, initialState) => {
+    // === START OF LOGGING ===
+    console.groupCollapsed(`[DEBUG: appStore] startDocumentCreation (FIXED)`);
+    console.log(`Action called with mode: %c${mode}`, "font-weight: bold;", {
+      ...initialState,
+    });
+    const oldState = get();
+    console.log("State BEFORE update:", {
+      selections: { ...oldState.selections },
+      docState: { ...oldState.ui.documentCreationState },
+    });
+    // === END OF LOGGING ===
 
-    console.log(
-      `[appStore] Starting document creation with lockedPartnerId: ${partnerId}, lockedJournalId: ${journalId}`
-    );
+    set((state) => {
+      // FIX: The logic to reset selections for downstream sliders has been removed.
+      // REASON: This was the root cause of the bug. When entering creation mode,
+      // the downstream sliders' data sources change entirely (from `selections` to
+      // `documentCreationState`). Their manager hooks are already designed to handle
+      // this by switching their active TanStack Query.
+      // Manually resetting their `selections` to `null` in this action was creating
+      // a transient state where the slider appeared "empty" before the new data arrived
+      // and the multi-select UI could take over. Removing this reset simplifies the
+      // state transition and allows the manager hooks to react cleanly to the change in `mode`.
+      // The `selections` for those sliders will naturally become invalid and will be ignored
+      // by the UI controllers when `isCreating` is true and a multi-select mode is active.
+      const newSelections = { ...state.selections };
+      newSelections.document = null; // Still correct to reset the document selection itself.
 
-    set((state) => ({
-      ui: {
-        ...state.ui,
-        documentCreationState: {
-          isCreating: true,
-          lockedPartnerId: partnerId,
-          lockedJournalId: journalId,
+      const finalState = {
+        ui: {
+          ...state.ui,
+          documentCreationState: {
+            ...getInitialDocumentCreationState(),
+            isCreating: true,
+            mode,
+            ...initialState,
+          },
         },
-      },
-      // Reset goods selection when starting a new doc
-      selections: { ...state.selections, goods: null },
-    }));
+        selections: newSelections,
+      };
+
+      // === LOGGING ===
+      console.log("State AFTER update:", {
+        selections: { ...finalState.selections },
+        docState: { ...finalState.ui.documentCreationState },
+      });
+      console.groupEnd();
+      // ===
+
+      return finalState;
+    });
   },
 
   cancelDocumentCreation: () =>
     set((state) => ({
       ui: {
         ...state.ui,
-        documentCreationState: {
-          isCreating: false,
-          lockedPartnerId: null,
-          lockedJournalId: null,
-        },
+        documentCreationState: getInitialDocumentCreationState(),
       },
     })),
+
+  toggleEntityForDocument: (type, id) => {
+    set((state) => {
+      const { documentCreationState } = state.ui;
+      const key = type === "partner" ? "lockedPartnerIds" : "lockedGoodIds";
+      const currentIds = new Set(documentCreationState[key]);
+      if (currentIds.has(id)) {
+        currentIds.delete(id);
+      } else {
+        currentIds.add(id);
+      }
+      return {
+        ui: {
+          ...state.ui,
+          documentCreationState: {
+            ...documentCreationState,
+            [key]: Array.from(currentIds),
+          },
+        },
+      };
+    });
+  },
+
+  updateDocumentItem: (goodId, updates) => {
+    set((state) => {
+      const { documentCreationState } = state.ui;
+      const newItems = documentCreationState.items.map((item) =>
+        item.goodId === goodId ? { ...item, ...updates } : item
+      );
+      return {
+        ui: {
+          ...state.ui,
+          documentCreationState: { ...documentCreationState, items: newItems },
+        },
+      };
+    });
+  },
+
+  setDocumentItems: (items) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        documentCreationState: {
+          ...state.ui.documentCreationState,
+          items,
+        },
+      },
+    }));
+  },
 
   toggleAccordion: (sliderId) =>
     set((state) => ({

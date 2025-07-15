@@ -1,67 +1,42 @@
 // src/services/clientDocumentService.ts
-
 import type {
   PaginatedDocumentsResponse,
   Document,
   CreateDocumentClientData,
-  UpdateDocumentClientData, // --- NEW --- Assuming this type will be added to lib/types.ts
+  UpdateDocumentClientData,
 } from "@/lib/types";
 
-/**
- * Fetches documents for a specific partner.
- * In our application flow, documents are always viewed in the context of a selected partner.
- *
- * @param partnerId The ID of the partner whose documents are to be fetched.
- * @returns A promise that resolves to a paginated list of documents.
- */
 export async function fetchDocuments(
   partnerId: string
 ): Promise<PaginatedDocumentsResponse> {
-  // A partnerId is mandatory for this feature's context.
   if (!partnerId) {
     console.warn("[fetchDocuments] No partnerId provided. Returning empty.");
     return { data: [], total: 0 };
   }
-
   const queryParams = new URLSearchParams();
   queryParams.append("partnerId", partnerId);
-
   const response = await fetch(`/api/documents?${queryParams.toString()}`);
-
   if (!response.ok) {
     let errorMessage = `Failed to fetch documents: ${response.statusText}`;
     try {
       const errorData = await response.json();
       errorMessage = errorData.message || errorMessage;
     } catch (e) {
-      // Could not parse JSON, use the original status text.
+      // Ignore JSON parse error
     }
     throw new Error(errorMessage);
   }
-
-  // The backend API serializes BigInts to strings, which matches our client-side types.
-  const result: PaginatedDocumentsResponse = await response.json();
-  return result;
+  return response.json();
 }
 
-/**
- * Sends a request to the backend to create a new document.
- * The payload contains the document header and an array of line items.
- *
- * @param data The data required to create a new document.
- * @returns A promise that resolves to the newly created document.
- */
 export async function createDocument(
   data: CreateDocumentClientData
 ): Promise<Document> {
   const response = await fetch("/api/documents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    // JSON.stringify will handle the conversion of the data object,
-    // including the nested lines array, into a JSON string.
     body: JSON.stringify(data),
   });
-
   if (!response.ok) {
     const errorData = await response
       .json()
@@ -70,22 +45,11 @@ export async function createDocument(
       errorData.message || `Failed to create document: ${response.statusText}`
     );
   }
-
-  // The backend returns the complete new Document object upon success.
-  const newDocument: Document = await response.json();
-  return newDocument;
+  return response.json();
 }
 
-// --- NEW ---
-
-/**
- * Fetches a single document by its ID.
- * @param id The ID of the document to fetch.
- * @returns A promise that resolves to the document details.
- */
 export async function getDocumentById(id: string): Promise<Document> {
   const response = await fetch(`/api/documents/${id}`);
-
   if (!response.ok) {
     const errorData = await response
       .json()
@@ -98,12 +62,6 @@ export async function getDocumentById(id: string): Promise<Document> {
   return response.json();
 }
 
-/**
- * Sends a request to the backend to update an existing document.
- * @param id The ID of the document to update.
- * @param data The fields to be updated.
- * @returns A promise that resolves to the updated document.
- */
 export async function updateDocument({
   id,
   data,
@@ -116,7 +74,6 @@ export async function updateDocument({
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-
   if (!response.ok) {
     const errorData = await response
       .json()
@@ -128,16 +85,10 @@ export async function updateDocument({
   return response.json();
 }
 
-/**
- * Sends a request to the backend to delete a document.
- * @param id The ID of the document to delete.
- * @returns A promise that resolves to true if deletion was successful.
- */
 export async function deleteDocument(id: string): Promise<boolean> {
   const response = await fetch(`/api/documents/${id}`, {
     method: "DELETE",
   });
-
   if (!response.ok) {
     const errorData = await response
       .json()
@@ -146,7 +97,31 @@ export async function deleteDocument(id: string): Promise<boolean> {
       errorData.message || `Failed to delete document: ${response.statusText}`
     );
   }
-
-  // A 204 No Content response means success.
   return true;
+}
+
+/**
+ * Sends a request to the backend to create multiple documents in bulk.
+ * @param data An array of document creation payloads.
+ * @returns A promise that resolves to a success response.
+ */
+export async function createBulkDocuments(
+  data: CreateDocumentClientData[]
+): Promise<{ success: boolean; createdCount: number }> {
+  const response = await fetch("/api/documents/bulk", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ documents: data }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Unknown error during bulk creation" }));
+    throw new Error(
+      errorData.message || `Failed to create documents: ${response.statusText}`
+    );
+  }
+
+  return response.json();
 }

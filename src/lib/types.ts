@@ -51,10 +51,13 @@ export interface FetchPartnersParams {
   filterStatus?: ActivePartnerFilters;
   filterStatuses?: string[];
   contextJournalIds?: string[];
+  journalId?: string | null; // Used for 'affected' filter
   restrictedJournalId?: string | null;
   linkedToJournalIds?: string[];
   linkedToGoodId?: string;
   includeChildren?: boolean;
+  // NEW: For J -> D -> G -> P or J -> G -> D -> P flows
+  forGoodsIntersection?: string[];
 }
 
 export type PaginatedPartnersResponse = { data: Partner[]; total: number };
@@ -134,6 +137,7 @@ export interface FetchGoodsParams {
   filterStatuses?: string[];
 
   contextJournalIds?: string[]; // Used for 'affected'
+  journalId?: string | null; // Used for 'affected' filter
   restrictedJournalId?: string | null; // Used for role-based 'unaffected' and 'inProcess'
 
   // For J-P-G or P-J-G flows (Goods is 3rd, filtered by JPGL)
@@ -150,6 +154,11 @@ export interface FetchGoodsParams {
     partnerId: string;
     journalId: string;
   };
+
+  // NEW: For J -> D -> P -> G flow
+  forPartnersIntersection?: string[];
+  // UPDATED: Allow multiple partner IDs for J -> P -> D -> G flow
+  forPartnerIds?: string[];
 }
 
 export type CreatePartnerClientData = {
@@ -271,6 +280,24 @@ export interface RoleData {
   permissions: Array<{ action: string; resource: string }>;
 }
 
+export type DocumentCreationMode =
+  | "IDLE" // Not in creation mode
+  | "SINGLE_ITEM" // J->P->G->D or J->G->P->D
+  | "LOCK_PARTNER" // J->P->D->G
+  | "LOCK_GOOD" // J->G->D->P
+  | "INTERSECT_FROM_PARTNER" // J->D->P->G
+  | "INTERSECT_FROM_GOOD"; // J->D->G->P
+
+// NEW: Represents a line item being prepared for a document.
+export interface DocumentItem {
+  goodId: string;
+  goodLabel: string;
+  quantity: number;
+  unitPrice: number;
+  // This must be resolved just before submitting.
+  journalPartnerGoodLinkId?: string;
+}
+
 // Represents a Document from the backend, with BigInts as strings for client-side safety
 export interface Document {
   id: string; // BigInt as string
@@ -283,7 +310,7 @@ export interface Document {
   totalTax: number;
   totalTTC: number;
   balance: number;
-  // ... include any other fields from the Prisma schema that you need on the client
+  lines?: any[]; // Include lines if needed for view/edit
 }
 
 // Represents the shape of the paginated response for documents.

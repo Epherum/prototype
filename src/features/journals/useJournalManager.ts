@@ -1,3 +1,4 @@
+//src/features/journals/useJournalManager.ts
 "use client";
 
 import { useState, useCallback, useMemo } from "react";

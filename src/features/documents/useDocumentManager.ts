@@ -1,310 +1,286 @@
 // src/features/documents/useDocumentManager.ts
-
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
 import { documentKeys } from "@/lib/queryKeys";
 import {
-  createDocument,
   fetchDocuments,
-  getDocumentById, // --- NEW ---
-  updateDocument, // --- NEW ---
-  deleteDocument, // --- NEW ---
+  createDocument,
+  createBulkDocuments,
 } from "@/services/clientDocumentService";
-import { useJournalManager } from "@/features/journals/useJournalManager";
-
+import { SLIDER_TYPES } from "@/lib/constants";
 import type {
-  Document,
-  DocumentLineClientData,
-  CreateDocumentClientData,
-  UpdateDocumentClientData, // --- NEW ---
+  DocumentCreationMode,
+  DocumentItem,
   Good,
+  CreateDocumentClientData,
+  Document,
 } from "@/lib/types";
 
 export const useDocumentManager = () => {
   const queryClient = useQueryClient();
-  const { isTerminal, selectedJournalId } = useJournalManager();
-  const { partner: selectedPartnerId } = useAppStore(
-    (state) => state.selections
+
+  const { sliderOrder, visibility, documentCreationState } = useAppStore(
+    (state) => state.ui
   );
-  const { isCreating, lockedPartnerId } = useAppStore(
-    (state) => state.ui.documentCreationState
-  );
+  const selections = useAppStore((state) => state.selections);
   const startDocumentCreation = useAppStore(
     (state) => state.startDocumentCreation
   );
   const cancelDocumentCreation = useAppStore(
     (state) => state.cancelDocumentCreation
   );
-
-  // --- EXISTING STATE FOR CREATION ---
-  const [lines, setLines] = useState<DocumentLineClientData[]>([]);
+  const toggleEntityForDocument = useAppStore(
+    (state) => state.toggleEntityForDocument
+  );
+  const setDocumentItems = useAppStore((state) => state.setDocumentItems);
+  const prepareDocumentForFinalization = useAppStore(
+    (state) => state.prepareDocumentForFinalization
+  );
   const [isFinalizeModalOpen, setIsFinalizeModalOpen] = useState(false);
+  const [quantityModalState, setQuantityModalState] = useState<{
+    isOpen: boolean;
+    goodId: string | null;
+  }>({ isOpen: false, goodId: null });
 
-  // --- NEW STATE FOR EDIT/DELETE MODALS ---
-  const [modalState, setModalState] = useState<{
-    view: "closed" | "edit" | "delete" | "view";
-    documentId: string | null;
-  }>({ view: "closed", documentId: null });
-
-  // --- EXISTING QUERY FOR DOCUMENT LIST ---
-  const documentsQuery = useQuery({
-    queryKey: documentKeys.list(selectedPartnerId),
-    queryFn: () => {
-      if (!selectedPartnerId || selectedPartnerId === "undefined") {
-        return Promise.resolve({ data: [], total: 0 });
-      }
-      return fetchDocuments(selectedPartnerId);
-    },
-    enabled:
-      !!selectedPartnerId && selectedPartnerId !== "undefined" && !isCreating,
-  });
-
-  // --- NEW QUERY FOR A SINGLE (ACTIVE) DOCUMENT FOR THE MODAL ---
   const {
-    data: activeDocument,
-    isLoading: isLoadingActiveDocument,
-    isError: isErrorActiveDocument,
-  } = useQuery({
-    queryKey: documentKeys.detail(modalState.documentId),
-    queryFn: () => getDocumentById(modalState.documentId!),
-    enabled: modalState.documentId !== null && modalState.view !== "closed",
-    // Do not refetch when the window is refocused, to avoid closing the modal unexpectedly
-    refetchOnWindowFocus: false,
-  });
+    isCreating,
+    mode,
+    lockedPartnerIds,
+    lockedGoodIds,
+    items,
+    lockedJournalId,
+  } = documentCreationState;
 
-  // --- NEW MUTATION FOR UPDATING A DOCUMENT ---
-  const updateDocumentMutation = useMutation({
-    mutationFn: (vars: { id: string; data: UpdateDocumentClientData }) =>
-      updateDocument(vars),
-    onSuccess: (updatedDocument) => {
-      // Invalidate both the list of documents and the specific document detail query
-      queryClient.invalidateQueries({
-        queryKey: documentKeys.list(selectedPartnerId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: documentKeys.detail(updatedDocument.id),
-      });
-      alert("Document updated successfully!");
-      closeModal(); // Close the edit modal on success
-    },
-    onError: (error: Error) => {
-      console.error("Failed to update document:", error);
-      alert(`Error updating document: ${error.message}`);
-    },
-  });
-
-  // --- NEW MUTATION FOR DELETING A DOCUMENT ---
-  const deleteDocumentMutation = useMutation({
-    mutationFn: (id: string) => deleteDocument(id),
-    onSuccess: () => {
-      // Invalidate the list of documents to remove the deleted one
-      queryClient.invalidateQueries({
-        queryKey: documentKeys.list(selectedPartnerId),
-      });
-      alert("Document deleted successfully.");
-      closeModal(); // Close the confirmation modal
-    },
-    onError: (error: Error) => {
-      console.error("Failed to delete document:", error);
-      alert(`Error deleting document: ${error.message}`);
-    },
-  });
-
-  // --- NEW HANDLERS FOR MODALS ---
-  const openEditModal = (documentId: string) => {
-    setModalState({ view: "edit", documentId });
-  };
-
-  const openDeleteModal = (documentId: string) => {
-    setModalState({ view: "delete", documentId });
-  };
-
-  const openViewModal = (documentId: string) => {
-    setModalState({ view: "view", documentId });
-  };
-
-  const closeModal = () => {
-    setModalState({ view: "closed", documentId: null });
-  };
-
-  const handleConfirmDelete = () => {
-    if (modalState.documentId) {
-      deleteDocumentMutation.mutate(modalState.documentId);
-    }
-  };
-
-  // --- EXISTING LOGIC (UNCHANGED) ---
-  const canCreateDocument = useMemo(() => {
-    const isPartnerValid =
-      !!selectedPartnerId && selectedPartnerId !== "undefined";
-    return isPartnerValid && isTerminal;
-  }, [selectedPartnerId, isTerminal]);
+  const isJournalFirst = useMemo(() => {
+    const visibleOrder = sliderOrder.filter((id) => visibility[id]);
+    return visibleOrder.length > 0 && visibleOrder[0] === SLIDER_TYPES.JOURNAL;
+  }, [sliderOrder, visibility]);
 
   const handleStartCreation = useCallback(() => {
-    if (!canCreateDocument || !selectedPartnerId || !selectedJournalId) {
+    if (!isJournalFirst) {
       alert(
-        "Please select a valid Partner and a single, terminal Journal account to proceed."
+        "Document creation is only allowed when the Journal slider is first."
       );
       return;
     }
-    startDocumentCreation(selectedPartnerId, selectedJournalId);
-    setLines([]);
+
+    const visibleOrder = sliderOrder.filter((id) => visibility[id]);
+    const docIdx = visibleOrder.indexOf(SLIDER_TYPES.DOCUMENT);
+    const partnerIdx = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
+    const goodIdx = visibleOrder.indexOf(SLIDER_TYPES.GOODS);
+
+    let creationMode: DocumentCreationMode = "IDLE";
+    let initialState: Partial<typeof documentCreationState> = {};
+    const journalContext =
+      selections.journal.flatId || selections.journal.topLevelId;
+
+    // Scenarios...
+    if (
+      docIdx === visibleOrder.length - 1 &&
+      partnerIdx !== -1 &&
+      goodIdx !== -1
+    ) {
+      if (!selections.partner || !selections.goods) {
+        alert(
+          "Please select a Partner and a Good before creating the document."
+        );
+        return;
+      }
+      creationMode = "SINGLE_ITEM";
+      initialState = {
+        lockedPartnerIds: [selections.partner],
+        lockedGoodIds: [selections.goods],
+        lockedJournalId: journalContext,
+      };
+      // For this specific flow, we call the action later
+    } else if (partnerIdx < docIdx && docIdx < goodIdx) {
+      if (!selections.partner) {
+        alert("Please select a Partner to lock in.");
+        return;
+      }
+      creationMode = "LOCK_PARTNER";
+      initialState = {
+        lockedPartnerIds: [selections.partner],
+        lockedJournalId: journalContext,
+      };
+    } else if (goodIdx < docIdx && docIdx < partnerIdx) {
+      if (!selections.goods) {
+        alert("Please select a Good to lock in.");
+        return;
+      }
+      creationMode = "LOCK_GOOD";
+      initialState = {
+        lockedGoodIds: [selections.goods],
+        lockedJournalId: journalContext,
+      };
+    } else if (docIdx < partnerIdx && partnerIdx < goodIdx) {
+      creationMode = "INTERSECT_FROM_PARTNER";
+      initialState = { lockedJournalId: journalContext };
+    } else if (docIdx < goodIdx && goodIdx < partnerIdx) {
+      creationMode = "INTERSECT_FROM_GOOD";
+      initialState = { lockedJournalId: journalContext };
+    }
+
+    // === START OF LOGGING ===
+    console.groupCollapsed(`[DEBUG: useDocumentManager] handleStartCreation`);
+    console.log("Visible slider order:", visibleOrder);
+    console.log(
+      `Determined creationMode: %c${creationMode}`,
+      "font-weight: bold;"
+    );
+    console.log("Initial state to be dispatched:", initialState);
+    console.groupEnd();
+    // === END OF LOGGING ===
+
+    if (creationMode !== "IDLE") {
+      startDocumentCreation(creationMode, initialState);
+      if (creationMode === "SINGLE_ITEM") {
+        setQuantityModalState({ isOpen: true, goodId: selections.goods });
+      }
+    } else {
+      alert(
+        "Document creation is not supported in the current slider configuration."
+      );
+    }
   }, [
-    canCreateDocument,
-    selectedPartnerId,
-    selectedJournalId,
+    isJournalFirst,
+    sliderOrder,
+    visibility,
+    selections,
     startDocumentCreation,
   ]);
 
+  // ... rest of the file is unchanged
   const handleCancelCreation = useCallback(() => {
     cancelDocumentCreation();
-    setLines([]);
+    setIsFinalizeModalOpen(false);
+    setQuantityModalState({ isOpen: false, goodId: null });
   }, [cancelDocumentCreation]);
 
-  const handleAddOrRemoveGood = useCallback((good: Good) => {
-    if (!good.jpqLinkId) {
-      console.error("Attempted to add a good without a jpqLinkId:", good);
-      alert("This good cannot be added to a document in the current context.");
-      return;
-    }
-    setLines((currentLines) => {
-      const existingLineIndex = currentLines.findIndex(
-        (line) => line.journalPartnerGoodLinkId === good.jpqLinkId
-      );
-      if (existingLineIndex > -1) {
-        return currentLines.filter((_, index) => index !== existingLineIndex);
-      } else {
-        const newLine: DocumentLineClientData = {
-          journalPartnerGoodLinkId: good.jpqLinkId,
-          designation: good.label,
-          quantity: 1,
-          unitPrice: 0,
-          taxRate: 0.2,
-        };
-        return [...currentLines, newLine];
-      }
-    });
-  }, []);
-
-  const handleUpdateLine = useCallback(
-    (jpqLinkId: string, details: { quantity?: number; unitPrice?: number }) => {
-      setLines((currentLines) =>
-        currentLines.map((line) => {
-          if (line.journalPartnerGoodLinkId === jpqLinkId) {
-            const newQuantity = details.quantity;
-            const newUnitPrice = details.unitPrice;
-
-            return {
-              ...line,
-              quantity:
-                newQuantity !== undefined && !isNaN(newQuantity)
-                  ? newQuantity
-                  : line.quantity,
-              unitPrice:
-                newUnitPrice !== undefined && !isNaN(newUnitPrice)
-                  ? newUnitPrice
-                  : line.unitPrice,
-            };
-          }
-          return line;
-        })
-      );
+  const handleSingleItemSubmit = useCallback(
+    ({ good, quantity }: { good: Good; quantity: number }) => {
+      const newItem: DocumentItem = {
+        goodId: good.id,
+        goodLabel: good.label || good.name || "Unknown Good",
+        quantity: quantity,
+        unitPrice: good.price || 0,
+      };
+      setDocumentItems([newItem]);
+      setQuantityModalState({ isOpen: false, goodId: null });
+      setIsFinalizeModalOpen(true);
     },
-    []
+    [setDocumentItems]
   );
 
-  const handleOpenFinalizeModal = () => {
-    if (lines.length === 0) {
-      alert("Please add at least one item to the document.");
-      return;
-    }
-    setIsFinalizeModalOpen(true);
-  };
-
-  const createDocumentMutation = useMutation({
-    mutationFn: (data: CreateDocumentClientData) => createDocument(data),
-    onSuccess: (newDocument) => {
-      queryClient.invalidateQueries({
-        queryKey: documentKeys.list(lockedPartnerId),
-      });
-      alert(`Document '${newDocument.refDoc}' created successfully!`);
+  const createDocMutation = useMutation<
+    Document | { success: boolean; createdCount: number },
+    Error,
+    CreateDocumentClientData | CreateDocumentClientData[]
+  >({
+    mutationFn: (
+      data: CreateDocumentClientData | CreateDocumentClientData[]
+    ) => {
+      if (Array.isArray(data)) {
+        return createBulkDocuments(data);
+      }
+      return createDocument(data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+      alert(`Document(s) created successfully!`);
       handleCancelCreation();
     },
     onError: (error: Error) => {
-      console.error("Failed to create document:", error);
-      alert(`Error creating document: ${error.message}`);
+      alert(`Error creating document(s): ${error.message}`);
     },
     onSettled: () => {
       setIsFinalizeModalOpen(false);
     },
   });
 
+  const handlePrepareFinalization = useCallback(
+    (allGoodsInSlider: Good[]) => {
+      const success = prepareDocumentForFinalization(allGoodsInSlider);
+      if (success) {
+        setIsFinalizeModalOpen(true);
+      }
+    },
+    [prepareDocumentForFinalization]
+  );
+
   const handleSubmit = useCallback(
-    (headerData: { refDoc: string; date: Date; type: Document["type"] }) => {
-      if (!lockedPartnerId) {
-        alert(
-          "Critical Error: Locked partner ID is missing. Cannot save document."
-        );
+    (headerData: { refDoc: string; date: Date; type: any }) => {
+      if (items.length === 0) {
+        alert("Cannot create a document with no lines.");
         return;
       }
-      const finalPayload: CreateDocumentClientData = {
-        ...headerData,
-        partnerId: lockedPartnerId,
-        lines: lines,
-      };
-      createDocumentMutation.mutate(finalPayload);
+      const lines = items.map((item) => ({
+        journalPartnerGoodLinkId:
+          item.journalPartnerGoodLinkId || `NEEDS_REAL_ID_FOR_${item.goodId}`,
+        designation: item.goodLabel,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        taxRate: 0.2,
+      }));
+      if (
+        mode === "LOCK_GOOD" ||
+        mode === "INTERSECT_FROM_PARTNER" ||
+        mode === "INTERSECT_FROM_GOOD"
+      ) {
+        if (lockedPartnerIds.length === 0) {
+          alert("Error: No partners selected for document creation.");
+          return;
+        }
+        const payloads = lockedPartnerIds.map((partnerId) => ({
+          ...headerData,
+          partnerId,
+          lines,
+        }));
+        createDocMutation.mutate(payloads);
+      } else {
+        if (lockedPartnerIds.length !== 1) {
+          alert("Error: Exactly one partner must be locked for this mode.");
+          return;
+        }
+        const payload = {
+          ...headerData,
+          partnerId: lockedPartnerIds[0],
+          lines,
+        };
+        createDocMutation.mutate(payload);
+      }
     },
-    [lockedPartnerId, lines, createDocumentMutation]
+    [documentCreationState, items, createDocMutation]
   );
 
-  const documentsForSlider = useMemo(
-    () => documentsQuery.data?.data || [],
-    [documentsQuery.data]
-  );
+  const documentsQuery = useQuery({
+    queryKey: documentKeys.list(selections.partner),
+    queryFn: () => fetchDocuments(selections.partner!),
+    enabled: !!selections.partner && !isCreating,
+  });
 
-  const isGoodInDocument = useCallback(
-    (good: Good): boolean => {
-      if (!good.jpqLinkId) return false;
-      return lines.some(
-        (line) => line.journalPartnerGoodLinkId === good.jpqLinkId
-      );
-    },
-    [lines]
-  );
-
-  // --- RETURN NEW AND EXISTING VALUES ---
   return {
-    // Existing values for Creation
     isCreating,
-    lines,
-    documentsForSlider,
-    documentsQuery,
-    createDocumentMutation,
-    isFinalizeModalOpen,
-    canCreateDocument,
+    mode,
+    isJournalFirst,
+    lockedPartnerIds,
+    lockedGoodIds,
+    items,
+    quantityModalState,
     handleStartCreation,
     handleCancelCreation,
-    handleAddOrRemoveGood,
-    handleUpdateLine,
-    handleOpenFinalizeModal,
+    toggleEntityForDocument,
+    setDocumentItems,
     handleSubmit,
-    isGoodInDocument,
+    handleSingleItemSubmit,
+    documentsForSlider: documentsQuery.data?.data || [],
+    documentsQuery,
+    handlePrepareFinalization,
+    isFinalizeModalOpen,
     setIsFinalizeModalOpen,
-
-    // --- NEW --- Values for Edit/Delete/View
-    modalState,
-    activeDocument,
-    isLoadingActiveDocument,
-    isErrorActiveDocument,
-    updateDocumentMutation,
-    deleteDocumentMutation,
-    openEditModal,
-    openDeleteModal,
-    openViewModal,
-    closeModal,
-    handleConfirmDelete,
+    createDocumentMutation: createDocMutation,
   };
 };

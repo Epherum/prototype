@@ -1,21 +1,13 @@
+// src/app/page.tsx
 "use client";
 
-// React & Next.js Core
 import { useRef, useCallback, useMemo } from "react";
-
-// Third-party Libraries
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
-
-// Styles & Constants
 import styles from "./page.module.css";
 import { SLIDER_TYPES, INITIAL_ORDER } from "@/lib/constants";
 import "swiper/css";
-
-// Store & State Initialization
 import { useAppStore } from "@/store/appStore";
 import { useAuthStoreInitializer } from "@/hooks/useAuthStoreInitializer";
-
-// Feature Controllers
 import { PartnerSliderController } from "@/features/partners/PartnerSliderController";
 import { GoodsSliderController } from "@/features/goods/GoodsSliderController";
 import {
@@ -28,27 +20,19 @@ import {
   type UsersControllerRef,
 } from "@/features/users/UsersController";
 import { ProjectSliderController } from "@/features/projects/ProjectSliderController";
-
-// Layout Components
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
 import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
-
-// Cross-cutting Hooks & Manager Hooks
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 import { useDocumentManager } from "@/features/documents/useDocumentManager";
-
-// Global Modals
+import { useGoodManager } from "@/features/goods/useGoodManager";
 import LinkGoodToPartnersViaJournalModal from "@/features/linking/components/LinkGoodToPartnersViaJournalModal";
 import UnlinkGoodFromPartnersViaJournalModal from "@/features/linking/components/UnlinkGoodFromPartnersViaJournalModal";
-
-// Types
 import type { AccountNodeData } from "@/lib/types";
 
 export default function Home() {
   useAuthStoreInitializer();
 
-  const documentControllerRef = useRef(null);
   const usersControllerRef = useRef<UsersControllerRef>(null);
   const journalControllerRef = useRef<JournalSliderControllerRef>(null);
 
@@ -60,7 +44,15 @@ export default function Home() {
   );
 
   const docManager = useDocumentManager();
-  const isDocumentCreationMode = docManager.isCreating;
+  const goodManager = useGoodManager();
+
+  const {
+    isCreating,
+    mode,
+    lockedPartnerIds,
+    lockedGoodIds,
+    toggleEntityForDocument,
+  } = docManager;
 
   const journalManager = useJournalManager();
   const jpqlLinking = useJournalPartnerGoodLinking();
@@ -92,7 +84,6 @@ export default function Home() {
   return (
     <div className={styles.pageContainer}>
       <UsersController ref={usersControllerRef} />
-
       <h1 className={styles.title}>ERP Application Interface</h1>
       <UserAuthDisplay
         onOpenCreateUserModal={() => usersControllerRef.current?.open()}
@@ -107,24 +98,22 @@ export default function Home() {
       <LayoutGroup id="main-sliders-layout-group">
         <div
           className={`${styles.slidersArea} ${
-            isDocumentCreationMode ? styles.slidersAreaWithToolbar : ""
+            isCreating ? styles.slidersAreaWithToolbar : ""
           }`}
         >
           <AnimatePresence initial={false}>
             {sliderOrder.map((sliderId) => {
               if (!visibility[sliderId]) return null;
-
               const currentVisibleIndex = visibleSliderOrder.indexOf(sliderId);
-              const isMoveDisabledForThisSlider = isDocumentCreationMode;
-
               const layoutControlProps = {
                 canMoveUp: currentVisibleIndex > 0,
                 canMoveDown:
                   currentVisibleIndex < visibleSliderOrder.length - 1,
                 onMoveUp: () => moveSlider(sliderId, "up"),
                 onMoveDown: () => moveSlider(sliderId, "down"),
-                isMoveDisabled: isMoveDisabledForThisSlider,
+                isMoveDisabled: isCreating,
               };
+
               return (
                 <motion.div
                   key={sliderId}
@@ -152,16 +141,26 @@ export default function Home() {
                       {...layoutControlProps}
                       onOpenJournalSelector={openJournalSelectorForLinking}
                       fullJournalHierarchy={journalManager.hierarchyData}
+                      isLocked={
+                        isCreating &&
+                        (mode === "LOCK_PARTNER" || mode === "SINGLE_ITEM")
+                      }
+                      isMultiSelect={
+                        isCreating &&
+                        (mode === "INTERSECT_FROM_GOOD" ||
+                          mode === "INTERSECT_FROM_PARTNER" ||
+                          mode === "LOCK_GOOD")
+                      }
+                      selectedPartnerIdsForDoc={lockedPartnerIds}
+                      onTogglePartnerForDoc={(id) =>
+                        toggleEntityForDocument("partner", id)
+                      }
                     />
                   )}
 
                   {sliderId === SLIDER_TYPES.GOODS && (
                     <GoodsSliderController
                       {...layoutControlProps}
-                      onToggleGoodForDocument={docManager.handleAddOrRemoveGood}
-                      isGoodInDocument={docManager.isGoodInDocument}
-                      documentLines={docManager.lines}
-                      onUpdateLineForDocument={docManager.handleUpdateLine}
                       onOpenJournalSelectorForLinking={
                         openJournalSelectorForLinking
                       }
@@ -173,6 +172,20 @@ export default function Home() {
                       onOpenUnlinkGoodFromPartnersModal={
                         jpqlLinking.openUnlinkModal
                       }
+                      isLocked={
+                        isCreating &&
+                        (mode === "LOCK_GOOD" || mode === "SINGLE_ITEM")
+                      }
+                      isMultiSelect={
+                        isCreating &&
+                        (mode === "LOCK_PARTNER" ||
+                          mode === "INTERSECT_FROM_PARTNER" ||
+                          mode === "INTERSECT_FROM_GOOD")
+                      }
+                      selectedGoodIdsForDoc={lockedGoodIds}
+                      onToggleGoodForDoc={(id) =>
+                        toggleEntityForDocument("good", id)
+                      }
                     />
                   )}
 
@@ -182,9 +195,13 @@ export default function Home() {
 
                   {sliderId === SLIDER_TYPES.DOCUMENT && (
                     <DocumentController
-                      ref={documentControllerRef}
+                      manager={docManager}
                       {...layoutControlProps}
-                      manager={docManager} // <<< --- FIX: Pass the single manager instance
+                      onPrepareFinalization={() =>
+                        docManager.handlePrepareFinalization(
+                          goodManager.goodsForSlider
+                        )
+                      }
                     />
                   )}
                 </motion.div>
@@ -193,6 +210,8 @@ export default function Home() {
           </AnimatePresence>
         </div>
       </LayoutGroup>
+
+      {/* --- Other Modals --- */}
       <AnimatePresence>
         {jpqlLinking.isLinkModalOpen && (
           <LinkGoodToPartnersViaJournalModal

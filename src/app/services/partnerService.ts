@@ -11,6 +11,7 @@ import { z } from "zod";
 import { journalService } from "./journalService";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
 import { PartnerGoodFilterStatus } from "@/lib/types";
+import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 
 export const createPartnerSchema = z.object({
   name: z.string().min(1, "Partner name is required").max(255),
@@ -203,7 +204,7 @@ const partnerService = {
 
     console.log(
       "Chef (PartnerService): Final Prisma 'where' clause:",
-      JSON.stringify(prismaWhere, null, 2)
+      JSON.stringify(prismaWhere, jsonBigIntReplacer, 2)
     );
 
     const totalCount = await prisma.partner.count({ where: prismaWhere });
@@ -289,6 +290,76 @@ const partnerService = {
       );
       return null;
     }
+  },
+
+  // Add this function to your existing partnerService.ts file
+
+  /**
+   * Finds partners who are linked to ALL specified goods within a given journal context.
+   * @param goodIds - An array of Good IDs.
+   * @param journalId - The Journal ID context.
+   * @returns A paginated response of partners common to all goods.
+   */
+  async findPartnersForGoodsIntersection(
+    goodIds: bigint[],
+    journalId: string
+  ): Promise<{ partners: Partner[]; totalCount: number }> {
+    if (goodIds.length === 0) {
+      return { partners: [], totalCount: 0 };
+    }
+
+    // Group by the JournalPartnerLink ID, counting how many of the specified
+    // goods are associated with it in the given journal.
+    const linkIdGroups = await prisma.journalPartnerGoodLink.groupBy({
+      by: ["journalPartnerLinkId"],
+      where: {
+        goodId: { in: goodIds },
+        journalPartnerLink: {
+          journalId: journalId,
+        },
+      },
+      _count: {
+        goodId: true,
+      },
+      having: {
+        goodId: {
+          _count: {
+            equals: goodIds.length,
+          },
+        },
+      },
+    });
+
+    const intersectingLinkIds = linkIdGroups.map(
+      (group) => group.journalPartnerLinkId
+    );
+
+    if (intersectingLinkIds.length === 0) {
+      return { partners: [], totalCount: 0 };
+    }
+
+    // Now, find all partners associated with these fully-matched links.
+    const totalCount = await prisma.partner.count({
+      where: {
+        journalLinks: {
+          some: {
+            id: { in: intersectingLinkIds },
+          },
+        },
+      },
+    });
+
+    const partners = await prisma.partner.findMany({
+      where: {
+        journalLinks: {
+          some: {
+            id: { in: intersectingLinkIds },
+          },
+        },
+      },
+    });
+
+    return { partners, totalCount };
   },
 };
 

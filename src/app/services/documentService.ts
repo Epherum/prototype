@@ -1,3 +1,4 @@
+//src/app/services/documentService.ts
 import prisma from "@/app/utils/prisma";
 import {
   Document,
@@ -186,6 +187,76 @@ const documentService = {
         deletedById: user.id, // Records who performed the deletion
       },
     });
+  },
+
+  /**
+   * Creates multiple documents in a single atomic transaction.
+   * @param documentsData An array of validated document creation data.
+   * @param createdById The ID of the user creating the documents.
+   * @param createdByIp The IP address of the user.
+   * @returns The number of documents successfully created.
+   */
+  async createBulkDocuments(
+    documentsData: CreateDocumentData[],
+    createdById: string,
+    createdByIp?: string | null
+  ): Promise<number> {
+    const creationPromises = documentsData.map((data) => {
+      // Re-use the existing calculation logic from the single create function
+      let totalHT = 0;
+      let totalTax = 0;
+      const linesToCreate = data.lines.map((line) => {
+        const lineNetTotal = line.quantity * line.unitPrice;
+        const lineDiscountAmount =
+          lineNetTotal * (line.discountPercentage || 0);
+        const lineHT = lineNetTotal - lineDiscountAmount;
+        const lineTaxAmount = line.isTaxExempt ? 0 : lineHT * line.taxRate;
+        totalHT += lineHT;
+        totalTax += lineTaxAmount;
+        return {
+          journalPartnerGoodLinkId: line.journalPartnerGoodLinkId,
+          designation: line.designation,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          discountPercentage: line.discountPercentage || 0,
+          taxRate: line.taxRate,
+          unitOfMeasure: line.unitOfMeasure,
+          isTaxExempt: line.isTaxExempt,
+          netTotal: lineHT,
+          discountAmount: lineDiscountAmount,
+          taxAmount: lineTaxAmount,
+        };
+      });
+      const totalTTC = totalHT + totalTax;
+
+      // This creates a promise for a single document creation within the transaction
+      return prisma.document.create({
+        data: {
+          refDoc: data.refDoc,
+          type: data.type,
+          date: data.date,
+          partnerId: data.partnerId,
+          description: data.description,
+          paymentMode: data.paymentMode,
+          totalHT,
+          totalTax,
+          totalTTC,
+          balance: totalTTC,
+          createdById,
+          createdByIp,
+          entityState: EntityState.ACTIVE,
+          approvalStatus: ApprovalStatus.PENDING,
+          lines: {
+            create: linesToCreate,
+          },
+        },
+      });
+    });
+
+    // Execute all creation promises within a single transaction
+    const createdDocuments = await prisma.$transaction(creationPromises);
+
+    return createdDocuments.length;
   },
 };
 
