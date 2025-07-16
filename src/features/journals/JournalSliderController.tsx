@@ -1,4 +1,4 @@
-//src/features/journals/JournalSliderController.tsx
+// src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
@@ -63,7 +63,7 @@ export const JournalSliderController = forwardRef<
 >(({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, isMoveDisabled }, ref) => {
   const journalManager = useJournalManager();
 
-  // --- Read the global document creation state ---
+  // ✅ 1. Read the global document creation state
   const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
 
   // Other store selections
@@ -101,6 +101,7 @@ export const JournalSliderController = forwardRef<
 
   // --- Callback to handle navigating up the hierarchy one level at a time ---
   const handleNavigateUpOneLevel = useCallback(() => {
+    if (isCreating) return; // Prevent navigation when locked
     const currentTopLevelId = journalManager.selectedTopLevelJournalId;
     const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
 
@@ -120,7 +121,7 @@ export const JournalSliderController = forwardRef<
       undefined,
       currentTopLevelId
     );
-  }, [journalManager, restrictedJournalId]);
+  }, [journalManager, restrictedJournalId, isCreating]);
 
   useImperativeHandle(ref, () => ({
     openJournalSelector: (callback) => {
@@ -201,9 +202,8 @@ export const JournalSliderController = forwardRef<
     if (journalManager.isJournalSliderPrimary) {
       return (
         <JournalHierarchySlider
-          // --- Pass the isLocked prop ---
+          // ✅ 2. Pass the isLocked prop down
           isLocked={isCreating}
-          // All other props remain the same
           sliderId={SLIDER_TYPES.JOURNAL}
           hierarchyData={journalManager.currentHierarchy}
           fullHierarchyData={journalManager.hierarchyData}
@@ -241,9 +241,8 @@ export const JournalSliderController = forwardRef<
     if (queryToUse) {
       return (
         <DynamicSlider
-          // --- Pass the isLocked prop ---
+          // ✅ 2. Pass the isLocked prop down
           isLocked={isCreating}
-          // All other props remain the same
           sliderId={SLIDER_TYPES.JOURNAL}
           title="Journal (Filtered)"
           data={(queryToUse.data || []).map((j) => ({
@@ -264,7 +263,6 @@ export const JournalSliderController = forwardRef<
 
     return (
       <DynamicSlider
-        // No need to lock this as it's a placeholder
         isLocked={false}
         sliderId={SLIDER_TYPES.JOURNAL}
         title="Journal"
@@ -287,7 +285,7 @@ export const JournalSliderController = forwardRef<
             onClick={journalManager.openJournalNavModal}
             className={`${styles.controlButton} ${styles.editButton}`}
             aria-label="Options for Journal"
-            // Disable options when creating a document
+            // ✅ 3. Disable the options button when creating a document
             disabled={isCreating}
           >
             <IoOptionsOutline />
@@ -295,7 +293,9 @@ export const JournalSliderController = forwardRef<
 
           {journalManager.isJournalSliderPrimary && selectedL1Journal && (
             <div
-              className={styles.journalParentInfo}
+              className={`${styles.journalParentInfo} ${
+                isCreating ? styles.locked : ""
+              }`}
               onDoubleClick={handleNavigateUpOneLevel}
               title="Double-click to navigate up one level"
             >
@@ -309,8 +309,8 @@ export const JournalSliderController = forwardRef<
             <button
               onClick={onMoveUp}
               className={styles.controlButton}
-              // Disable move buttons when creating
-              disabled={isMoveDisabled || isCreating}
+              // This is already correctly disabled via page.tsx's `isMoveDisabled` prop
+              disabled={isMoveDisabled}
             >
               ▲ Up
             </button>
@@ -319,8 +319,8 @@ export const JournalSliderController = forwardRef<
             <button
               onClick={onMoveDown}
               className={styles.controlButton}
-              // Disable move buttons when creating
-              disabled={isMoveDisabled || isCreating}
+              // This is also correctly disabled
+              disabled={isMoveDisabled}
             >
               ▼ Down
             </button>
@@ -328,8 +328,6 @@ export const JournalSliderController = forwardRef<
         </div>
       </div>
       {renderSlider()}
-
-      {/* --- MODALS RENDERED BY THIS CONTROLLER --- */}
       <AddJournalModal
         isOpen={journalManager.isAddJournalModalOpen}
         onClose={journalManager.closeAddJournalModal}

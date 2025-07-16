@@ -29,17 +29,13 @@ type SeedJournalInput = Omit<
 async function deleteAllData() {
   console.log("--- Deleting all existing data... ---");
   await prisma.$transaction([
-    // *** START MODIFICATION ***
     prisma.documentLine.deleteMany({}),
-    // *** END MODIFICATION ***
     prisma.journalPartnerGoodLink.deleteMany({}),
     prisma.rolePermission.deleteMany({}),
     prisma.userRole.deleteMany({}),
     prisma.journalPartnerLink.deleteMany({}),
     prisma.journalGoodLink.deleteMany({}),
-    // *** START MODIFICATION ***
     prisma.document.deleteMany({}),
-    // *** END MODIFICATION ***
     prisma.goodsAndService.deleteMany({}),
     prisma.partner.deleteMany({}),
     prisma.taxCode.deleteMany({}),
@@ -219,34 +215,9 @@ async function main() {
       description: "Can read journal data",
     },
     {
-      action: "READ",
-      resource: "JOURNAL",
-      description: "Can read journal data",
-    },
-    {
       action: "MANAGE",
       resource: "DOCUMENT",
       description: "Can create, read, update, and delete documents",
-    },
-    {
-      action: "CREATE",
-      resource: "DOCUMENT",
-      description: "Can create new documents",
-    },
-    {
-      action: "READ",
-      resource: "DOCUMENT",
-      description: "Can read document data",
-    },
-    {
-      action: "UPDATE",
-      resource: "DOCUMENT",
-      description: "Can update document data",
-    },
-    {
-      action: "DELETE",
-      resource: "DOCUMENT",
-      description: "Can delete documents",
     },
   ];
   for (const p of permissionsToCreate) {
@@ -261,11 +232,9 @@ async function main() {
   // --- 2. Create Roles and connect permissions ---
   const adminRolePermissions = [
     { action: "MANAGE", resource: "USERS" },
-    { action: "MANAGE", resource: "DOCUMENT" }, // Give full control over documents
-    { action: "CREATE", resource: "ROLE" }, // Roles don't have a "MANAGE" action in your setup
+    { action: "MANAGE", resource: "DOCUMENT" },
+    { action: "CREATE", resource: "ROLE" },
     { action: "READ", resource: "ROLE" },
-    // NOTE: We can omit the granular permissions for resources covered by "MANAGE"
-    // unless a specific check requires them. For simplicity and power, MANAGE is best.
     { action: "CREATE", resource: "PARTNER" },
     { action: "READ", resource: "PARTNER" },
     { action: "UPDATE", resource: "PARTNER" },
@@ -486,7 +455,6 @@ async function main() {
       email: "admin@bakerydemo.com",
       name: "Admin User",
       passwordHash: await bcrypt.hash("admin123", 10),
-      // This admin is unrestricted, so restrictedTopLevelJournalId is null (default)
       userRoles: { create: { roleId: adminRole.id } },
     },
   });
@@ -495,13 +463,8 @@ async function main() {
       email: "sales.manager@bakerydemo.com",
       name: "Sales Manager Sam",
       passwordHash: await bcrypt.hash("sales123", 10),
-      // REFACTORED: Restriction is now at the User level
       restrictedTopLevelJournalId: "4",
-      userRoles: {
-        create: {
-          roleId: salesManagerRole.id,
-        },
-      },
+      userRoles: { create: { roleId: salesManagerRole.id } },
     },
   });
   const procurementUser = await prisma.user.create({
@@ -509,13 +472,8 @@ async function main() {
       email: "procurement.specialist@bakerydemo.com",
       name: "Procurement Specialist Pat",
       passwordHash: await bcrypt.hash("procurement123", 10),
-      // REFACTORED: Restriction is now at the User level
       restrictedTopLevelJournalId: "5",
-      userRoles: {
-        create: {
-          roleId: procurementRole.id,
-        },
-      },
+      userRoles: { create: { roleId: procurementRole.id } },
     },
   });
   console.log(
@@ -569,6 +527,8 @@ async function main() {
       entityState: EntityState.ACTIVE,
     },
   });
+
+  // -- Partners for Journal 4001 (Cake Sales)
   const pCustomerCafeA = await prisma.partner.create({
     data: {
       name: "The Cozy Cafe",
@@ -578,6 +538,54 @@ async function main() {
       entityState: EntityState.ACTIVE,
     },
   });
+  const pCustomerDowntownDeli = await prisma.partner.create({
+    data: {
+      name: "Downtown Deli",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+  const pCustomerCityCenterBakery = await prisma.partner.create({
+    data: {
+      name: "City Center Bakery",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+  const pCustomerUptownConfections = await prisma.partner.create({
+    data: {
+      name: "Uptown Confections",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+
+  // -- Partners for other journals
+  const pCustomerGourmetBistro = await prisma.partner.create({
+    data: {
+      name: "Gourmet Bistro",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+  const pCustomerCookieJar = await prisma.partner.create({
+    data: {
+      name: "The Cookie Jar",
+      partnerType: PartnerType.LEGAL_ENTITY,
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+    },
+  });
+
   const pCustomerMegaCorp = await prisma.partner.create({
     data: {
       name: "MegaCorp Events",
@@ -643,6 +651,8 @@ async function main() {
       unitCodeId: uomBox.id,
     },
   });
+
+  // -- Goods for Journal 4001 (Cake Sales)
   const gGoodChocolateCake = await prisma.goodsAndService.create({
     data: {
       label: "Classic Chocolate Cake",
@@ -652,6 +662,41 @@ async function main() {
       entityState: EntityState.ACTIVE,
       taxCodeId: taxStd.id,
       unitCodeId: uomEach.id,
+    },
+  });
+  const gGoodRedVelvetCupcake = await prisma.goodsAndService.create({
+    data: {
+      label: "Red Velvet Cupcake (Box of 12)",
+      referenceCode: "CAKE-RVC-12",
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxStd.id,
+      unitCodeId: uomBox.id,
+    },
+  });
+  const gGoodCarrotCakeSlice = await prisma.goodsAndService.create({
+    data: {
+      label: "Carrot Cake Slice (Individual)",
+      referenceCode: "CAKE-CRT-01",
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxStd.id,
+      unitCodeId: uomEach.id,
+    },
+  });
+
+  // -- Goods for other journals
+  const gGoodOatmealCookie = await prisma.goodsAndService.create({
+    data: {
+      label: "Oatmeal Raisin Cookies (Box of 24)",
+      referenceCode: "CK-OAT-01",
+      createdById: defaultCreatorId,
+      approvalStatus: ApprovalStatus.APPROVED,
+      entityState: EntityState.ACTIVE,
+      taxCodeId: taxStd.id,
+      unitCodeId: uomBox.id,
     },
   });
   const gGoodCroissant = await prisma.goodsAndService.create({
@@ -695,8 +740,28 @@ async function main() {
     "CUSTOMER"
   );
   await linkPartnerToJournalWithHierarchy(
-    pCustomerCafeA.id,
+    pCustomerDowntownDeli.id,
+    "4001",
+    "CUSTOMER"
+  );
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerCityCenterBakery.id,
+    "4001",
+    "CUSTOMER"
+  );
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerUptownConfections.id,
+    "4001",
+    "CUSTOMER"
+  );
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerGourmetBistro.id,
     "4003",
+    "CUSTOMER"
+  );
+  await linkPartnerToJournalWithHierarchy(
+    pCustomerCookieJar.id,
+    "4002",
     "CUSTOMER"
   );
   await linkPartnerToJournalWithHierarchy(
@@ -707,30 +772,101 @@ async function main() {
   await linkGoodToJournalWithHierarchy(gGoodFlour.id, "5001");
   await linkGoodToJournalWithHierarchy(gGoodSugar.id, "5002");
   await linkGoodToJournalWithHierarchy(gGoodChocolateCake.id, "4001");
+  await linkGoodToJournalWithHierarchy(gGoodRedVelvetCupcake.id, "4001");
+  await linkGoodToJournalWithHierarchy(gGoodCarrotCakeSlice.id, "4001");
+  await linkGoodToJournalWithHierarchy(gGoodOatmealCookie.id, "4002");
   await linkGoodToJournalWithHierarchy(gGoodCroissant.id, "4003");
   await linkGoodToJournalWithHierarchy(gGoodCatering.id, "4101");
   console.log("Hierarchical Partner-Journal and Good-Journal links created.");
 
   // --- 9. Create Tri-partite Links (Journal-Partner-Good) ---
   console.log("\nCreating tri-partite Journal-Partner-Good links...");
-  const jplCafeCakes = await prisma.journalPartnerLink.findFirstOrThrow({
+
+  // Get the specific links for Journal 4001
+  const jplCozyCafeCakes = await prisma.journalPartnerLink.findFirstOrThrow({
     where: { partnerId: pCustomerCafeA.id, journalId: "4001" },
   });
+  const jplDeliCakes = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerDowntownDeli.id, journalId: "4001" },
+  });
+  const jplCityCenterCakes = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerCityCenterBakery.id, journalId: "4001" },
+  });
+  const jplUptownCakes = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerUptownConfections.id, journalId: "4001" },
+  });
+
+  // Build the intersection graph for Journal 4001
+  console.log("Building intersection graph for Journal 4001...");
+  // Partner 1: The Cozy Cafe buys Chocolate Cake and Red Velvet Cupcakes
+  await prisma.journalPartnerGoodLink.createMany({
+    data: [
+      {
+        journalPartnerLinkId: jplCozyCafeCakes.id,
+        goodId: gGoodChocolateCake.id,
+      },
+      {
+        journalPartnerLinkId: jplCozyCafeCakes.id,
+        goodId: gGoodRedVelvetCupcake.id,
+      },
+    ],
+  });
+  // Partner 2: Downtown Deli buys Chocolate Cake and Carrot Cake
+  await prisma.journalPartnerGoodLink.createMany({
+    data: [
+      { journalPartnerLinkId: jplDeliCakes.id, goodId: gGoodChocolateCake.id },
+      {
+        journalPartnerLinkId: jplDeliCakes.id,
+        goodId: gGoodCarrotCakeSlice.id,
+      },
+    ],
+  });
+  // Partner 3: City Center Bakery buys Chocolate Cake and Carrot Cake
+  await prisma.journalPartnerGoodLink.createMany({
+    data: [
+      {
+        journalPartnerLinkId: jplCityCenterCakes.id,
+        goodId: gGoodChocolateCake.id,
+      },
+      {
+        journalPartnerLinkId: jplCityCenterCakes.id,
+        goodId: gGoodCarrotCakeSlice.id,
+      },
+    ],
+  });
+  // Partner 4: Uptown Confections buys Red Velvet Cupcakes and Carrot Cake
+  await prisma.journalPartnerGoodLink.createMany({
+    data: [
+      {
+        journalPartnerLinkId: jplUptownCakes.id,
+        goodId: gGoodRedVelvetCupcake.id,
+      },
+      {
+        journalPartnerLinkId: jplUptownCakes.id,
+        goodId: gGoodCarrotCakeSlice.id,
+      },
+    ],
+  });
+
+  // -- Other Tri-partite links from original seed --
+  const jplBistroPastries = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerGourmetBistro.id, journalId: "4003" },
+  });
   await prisma.journalPartnerGoodLink.create({
     data: {
-      journalPartnerLinkId: jplCafeCakes.id,
-      goodId: gGoodChocolateCake.id,
-      descriptiveText: "Weekly standing order for chocolate cakes.",
+      journalPartnerLinkId: jplBistroPastries.id,
+      goodId: gGoodCroissant.id,
+      descriptiveText: "Regular order of croissants for bistro service.",
     },
   });
-  const jplCafePastries = await prisma.journalPartnerLink.findFirstOrThrow({
-    where: { partnerId: pCustomerCafeA.id, journalId: "4003" },
+  const jplCookieJarCookies = await prisma.journalPartnerLink.findFirstOrThrow({
+    where: { partnerId: pCustomerCookieJar.id, journalId: "4002" },
   });
   await prisma.journalPartnerGoodLink.create({
     data: {
-      journalPartnerLinkId: jplCafePastries.id,
-      goodId: gGoodCroissant.id,
-      descriptiveText: "Daily delivery of 50 croissants.",
+      journalPartnerLinkId: jplCookieJarCookies.id,
+      goodId: gGoodOatmealCookie.id,
+      descriptiveText: "Bulk purchase of oatmeal cookies for resale.",
     },
   });
   const jplMegaCorpCatering = await prisma.journalPartnerLink.findFirstOrThrow({
@@ -747,8 +883,6 @@ async function main() {
 
   // --- 10. Create Sample Documents ---
   console.log("\nCreating sample documents...");
-
-  // Create an INVOICE for 'The Cozy Cafe' (Partner linked to journal 4001)
   await prisma.document.create({
     data: {
       refDoc: "INV-2025-001",
@@ -756,8 +890,8 @@ async function main() {
       date: new Date("2025-06-15T10:00:00Z"),
       state: DocumentState.FINALIZED,
       description: "Invoice for weekly pastry delivery.",
-      partnerId: pCustomerCafeA.id, // pCustomerCafeA is linked to journal 4001
-      createdById: defaultCreatorId, // Created by 'Sales Manager Sam'
+      partnerId: pCustomerCafeA.id,
+      createdById: defaultCreatorId,
       totalHT: new Prisma.Decimal(150.0),
       totalTax: new Prisma.Decimal(30.0),
       totalTTC: new Prisma.Decimal(180.0),
@@ -765,9 +899,6 @@ async function main() {
       approvalStatus: ApprovalStatus.APPROVED,
     },
   });
-
-  // Create a DRAFT QUOTE for 'MegaCorp Events' (Partner linked to journal 4101)
-  // This demonstrates creating a document for another partner in the revenue hierarchy.
   await prisma.document.create({
     data: {
       refDoc: "QT-2025-002",
@@ -776,7 +907,7 @@ async function main() {
       state: DocumentState.DRAFT,
       description: "Quote for annual gala catering.",
       partnerId: pCustomerMegaCorp.id,
-      createdById: defaultCreatorId, // Created by 'Sales Manager Sam'
+      createdById: defaultCreatorId,
       totalHT: new Prisma.Decimal(5000.0),
       totalTax: new Prisma.Decimal(1000.0),
       totalTTC: new Prisma.Decimal(6000.0),
@@ -784,9 +915,56 @@ async function main() {
       approvalStatus: ApprovalStatus.PENDING,
     },
   });
+  await prisma.document.create({
+    data: {
+      refDoc: "INV-2025-003",
+      type: DocumentType.INVOICE,
+      date: new Date("2025-07-20T09:00:00Z"),
+      state: DocumentState.FINALIZED,
+      description: "Invoice for croissants.",
+      partnerId: pCustomerGourmetBistro.id,
+      createdById: defaultCreatorId,
+      totalHT: new Prisma.Decimal(250.0),
+      totalTax: new Prisma.Decimal(50.0),
+      totalTTC: new Prisma.Decimal(300.0),
+      balance: new Prisma.Decimal(300.0),
+      approvalStatus: ApprovalStatus.APPROVED,
+    },
+  });
+  await prisma.document.create({
+    data: {
+      refDoc: "PO-2025-001",
+      type: DocumentType.PURCHASE_ORDER,
+      date: new Date("2025-07-22T11:00:00Z"),
+      state: DocumentState.DRAFT,
+      description: "Purchase order for oatmeal cookies.",
+      partnerId: pCustomerCookieJar.id,
+      createdById: defaultCreatorId,
+      totalHT: new Prisma.Decimal(400.0),
+      totalTax: new Prisma.Decimal(80.0),
+      totalTTC: new Prisma.Decimal(480.0),
+      balance: new Prisma.Decimal(480.0),
+      approvalStatus: ApprovalStatus.PENDING,
+    },
+  });
+  await prisma.document.create({
+    data: {
+      refDoc: "QT-2025-004",
+      type: DocumentType.QUOTE,
+      date: new Date("2025-08-01T16:00:00Z"),
+      state: DocumentState.FINALIZED,
+      description: "Quote for custom three-tier wedding cake.",
+      partnerId: pCustomerMegaCorp.id,
+      createdById: defaultCreatorId,
+      totalHT: new Prisma.Decimal(850.0),
+      totalTax: new Prisma.Decimal(170.0),
+      totalTTC: new Prisma.Decimal(1020.0),
+      balance: new Prisma.Decimal(1020.0),
+      approvalStatus: ApprovalStatus.APPROVED,
+    },
+  });
 
   console.log("Sample documents created successfully.");
-
   console.log("\n--- Seeding finished successfully! ---");
 }
 

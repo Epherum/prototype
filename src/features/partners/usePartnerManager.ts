@@ -1,4 +1,4 @@
-// src/features/partners/usePartnerManager.ts
+//src/features/partners/usePartnerManager.ts
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
@@ -10,14 +10,14 @@ import {
 } from "@tanstack/react-query";
 import { partnerKeys } from "@/lib/queryKeys";
 import { useAppStore } from "@/store/appStore";
-import { SLIDER_TYPES } from "@/lib/constants";
+import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants"; // ✅ ADD ROOT_JOURNAL_ID
 import { getFirstId } from "@/lib/helpers";
 import {
   fetchPartners,
   createPartner,
   updatePartner,
   deletePartner,
-  fetchIntersectionOfPartners,
+  getPartnersForGoods,
 } from "@/services/clientPartnerService";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 import type {
@@ -47,6 +47,34 @@ export const usePartnerManager = () => {
   } = selections;
 
   const { effectiveSelectedJournalIds } = useJournalManager();
+
+  // ✅ --- START: COPIED LOGIC FROM useGoodManager ---
+  // This is the key fix. It correctly determines the most specific journal ID for the current context.
+  const activeJournalIdForIntersection = useMemo(() => {
+    const { journal } = selections;
+
+    // In creation mode, we need the SINGLE most specific terminal journal ID.
+    if (documentCreationState.isCreating) {
+      if (journal.level3Ids.length > 0) {
+        // NOTE: This assumes we operate on the first L3 selection if multiple are possible.
+        // Adjust if business logic requires handling multiple L3s differently.
+        return journal.level3Ids[0];
+      }
+      if (journal.level2Ids.length > 0) {
+        return journal.level2Ids[0];
+      }
+      if (journal.flatId) {
+        return journal.flatId;
+      }
+      // Fallback to the top-level journal if no deeper selection is made.
+      return journal.topLevelId;
+    }
+
+    // Return null when not in creation mode, as this logic is only for intersection queries.
+    return null;
+  }, [selections.journal, documentCreationState.isCreating]);
+  // ✅ --- END: COPIED LOGIC ---
+
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
     useState(false);
   const [partnerOptionsMenuAnchorEl, setPartnerOptionsMenuAnchorEl] =
@@ -63,25 +91,7 @@ export const usePartnerManager = () => {
     },
     [setSelection]
   );
-
-  // === LOGGING: Let's see what this manager thinks the state is ===
-  if (true) {
-    console.groupCollapsed(`[DEBUG: usePartnerManager] Render/Update`);
-    console.log(
-      `Document Creation Mode: %c${documentCreationState.mode}`,
-      "font-weight: bold;"
-    );
-    console.log(`isCreating: ${documentCreationState.isCreating}`);
-    console.log(
-      `Locked Goods: [${documentCreationState.lockedGoodIds.join(", ")}]`
-    );
-    console.log(`Locked Journal: ${documentCreationState.lockedJournalId}`);
-    console.groupEnd();
-  }
-  // ===
-
   const normalPartnerQueryParams = useMemo((): FetchPartnersParams => {
-    // ... (logic is unchanged) ...
     const visibleOrder = sliderOrder.filter((id) => visibility[id]);
     const partnerIndex = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
     if (partnerIndex === -1) return {};
@@ -119,87 +129,44 @@ export const usePartnerManager = () => {
     effectiveSelectedJournalIds,
   ]);
 
-  const normalPartnerQueryEnabled =
-    !documentCreationState.isCreating ||
-    (documentCreationState.isCreating &&
-      (documentCreationState.mode === "LOCK_PARTNER" ||
-        documentCreationState.mode === "SINGLE_ITEM" ||
-        documentCreationState.mode === "INTERSECT_FROM_PARTNER"));
-
   const normalPartnerQuery = useQuery({
     queryKey: partnerKeys.list(normalPartnerQueryParams),
     queryFn: () => fetchPartners(normalPartnerQueryParams),
-    enabled: normalPartnerQueryEnabled,
+    enabled: !documentCreationState.isCreating,
   });
 
-  const partnersForSingleGoodQuery = useQuery({
-    queryKey: partnerKeys.list({
-      linkedToGoodId: documentCreationState.lockedGoodIds[0],
-      linkedToJournalIds: [documentCreationState.lockedJournalId!],
-    }),
-    queryFn: () =>
-      fetchPartners({
-        linkedToGoodId: documentCreationState.lockedGoodIds[0],
-        linkedToJournalIds: [documentCreationState.lockedJournalId!],
-      }),
-    enabled:
-      documentCreationState.isCreating &&
-      // ✅ Enable this query in two scenarios:
-      (documentCreationState.mode === "LOCK_GOOD" ||
-        (documentCreationState.mode === "INTERSECT_FROM_GOOD" &&
-          documentCreationState.lockedGoodIds.length === 1)) &&
-      documentCreationState.lockedGoodIds.length > 0 && // Technically redundant due to the length check, but safe
-      !!documentCreationState.lockedJournalId,
-  });
-
-  // 3. Query for the INTERSECTION of MULTIPLE selected goods (2 or more)
-  const intersectionPartnersQuery = useQuery({
+  const partnersForGoodsQuery = useQuery({
     queryKey: partnerKeys.list({
       forGoodsIntersection: documentCreationState.lockedGoodIds,
-      journalId: documentCreationState.lockedJournalId,
+      journalId: activeJournalIdForIntersection,
     }),
     queryFn: () =>
-      fetchIntersectionOfPartners(
+      getPartnersForGoods(
         documentCreationState.lockedGoodIds,
-        documentCreationState.lockedJournalId!
+        activeJournalIdForIntersection!
       ),
-    // ✅ FIX: This query should ONLY be enabled when there are 2 OR MORE goods selected.
     enabled:
       documentCreationState.isCreating &&
-      documentCreationState.mode === "INTERSECT_FROM_GOOD" &&
-      documentCreationState.lockedGoodIds.length > 1 && // The key change is from `> 0` to `> 1`
-      !!documentCreationState.lockedJournalId,
+      (documentCreationState.mode === "INTERSECT_FROM_GOOD" ||
+        documentCreationState.mode === "LOCK_GOOD") &&
+      documentCreationState.lockedGoodIds.length > 0 &&
+      !!activeJournalIdForIntersection,
     staleTime: Infinity,
   });
 
-  // === ACTIVE QUERY SELECTOR (THE CORE FIX) ===
   const activeQuery: UseQueryResult<PaginatedPartnersResponse, Error> =
     useMemo(() => {
-      const { isCreating, mode, lockedGoodIds } = documentCreationState;
+      const { isCreating, mode } = documentCreationState;
 
       if (!isCreating) {
         return normalPartnerQuery;
       }
 
       switch (mode) {
-        // This is the flow we are fixing (J -> D -> G -> P)
         case "INTERSECT_FROM_GOOD":
-          // If 1 good is selected, show all its partners.
-          if (lockedGoodIds.length === 1) {
-            return partnersForSingleGoodQuery;
-          }
-          // If 2 or more goods are selected, show the intersection.
-          if (lockedGoodIds.length > 1) {
-            return intersectionPartnersQuery;
-          }
-          // If 0 goods are selected, show nothing.
-          return { data: { data: [], total: 0 }, status: "success" } as any;
-
-        // This flow (J -> G -> D -> P) correctly uses the single good query.
         case "LOCK_GOOD":
-          return partnersForSingleGoodQuery;
+          return partnersForGoodsQuery;
 
-        // These other flows use the normal partner query logic.
         case "LOCK_PARTNER":
         case "SINGLE_ITEM":
         case "INTERSECT_FROM_PARTNER":
@@ -208,13 +175,9 @@ export const usePartnerManager = () => {
         default:
           return { data: { data: [], total: 0 }, status: "success" } as any;
       }
-    }, [
-      documentCreationState,
-      normalPartnerQuery,
-      intersectionPartnersQuery,
-      partnersForSingleGoodQuery, // Renamed from partnersForLockedGoodQuery for clarity
-    ]);
+    }, [documentCreationState, normalPartnerQuery, partnersForGoodsQuery]);
 
+  // --- (useEffect for selection, Mutations and Modal Handlers are unchanged) ---
   useEffect(() => {
     if (
       activeQuery.isSuccess &&
@@ -240,7 +203,8 @@ export const usePartnerManager = () => {
     documentCreationState.isCreating,
   ]);
 
-  // --- Mutations and Modal Handlers (unchanged) ---
+  //... all mutations and handlers remain the same from here
+
   const createPartnerMutation = useMutation<
     Partner,
     Error,

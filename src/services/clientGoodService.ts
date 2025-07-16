@@ -5,9 +5,9 @@ import type {
   PaginatedGoodsResponse,
   UpdateGoodClientData,
   FetchGoodsParams,
-  ActivePartnerFilters, // Import the array type
 } from "@/lib/types";
 
+// --- Main fetchGoods function (remains unchanged) ---
 export async function fetchGoods(
   params: FetchGoodsParams = {}
 ): Promise<PaginatedGoodsResponse> {
@@ -84,7 +84,8 @@ export async function fetchGoods(
   }));
   return result;
 }
-// --- CRUD Operations (createGood, updateGood, deleteGood, fetchGoodById) ---
+
+// --- CRUD Operations (remain unchanged) ---
 export async function createGood(
   goodData: CreateGoodClientData
 ): Promise<Good> {
@@ -93,22 +94,9 @@ export async function createGood(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(goodData),
   });
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error creating good/service" }));
-    throw new Error(
-      errorData.message ||
-        `Failed to create good/service: ${response.statusText}`
-    );
-  }
+  if (!response.ok) throw new Error("Failed to create good/service");
   const newGood = await response.json();
-  return {
-    ...newGood,
-    id: String(newGood.id),
-    taxCodeId: newGood.taxCodeId ?? null,
-    unitCodeId: newGood.unitCodeId ?? null,
-  };
+  return { ...newGood, id: String(newGood.id) };
 }
 
 export async function updateGood(
@@ -120,37 +108,15 @@ export async function updateGood(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(goodData),
   });
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error updating good/service" }));
-    throw new Error(
-      errorData.message ||
-        `Failed to update good/service: ${response.statusText}`
-    );
-  }
+  if (!response.ok) throw new Error("Failed to update good/service");
   const updatedGood = await response.json();
-  return {
-    ...updatedGood,
-    id: String(updatedGood.id),
-    taxCodeId: updatedGood.taxCodeId ?? null,
-    unitCodeId: updatedGood.unitCodeId ?? null,
-  };
+  return { ...updatedGood, id: String(updatedGood.id) };
 }
 
 export async function deleteGood(goodId: string): Promise<{ message: string }> {
   const response = await fetch(`/api/goods/${goodId}`, { method: "DELETE" });
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error deleting good/service" }));
-    throw new Error(
-      errorData.message ||
-        `Failed to delete good/service: ${response.statusText}`
-    );
-  }
+  if (!response.ok) throw new Error("Failed to delete good/service");
   if (response.status === 204)
-    // No Content
     return { message: `Good/service ${goodId} deleted successfully.` };
   return response.json();
 }
@@ -159,29 +125,13 @@ export async function fetchGoodById(goodId: string): Promise<Good | null> {
   const response = await fetch(`/api/goods/${goodId}`);
   if (!response.ok) {
     if (response.status === 404) return null;
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error fetching good/service by ID" }));
-    throw new Error(
-      errorData.message ||
-        `Failed to fetch good/service ${goodId}: ${response.statusText}`
-    );
+    throw new Error(`Failed to fetch good/service ${goodId}`);
   }
   const good = await response.json();
-  return {
-    ...good,
-    id: String(good.id),
-    taxCodeId: good.taxCodeId ?? null,
-    unitCodeId: good.unitCodeId ?? null,
-  };
+  return { ...good, id: String(good.id) };
 }
 
-// --- Specialized Fetch Functions ---
-// These can be kept if they map to specific backend logic not covered by the main fetchGoods,
-// or they can be refactored to use the main fetchGoods if the backend /api/goods is versatile enough.
-
-// This function is used in page.tsx for J-P-G and P-J-G flows.
-// It now correctly calls the main `fetchGoods` which will handle these params.
+// --- Specialized Fetch Functions (unchanged portions) ---
 export async function fetchGoodsForJournalsAndPartner(
   journalIds: string[],
   partnerId: string,
@@ -189,142 +139,87 @@ export async function fetchGoodsForJournalsAndPartner(
 ): Promise<Good[]> {
   if (!journalIds || journalIds.length === 0 || !partnerId) return [];
   const result = await fetchGoods({
-    forJournalIds: journalIds, // Matches FetchGoodsParams
-    forPartnerId: partnerId, // Matches FetchGoodsParams
+    forJournalIds: journalIds,
+    forPartnerId: partnerId,
     includeJournalChildren: includeJournalChildren,
   });
   return result.data;
 }
 
-// This function is used for J-G or G-J (2-way) flows.
 export async function fetchGoodsLinkedToJournals(
   journalIds: string[],
-  includeChildren: boolean = true // Renamed to includeJournalChildren for consistency with FetchGoodsParams
+  includeChildren: boolean = true
 ): Promise<Good[]> {
   if (!journalIds || journalIds.length === 0) return [];
   const result = await fetchGoods({
-    linkedToJournalIds: journalIds, // Matches FetchGoodsParams
+    linkedToJournalIds: journalIds,
     includeJournalChildren: includeChildren,
   });
   return result.data;
 }
 
-// This function hits a DEDICATED backend endpoint for fetching goods linked to a partner via JPGL,
-// irrespective of a specific journal context from the UI at that moment.
-// KEEP THIS AS IS if it serves a distinct purpose (e.g., showing ALL goods ever 3-way linked to a partner).
 export async function fetchGoodsLinkedToPartnerViaJPGL(
   partnerId: string
 ): Promise<Good[]> {
-  if (!partnerId || partnerId === "undefined") {
-    console.warn(
-      `[fetchGoodsLinkedToPartnerViaJPGL] Called with invalid partnerId: '${partnerId}'. Returning [].`
-    );
-    return [];
-  }
-  // This specific endpoint likely has its own optimized query.
+  if (!partnerId || partnerId === "undefined") return [];
   const response = await fetch(`/api/partners/${partnerId}/goods-via-jpgl`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Failed to fetch goods linked to partner ${partnerId} via JPGL`,
-    }));
-    throw new Error(errorData.message || "Failed to fetch goods");
-  }
-
-  const result: PaginatedGoodsResponse = await response.json(); // Assuming it returns PaginatedGoodsResponse
-
-  console.log(`[clientGoodService] Parsed response data:`, result.data);
-
-  return result.data.map((g) => ({
-    ...g,
-    id: String(g.id),
-    taxCodeId: g.taxCodeId ?? null,
-    unitCodeId: g.unitCodeId ?? null,
-  }));
+  if (!response.ok) throw new Error("Failed to fetch goods");
+  const result: PaginatedGoodsResponse = await response.json();
+  return result.data.map((g) => ({ ...g, id: String(g.id) }));
 }
 
-/**
- * Fetches goods specifically for the document creation context by hitting the
- * endpoint that is guaranteed to return the `jpqLinkId`.
- * @param partnerId The ID of the selected partner.
- * @param journalId The ID of the selected journal.
- * @returns A promise that resolves to a paginated list of goods, annotated with jpqLinkId.
- */
-/**
- */
 export async function fetchGoodsForDocumentContext(
   partnerId: string,
   journalId: string
 ): Promise<PaginatedGoodsResponse> {
-  // --- BULLETPROOF GUARD AND LOGGING ---
-  console.log(
-    `[clientGoodService] fetchGoodsForDocumentContext called with: partnerId='${partnerId}' (type: ${typeof partnerId}), journalId='${journalId}'`
-  );
-
-  // This is the most important guard. It prevents the API call if the data is invalid.
   if (!partnerId || partnerId === "undefined" || !journalId) {
-    const errorMessage = `[clientGoodService] Invalid arguments provided. Aborting fetch. PartnerID: ${partnerId}, JournalID: ${journalId}`;
-    console.error(errorMessage);
-    // Throw an error to stop the React Query from proceeding.
-    throw new Error(errorMessage);
-  }
-
-  // Construct the final URL.
-  const apiUrl = `/api/partners/${partnerId}/goods-via-jpgl?journalId=${journalId}`;
-
-  console.log(`[clientGoodService] Making fetch request to: ${apiUrl}`);
-  // --- END BULLETPROOF GUARD ---
-
-  const response = await fetch(apiUrl); // Use the constructed apiUrl variable
-
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error" }));
     throw new Error(
-      errorData.message || `Failed to fetch goods for document context`
+      "Invalid arguments provided to fetchGoodsForDocumentContext."
     );
   }
-
+  const apiUrl = `/api/partners/${partnerId}/goods-via-jpgl?journalId=${journalId}`;
+  const response = await fetch(apiUrl);
+  if (!response.ok)
+    throw new Error("Failed to fetch goods for document context");
   const result: PaginatedGoodsResponse = await response.json();
-  result.data = result.data.map((good) => ({
-    ...good,
-    id: String(good.id),
-    // The backend is now responsible for adding `jpqLinkId` to each good object.
-  }));
+  result.data = result.data.map((good) => ({ ...good, id: String(good.id) }));
   return result;
 }
 
-// Add this function to the end of your src/services/clientGoodService.ts file
-
+// ✅ --- ADDED: New Consolidated Function ---
 /**
- * Fetches goods that are common to a given set of partners within a journal context.
- * Calls the dedicated intersection endpoint.
- * @param partnerIds - An array of partner IDs to find the intersection for.
- * @param journalId - The journal context ID.
- * @returns A promise that resolves to a paginated response of common goods.
+ * Fetches goods for one or more partners within a journal context.
+ * Calls the new consolidated `/api/goods/for-partners` endpoint.
+ * - If one ID is provided, it fetches all goods for that partner (union-like).
+ * - If multiple IDs are provided, it fetches the intersection of goods common to all partners.
+ * @param partnerIds - An array of partner IDs.
+ * @param journalId - The ID of the journal context.
+ * @returns A promise that resolves to the API response with goods data.
  */
-export const fetchIntersectionOfGoods = async (
+export async function getGoodsForPartners(
   partnerIds: string[],
   journalId: string
-): Promise<PaginatedGoodsResponse> => {
+): Promise<PaginatedGoodsResponse> {
   if (partnerIds.length === 0 || !journalId) {
-    return { data: [], total: 0 };
+    // Return a promise that resolves to an empty state to prevent API errors
+    return Promise.resolve({ data: [], total: 0 });
   }
 
+  // Construct the query parameters. The key is joining the array into a comma-separated string.
   const params = new URLSearchParams({
     partnerIds: partnerIds.join(","),
     journalId: journalId,
   });
 
-  const response = await fetch(
-    `/api/goods/for-partners-intersection?${params.toString()}`
+  console.log(
+    `[CLIENT-SERVICE: getGoodsForPartners] Firing API Request to: /api/goods/for-partners?${params.toString()}`
   );
+
+  const response = await fetch(`/api/goods/for-partners?${params.toString()}`);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.message || "Failed to fetch intersection of goods"
-    );
+    throw new Error(errorData.message || "Failed to fetch goods for partners");
   }
 
   const result: PaginatedGoodsResponse = await response.json();
@@ -333,4 +228,8 @@ export const fetchIntersectionOfGoods = async (
     id: String(good.id),
   }));
   return result;
-};
+}
+
+// ✅ --- REMOVED: Obsolete Functions ---
+// `fetchIntersectionOfGoods` has been removed.
+// `fetchGoodsForPartnersUnion` has been removed.

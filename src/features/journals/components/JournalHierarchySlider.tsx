@@ -186,6 +186,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                 activeFilters.includes("affected") ? styles.activeFilter : ""
               }
               onClick={() => onToggleFilter("affected")}
+              disabled={isLocked}
             >
               Affected
             </button>
@@ -194,6 +195,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                 activeFilters.includes("unaffected") ? styles.activeFilter : ""
               }
               onClick={() => onToggleFilter("unaffected")}
+              disabled={isLocked}
             >
               Unaffected
             </button>
@@ -203,6 +205,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               }
               onClick={() => onToggleFilter("inProcess")}
               title="Items created by you, not yet linked to your home journal"
+              disabled={isLocked}
             >
               In Process
             </button>
@@ -256,6 +259,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                     title={`${l2Node.code} - ${
                       l2Node.name || "Unnamed"
                     }. Double-click to drill down.`}
+                    disabled={isLocked}
                   >
                     {l2Node.code || "N/A"}
                   </button>
@@ -322,6 +326,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                     title={`${l3Node.code} - ${
                       l3Node.name || "Unnamed"
                     }. Double-click to drill up.`}
+                    disabled={isLocked}
                   >
                     {l3Node.code || "N/A"}
                   </button>

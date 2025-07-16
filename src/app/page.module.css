@@ -1,6 +1,8 @@
 /* src/app/page.module.css */
 
 .pageContainer {
+  position: relative; /* <<< --- ADD THIS LINE */
+
   max-width: 600px; /* This is specific, not a variable */
   margin: 0 auto;
   padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
@@ -53,7 +55,7 @@
 }
 
 .slidersAreaWithToolbar {
-  padding-bottom: 50px; /* Adjust this value as needed. 120px is a safe starting point. */
+  padding-bottom: 100px; /* Adjust this value as needed. 120px is a safe starting point. */
 }
 
 .sliderWrapper {

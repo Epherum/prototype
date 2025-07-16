@@ -1,54 +1,100 @@
-/* src/components/modals/DocumentConfirmationModal.module.css */
-/* Re-uses .modalOverlay, .modalContent, .modalCloseButton, .modalActions etc. */
+/*
+  MODIFIED: Mobile-first styles that use global variables 
+  for a clean, integrated, and responsive layout.
+*/
+.formContainer {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 3);
+  width: 100%;
+}
 
+.formSection,
 .confirmationSection {
-  margin-bottom: calc(var(--spacing-unit) * 2);
-  padding-bottom: calc(var(--spacing-unit) * 1.5);
-  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-unit);
 }
-.confirmationSection:last-of-type {
-  border-bottom: none;
-  margin-bottom: 0;
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
 }
-.confirmationSection h3 {
-  font-size: 1.15em;
-  color: var(--text-primary);
-  margin-top: 0;
-  margin-bottom: var(--spacing-unit);
-}
-.confirmationSection p {
-  font-size: 0.95em;
+
+.formGroup label {
+  font-weight: 600;
+  font-size: 0.9em;
   color: var(--text-secondary);
-  margin: calc(var(--spacing-unit) * 0.5) 0;
-  text-align: left;
-  line-height: 1.6;
+}
+
+.formInput {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 1.5);
+  font-size: 1rem;
+  color: var(--text-primary);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  transition: all 0.2s ease;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-light);
+}
+
+/* For side-by-side Date and Type fields */
+.formGroupGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-unit);
+}
+
+/* Goods List Styling */
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: var(--spacing-unit);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .confirmationGoodsList {
   list-style: none;
-  padding-left: 0;
-  max-height: 200px;
+  max-height: 220px; /* Control height on mobile */
   overflow-y: auto;
+  padding-right: calc(var(--spacing-unit) * 0.5); /* For scrollbar */
 }
+
 .confirmationGoodsList li {
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 0.5);
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-unit) 0;
   border-bottom: 1px dashed var(--border-subtle);
-  background-color: #fdfdfd;
-  border-radius: var(--border-radius-sm);
-  margin-bottom: calc(var(--spacing-unit) * 0.5);
 }
+
 .confirmationGoodsList li:last-child {
   border-bottom: none;
-  margin-bottom: 0;
 }
-.confirmationGoodsList li strong {
+
+.itemName {
+  font-weight: 500;
   color: var(--text-primary);
-  font-size: 1em;
-  display: block;
-  margin-bottom: 2px;
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
 }
-.confirmationGoodsList li p {
+
+.lineItemDetails {
   font-size: 0.9em;
-  margin: 2px 0 0 0;
   color: var(--text-secondary);
+  align-self: flex-end; /* Push details to the right */
+}
+
+.lineItemDetails strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }

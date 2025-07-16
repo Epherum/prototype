@@ -1,3 +1,4 @@
+//src/features/documents/components/DocumentConfirmationModal.tsx
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
@@ -56,8 +57,8 @@ export const DocumentConfirmationModal = ({
 
   if (!isOpen) return null;
 
-  // --- MODIFIED --- The handler now collects state and calls onValidate with it
-  const handleValidateClick = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent default form submission
     if (!refDoc) {
       alert("Please enter a document reference.");
       return;
@@ -100,102 +101,101 @@ export const DocumentConfirmationModal = ({
           },
         }}
       >
-        <button
-          className={baseStyles.modalCloseButton}
-          onClick={onClose}
-          aria-label="Close"
-        >
+        <button className={baseStyles.modalCloseButton} onClick={onClose}>
           ×
         </button>
         <h2 className={baseStyles.modalTitle}>{title}</h2>
 
-        {message && <p className={styles.confirmationMessage}>{message}</p>}
+        {/* MODIFIED: Wrapped in a form element */}
+        <form onSubmit={handleSubmit} className={styles.formContainer}>
+          {/* Form for document header */}
+          <div className={styles.formSection}>
+            <div className={styles.formGroup}>
+              <label htmlFor="refDoc">Reference</label>
+              <input
+                id="refDoc"
+                type="text"
+                value={refDoc}
+                onChange={(e) => setRefDoc(e.target.value)}
+                placeholder="e.g., INV-2025-001"
+                className={styles.formInput} // Use local styles for consistency
+                required // Added for form validation
+                autoFocus // Good UX
+              />
+            </div>
+            <div className={styles.formGroupGrid}>
+              <div className={styles.formGroup}>
+                <label htmlFor="date">Date</label>
+                <input
+                  id="date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className={styles.formInput}
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="type">Type</label>
+                <select
+                  id="type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as Document["type"])}
+                  className={styles.formInput}
+                >
+                  <option value="INVOICE">Invoice</option>
+                  <option value="CREDIT_NOTE">Credit Note</option>
+                  <option value="QUOTE">Quote</option>
+                </select>
+              </div>
+            </div>
+          </div>
 
-        {/* --- NEW --- Form for document header */}
-        <div className={styles.formSection}>
-          <div className={styles.formGroup}>
-            <label htmlFor="refDoc">Reference</label>
-            <input
-              id="refDoc"
-              type="text"
-              value={refDoc}
-              onChange={(e) => setRefDoc(e.target.value)}
-              placeholder="e.g., INV-2025-001"
-              className={baseStyles.formInput} // Using a generic form input style
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="date">Date</label>
-            <input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={baseStyles.formInput}
-            />
-          </div>
-          <div className={styles.formGroup}>
-            <label htmlFor="type">Type</label>
-            <select
-              id="type"
-              value={type}
-              onChange={(e) => setType(e.target.value as Document["type"])}
-              className={baseStyles.formInput}
+          {/* Section for displaying goods */}
+          {goods && goods.length > 0 && (
+            <div className={styles.confirmationSection}>
+              <h3 className={styles.sectionHeader}>
+                <span>Summary</span>
+                <span>Total: ${totalAmount}</span>
+              </h3>
+              <ul className={styles.confirmationGoodsList}>
+                {goods.map((good) => (
+                  <li key={good.id}>
+                    <span className={styles.itemName}>{good.name}</span>
+                    <span className={styles.lineItemDetails}>
+                      {good.quantity} x ${good.price?.toFixed(2)} ={" "}
+                      <strong>${good.amount.toFixed(2)}</strong>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className={baseStyles.modalActions}>
+            <button
+              type="button"
+              className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
+              onClick={onClose}
+              disabled={isLoading}
             >
-              <option value="INVOICE">Invoice</option>
-              <option value="CREDIT_NOTE">Credit Note</option>
-              <option value="QUOTE">Quote</option>
-            </select>
+              Cancel
+            </button>
+            <button
+              type="submit" // Changed to submit
+              className={`${baseStyles.modalActionButton} ${
+                isDestructive
+                  ? baseStyles.modalButtonDestructive
+                  : baseStyles.modalButtonPrimary
+              }`}
+              disabled={isLoading}
+            >
+              {isLoading ? "Saving..." : confirmButtonText}
+            </button>
           </div>
-        </div>
-
-        {/* Section for displaying goods remains */}
-        {goods && goods.length > 0 && (
-          <div className={styles.confirmationSection}>
-            <h3>
-              Summary ({goods.length} items) - Total: ${totalAmount}
-            </h3>
-            <ul className={styles.confirmationGoodsList}>
-              {goods.map((good) => (
-                <li key={good.id}>
-                  <span>{good.name}</span>
-                  <span className={styles.lineItemDetails}>
-                    {good.quantity} x ${good.price?.toFixed(2)} = $
-                    {good.amount.toFixed(2)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className={baseStyles.modalActions}>
-          <button
-            type="button"
-            className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            // --- MODIFIED --- Calls the new handler
-            onClick={handleValidateClick}
-            className={`${baseStyles.modalActionButton} ${
-              isDestructive
-                ? baseStyles.modalButtonDestructive
-                : baseStyles.modalButtonPrimary
-            }`}
-            disabled={isLoading}
-          >
-            {isLoading ? "Saving..." : confirmButtonText}
-          </button>
-        </div>
+        </form>
       </motion.div>
     </motion.div>
   );
 };
 
-// Exporting as both default and named for flexibility
 export default DocumentConfirmationModal;

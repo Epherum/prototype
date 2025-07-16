@@ -29,6 +29,7 @@ import { useGoodManager } from "@/features/goods/useGoodManager";
 import LinkGoodToPartnersViaJournalModal from "@/features/linking/components/LinkGoodToPartnersViaJournalModal";
 import UnlinkGoodFromPartnersViaJournalModal from "@/features/linking/components/UnlinkGoodFromPartnersViaJournalModal";
 import type { AccountNodeData } from "@/lib/types";
+import DocumentCreationToolbar from "@/features/documents/components/DocumentCreationToolbar";
 
 export default function Home() {
   useAuthStoreInitializer();
@@ -72,6 +73,17 @@ export default function Home() {
     () => sliderOrder.filter((id) => visibility[id]),
     [sliderOrder, visibility]
   );
+
+  // ✅ NEW: Logic to determine if document creation should be enabled.
+  // This adheres to the new rule: creation is enabled only when a single, terminal journal is selected.
+  const isCreationEnabled = useMemo(() => {
+    // The useJournalManager hook already provides the necessary derived state:
+    // - `selectedJournalId` is non-null only if there's a single selection.
+    // - `isTerminal` is true only if that single selection has no children.
+    return (
+      journalManager.isTerminal && journalManager.selectedJournalId !== null
+    );
+  }, [journalManager.isTerminal, journalManager.selectedJournalId]);
 
   const sliderConfigs = {
     [SLIDER_TYPES.JOURNAL]: { title: "Journal" },
@@ -197,11 +209,8 @@ export default function Home() {
                     <DocumentController
                       manager={docManager}
                       {...layoutControlProps}
-                      onPrepareFinalization={() =>
-                        docManager.handlePrepareFinalization(
-                          goodManager.goodsForSlider
-                        )
-                      }
+                      // ✅ PASS THE NEW PROP: The DocumentController will now know when to show its create button.
+                      isCreationEnabled={isCreationEnabled}
                     />
                   )}
                 </motion.div>
@@ -240,6 +249,17 @@ export default function Home() {
               jpqlLinking.isLoadingJpgLinksForModal
             }
             isLoadingLinks={jpqlLinking.isLoadingJpgLinksForModal}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {isCreating && (
+          <DocumentCreationToolbar
+            onCancel={docManager.handleCancelCreation}
+            onFinish={() =>
+              docManager.handlePrepareFinalization(goodManager.goodsForSlider)
+            }
           />
         )}
       </AnimatePresence>

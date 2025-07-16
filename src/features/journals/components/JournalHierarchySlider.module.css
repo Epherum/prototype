@@ -1,27 +1,27 @@
 /* Row 2: Container for the Filter Buttons */
 .headerFilterRow {
-  text-align: center; /* This centers the inline-flex group below */
+  text-align: center;
   width: 100%;
   margin-bottom: calc(var(--spacing-unit) * 1);
 }
 
 /* The group of filter buttons */
 .rootFilterControls {
-  display: inline-flex; /* Behaves like text, allowing it to be centered */
+  display: inline-flex;
   align-items: center;
   gap: var(--spacing-unit);
-  background-color: #f7f7f7; /* Light grey background for the group */
+  background-color: var(--bg-secondary);
   padding: calc(var(--spacing-unit) * 0.5);
   border-radius: var(--border-radius-md);
-  border: 1px solid #eee;
+  border: 1px solid var(--border-subtle);
 }
 
 .rootFilterControls button {
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   border: none;
-  background-color: transparent; /* Inactive buttons are clear */
-  color: var(--text-secondary, #555);
-  border-radius: var(--border-radius-sm, 4px);
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   font-size: 0.85em;
   transition: all 0.2s ease;
@@ -32,13 +32,13 @@
 }
 
 .rootFilterControls button.activeFilter {
-  background-color: var(--accent-warm, #e89f71);
-  color: var(--bg-card, white);
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px var(--shadow-color);
 }
 
-/* --- L2 and L3 Scroller Styles (Unchanged) --- */
+/* --- L2 and L3 Scroller Styles --- */
 
 .level2ScrollerTitle {
   font-size: 0.9em;
@@ -70,13 +70,13 @@
   transform: translateY(-50%);
   width: 28px;
   height: 28px;
-  background-color: rgba(230, 230, 230, 0.7);
+  background-color: var(--accent-slider);
   border-radius: 50%;
 }
 
 .level2ScrollerSwiper .swiper-button-next:hover,
 .level2ScrollerSwiper .swiper-button-prev:hover {
-  background-color: rgba(220, 220, 220, 0.9);
+  background-color: var(--accent-warm-light);
 }
 
 .level2ScrollerSlideNoOverflow {
@@ -102,7 +102,7 @@
   cursor: pointer;
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-pill);
-  background-color: #f8f8f8;
+  background-color: var(--bg-secondary);
   color: var(--text-secondary);
   transition: background-color 0.2s ease, color 0.2s ease,
     border-color 0.2s ease;
@@ -116,7 +116,7 @@
 
 .level2Button:hover:not(.level2ButtonActive) {
   border-color: var(--accent-warm-light);
-  background-color: #f0f0f0;
+  background-color: var(--accent-slider);
 }
 
 .level2ButtonActive,

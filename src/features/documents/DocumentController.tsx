@@ -1,10 +1,9 @@
-// src/features/documents/DocumentController.tsx
 "use client";
 
 import React, { forwardRef, useMemo } from "react";
 import { useAppStore } from "@/store/appStore";
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
-import DocumentCreationToolbar from "./components/DocumentCreationToolbar";
+// ✨ NEW: Import our new, prettier modal
 import DocumentConfirmationModal from "./components/DocumentConfirmationModal";
 import SingleItemQuantityModal from "./components/SingleItemQuantityModal";
 import { SLIDER_TYPES } from "@/lib/constants";
@@ -19,7 +18,7 @@ interface DocumentControllerProps {
   onMoveDown: () => void;
   isMoveDisabled: boolean;
   manager: ReturnType<typeof useDocumentManager>;
-  onPrepareFinalization: () => void; // <-- Add this prop
+  isCreationEnabled: boolean;
 }
 
 export const DocumentController = forwardRef<
@@ -34,7 +33,7 @@ export const DocumentController = forwardRef<
       canMoveUp,
       canMoveDown,
       isMoveDisabled,
-      onPrepareFinalization,
+      isCreationEnabled,
     },
     ref
   ) => {
@@ -51,15 +50,23 @@ export const DocumentController = forwardRef<
       [manager.documentsForSlider]
     );
 
+    const disabledMessage = useMemo(() => {
+      if (!manager.isJournalFirst) {
+        return "Journal must be first to create a document.";
+      }
+      return "Select a single, terminal journal to create a document.";
+    }, [manager.isJournalFirst]);
+
     return (
       <div ref={ref}>
         <div className={styles.controls}>
-          {!manager.isCreating ? (
+          {/* 🎨 MODIFIED: The old toolbar is gone. We only show the create button or the disabled text. */}
+          {!manager.isCreating && (
             <>
               <div
                 style={{ flexGrow: 1, display: "flex", alignItems: "center" }}
               >
-                {manager.isJournalFirst ? (
+                {isCreationEnabled ? (
                   <button
                     onClick={manager.handleStartCreation}
                     className={`${styles.controlButton} ${styles.createDocumentButton}`}
@@ -69,7 +76,7 @@ export const DocumentController = forwardRef<
                   </button>
                 ) : (
                   <div className={styles.disabledControlText}>
-                    Journal must be first to create a document.
+                    {disabledMessage}
                   </div>
                 )}
               </div>
@@ -94,12 +101,8 @@ export const DocumentController = forwardRef<
                 )}
               </div>
             </>
-          ) : (
-            <DocumentCreationToolbar
-              onFinish={onPrepareFinalization}
-              onCancel={manager.handleCancelCreation}
-            />
           )}
+          {/* If we are creating, this area is now intentionally blank. */}
         </div>
 
         <DynamicSlider
@@ -114,13 +117,13 @@ export const DocumentController = forwardRef<
           onToggleAccordion={() => {}}
           placeholderMessage={
             manager.isCreating
-              ? `Building document in '${manager.mode}' mode...`
+              ? `Building document in '${manager.mode}' mode... Use the toolbar at the bottom to proceed.`
               : "No documents for selected partner."
           }
         />
         <SingleItemQuantityModal
           isOpen={manager.quantityModalState.isOpen}
-          onClose={() => manager.handleCancelCreation()} // <-- Changed to cancel instead of just closing
+          onClose={() => manager.handleCancelCreation()}
           onSubmit={manager.handleSingleItemSubmit}
           goodId={manager.quantityModalState.goodId}
         />
@@ -128,10 +131,8 @@ export const DocumentController = forwardRef<
         <DocumentConfirmationModal
           isOpen={manager.isFinalizeModalOpen}
           onClose={() => manager.setIsFinalizeModalOpen(false)}
-          onValidate={manager.handleSubmit}
-          title="Finalize Document"
-          confirmButtonText="Validate Document"
-          isDestructive={false}
+          onValidate={manager.handleSubmit} // Pass the correct handler
+          title="Finalize Document Creation"
           goods={manager.items.map((item: any) => ({
             id: item.goodId,
             name: item.goodLabel,

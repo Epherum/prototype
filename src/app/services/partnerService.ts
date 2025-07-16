@@ -30,10 +30,6 @@ export const createPartnerSchema = z.object({
 export type CreatePartnerData = z.infer<typeof createPartnerSchema>;
 export type UpdatePartnerData = Partial<Omit<CreatePartnerData, "partnerType">>;
 
-/**
- * === MODIFIED INTERFACE ===
- * @description Defines the options for the getAllPartners service method.
- */
 export interface GetAllPartnersOptions {
   where?: Prisma.PartnerWhereInput;
   take?: number;
@@ -47,6 +43,7 @@ export interface GetAllPartnersOptions {
 }
 
 const partnerService = {
+  // --- (createPartner, getAllPartners, getPartnerById, updatePartner, deletePartner functions are unchanged) ---
   async createPartner(
     data: CreatePartnerData,
     createdById: string,
@@ -78,10 +75,6 @@ const partnerService = {
     return newPartner;
   },
 
-  /**
-   * === REFACTORED FUNCTION ===
-   * Fetches partners with simplified and powerful filtering logic in a single-tenant environment.
-   */
   async getAllPartners(
     options: GetAllPartnersOptions
   ): Promise<{ partners: Partner[]; totalCount: number }> {
@@ -114,11 +107,8 @@ const partnerService = {
     const isRootUser =
       !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
 
-    // --- Multi-filter logic ---
     if (filterStatuses.length > 0) {
       const orConditions: Prisma.PartnerWhereInput[] = [];
-
-      // Asynchronously get descendantIds if needed, once.
       const descendantIds =
         !isRootUser && filterStatuses.includes("unaffected")
           ? await journalService.getDescendantJournalIds(restrictedJournalId!)
@@ -192,12 +182,9 @@ const partnerService = {
         }
       }
 
-      // If any conditions were generated, combine them with OR
       if (orConditions.length > 0) {
         prismaWhere.OR = orConditions;
       } else {
-        // If filters were selected but no valid conditions could be made (e.g. 'affected' with no journal IDs)
-        // return nothing.
         return { partners: [], totalCount: 0 };
       }
     }
@@ -291,75 +278,104 @@ const partnerService = {
       return null;
     }
   },
-
-  // Add this function to your existing partnerService.ts file
-
   /**
-   * Finds partners who are linked to ALL specified goods within a given journal context.
+   * ✅ CORRECTED LOGIC
+   * Finds partners that are linked to ALL specified goods within a given journal context.
+   * This logic now correctly handles the schema asymmetry and mirrors the logic of the working
+   * `goodsService.findGoodsForPartners` function.
+   *
    * @param goodIds - An array of Good IDs.
    * @param journalId - The Journal ID context.
-   * @returns A paginated response of partners common to all goods.
+   * @returns A response of partners that are common to all specified goods in that journal.
    */
-  async findPartnersForGoodsIntersection(
+  async findPartnersForGoods(
     goodIds: bigint[],
     journalId: string
   ): Promise<{ partners: Partner[]; totalCount: number }> {
-    if (goodIds.length === 0) {
+    console.groupCollapsed(
+      `[DATABASE-SERVICE: findPartnersForGoods (FINAL CORRECTED LOGIC)]`
+    );
+    console.log("INPUTS -> goodIds:", goodIds, `| journalId: "${journalId}"`);
+
+    if (goodIds.length === 0 || !journalId) {
+      console.log("EXIT: No good IDs or journalId provided.");
+      console.groupEnd();
       return { partners: [], totalCount: 0 };
     }
 
-    // Group by the JournalPartnerLink ID, counting how many of the specified
-    // goods are associated with it in the given journal.
-    const linkIdGroups = await prisma.journalPartnerGoodLink.groupBy({
-      by: ["journalPartnerLinkId"],
+    const uniqueInputGoodIds = new Set(goodIds);
+
+    // Step 1: Use a nested 'where' to query through the relationship.
+    // Fetch all links that match the desired goods AND are within the desired journal.
+    // This is the Prisma equivalent of an INNER JOIN with a WHERE clause.
+    const relevantLinks = await prisma.journalPartnerGoodLink.findMany({
       where: {
-        goodId: { in: goodIds },
+        goodId: { in: Array.from(uniqueInputGoodIds) },
+        // This nested clause is the key: it filters based on the parent table.
         journalPartnerLink: {
           journalId: journalId,
+          partner: {
+            entityState: "ACTIVE", // Only consider links to active partners
+          },
         },
       },
-      _count: {
+      select: {
         goodId: true,
-      },
-      having: {
-        goodId: {
-          _count: {
-            equals: goodIds.length,
+        journalPartnerLink: {
+          select: {
+            partnerId: true, // We need the partnerId for grouping
           },
         },
       },
     });
 
-    const intersectingLinkIds = linkIdGroups.map(
-      (group) => group.journalPartnerLinkId
-    );
-
-    if (intersectingLinkIds.length === 0) {
+    if (relevantLinks.length === 0) {
+      console.log("EXIT: No links found for these goods in this journal.");
+      console.groupEnd();
       return { partners: [], totalCount: 0 };
     }
 
-    // Now, find all partners associated with these fully-matched links.
-    const totalCount = await prisma.partner.count({
-      where: {
-        journalLinks: {
-          some: {
-            id: { in: intersectingLinkIds },
-          },
-        },
-      },
-    });
+    // Step 2: Perform the intersection logic in code.
+    // Create a map of { partnerId => Set<goodId> }.
+    const partnerToGoodIdsMap = new Map<bigint, Set<bigint>>();
+    for (const link of relevantLinks) {
+      const partnerId = link.journalPartnerLink.partnerId;
+      if (!partnerToGoodIdsMap.has(partnerId)) {
+        partnerToGoodIdsMap.set(partnerId, new Set());
+      }
+      partnerToGoodIdsMap.get(partnerId)!.add(link.goodId);
+    }
 
+    // Step 3: Filter the map to find partners who have all the required goods.
+    const intersectingPartnerIds: bigint[] = [];
+    for (const [partnerId, linkedGoodIds] of partnerToGoodIdsMap.entries()) {
+      if (linkedGoodIds.size === uniqueInputGoodIds.size) {
+        intersectingPartnerIds.push(partnerId);
+      }
+    }
+
+    console.log(
+      `Found ${intersectingPartnerIds.length} partners matching the intersection criteria.`
+    );
+
+    if (intersectingPartnerIds.length === 0) {
+      console.log("EXIT: No partners satisfied the intersection count.");
+      console.groupEnd();
+      return { partners: [], totalCount: 0 };
+    }
+
+    // Step 4: Fetch the full partner details for the final list of IDs.
     const partners = await prisma.partner.findMany({
       where: {
-        journalLinks: {
-          some: {
-            id: { in: intersectingLinkIds },
-          },
-        },
+        id: { in: intersectingPartnerIds },
       },
+      orderBy: { name: "asc" },
     });
 
-    return { partners, totalCount };
+    console.log(`Returning ${partners.length} final partner records.`);
+    console.groupEnd();
+
+    return { partners, totalCount: partners.length };
   },
 };
 

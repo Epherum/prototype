@@ -1,3 +1,4 @@
+// src/app/api/partners/for-goods/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions, ExtendedSession } from "@/lib/auth/authOptions";
@@ -18,7 +19,6 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const goodIdsStr = searchParams.get("goodIds");
-  // ✅ FIX: Get journalId as a string and keep it that way.
   const journalId = searchParams.get("journalId");
 
   if (!goodIdsStr || !journalId) {
@@ -27,8 +27,6 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     );
   }
-
-  // No longer need to parse journalId to BigInt here.
 
   const goodIds = goodIdsStr
     .split(",")
@@ -43,9 +41,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // ✅ FIX: Pass the journalId string directly to the service.
-    const { partners, totalCount } =
-      await partnerService.findPartnersForGoodsIntersection(goodIds, journalId);
+    // ✅ Call the single, unified service function
+    const { partners, totalCount } = await partnerService.findPartnersForGoods(
+      goodIds,
+      journalId
+    );
     const body = JSON.stringify(
       { data: partners, total: totalCount },
       jsonBigIntReplacer
@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("API /partners/for-goods-intersection GET Error:", error);
+    console.error("API /partners/for-goods GET Error:", error);
     return NextResponse.json(
-      { message: "Failed to retrieve common partners." },
+      { message: "Failed to retrieve partners for goods." },
       { status: 500 }
     );
   }

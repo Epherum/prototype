@@ -1,5 +1,4 @@
 // src/services/clientPartnerService.ts
-
 import type {
   PaginatedPartnersResponse,
   Partner,
@@ -8,25 +7,18 @@ import type {
   FetchPartnersParams,
 } from "@/lib/types";
 
-/**
- * === CORRECTED FUNCTION ===
- * This now correctly appends `restrictedJournalId` when it's present in the params.
- */
+// --- (fetchPartners and other CRUD functions are unchanged) ---
 export async function fetchPartners(
   params: FetchPartnersParams = {}
 ): Promise<PaginatedPartnersResponse> {
   const queryParams = new URLSearchParams();
 
-  // Append standard pagination and type parameters
   if (params.limit !== undefined)
     queryParams.append("limit", String(params.limit));
   if (params.offset !== undefined)
     queryParams.append("offset", String(params.offset));
   if (params.partnerType) queryParams.append("partnerType", params.partnerType);
 
-  // --- Logic for different filtering scenarios ---
-
-  // Priority 1: Specific linking scenarios (e.g., J-G-P, G-J-P)
   if (
     params.linkedToGoodId &&
     params.linkedToJournalIds &&
@@ -40,13 +32,8 @@ export async function fetchPartners(
     if (params.includeChildren !== undefined) {
       queryParams.append("includeChildren", String(params.includeChildren));
     }
-  }
-  // Priority 2: Our main Journal-as-Root multi-select filter
-  else if (params.filterStatuses && params.filterStatuses.length > 0) {
-    // Join the array into a comma-separated string for the URL
+  } else if (params.filterStatuses && params.filterStatuses.length > 0) {
     queryParams.append("filterStatuses", params.filterStatuses.join(","));
-
-    // contextJournalIds is primarily for the 'affected' filter.
     if (
       params.filterStatuses.includes("affected") &&
       params.contextJournalIds &&
@@ -57,24 +44,20 @@ export async function fetchPartners(
         params.contextJournalIds.join(",")
       );
     }
-  }
-  // Priority 3: Other general linking (fallback)
-  else if (params.linkedToJournalIds && params.linkedToJournalIds.length > 0) {
+  } else if (
+    params.linkedToJournalIds &&
+    params.linkedToJournalIds.length > 0
+  ) {
     queryParams.append(
       "linkedToJournalIds",
       params.linkedToJournalIds.join(",")
     );
   }
 
-  // This parameter is independent and should be added if present,
-  // as it's crucial for the backend logic of 'unaffected' and 'inProcess'.
   if (params.restrictedJournalId) {
     queryParams.append("restrictedJournalId", params.restrictedJournalId);
   }
 
-  console.log(
-    `[fetchPartners] Fetching from URL: /api/partners?${queryParams.toString()}`
-  );
   const response = await fetch(`/api/partners?${queryParams.toString()}`);
 
   if (!response.ok) {
@@ -82,9 +65,7 @@ export async function fetchPartners(
     try {
       const errorData = await response.json();
       errorMessage = errorData.message || errorMessage;
-    } catch (e) {
-      // Could not parse JSON, use the original status text
-    }
+    } catch (e) {}
     throw new Error(errorMessage);
   }
 
@@ -92,8 +73,6 @@ export async function fetchPartners(
   result.data = result.data.map((p) => ({ ...p, id: String(p.id) }));
   return result;
 }
-
-// ... (createPartner, updatePartner, deletePartner, etc. remain the same) ...
 
 export async function createPartner(
   partnerData: CreatePartnerClientData
@@ -178,9 +157,6 @@ export async function fetchPartnersLinkedToJournals(
   includeChildren: boolean = true
 ): Promise<Partner[]> {
   if (!journalIds || journalIds.length === 0) {
-    console.log(
-      "[fetchPartnersLinkedToJournals] No journalIds provided, returning []."
-    );
     return [];
   }
   const result = await fetchPartners({
@@ -206,21 +182,22 @@ export async function fetchPartnersLinkedToJournalsAndGood(
   return result.data;
 }
 
-// Add this function to the end of your src/services/clientPartnerService.ts file
-
+// ✅ --- ADDED: New Consolidated Function ---
 /**
- * Fetches partners that are common to a given set of goods within a journal context.
- * Calls the dedicated intersection endpoint.
- * @param goodIds - An array of good IDs to find the intersection for.
- * @param journalId - The journal context ID.
- * @returns A promise that resolves to a paginated response of common partners.
+ * Fetches partners for one or more goods within a journal context.
+ * Calls the new consolidated `/api/partners/for-goods` endpoint.
+ * - If one ID is provided, it fetches all partners for that good.
+ * - If multiple IDs are provided, it fetches the intersection of partners common to all goods.
+ * @param goodIds - An array of good IDs.
+ * @param journalId - The ID of the journal context.
+ * @returns A promise that resolves to the API response with partners data.
  */
-export const fetchIntersectionOfPartners = async (
+export async function getPartnersForGoods(
   goodIds: string[],
   journalId: string
-): Promise<PaginatedPartnersResponse> => {
+): Promise<PaginatedPartnersResponse> {
   if (goodIds.length === 0 || !journalId) {
-    return { data: [], total: 0 };
+    return Promise.resolve({ data: [], total: 0 });
   }
 
   const params = new URLSearchParams({
@@ -228,18 +205,17 @@ export const fetchIntersectionOfPartners = async (
     journalId: journalId,
   });
 
-  const response = await fetch(
-    `/api/partners/for-goods-intersection?${params.toString()}`
-  );
+  const response = await fetch(`/api/partners/for-goods?${params.toString()}`);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(
-      errorData.message || "Failed to fetch intersection of partners"
-    );
+    throw new Error(errorData.message || "Failed to fetch partners for goods");
   }
 
   const result: PaginatedPartnersResponse = await response.json();
   result.data = result.data.map((p) => ({ ...p, id: String(p.id) }));
   return result;
-};
+}
+
+// ✅ --- REMOVED: Obsolete Functions ---
+// `fetchIntersectionOfPartners` has been removed and replaced by `getPartnersForGoods`.

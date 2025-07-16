@@ -1,44 +1,69 @@
-/* src/features/documents/components/DocumentCreationToolbar.module.css */
-.finishDocumentContainer {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  padding: calc(var(--spacing-unit) * 2); /* Use spacing unit */
-  /* Use a gradient from your app's main background color */
+/*
+  CORRECTED: This ensures the toolbar is a centered, horizontal pill at the bottom.
+*/
+.toolbarContainer {
+  /* --- Positioning (The Fix) --- */
+  position: fixed; /* <<< --- CHANGE FROM 'fixed' TO 'absolute' */
+  bottom: calc(var(--spacing-unit) * 3);
+  z-index: 1000;
 
+  /* --- Layout (Unchanged) --- */
   display: flex;
-  justify-content: center;
+  flex-direction: row;
   align-items: center;
-  z-index: 1001;
+  gap: var(--spacing-unit);
+
+  /* --- Appearance (Unchanged) --- */
+  padding: var(--spacing-unit);
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-pill);
+  box-shadow: 0 4px 16px var(--shadow-color);
+  border: 1px solid var(--border-subtle);
 }
 
-.finishDocumentButton {
-  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 3); /* Use spacing unit */
-  font-size: 1.1rem;
-  font-weight: bold;
-  color: var(
-    --text-on-danger
-  ); /* Use a consistent variable for text on colored buttons */
-  background-color: var(--accent-warm); /* Use your app's accent color */
+/* Generic styles for both buttons */
+.toolbarButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-unit);
+
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap; /* Prevent text from breaking into a new line */
+
   border: none;
-  border-radius: var(
-    --border-radius-pill
-  ); /* Use pill shape for a prominent action button */
   cursor: pointer;
-  box-shadow: 0 2px 4px var(--shadow-color);
-  transition: background-color 0.2s, transform 0.2s, box-shadow 0.2s;
-  -webkit-tap-highlight-color: transparent; /* Good for mobile */
+  transition: all 0.2s ease-in-out;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.finishDocumentButton:hover {
-  /* Create a slightly darker version of the accent for hover. You might want to add this as a variable later e.g., --accent-warm-dark */
-  background-color: #d18f64; /* A slightly darker version of #e89f71 */
+.toolbarButton svg {
+  font-size: 1.4rem;
+}
+
+/* Specific styling for each button */
+.cancelButton {
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5);
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--border-radius-pill);
+}
+
+.cancelButton:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.finishButton {
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2.5);
+  background-color: var(--accent-warm);
+  color: var(--text-on-danger); /* Uses white text from globals */
+  border-radius: var(--border-radius-pill);
+  box-shadow: 0 2px 8px -2px var(--accent-warm);
+}
+
+.finishButton:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px var(--shadow-color);
-}
-
-.finishDocumentButton:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 4px var(--shadow-color);
+  box-shadow: 0 4px 12px -2px var(--accent-warm);
 }

@@ -1,4 +1,4 @@
-// File: src/app/services/goodsService.ts
+// src/app/services/goodsService.ts
 import prisma from "@/app/utils/prisma";
 import { GoodsAndService, Prisma, EntityState } from "@prisma/client";
 import { journalService } from "./journalService";
@@ -227,47 +227,64 @@ const goodsService = {
     }
   },
 
-  // Add this function to your existing goodsService.ts file
-
   /**
-   * Finds goods that are linked to ALL specified partners within a given journal context.
-   * @param partnerIds - An array of Partner IDs.
+   * ✅ RENAMED & REFACTORED
+   * This single function now finds goods for partners based on the number of IDs provided.
+   * - If one partnerId is given, it finds all goods for that partner.
+   * - If multiple partnerIds are given, it finds the INTERSECTION of goods common to ALL of them.
+   *
+   * @param partnerIds - An array of one or more Partner IDs.
    * @param journalId - The Journal ID context.
-   * @returns A paginated response of goods that are common to all partners.
+   * @returns A response containing the relevant goods.
    */
-  async findGoodsForPartnersIntersection(
+  async findGoodsForPartners(
     partnerIds: bigint[],
     journalId: string
   ): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
-    if (partnerIds.length === 0) {
+    console.groupCollapsed(
+      `[DATABASE-SERVICE: findGoodsForPartners (UNIFIED LOGIC)]`
+    );
+    console.log(
+      "INPUTS -> partnerIds:",
+      partnerIds,
+      `| journalId: "${journalId}"`
+    );
+
+    if (partnerIds.length === 0 || !journalId) {
+      console.log("EXIT: No partner IDs or journalId provided.");
+      console.groupEnd();
       return { goods: [], totalCount: 0 };
     }
 
-    // Find the JournalPartnerLink IDs for the given journal and partners.
-    const journalPartnerLinks = await prisma.journalPartnerLink.findMany({
+    const uniqueInputPartnerIds = new Set(partnerIds);
+
+    // Step 1: Find all `journalPartnerLink` records that match our specific partners AND the journal.
+    const relevantLinks = await prisma.journalPartnerLink.findMany({
       where: {
         journalId: journalId,
-        partnerId: { in: partnerIds },
+        partnerId: { in: Array.from(uniqueInputPartnerIds) },
       },
-      select: { id: true, partnerId: true },
+      select: {
+        id: true,
+      },
     });
 
-    // Early exit if not all partners are even linked to the journal.
-    const uniquePartnerIdsInLinks = new Set(
-      journalPartnerLinks.map((l) => l.partnerId.toString())
-    );
-    if (uniquePartnerIdsInLinks.size < partnerIds.length) {
+    if (relevantLinks.length < uniqueInputPartnerIds.size) {
+      console.log("EXIT: Not all partners have links in this journal.");
+      console.groupEnd();
       return { goods: [], totalCount: 0 };
     }
 
-    const journalPartnerLinkIds = journalPartnerLinks.map((jpl) => jpl.id);
+    const relevantLinkIds = relevantLinks.map((link) => link.id);
 
-    // Group by goodId, and only return those that are linked to a number of
-    // JournalPartnerLinks equal to the number of partners we're searching for.
+    // Step 2: This is the core logic. It finds `goodId`s that are linked to a number of our
+    // relevant partners that EQUALS the number of unique partners we're searching for.
+    // This naturally handles the N=1 case (finds goods linked to 1 partner) and the N>1
+    // case (finds goods linked to ALL N partners).
     const goodIdGroups = await prisma.journalPartnerGoodLink.groupBy({
       by: ["goodId"],
       where: {
-        journalPartnerLinkId: { in: journalPartnerLinkIds },
+        journalPartnerLinkId: { in: relevantLinkIds },
       },
       _count: {
         journalPartnerLinkId: true,
@@ -275,7 +292,7 @@ const goodsService = {
       having: {
         journalPartnerLinkId: {
           _count: {
-            equals: partnerIds.length,
+            equals: uniqueInputPartnerIds.size,
           },
         },
       },
@@ -284,18 +301,25 @@ const goodsService = {
     const intersectingGoodIds = goodIdGroups.map((group) => group.goodId);
 
     if (intersectingGoodIds.length === 0) {
+      console.log("EXIT: No goods found matching the criteria.");
+      console.groupEnd();
       return { goods: [], totalCount: 0 };
     }
 
-    // Fetch the actual good data based on the resulting IDs.
-    const totalCount = intersectingGoodIds.length;
+    // Step 3: Fetch the full good details for the resulting IDs.
     const goods = await prisma.goodsAndService.findMany({
       where: {
         id: { in: intersectingGoodIds },
+        entityState: "ACTIVE",
       },
+      orderBy: { label: "asc" },
+      include: { taxCode: true, unitOfMeasure: true },
     });
 
-    return { goods, totalCount };
+    console.log(`Found ${goods.length} goods. Total matching: ${goods.length}`);
+    console.groupEnd();
+
+    return { goods, totalCount: goods.length };
   },
 };
 
