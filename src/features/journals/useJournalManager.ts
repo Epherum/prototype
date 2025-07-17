@@ -93,6 +93,58 @@ export const useJournalManager = () => {
     return topNode?.children || [];
   }, [selectedTopLevelId, hierarchyData, restrictedJournalId]);
 
+  // This is the derived state that other sliders consume.
+  const effectiveSelectedJournalIds = useMemo(() => {
+    // Case 1: The journal slider is not primary, so we use the flat selection.
+    if (!isJournalSliderPrimary) {
+      return selectedFlatJournalId ? [selectedFlatJournalId] : [];
+    }
+
+    // Case 2: The journal slider is primary and has hierarchical selections.
+    // This implements the "per-parent override" logic.
+    if (selectedLevel2Ids.length > 0 || selectedLevel3Ids.length > 0) {
+      const finalIds = new Set<string>();
+      // Always add the most specific (L3) selections first.
+      selectedLevel3Ids.forEach((id) => finalIds.add(id));
+
+      // Now, figure out which L2 parents are "represented" by an L3 selection.
+      const l2ParentsOfSelectedL3s = new Set<string>();
+      if (selectedLevel3Ids.length > 0) {
+        selectedLevel3Ids.forEach((l3Id) => {
+          const parent = findParentOfNode(l3Id, hierarchyData);
+          if (parent) {
+            l2ParentsOfSelectedL3s.add(parent.id);
+          }
+        });
+      }
+
+      // Finally, add L2 selections ONLY if they are not already represented by a child.
+      selectedLevel2Ids.forEach((l2Id) => {
+        if (!l2ParentsOfSelectedL3s.has(l2Id)) {
+          finalIds.add(l2Id);
+        }
+      });
+      return Array.from(finalIds);
+    }
+
+    // Case 3: No L2 or L3 selections, but user has drilled down.
+    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+    if (selectedTopLevelId && selectedTopLevelId !== effectiveRootId) {
+      return [selectedTopLevelId];
+    }
+
+    // Default case: No relevant selections.
+    return [];
+  }, [
+    isJournalSliderPrimary,
+    selectedFlatJournalId,
+    selectedLevel2Ids,
+    selectedLevel3Ids,
+    selectedTopLevelId,
+    hierarchyData, // This dependency is crucial for findParentOfNode
+    restrictedJournalId,
+  ]);
+
   const isTerminal = useMemo((): boolean => {
     const { selections } = useAppStore.getState();
     const { level2Ids, level3Ids, flatId } = selections.journal;
@@ -435,6 +487,7 @@ export const useJournalManager = () => {
     isJournalSliderPrimary,
     selectedJournalId,
     isTerminal,
+    effectiveSelectedJournalIds,
 
     // Modal State & Handlers
     isAddJournalModalOpen,
