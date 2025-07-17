@@ -127,7 +127,7 @@ export const JournalSliderController = forwardRef<
           selectedLevel3Ids={journalManager.selectedLevel3Ids}
           // ✅ PASS THE CORRECTED HANDLERS
           onL1ItemInteract={journalManager.handleL1Interaction}
-          onL2ItemToggle={journalManager.handleL2ManualToggle}
+          onL2ItemInteract={journalManager.handleL2Interaction}
           isLoading={journalManager.isHierarchyLoading}
           onToggleFilter={journalManager.handleToggleJournalRootFilter}
           activeFilters={

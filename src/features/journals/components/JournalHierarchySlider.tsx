@@ -33,7 +33,7 @@ interface JournalHierarchySliderProps {
   selectedLevel2Ids: string[];
   selectedLevel3Ids: string[];
   onL1ItemInteract: (id: string) => void;
-  onL2ItemToggle: (id: string) => void;
+  onL2ItemInteract: (id: string) => void;
   isLoading?: boolean;
   activeFilters: ActivePartnerFilters;
   onToggleFilter: (status: PartnerGoodFilterStatus) => void;
@@ -46,7 +46,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   selectedLevel2Ids,
   selectedLevel3Ids,
   onL1ItemInteract,
-  onL2ItemToggle,
+  onL2ItemInteract,
   isLoading,
   activeFilters,
   onToggleFilter,
@@ -184,7 +184,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                   className={styles.level2ScrollerSlideNoOverflow}
                 >
                   <button
-                    onClick={() => onL2ItemToggle(l2Node.id)}
+                    onClick={() => onL2ItemInteract(l2Node.id)}
                     onContextMenu={(e) => e.preventDefault()}
                     className={`${styles.level2Button} ${
                       isActive ? styles.level2ButtonActive : ""

@@ -63,6 +63,11 @@ export const useJournalManager = () => {
   const topButtonInteractionRef = useRef<{ timeout: NodeJS.Timeout | null }>({
     timeout: null,
   });
+
+  const l2ClickInteractionRef = useRef<{
+    id: string | null;
+    timeout: NodeJS.Timeout | null;
+  }>({ id: null, timeout: null });
   // --- Queries and Memos (Unchanged) ---
   const isJournalSliderPrimary = useMemo(
     () =>
@@ -220,6 +225,7 @@ export const useJournalManager = () => {
   }, [handleNavigateUpOneLevel, handleTopButtonInteraction]);
 
   /** Rule A: Single-Clicking a 1st Row Button */
+  /** Rule A: Single-Clicking a 1st Row Button (with new logic) */
   const handleL1Interaction = useCallback(
     (l1ItemId: string) => {
       // Standard double-click detection logic
@@ -239,45 +245,59 @@ export const useJournalManager = () => {
         const l1Node = findNodeById(hierarchyData, l1ItemId);
         if (!l1Node) return;
 
-        const cycle = l1ClickCycleState.current[l1ItemId] || 0;
-        const childrenIds = (l1Node.children || []).map((c) => c.id);
-        const childrenIdSet = new Set(childrenIds);
+        // ✅ FIX: Check if the node has children to decide which logic path to take.
+        const hasChildren = l1Node.children && l1Node.children.length > 0;
 
-        let newL2s = [...level2Ids];
-        // Start by removing this L1 item's children from the L3 list. This cleans the slate for the new state.
-        let newL3s = level3Ids.filter((id) => !childrenIdSet.has(id));
+        if (!hasChildren) {
+          // --- NEW LOGIC: Simple Toggle for items without children ---
+          const isSelected = level2Ids.includes(l1ItemId);
+          const newL2s = isSelected
+            ? level2Ids.filter((id) => id !== l1ItemId)
+            : [...level2Ids, l1ItemId];
 
-        // FIX: The logic for modifying L2 and L3 selections is now correctly implemented per the 3-state cycle rule.
-        switch (cycle) {
-          case 0: // Click 1: Select All Children
-            if (!newL2s.includes(l1ItemId)) newL2s.push(l1ItemId);
-            newL3s.push(...childrenIds);
-            break;
-          case 1: // Click 2: Select None (and unselect L1 item)
-            // This is the fix for Bug 1: removing the item from the L2 list.
-            newL2s = newL2s.filter((id) => id !== l1ItemId);
-            // L3 children are already filtered out.
-            break;
-          case 2: // Click 3: Restore Custom
-            if (!newL2s.includes(l1ItemId)) newL2s.push(l1ItemId);
-            const savedSelection =
-              savedL3SelectionsByL1.current[l1ItemId] || [];
-            newL3s.push(...savedSelection);
-            break;
+          setSelection("journal", { level2Ids: newL2s });
+
+          // Per Rule D, any interaction should reset the Top Button cycle and save state
+          topButtonClickCycleState.current = 0;
+          savedL2SelectionsForTopButton.current = newL2s;
+          savedL3SelectionsForTopButton.current = level3Ids; // L3s are unchanged
+        } else {
+          // --- EXISTING LOGIC: 3-State Cycle for items WITH children ---
+          const cycle = l1ClickCycleState.current[l1ItemId] || 0;
+          const childrenIds = (l1Node.children || []).map((c) => c.id);
+          const childrenIdSet = new Set(childrenIds);
+
+          let newL2s = [...level2Ids];
+          let newL3s = level3Ids.filter((id) => !childrenIdSet.has(id));
+
+          switch (cycle) {
+            case 0: // Click 1: Select All Children
+              if (!newL2s.includes(l1ItemId)) newL2s.push(l1ItemId);
+              newL3s.push(...childrenIds);
+              break;
+            case 1: // Click 2: Select None (and unselect L1 item)
+              newL2s = newL2s.filter((id) => id !== l1ItemId);
+              break;
+            case 2: // Click 3: Restore Custom
+              if (!newL2s.includes(l1ItemId)) newL2s.push(l1ItemId);
+              const savedSelection =
+                savedL3SelectionsByL1.current[l1ItemId] || [];
+              newL3s.push(...savedSelection);
+              break;
+          }
+
+          l1ClickCycleState.current[l1ItemId] = (cycle + 1) % 3;
+
+          const finalL2s = [...new Set(newL2s)];
+          const finalL3s = [...new Set(newL3s)];
+          setSelection("journal", { level2Ids: finalL2s, level3Ids: finalL3s });
+
+          topButtonClickCycleState.current = 0;
+          savedL2SelectionsForTopButton.current = finalL2s;
+          savedL3SelectionsForTopButton.current = finalL3s;
         }
 
-        l1ClickCycleState.current[l1ItemId] = (cycle + 1) % 3;
-
-        // Ensure uniqueness and update global state
-        const finalL2s = [...new Set(newL2s)];
-        const finalL3s = [...new Set(newL3s)];
-        setSelection("journal", { level2Ids: finalL2s, level3Ids: finalL3s });
-
-        // FIX: Per Rule D, any manual L1 click resets the Top Button cycle and saves the new state as its "custom" state.
-        topButtonClickCycleState.current = 0;
-        savedL2SelectionsForTopButton.current = finalL2s;
-        savedL3SelectionsForTopButton.current = finalL3s;
-
+        // Cleanup for the click detector
         clickInteractionRef.current = { id: null, timeout: null };
       }, DOUBLE_CLICK_DELAY);
 
@@ -287,7 +307,8 @@ export const useJournalManager = () => {
   );
 
   /** Rule D: The Critical Reset Condition */
-  const handleL2ManualToggle = useCallback(
+  // ✅ NEW: The logic from the old handleL2ManualToggle is now the single-click action.
+  const handleL2SingleClickToggle = useCallback(
     (l2ItemId: string) => {
       const { level2Ids, level3Ids } =
         useAppStore.getState().selections.journal;
@@ -300,20 +321,47 @@ export const useJournalManager = () => {
 
       const parentL1 = findParentOfNode(l2ItemId, hierarchyData);
       if (parentL1) {
-        l1ClickCycleState.current[parentL1.id] = 0; // Reset parent's cycle
-        // Save the new custom selection specifically for the parent L1 button's "restore" state.
+        l1ClickCycleState.current[parentL1.id] = 0;
         savedL3SelectionsByL1.current[parentL1.id] = newL3s.filter((id) =>
           parentL1.children?.some((c) => c.id === id)
         );
       }
 
-      // Also reset Top Button cycle
       topButtonClickCycleState.current = 0;
-      // FIX: This is the fix for Bug 2. It now saves the *entire* current L2 selection, not just a single parent.
       savedL2SelectionsForTopButton.current = [...level2Ids];
       savedL3SelectionsForTopButton.current = newL3s;
     },
     [hierarchyData, setSelection]
+  );
+
+  // ✅ NEW: Unified handler for L2 items to distinguish single/double clicks
+  const handleL2Interaction = useCallback(
+    (l2ItemId: string) => {
+      // Check for double-click
+      if (l2ClickInteractionRef.current.timeout) {
+        clearTimeout(l2ClickInteractionRef.current.timeout);
+      }
+      if (l2ClickInteractionRef.current.id === l2ItemId) {
+        // --- DOUBLE-CLICK LOGIC ---
+        const parent = findParentOfNode(l2ItemId, hierarchyData);
+        if (parent) {
+          // Navigate to the parent, and pre-select the item we just double-clicked.
+          handleSelectTopLevelJournal(parent.id, l2ItemId);
+        }
+        l2ClickInteractionRef.current = { id: null, timeout: null };
+        return;
+      }
+
+      // Set timeout for single-click
+      const newTimeout = setTimeout(() => {
+        // --- SINGLE-CLICK LOGIC ---
+        handleL2SingleClickToggle(l2ItemId);
+        l2ClickInteractionRef.current = { id: null, timeout: null };
+      }, DOUBLE_CLICK_DELAY);
+
+      l2ClickInteractionRef.current = { id: l2ItemId, timeout: newTimeout };
+    },
+    [hierarchyData, handleSelectTopLevelJournal, handleL2SingleClickToggle]
   );
 
   // --- Mutations and Modal handlers (Unchanged) ---
@@ -408,7 +456,7 @@ export const useJournalManager = () => {
     handleToggleJournalRootFilter,
     handleTopButtonInteraction,
     handleL1Interaction,
-    handleL2ManualToggle,
+    handleL2Interaction,
     handleTopButtonClick,
   };
 };
