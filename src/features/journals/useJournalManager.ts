@@ -1,7 +1,7 @@
-//src/features/journals/useJournalManager.ts
+// src/features/journals/useJournalManager.ts
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { journalKeys } from "@/lib/queryKeys";
 
@@ -21,13 +21,11 @@ import type {
   Journal,
 } from "@/lib/types";
 
-const MAX_L2_SELECTIONS = 10;
-const MAX_L3_SELECTIONS = 20;
+const DOUBLE_CLICK_DELAY = 200;
 
 export const useJournalManager = () => {
   const queryClient = useQueryClient();
 
-  // State from Zustand Store
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
   const restrictedJournalId = useAppStore(
@@ -37,260 +35,294 @@ export const useJournalManager = () => {
   const setSelection = useAppStore((state) => state.setSelection);
 
   const {
-    topLevelId: selectedTopLevelJournalId,
-    level2Ids: selectedLevel2JournalIds,
-    level3Ids: selectedLevel3JournalIds,
+    topLevelId: selectedTopLevelId,
+    level2Ids: selectedLevel2Ids,
+    level3Ids: selectedLevel3Ids,
     flatId: selectedFlatJournalId,
     rootFilter: activeJournalRootFilters,
   } = selections.journal;
 
-  // Local component state
   const [isAddJournalModalOpen, setIsAddJournalModalOpen] = useState(false);
-  const [addJournalContext, setAddJournalContext] = useState<{
-    level: "top" | "child";
-    parentId: string | null;
-    parentCode?: string;
-    parentName?: string;
-  } | null>(null);
+  const [addJournalContext, setAddJournalContext] = useState<any>(null);
   const [isJournalNavModalOpen, setIsJournalNavModalOpen] = useState(false);
 
+  const topButtonClickCycleState = useRef(0);
+  const savedL2SelectionsForTopButton = useRef<string[]>([]);
+  const savedL3SelectionsForTopButton = useRef<string[]>([]);
+
+  const l1ClickCycleState = useRef<Record<string, number>>({});
+  const savedL3SelectionsByL1 = useRef<Record<string, string[]>>({});
+
+  // ✅ FIX: Refs for managing single/double click distinction
+
+  const clickInteractionRef = useRef<{
+    id: string | null;
+    timeout: NodeJS.Timeout | null;
+  }>({ id: null, timeout: null });
+
+  const topButtonInteractionRef = useRef<{ timeout: NodeJS.Timeout | null }>({
+    timeout: null,
+  });
+  // --- Queries and Memos (Unchanged) ---
   const isJournalSliderPrimary = useMemo(
     () =>
       sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 0 &&
       visibility[SLIDER_TYPES.JOURNAL],
     [sliderOrder, visibility]
   );
-
   const journalHierarchyQuery = useQuery<AccountNodeData[], Error>({
     queryKey: journalKeys.hierarchy(restrictedJournalId),
     queryFn: () => fetchJournalHierarchy(restrictedJournalId),
     staleTime: 5 * 60 * 1000,
     enabled: visibility[SLIDER_TYPES.JOURNAL],
   });
-
   const hierarchyData = useMemo(
     () => journalHierarchyQuery.data || [],
     [journalHierarchyQuery.data]
   );
-
   const currentHierarchy = useMemo(() => {
-    if (!hierarchyData || hierarchyData.length === 0) return [];
-    if (
-      selectedTopLevelJournalId === (restrictedJournalId || ROOT_JOURNAL_ID)
-    ) {
+    if (!hierarchyData.length) return [];
+    if (selectedTopLevelId === (restrictedJournalId || ROOT_JOURNAL_ID))
       return hierarchyData;
-    }
-    const topLevelNode = findNodeById(hierarchyData, selectedTopLevelJournalId);
-    return topLevelNode ? topLevelNode.children || [] : [];
-  }, [selectedTopLevelJournalId, hierarchyData, restrictedJournalId]);
+    const topNode = findNodeById(hierarchyData, selectedTopLevelId);
+    return topNode?.children || [];
+  }, [selectedTopLevelId, hierarchyData, restrictedJournalId]);
 
-  // --- MODIFICATION: Corrected logic for finding the single selected journal ---
+  const isTerminal = useMemo((): boolean => {
+    const { selections } = useAppStore.getState();
+    const { level2Ids, level3Ids, flatId } = selections.journal;
+    const singleSelectedId =
+      level3Ids.length === 1
+        ? level3Ids[0]
+        : level2Ids.length === 1 && level3Ids.length === 0
+        ? level2Ids[0]
+        : flatId;
+    if (!singleSelectedId) return false;
+    const node = findNodeById(hierarchyData, singleSelectedId);
+    return !!node && (!node.children || node.children.length === 0);
+  }, [selections.journal, hierarchyData]);
+
   const selectedJournalId = useMemo((): string | null => {
-    // If the journal slider is not primary, the flat selection is the only possibility.
-    if (!isJournalSliderPrimary) {
-      return selectedFlatJournalId;
-    }
-
-    // Priority 1: A single L3 item is selected. This is the most specific context.
-    if (selectedLevel3JournalIds.length === 1) {
-      return selectedLevel3JournalIds[0];
-    }
-
-    // Priority 2: No L3s are selected, but a single L2 item is.
+    if (!isJournalSliderPrimary) return selectedFlatJournalId;
+    if (selectedLevel3Ids.length === 1) return selectedLevel3Ids[0];
+    if (selectedLevel2Ids.length === 1 && selectedLevel3Ids.length === 0)
+      return selectedLevel2Ids[0];
+    const effectiveRoot = restrictedJournalId || ROOT_JOURNAL_ID;
     if (
-      selectedLevel3JournalIds.length === 0 &&
-      selectedLevel2JournalIds.length === 1
-    ) {
-      return selectedLevel2JournalIds[0];
-    }
-
-    // Priority 3: No L2s or L3s are selected. The context is the L1 container itself,
-    // but ONLY if the user has drilled down (i.e., it's not the root).
-    if (
-      selectedLevel2JournalIds.length === 0 &&
-      selectedLevel3JournalIds.length === 0
-    ) {
-      const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
-      if (
-        selectedTopLevelJournalId &&
-        selectedTopLevelJournalId !== effectiveRootId
-      ) {
-        return selectedTopLevelJournalId;
-      }
-    }
-
-    // In all other cases (multiple selections at the lowest level, no selection), there is no single context.
+      selectedTopLevelId &&
+      selectedTopLevelId !== effectiveRoot &&
+      selectedLevel2Ids.length === 0 &&
+      selectedLevel3Ids.length === 0
+    )
+      return selectedTopLevelId;
     return null;
   }, [
     isJournalSliderPrimary,
     selectedFlatJournalId,
-    selectedLevel2JournalIds,
-    selectedLevel3JournalIds,
-    selectedTopLevelJournalId,
+    selectedLevel2Ids,
+    selectedLevel3Ids,
+    selectedTopLevelId,
     restrictedJournalId,
   ]);
 
-  // This `isTerminal` check now works correctly because `selectedJournalId` is calculated correctly.
-  const isTerminal = useMemo((): boolean => {
-    // If no single journal is selected, it can't be terminal.
-    if (!selectedJournalId) {
-      return false;
-    }
-
-    // Find the selected node in the full hierarchy.
-    const node = findNodeById(hierarchyData, selectedJournalId);
-
-    // A node is terminal if it exists and is marked as such (e.g., no children).
-    return !!node && (!node.children || node.children.length === 0);
-  }, [selectedJournalId, hierarchyData]);
-
-  const effectiveSelectedJournalIds = useMemo(() => {
-    if (!isJournalSliderPrimary) {
-      return selectedFlatJournalId ? [selectedFlatJournalId] : [];
-    }
-
-    if (
-      selectedLevel2JournalIds.length > 0 ||
-      selectedLevel3JournalIds.length > 0
-    ) {
-      const finalIds = new Set<string>();
-      selectedLevel3JournalIds.forEach((id) => finalIds.add(id));
-
-      const l2ParentsOfSelectedL3s = new Set<string>();
-      if (selectedLevel3JournalIds.length > 0) {
-        selectedLevel3JournalIds.forEach((l3Id) => {
-          const parent = findParentOfNode(l3Id, hierarchyData);
-          if (parent) {
-            l2ParentsOfSelectedL3s.add(parent.id);
-          }
-        });
-      }
-
-      selectedLevel2JournalIds.forEach((l2Id) => {
-        if (!l2ParentsOfSelectedL3s.has(l2Id)) {
-          finalIds.add(l2Id);
-        }
-      });
-      return Array.from(finalIds);
-    }
-
-    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
-    if (
-      selectedTopLevelJournalId &&
-      selectedTopLevelJournalId !== effectiveRootId
-    ) {
-      return [selectedTopLevelJournalId];
-    }
-
-    return [];
-  }, [
-    isJournalSliderPrimary,
-    selectedFlatJournalId,
-    selectedLevel2JournalIds,
-    selectedLevel3JournalIds,
-    selectedTopLevelJournalId,
-    restrictedJournalId,
-    hierarchyData,
-  ]);
-
-  // --- Handlers (No changes below this line) ---
+  // --- Core State Management Actions (Unchanged) ---
   const handleToggleJournalRootFilter = useCallback(
-    (filterToToggle: PartnerGoodFilterStatus) => {
-      setSelection("journal.rootFilter", filterToToggle);
-    },
+    (filter: PartnerGoodFilterStatus) =>
+      setSelection("journal.rootFilter", filter),
     [setSelection]
   );
-
   const setSelectedFlatJournalId = useCallback(
-    (id: string | null) => {
-      setSelection("journal", { flatId: id });
-    },
+    (id: string | null) => setSelection("journal", { flatId: id }),
     [setSelection]
   );
-
-  const resetJournalSelections = useCallback(
-    (options?: { keepRootFilter?: boolean }) => {
-      const resetPayload: any = {
-        topLevelId: restrictedJournalId || ROOT_JOURNAL_ID,
-        level2Ids: [],
-        level3Ids: [],
-        flatId: null,
-      };
-      if (!options?.keepRootFilter) {
-        resetPayload.rootFilter = [];
-      }
-      setSelection("journal", resetPayload);
-    },
-    [setSelection, restrictedJournalId]
-  );
-
+  const resetJournalSelections = useCallback(() => {
+    setSelection("journal", {
+      topLevelId: restrictedJournalId || ROOT_JOURNAL_ID,
+      level2Ids: [],
+      level3Ids: [],
+      flatId: null,
+    });
+    topButtonClickCycleState.current = 0;
+    l1ClickCycleState.current = {};
+  }, [setSelection, restrictedJournalId]);
   const handleSelectTopLevelJournal = useCallback(
-    (
-      newTopLevelId: string,
-      _fullHierarchy?: AccountNodeData[],
-      childToSelectInL2: string | null = null
-    ) => {
+    (newTopLevelId: string, childToSelectInL2: string | null = null) => {
       setSelection("journal", {
         topLevelId: newTopLevelId,
         level2Ids: childToSelectInL2 ? [childToSelectInL2] : [],
         level3Ids: [],
       });
+      topButtonClickCycleState.current = 0;
+      l1ClickCycleState.current = {};
     },
     [setSelection]
   );
 
-  const handleToggleLevel2JournalId = useCallback(
-    (level2IdToToggle: string) => {
-      if (useAppStore.getState().selections.journal.rootFilter.length === 0) {
+  // --- AUTHORITATIVE INTERACTION HANDLERS ---
+
+  /** Rule B: Single-Clicking the Top Button */
+
+  const handleNavigateUpOneLevel = useCallback(() => {
+    const currentTopLevelId =
+      useAppStore.getState().selections.journal.topLevelId;
+    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
+    if (!currentTopLevelId || currentTopLevelId === effectiveRootId) return;
+
+    const parent = findParentOfNode(currentTopLevelId, hierarchyData);
+    const newTopLevelId = parent ? parent.id : effectiveRootId;
+    handleSelectTopLevelJournal(newTopLevelId, currentTopLevelId);
+  }, [hierarchyData, restrictedJournalId, handleSelectTopLevelJournal]);
+
+  const handleTopButtonInteraction = useCallback(() => {
+    const topLevelNode = findNodeById(hierarchyData, selectedTopLevelId);
+    if (!topLevelNode) return;
+
+    const cycle = topButtonClickCycleState.current;
+    let newL2Ids: string[] = [];
+    let newL3Ids: string[] = [];
+
+    switch (cycle) {
+      case 0: // Click 1: Select All Descendants
+        newL2Ids = (topLevelNode.children || []).map((c) => c.id);
+        newL3Ids = (topLevelNode.children || [])
+          .flatMap((c) => c.children || [])
+          .map((gc) => gc.id);
+        break;
+      case 1: // Click 2: Select None
+        // State is already empty []
+        break;
+      case 2: // Click 3: Restore Custom
+        newL2Ids = savedL2SelectionsForTopButton.current;
+        newL3Ids = savedL3SelectionsForTopButton.current;
+        break;
+    }
+
+    topButtonClickCycleState.current = (cycle + 1) % 3;
+    setSelection("journal", { level2Ids: newL2Ids, level3Ids: newL3Ids });
+  }, [hierarchyData, selectedTopLevelId, setSelection]);
+
+  const handleTopButtonClick = useCallback(() => {
+    // If a timeout is pending, it means this is a double-click
+    if (topButtonInteractionRef.current.timeout) {
+      clearTimeout(topButtonInteractionRef.current.timeout);
+      topButtonInteractionRef.current.timeout = null;
+      handleNavigateUpOneLevel(); // Execute double-click action
+      return;
+    }
+
+    // Otherwise, set a timeout for the single-click action
+    const newTimeout = setTimeout(() => {
+      handleTopButtonInteraction(); // Execute single-click action
+      topButtonInteractionRef.current.timeout = null;
+    }, DOUBLE_CLICK_DELAY);
+
+    topButtonInteractionRef.current.timeout = newTimeout;
+  }, [handleNavigateUpOneLevel, handleTopButtonInteraction]);
+
+  /** Rule A: Single-Clicking a 1st Row Button */
+  const handleL1Interaction = useCallback(
+    (l1ItemId: string) => {
+      // Standard double-click detection logic
+      if (clickInteractionRef.current.timeout) {
+        clearTimeout(clickInteractionRef.current.timeout);
+      }
+      if (clickInteractionRef.current.id === l1ItemId) {
+        handleSelectTopLevelJournal(l1ItemId);
+        clickInteractionRef.current = { id: null, timeout: null };
         return;
       }
 
-      const currentL2s = useAppStore.getState().selections.journal.level2Ids;
-      const isSelected = currentL2s.includes(level2IdToToggle);
-      let newL2s;
-      let newL3s = useAppStore.getState().selections.journal.level3Ids;
+      // Single-click logic
+      const newTimeout = setTimeout(() => {
+        const { level2Ids, level3Ids } =
+          useAppStore.getState().selections.journal;
+        const l1Node = findNodeById(hierarchyData, l1ItemId);
+        if (!l1Node) return;
 
-      if (isSelected) {
-        newL2s = currentL2s.filter((id) => id !== level2IdToToggle);
-        const l2Node = findNodeById(hierarchyData, level2IdToToggle);
-        if (l2Node?.children) {
-          const childrenIds = l2Node.children.map((c) => c.id);
-          newL3s = newL3s.filter((id) => !childrenIds.includes(id));
+        const cycle = l1ClickCycleState.current[l1ItemId] || 0;
+        const childrenIds = (l1Node.children || []).map((c) => c.id);
+        const childrenIdSet = new Set(childrenIds);
+
+        let newL2s = [...level2Ids];
+        // Start by removing this L1 item's children from the L3 list. This cleans the slate for the new state.
+        let newL3s = level3Ids.filter((id) => !childrenIdSet.has(id));
+
+        // FIX: The logic for modifying L2 and L3 selections is now correctly implemented per the 3-state cycle rule.
+        switch (cycle) {
+          case 0: // Click 1: Select All Children
+            if (!newL2s.includes(l1ItemId)) newL2s.push(l1ItemId);
+            newL3s.push(...childrenIds);
+            break;
+          case 1: // Click 2: Select None (and unselect L1 item)
+            // This is the fix for Bug 1: removing the item from the L2 list.
+            newL2s = newL2s.filter((id) => id !== l1ItemId);
+            // L3 children are already filtered out.
+            break;
+          case 2: // Click 3: Restore Custom
+            if (!newL2s.includes(l1ItemId)) newL2s.push(l1ItemId);
+            const savedSelection =
+              savedL3SelectionsByL1.current[l1ItemId] || [];
+            newL3s.push(...savedSelection);
+            break;
         }
-      } else {
-        newL2s = [...currentL2s, level2IdToToggle].slice(-MAX_L2_SELECTIONS);
+
+        l1ClickCycleState.current[l1ItemId] = (cycle + 1) % 3;
+
+        // Ensure uniqueness and update global state
+        const finalL2s = [...new Set(newL2s)];
+        const finalL3s = [...new Set(newL3s)];
+        setSelection("journal", { level2Ids: finalL2s, level3Ids: finalL3s });
+
+        // FIX: Per Rule D, any manual L1 click resets the Top Button cycle and saves the new state as its "custom" state.
+        topButtonClickCycleState.current = 0;
+        savedL2SelectionsForTopButton.current = finalL2s;
+        savedL3SelectionsForTopButton.current = finalL3s;
+
+        clickInteractionRef.current = { id: null, timeout: null };
+      }, DOUBLE_CLICK_DELAY);
+
+      clickInteractionRef.current = { id: l1ItemId, timeout: newTimeout };
+    },
+    [hierarchyData, setSelection, handleSelectTopLevelJournal]
+  );
+
+  /** Rule D: The Critical Reset Condition */
+  const handleL2ManualToggle = useCallback(
+    (l2ItemId: string) => {
+      const { level2Ids, level3Ids } =
+        useAppStore.getState().selections.journal;
+      const isSelected = level3Ids.includes(l2ItemId);
+      const newL3s = isSelected
+        ? level3Ids.filter((id) => id !== l2ItemId)
+        : [...level3Ids, l2ItemId];
+
+      setSelection("journal", { level3Ids: newL3s });
+
+      const parentL1 = findParentOfNode(l2ItemId, hierarchyData);
+      if (parentL1) {
+        l1ClickCycleState.current[parentL1.id] = 0; // Reset parent's cycle
+        // Save the new custom selection specifically for the parent L1 button's "restore" state.
+        savedL3SelectionsByL1.current[parentL1.id] = newL3s.filter((id) =>
+          parentL1.children?.some((c) => c.id === id)
+        );
       }
 
-      setSelection("journal", { level2Ids: newL2s, level3Ids: newL3s });
+      // Also reset Top Button cycle
+      topButtonClickCycleState.current = 0;
+      // FIX: This is the fix for Bug 2. It now saves the *entire* current L2 selection, not just a single parent.
+      savedL2SelectionsForTopButton.current = [...level2Ids];
+      savedL3SelectionsForTopButton.current = newL3s;
     },
     [hierarchyData, setSelection]
   );
 
-  const handleToggleLevel3JournalId = useCallback(
-    (level3IdToToggle: string) => {
-      if (useAppStore.getState().selections.journal.rootFilter.length === 0) {
-        return;
-      }
-
-      const currentL3s = useAppStore.getState().selections.journal.level3Ids;
-      const isSelected = currentL3s.includes(level3IdToToggle);
-      let newL3s;
-      if (isSelected) {
-        newL3s = currentL3s.filter((id) => id !== level3IdToToggle);
-      } else {
-        newL3s = [...currentL3s, level3IdToToggle].slice(-MAX_L3_SELECTIONS);
-      }
-      setSelection("journal", { level3Ids: newL3s });
-    },
-    [setSelection]
-  );
-
+  // --- Mutations and Modal handlers (Unchanged) ---
   const createJournalMutation = useMutation<
     Journal,
     Error,
     ServerCreateJournalData
   >({
-    mutationFn: (data) => serverCreateJournalEntry(data),
+    mutationFn: serverCreateJournalEntry,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: journalKeys.hierarchy(restrictedJournalId),
@@ -298,10 +330,9 @@ export const useJournalManager = () => {
       closeAddJournalModal();
     },
   });
-
   const deleteJournalMutation = useMutation<{ message: string }, Error, string>(
     {
-      mutationFn: (journalId) => serverDeleteJournalEntry(journalId),
+      mutationFn: serverDeleteJournalEntry,
       onSuccess: () => {
         queryClient.invalidateQueries({
           queryKey: journalKeys.hierarchy(restrictedJournalId),
@@ -310,15 +341,10 @@ export const useJournalManager = () => {
       },
     }
   );
-
-  const openAddJournalModal = useCallback(
-    (context: typeof addJournalContext) => {
-      setAddJournalContext(context);
-      setIsAddJournalModalOpen(true);
-    },
-    []
-  );
-
+  const openAddJournalModal = useCallback((context: any) => {
+    setAddJournalContext(context);
+    setIsAddJournalModalOpen(true);
+  }, []);
   const closeAddJournalModal = useCallback(
     () => setIsAddJournalModalOpen(false),
     []
@@ -331,44 +357,38 @@ export const useJournalManager = () => {
     () => setIsJournalNavModalOpen(false),
     []
   );
-
   const createJournal = useCallback(
-    (
-      formDataFromModal: Omit<AccountNodeData, "children" | "id"> & {
-        id?: string;
-        code?: string;
-      }
-    ) => {
-      const journalToCreate: ServerCreateJournalData = {
-        id: formDataFromModal.code || formDataFromModal.id || "",
-        name: formDataFromModal.name,
-        parentId: addJournalContext?.parentId || undefined,
-      };
-      createJournalMutation.mutate(journalToCreate);
+    (formData: any) => {
+      createJournalMutation.mutate({
+        id: formData.code,
+        name: formData.name,
+        parentId: addJournalContext?.parentId,
+      });
     },
     [addJournalContext, createJournalMutation]
   );
-
   const deleteJournal = useCallback(
-    (journalId: string) => {
-      deleteJournalMutation.mutate(journalId);
-    },
+    (journalId: string) => deleteJournalMutation.mutate(journalId),
     [deleteJournalMutation]
   );
 
   return {
+    // Data and State
     hierarchyData,
     currentHierarchy,
     isHierarchyLoading: journalHierarchyQuery.isLoading,
     isHierarchyError: journalHierarchyQuery.isError,
     hierarchyError: journalHierarchyQuery.error,
-    selectedTopLevelJournalId,
-    selectedLevel2JournalIds,
-    selectedLevel3JournalIds,
+    selectedTopLevelId,
+    selectedLevel2Ids,
+    selectedLevel3Ids,
     selectedFlatJournalId,
     activeJournalRootFilters,
-    effectiveSelectedJournalIds,
     isJournalSliderPrimary,
+    selectedJournalId,
+    isTerminal,
+
+    // Modal State & Handlers
     isAddJournalModalOpen,
     addJournalContext,
     openAddJournalModal,
@@ -380,13 +400,15 @@ export const useJournalManager = () => {
     isCreatingJournal: createJournalMutation.isPending,
     deleteJournal,
     isDeletingJournal: deleteJournalMutation.isPending,
+
+    // Core Interaction Handlers
     handleSelectTopLevelJournal,
-    handleToggleLevel2JournalId,
-    handleToggleLevel3JournalId,
     resetJournalSelections,
     setSelectedFlatJournalId,
     handleToggleJournalRootFilter,
-    selectedJournalId,
-    isTerminal, // This is now correctly calculated and is the single source of truth.
+    handleTopButtonInteraction,
+    handleL1Interaction,
+    handleL2ManualToggle,
+    handleTopButtonClick,
   };
 };

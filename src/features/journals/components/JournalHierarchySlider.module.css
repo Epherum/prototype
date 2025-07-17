@@ -1,3 +1,4 @@
+/* src/features/journals/components/journalhierachyslider */
 /* Row 2: Container for the Filter Buttons */
 .headerFilterRow {
   text-align: center;
@@ -124,5 +125,15 @@
   background-color: var(--accent-warm);
   color: var(--bg-card);
   border-color: var(--accent-warm);
+  font-weight: 600;
+}
+
+/* This is the key rule: It applies the custom pastel color ONLY when
+   a button is both active and has been assigned a color variable. */
+.level2Button.colored.level2ButtonActive,
+.level2Button.colored.level2ButtonActive:hover {
+  background-color: var(--item-color);
+  border-color: var(--item-color);
+  color: #333; /* A dark color for better contrast on pastel backgrounds */
   font-weight: 600;
 }

@@ -1,5 +1,5 @@
 // src/features/journals/components/JournalHierarchySlider.tsx
-import React, { useRef, useMemo } from "react";
+import React, { useMemo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
 import "swiper/css";
@@ -10,338 +10,201 @@ import type {
   AccountNodeData,
   ActivePartnerFilters,
   PartnerGoodFilterStatus,
-} from "@/lib/types"; // Import new type
+} from "@/lib/types";
 
-const DOUBLE_CLICK_DELAY = 200;
+// A designer-curated palette with better distinction and harmony.
+const pastelColors = [
+  "#FFB3BA", // Soft Coral Pink (Warm)
+  "#BAE1FF", // Baby Blue (Cool)
+  "#BFFCC6", // Mint Green (Cool)
+  "#FFFFBA", // Pastel Yellow (Warm/Neutral)
+  "#FFDAC1", // Peachy Pink (Warm)
+  "#D5AAFF", // Lavender Violet (Cool)
+  "#C2F0FC", // Icy Sky Blue (Cool)
+  "#FFD6FC", // Cotton Candy Pink (Warm/Cool)
+  "#B5EAD7", // Light Teal (Cool)
+  "#E6E6FA", // Lavender Mist (Neutral)
+];
 
 interface JournalHierarchySliderProps {
   sliderId: string;
   hierarchyData: AccountNodeData[];
   fullHierarchyData: AccountNodeData[];
-  selectedTopLevelId: string | null;
   selectedLevel2Ids: string[];
   selectedLevel3Ids: string[];
-  onSelectTopLevel: (
-    newTopLevelId: string,
-    childToSelectInL2?: string | null
-  ) => void;
-  onToggleLevel2Id: (id: string) => void;
-  onToggleLevel3Id: (id: string) => void;
-  rootJournalIdConst: string;
-  restrictedJournalId?: string | null;
+  onL1ItemInteract: (id: string) => void;
+  onL2ItemToggle: (id: string) => void;
   isLoading?: boolean;
-  isError?: boolean;
-  isRootView?: boolean;
   activeFilters: ActivePartnerFilters;
   onToggleFilter: (status: PartnerGoodFilterStatus) => void;
   isLocked?: boolean;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
-  sliderId,
   hierarchyData,
   fullHierarchyData,
-  selectedTopLevelId,
   selectedLevel2Ids,
   selectedLevel3Ids,
-  onSelectTopLevel,
-  onToggleLevel2Id,
-  onToggleLevel3Id,
-  rootJournalIdConst,
-  restrictedJournalId,
+  onL1ItemInteract,
+  onL2ItemToggle,
   isLoading,
-  isError,
-  isRootView,
   activeFilters,
   onToggleFilter,
   isLocked,
 }) => {
-  const l2ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const l2ClickCountRef = useRef<number>(0);
-  const l3ClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const l3ClickCountRef = useRef<number>(0);
+  const level2NodesForScroller = useMemo(
+    () => hierarchyData.filter((node): node is AccountNodeData => !!node?.id),
+    [hierarchyData]
+  );
 
-  const currentL1ContextNode = useMemo(() => {
-    if (!selectedTopLevelId) return null;
-    if (
-      selectedTopLevelId === rootJournalIdConst &&
-      (!restrictedJournalId || restrictedJournalId === rootJournalIdConst)
-    ) {
-      return {
-        id: rootJournalIdConst,
-        name: "Chart of Accounts",
-        code: "Root",
-        children: hierarchyData,
-        isTerminal: false,
-      } as AccountNodeData;
-    }
-    return findNodeById(fullHierarchyData, selectedTopLevelId);
-  }, [
-    selectedTopLevelId,
-    hierarchyData,
-    fullHierarchyData,
-    rootJournalIdConst,
-    restrictedJournalId,
-  ]);
-
-  const level2NodesForScroller = useMemo(() => {
-    if (!currentL1ContextNode) return [];
-    return (currentL1ContextNode.children || []).filter(
-      (node): node is AccountNodeData =>
-        node && typeof node.id === "string" && node.id !== ""
-    );
-  }, [currentL1ContextNode]);
+  // ✅ FIX: The color map now depends on the STABLE display list (`level2NodesForScroller`),
+  // not the dynamic selection list (`selectedLevel2Ids`). This ensures colors never change.
+  const colorMap = useMemo(() => {
+    const map = new Map<string, string>();
+    level2NodesForScroller.forEach((node, index) => {
+      map.set(node.id, pastelColors[index % pastelColors.length]);
+    });
+    return map;
+  }, [level2NodesForScroller]);
 
   const level3NodesForScroller = useMemo(() => {
-    if (selectedLevel2Ids.length === 0 || level2NodesForScroller.length === 0)
-      return [];
-    const l3nodes = selectedLevel2Ids.flatMap((l2Id) => {
-      const l2Node = findNodeById(level2NodesForScroller, l2Id);
-      return (
-        l2Node?.children?.filter(
-          (child): child is AccountNodeData =>
-            child && typeof child.id === "string" && child.id !== ""
-        ) || []
-      );
-    });
-    return Array.from(new Set(l3nodes.map((n) => n.id))).map(
-      (id) => l3nodes.find((n) => n.id === id)!
-    );
-  }, [selectedLevel2Ids, level2NodesForScroller]);
+    // For efficient lookup, create a Set of the selected IDs.
+    const selectedL2IdSet = new Set(selectedLevel2Ids);
 
-  const navigateDown = (newTopLevelId: string) => {
-    const targetNode = findNodeById(fullHierarchyData, newTopLevelId);
-    if (!targetNode) {
-      console.error(
-        `[JHS] navigateDown: Target node ${newTopLevelId} not found.`
-      );
-      return;
-    }
-    onSelectTopLevel(newTopLevelId, null);
-  };
-
-  const handleL2ItemClick = (l2ItemId: string) => {
-    l2ClickCountRef.current += 1;
-    if (l2ClickTimeoutRef.current) clearTimeout(l2ClickTimeoutRef.current);
-
-    if (l2ClickCountRef.current === 1) {
-      l2ClickTimeoutRef.current = setTimeout(() => {
-        onToggleLevel2Id(l2ItemId);
-        l2ClickCountRef.current = 0;
-      }, DOUBLE_CLICK_DELAY);
-    } else if (l2ClickCountRef.current === 2) {
-      navigateDown(l2ItemId);
-      l2ClickCountRef.current = 0;
-    }
-  };
-
-  const handleL3ItemClick = (l3ItemId: string) => {
-    l3ClickCountRef.current += 1;
-    if (l3ClickTimeoutRef.current) clearTimeout(l3ClickTimeoutRef.current);
-
-    if (l3ClickCountRef.current === 1) {
-      l3ClickTimeoutRef.current = setTimeout(() => {
-        onToggleLevel3Id(l3ItemId);
-        l3ClickCountRef.current = 0;
-      }, DOUBLE_CLICK_DELAY);
-    } else if (l3ClickCountRef.current === 2) {
-      const parentNode = findParentOfNode(l3ItemId, fullHierarchyData);
-      if (parentNode) {
-        navigateDown(parentNode.id);
+    // Iterate over the STABLE `level2NodesForScroller` array, not the unstable selection array.
+    // This ensures the groups of children appear in the same order as their parents in the 1st row.
+    return level2NodesForScroller.flatMap((l1Node) => {
+      // If the parent node in the stable list is currently selected...
+      if (selectedL2IdSet.has(l1Node.id)) {
+        // ...then return its children to be included in the final list.
+        return (
+          l1Node.children?.filter(
+            (child): child is AccountNodeData => !!child?.id
+          ) || []
+        );
       }
-      l3ClickCountRef.current = 0;
-    }
-  };
-
-  const getNodeCodesFromIds = (
-    ids: string[],
-    nodeList: AccountNodeData[] | undefined
-  ): string => {
-    if (!ids || ids.length === 0 || !nodeList || nodeList.length === 0)
-      return "None";
-    return ids
-      .map((id) => findNodeById(nodeList, id)?.code || id)
-      .filter(Boolean)
-      .join(", ");
-  };
+      // Otherwise, return an empty array, which flatMap will ignore.
+      return [];
+    });
+  }, [level2NodesForScroller, selectedLevel2Ids]);
 
   if (isLoading)
     return <div className={styles.noData}>Loading Journals...</div>;
-  if (isError)
-    return <div className={styles.noData}>Error loading journals.</div>;
-
-  const isEffectivelyAtTrueRoot =
-    selectedTopLevelId === rootJournalIdConst &&
-    (!restrictedJournalId || restrictedJournalId === rootJournalIdConst);
 
   return (
     <>
-      {/* --- ROW 2: Filter Buttons --- */}
-      {/* FIX: Removed 'isRootView' condition to make filters always visible */}
-      {onToggleFilter && (
-        <div className={styles.headerFilterRow}>
-          <div className={styles.rootFilterControls}>
-            <button
-              className={
-                activeFilters.includes("affected") ? styles.activeFilter : ""
-              }
-              onClick={() => onToggleFilter("affected")}
-              disabled={isLocked}
-            >
-              Affected
-            </button>
-            <button
-              className={
-                activeFilters.includes("unaffected") ? styles.activeFilter : ""
-              }
-              onClick={() => onToggleFilter("unaffected")}
-              disabled={isLocked}
-            >
-              Unaffected
-            </button>
-            <button
-              className={
-                activeFilters.includes("inProcess") ? styles.activeFilter : ""
-              }
-              onClick={() => onToggleFilter("inProcess")}
-              title="Items created by you, not yet linked to your home journal"
-              disabled={isLocked}
-            >
-              In Process
-            </button>
-          </div>
-        </div>
-      )}
-
-      <h3 className={styles.level2ScrollerTitle}>
-        {isEffectivelyAtTrueRoot
-          ? `L1 Accounts (Selected: ${getNodeCodesFromIds(
-              selectedLevel2Ids,
-              level2NodesForScroller
-            )})`
-          : `L2 under ${currentL1ContextNode?.code || "Context"}${
-              selectedLevel2Ids.length > 0
-                ? ` (Selected: ${getNodeCodesFromIds(
-                    selectedLevel2Ids,
-                    level2NodesForScroller
-                  )})`
-                : ""
-            }`}
-      </h3>
-      {level2NodesForScroller.length > 0 ? (
-        <div className={styles.level2ScrollerContainer}>
-          <Swiper
-            modules={[Navigation]}
-            navigation={level2NodesForScroller.length > 5}
-            slidesPerView="auto"
-            spaceBetween={8}
-            className={styles.levelScrollerSwiper}
-            slidesPerGroupAuto={true}
-            key={`l2-swiper-${selectedTopLevelId}-${level2NodesForScroller.length}`}
+      <div className={styles.headerFilterRow}>
+        <div className={styles.rootFilterControls}>
+          <button
+            className={
+              activeFilters.includes("affected") ? styles.activeFilter : ""
+            }
+            onClick={() => onToggleFilter("affected")}
+            disabled={isLocked}
           >
-            {level2NodesForScroller.map((l2Node) => (
-              <SwiperSlide
-                key={l2Node.id}
-                className={styles.level2ScrollerSlideNoOverflow}
-                style={{ width: "auto" }}
-              >
-                <div
-                  className={`${styles.l2ButtonInteractiveWrapper} noSelect touchManipulation`}
-                >
-                  <button
-                    onClick={() => handleL2ItemClick(l2Node.id)}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className={`${styles.level2Button} ${
-                      selectedLevel2Ids.includes(l2Node.id)
-                        ? styles.level2ButtonActive
-                        : ""
-                    }`}
-                    title={`${l2Node.code} - ${
-                      l2Node.name || "Unnamed"
-                    }. Double-click to drill down.`}
-                    disabled={isLocked}
-                  >
-                    {l2Node.code || "N/A"}
-                  </button>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
+            Affected
+          </button>
+          <button
+            className={
+              activeFilters.includes("unaffected") ? styles.activeFilter : ""
+            }
+            onClick={() => onToggleFilter("unaffected")}
+            disabled={isLocked}
+          >
+            Unaffected
+          </button>
+          <button
+            className={
+              activeFilters.includes("inProcess") ? styles.activeFilter : ""
+            }
+            onClick={() => onToggleFilter("inProcess")}
+            disabled={isLocked}
+          >
+            In Process
+          </button>
         </div>
-      ) : (
-        <div className={styles.noDataSmall}>
-          {isEffectivelyAtTrueRoot
-            ? "No top-level accounts."
-            : `No L2 accounts under '${
-                currentL1ContextNode?.name || "context"
-              }'.`}
-        </div>
-      )}
+      </div>
 
-      <h3 className={styles.level2ScrollerTitle}>
-        {selectedLevel2Ids.length === 0
-          ? "Select L2 Account(s) to see L3"
-          : `L3 under ${getNodeCodesFromIds(
-              selectedLevel2Ids,
-              level2NodesForScroller
-            )}${
-              selectedLevel3Ids.length > 0
-                ? ` (Selected: ${getNodeCodesFromIds(
-                    selectedLevel3Ids,
-                    level3NodesForScroller
-                  )})`
-                : ""
-            }`}
-      </h3>
-      {level3NodesForScroller.length > 0 ? (
-        <div className={styles.level2ScrollerContainer}>
+      <h3 className={styles.level2ScrollerTitle}>1st Row</h3>
+      <div className={styles.level2ScrollerContainer}>
+        <Swiper
+          modules={[Navigation]}
+          navigation={level2NodesForScroller.length > 5}
+          slidesPerView="auto"
+          spaceBetween={8}
+          className={styles.levelScrollerSwiper}
+          slidesPerGroupAuto
+        >
+          {level2NodesForScroller.map((l1Node) => {
+            const isActive = selectedLevel2Ids.includes(l1Node.id);
+            // The color is now stable, retrieved from the pre-built map.
+            const color = colorMap.get(l1Node.id);
+            return (
+              <SwiperSlide
+                key={l1Node.id}
+                className={styles.level2ScrollerSlideNoOverflow}
+              >
+                <button
+                  onClick={() => onL1ItemInteract(l1Node.id)}
+                  onContextMenu={(e) => e.preventDefault()}
+                  // The color is only APPLIED when active, but it's always the SAME color for this item.
+                  className={`${styles.level2Button} ${
+                    isActive ? styles.level2ButtonActive : ""
+                  } ${isActive && color ? styles.colored : ""}`}
+                  style={{ "--item-color": color } as React.CSSProperties}
+                  title={`${l1Node.code} - ${l1Node.name}. Click to cycle, Dbl-click to drill.`}
+                  disabled={isLocked}
+                >
+                  {l1Node.code || "N/A"}
+                </button>
+              </SwiperSlide>
+            );
+          })}
+        </Swiper>
+      </div>
+
+      <h3 className={styles.level2ScrollerTitle}>2nd Row</h3>
+      <div className={styles.level2ScrollerContainer}>
+        {level3NodesForScroller.length > 0 ? (
           <Swiper
             modules={[Navigation]}
             navigation={level3NodesForScroller.length > 5}
             slidesPerView="auto"
             spaceBetween={8}
             className={styles.levelScrollerSwiper}
-            slidesPerGroupAuto={true}
-            key={`l3-swiper-${selectedLevel2Ids.join("_")}-${
-              level3NodesForScroller.length
-            }`}
           >
-            {level3NodesForScroller.map((l3Node) => (
-              <SwiperSlide
-                key={l3Node.id}
-                className={styles.level2ScrollerSlideNoOverflow}
-                style={{ width: "auto" }}
-              >
-                <div
-                  className={`${styles.l2ButtonInteractiveWrapper} noSelect touchManipulation`}
+            {level3NodesForScroller.map((l2Node) => {
+              const isActive = selectedLevel3Ids.includes(l2Node.id);
+              const parent = findParentOfNode(l2Node.id, fullHierarchyData);
+              // The parent's color is retrieved from the same stable map.
+              const color = parent ? colorMap.get(parent.id) : undefined;
+              return (
+                <SwiperSlide
+                  key={l2Node.id}
+                  className={styles.level2ScrollerSlideNoOverflow}
                 >
                   <button
-                    onClick={() => handleL3ItemClick(l3Node.id)}
+                    onClick={() => onL2ItemToggle(l2Node.id)}
                     onContextMenu={(e) => e.preventDefault()}
                     className={`${styles.level2Button} ${
-                      selectedLevel3Ids.includes(l3Node.id)
-                        ? styles.level2ButtonActive
-                        : ""
-                    }`}
-                    title={`${l3Node.code} - ${
-                      l3Node.name || "Unnamed"
-                    }. Double-click to drill up.`}
+                      isActive ? styles.level2ButtonActive : ""
+                    } ${color ? styles.colored : ""}`} // Child buttons always show the parent color tint
+                    style={{ "--item-color": color } as React.CSSProperties}
+                    title={`${l2Node.code} - ${l2Node.name}`}
                     disabled={isLocked}
                   >
-                    {l3Node.code || "N/A"}
+                    {l2Node.code || "N/A"}
                   </button>
-                </div>
-              </SwiperSlide>
-            ))}
+                </SwiperSlide>
+              );
+            })}
           </Swiper>
-        </div>
-      ) : (
-        <div className={styles.noDataSmall}>
-          {selectedLevel2Ids.length > 0
-            ? "No L3 accounts for selected L2s."
-            : "Select L2 account(s) to see children."}
-        </div>
-      )}
+        ) : (
+          <div className={styles.noDataSmall}>
+            Select from 1st Row to see children.
+          </div>
+        )}
+      </div>
     </>
   );
 };

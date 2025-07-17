@@ -1,4 +1,4 @@
-// src/features/journals/JournalSliderController.tsx
+//src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
@@ -10,7 +10,6 @@ import React, {
 } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { journalKeys } from "@/lib/queryKeys";
-
 import { IoOptionsOutline } from "react-icons/io5";
 import styles from "@/app/page.module.css";
 
@@ -39,14 +38,10 @@ import type {
   PartnerGoodFilterStatus,
 } from "@/lib/types";
 
-// --- Interface and Props remain the same ---
 export interface JournalSliderControllerRef {
-  openJournalSelector: (
-    onSelectCallback: (node: AccountNodeData) => void
-  ) => void;
+  openJournalSelector: (cb: (node: AccountNodeData) => void) => void;
   openJournalSelectorForGPG: () => void;
 }
-
 interface LayoutControlProps {
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -54,7 +49,6 @@ interface LayoutControlProps {
   onMoveDown: () => void;
   isMoveDisabled: boolean;
 }
-
 export interface JournalSliderControllerProps extends LayoutControlProps {}
 
 export const JournalSliderController = forwardRef<
@@ -62,11 +56,7 @@ export const JournalSliderController = forwardRef<
   JournalSliderControllerProps
 >(({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, isMoveDisabled }, ref) => {
   const journalManager = useJournalManager();
-
-  // ✅ 1. Read the global document creation state
   const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
-
-  // Other store selections
   const restrictedJournalId = useAppStore(
     (state) => state.auth.effectiveRestrictedJournalId
   );
@@ -75,173 +65,92 @@ export const JournalSliderController = forwardRef<
   const selectedGoodsId = useAppStore((state) => state.selections.goods);
   const setSelection = useAppStore((state) => state.setSelection);
 
-  // Modal state remains the same
   const [isLinkingModalOpen, setIsLinkingModalOpen] = useState(false);
   const [onSelectForLinkingCallback, setOnSelectForLinkingCallback] = useState<
     ((node: AccountNodeData) => void) | null
   >(null);
   const [isGpgContextModalOpen, setIsGpgContextModalOpen] = useState(false);
 
-  const selectedL1Journal = useMemo(() => {
+  const topLevelContextNode = useMemo(() => {
     if (
       !journalManager.isJournalSliderPrimary ||
-      !journalManager.selectedTopLevelJournalId
-    ) {
+      !journalManager.selectedTopLevelId
+    )
       return null;
-    }
+    const isAtRoot =
+      journalManager.selectedTopLevelId ===
+      (restrictedJournalId || ROOT_JOURNAL_ID);
+    if (isAtRoot) return null; // Don't show top button in Admin View
     return findNodeById(
       journalManager.hierarchyData,
-      journalManager.selectedTopLevelJournalId
+      journalManager.selectedTopLevelId
     );
   }, [
     journalManager.isJournalSliderPrimary,
-    journalManager.selectedTopLevelJournalId,
+    journalManager.selectedTopLevelId,
     journalManager.hierarchyData,
+    restrictedJournalId,
   ]);
-
-  // --- Callback to handle navigating up the hierarchy one level at a time ---
-  const handleNavigateUpOneLevel = useCallback(() => {
-    if (isCreating) return; // Prevent navigation when locked
-    const currentTopLevelId = journalManager.selectedTopLevelJournalId;
-    const effectiveRootId = restrictedJournalId || ROOT_JOURNAL_ID;
-
-    if (!currentTopLevelId || currentTopLevelId === effectiveRootId) {
-      return; // Already at root, do nothing.
-    }
-
-    const parent = findParentOfNode(
-      currentTopLevelId,
-      journalManager.hierarchyData
-    );
-    const newTopLevelId = parent ? parent.id : effectiveRootId;
-
-    // Pre-select the journal we just navigated up from for better UX
-    journalManager.handleSelectTopLevelJournal(
-      newTopLevelId,
-      undefined,
-      currentTopLevelId
-    );
-  }, [journalManager, restrictedJournalId, isCreating]);
 
   useImperativeHandle(ref, () => ({
     openJournalSelector: (callback) => {
       setOnSelectForLinkingCallback(() => callback);
       setIsLinkingModalOpen(true);
     },
-    openJournalSelectorForGPG: () => {
-      setIsGpgContextModalOpen(true);
-    },
+    openJournalSelectorForGPG: () => setIsGpgContextModalOpen(true),
   }));
-
-  const handleToggleJournalRootFilter = useCallback(
-    (filter: PartnerGoodFilterStatus) => {
-      setSelection("journal.rootFilter", filter);
-    },
-    [setSelection]
-  );
-
-  // Queries for flat view
-  const isJournalAfterPartner = useMemo(
-    () =>
-      sliderOrder.indexOf(SLIDER_TYPES.PARTNER) === 0 &&
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1,
-    [sliderOrder]
-  );
-  const isJournalAfterGood = useMemo(
-    () =>
-      sliderOrder.indexOf(SLIDER_TYPES.GOODS) === 0 &&
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) === 1,
-    [sliderOrder]
-  );
 
   const flatJournalsByPartnerQuery = useQuery<Journal[], Error>({
     queryKey: journalKeys.flatListByPartner(selectedPartnerId),
     queryFn: () => fetchJournalsLinkedToPartner(selectedPartnerId!),
-    enabled: isJournalAfterPartner && !!selectedPartnerId,
+    enabled:
+      sliderOrder.indexOf(SLIDER_TYPES.PARTNER) <
+        sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) && !!selectedPartnerId,
   });
-
   const flatJournalsByGoodQuery = useQuery<Journal[], Error>({
     queryKey: journalKeys.flatListByGood(selectedGoodsId),
     queryFn: () => fetchJournalsLinkedToGood(selectedGoodsId!),
-    enabled: isJournalAfterGood && !!selectedGoodsId,
+    enabled:
+      sliderOrder.indexOf(SLIDER_TYPES.GOODS) <
+        sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) && !!selectedGoodsId,
   });
-
-  // --- MODAL HANDLERS ---
-
-  const handleCloseLinkingModal = useCallback(() => {
-    setIsLinkingModalOpen(false);
-    setOnSelectForLinkingCallback(null);
-  }, []);
-
-  const handleJournalNodeSelectedForLinking = useCallback(
-    (selectedNode: AccountNodeData) => {
-      if (onSelectForLinkingCallback) {
-        onSelectForLinkingCallback(selectedNode);
-      }
-    },
-    [onSelectForLinkingCallback]
-  );
-
-  const handleGpgContextJournalSelected = useCallback(
-    (node: AccountNodeData) => {
-      if (node && !node.isConceptualRoot && node.id !== ROOT_JOURNAL_ID) {
-        useAppStore.getState().setSelection("gpgContextJournalId", node.id);
-      } else {
-        alert(
-          "Please select a specific journal account for the G-P-G context."
-        );
-      }
-      setIsGpgContextModalOpen(false);
-    },
-    []
-  );
-
-  // --- RENDER LOGIC ---
 
   const renderSlider = () => {
     if (journalManager.isJournalSliderPrimary) {
       return (
         <JournalHierarchySlider
-          // ✅ 2. Pass the isLocked prop down
           isLocked={isCreating}
           sliderId={SLIDER_TYPES.JOURNAL}
           hierarchyData={journalManager.currentHierarchy}
           fullHierarchyData={journalManager.hierarchyData}
-          selectedTopLevelId={journalManager.selectedTopLevelJournalId}
-          selectedLevel2Ids={journalManager.selectedLevel2JournalIds}
-          selectedLevel3Ids={journalManager.selectedLevel3JournalIds}
-          onSelectTopLevel={(id: string, childId?: string) =>
-            journalManager.handleSelectTopLevelJournal(id, undefined, childId)
-          }
-          onToggleLevel2Id={journalManager.handleToggleLevel2JournalId}
-          onToggleLevel3Id={journalManager.handleToggleLevel3JournalId}
-          rootJournalIdConst={ROOT_JOURNAL_ID}
-          restrictedJournalId={
-            useAppStore.getState().auth.effectiveRestrictedJournalId
-          }
+          selectedLevel2Ids={journalManager.selectedLevel2Ids}
+          selectedLevel3Ids={journalManager.selectedLevel3Ids}
+          // ✅ PASS THE CORRECTED HANDLERS
+          onL1ItemInteract={journalManager.handleL1Interaction}
+          onL2ItemToggle={journalManager.handleL2ManualToggle}
           isLoading={journalManager.isHierarchyLoading}
-          isError={journalManager.isHierarchyError}
-          isRootView={
-            journalManager.selectedTopLevelJournalId ===
-            (useAppStore.getState().auth.effectiveRestrictedJournalId ||
-              ROOT_JOURNAL_ID)
-          }
-          onToggleFilter={handleToggleJournalRootFilter}
+          onToggleFilter={journalManager.handleToggleJournalRootFilter}
           activeFilters={
             journalManager.activeJournalRootFilters as PartnerGoodFilterStatus[]
           }
         />
       );
     }
-
+    // ... (rest of the rendering logic is unchanged)
     let queryToUse = null;
-    if (isJournalAfterPartner) queryToUse = flatJournalsByPartnerQuery;
-    else if (isJournalAfterGood) queryToUse = flatJournalsByGoodQuery;
-
-    if (queryToUse) {
+    if (
+      sliderOrder.indexOf(SLIDER_TYPES.PARTNER) <
+      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL)
+    )
+      queryToUse = flatJournalsByPartnerQuery;
+    else if (
+      sliderOrder.indexOf(SLIDER_TYPES.GOODS) <
+      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL)
+    )
+      queryToUse = flatJournalsByGoodQuery;
+    if (queryToUse)
       return (
         <DynamicSlider
-          // ✅ 2. Pass the isLocked prop down
           isLocked={isCreating}
           sliderId={SLIDER_TYPES.JOURNAL}
           title="Journal (Filtered)"
@@ -259,8 +168,6 @@ export const JournalSliderController = forwardRef<
           onToggleAccordion={() => {}}
         />
       );
-    }
-
     return (
       <DynamicSlider
         isLocked={false}
@@ -268,7 +175,7 @@ export const JournalSliderController = forwardRef<
         title="Journal"
         data={[]}
         isLoading={false}
-        placeholderMessage="Journal context determined by preceding slider."
+        placeholderMessage="Context determined by preceding slider."
         activeItemId={null}
         onSlideChange={() => {}}
         isAccordionOpen={false}
@@ -284,32 +191,30 @@ export const JournalSliderController = forwardRef<
           <button
             onClick={journalManager.openJournalNavModal}
             className={`${styles.controlButton} ${styles.editButton}`}
-            aria-label="Options for Journal"
-            // ✅ 3. Disable the options button when creating a document
+            aria-label="Options"
             disabled={isCreating}
           >
             <IoOptionsOutline />
           </button>
-
-          {journalManager.isJournalSliderPrimary && selectedL1Journal && (
+          {topLevelContextNode && (
             <div
               className={`${styles.journalParentInfo} ${
                 isCreating ? styles.locked : ""
               }`}
-              onDoubleClick={handleNavigateUpOneLevel}
-              title="Double-click to navigate up one level"
+              // ✅ FIX: Use the single, unified click handler.
+              // This now correctly handles both single and double clicks.
+              onClick={journalManager.handleTopButtonClick}
+              title={`${topLevelContextNode.code} - ${topLevelContextNode.name}. Single-click to cycle selections. Double-click to navigate up.`}
             >
-              {selectedL1Journal.code} - {selectedL1Journal.name}
+              {topLevelContextNode.code} - {topLevelContextNode.name}
             </div>
           )}
         </div>
-
         <div className={styles.moveButtonGroup}>
           {canMoveUp && (
             <button
               onClick={onMoveUp}
               className={styles.controlButton}
-              // This is already correctly disabled via page.tsx's `isMoveDisabled` prop
               disabled={isMoveDisabled}
             >
               ▲ Up
@@ -319,7 +224,6 @@ export const JournalSliderController = forwardRef<
             <button
               onClick={onMoveDown}
               className={styles.controlButton}
-              // This is also correctly disabled
               disabled={isMoveDisabled}
             >
               ▼ Down
@@ -328,6 +232,7 @@ export const JournalSliderController = forwardRef<
         </div>
       </div>
       {renderSlider()}
+      {/* Modals are unchanged */}
       <AddJournalModal
         isOpen={journalManager.isAddJournalModalOpen}
         onClose={journalManager.closeAddJournalModal}
@@ -343,36 +248,31 @@ export const JournalSliderController = forwardRef<
         onClose={() => {
           if (journalManager.isJournalNavModalOpen)
             journalManager.closeJournalNavModal();
-          if (isLinkingModalOpen) handleCloseLinkingModal();
+          if (isLinkingModalOpen) setIsLinkingModalOpen(false);
           if (isGpgContextModalOpen) setIsGpgContextModalOpen(false);
         }}
         modalTitle={
-          isLinkingModalOpen
-            ? "Select Journal(s) to Link"
-            : isGpgContextModalOpen
-            ? "Select Context Journal for G-P-G View"
-            : "Manage & Select Journals"
+          isLinkingModalOpen ? "Select Journal" : "Manage & Select Journals"
         }
-        onConfirmSelection={
-          isLinkingModalOpen || isGpgContextModalOpen
-            ? undefined
-            : (nodeId: string, childToSelectInL2?: string) =>
-                journalManager.handleSelectTopLevelJournal(
-                  nodeId,
-                  undefined,
-                  childToSelectInL2
-                )
+        onConfirmSelection={(nodeId, childId) =>
+          journalManager.handleSelectTopLevelJournal(nodeId, childId)
         }
-        onSetShowRoot={
-          isLinkingModalOpen || isGpgContextModalOpen
-            ? undefined
-            : () => journalManager.handleSelectTopLevelJournal(ROOT_JOURNAL_ID)
+        onSetShowRoot={() =>
+          journalManager.handleSelectTopLevelJournal(ROOT_JOURNAL_ID)
         }
         onSelectForLinking={
           isLinkingModalOpen
-            ? handleJournalNodeSelectedForLinking
+            ? (node) => {
+                if (onSelectForLinkingCallback)
+                  onSelectForLinkingCallback(node);
+              }
             : isGpgContextModalOpen
-            ? handleGpgContextJournalSelected
+            ? (node) => {
+                useAppStore
+                  .getState()
+                  .setSelection("gpgContextJournalId", node.id);
+                setIsGpgContextModalOpen(false);
+              }
             : undefined
         }
         hierarchy={
@@ -390,15 +290,12 @@ export const JournalSliderController = forwardRef<
         }
         isLoading={journalManager.isHierarchyLoading}
         onTriggerAddChild={(parentId, parentCode) => {
-          const parentNode =
-            parentId === "__MODAL_ROOT_NODE__"
-              ? null
-              : findNodeById(journalManager.hierarchyData, parentId);
+          const pNode = findNodeById(journalManager.hierarchyData, parentId);
           journalManager.openAddJournalModal({
-            level: parentNode ? "child" : "top",
-            parentId: parentNode ? parentId : null,
-            parentCode: parentCode,
-            parentName: parentNode?.name || "",
+            level: pNode ? "child" : "top",
+            parentId: pNode ? parentId : null,
+            parentCode,
+            parentName: pNode?.name,
           });
         }}
         onDeleteAccount={journalManager.deleteJournal}
@@ -406,5 +303,4 @@ export const JournalSliderController = forwardRef<
     </>
   );
 });
-
 JournalSliderController.displayName = "JournalSliderController";

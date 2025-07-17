@@ -346,18 +346,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
     })),
 
   startDocumentCreation: (mode, initialState) => {
-    // === START OF LOGGING ===
-    console.groupCollapsed(`[DEBUG: appStore] startDocumentCreation (FIXED)`);
-    console.log(`Action called with mode: %c${mode}`, "font-weight: bold;", {
-      ...initialState,
-    });
-    const oldState = get();
-    console.log("State BEFORE update:", {
-      selections: { ...oldState.selections },
-      docState: { ...oldState.ui.documentCreationState },
-    });
-    // === END OF LOGGING ===
-
     set((state) => {
       // FIX: The logic to reset selections for downstream sliders has been removed.
       // REASON: This was the root cause of the bug. When entering creation mode,
@@ -385,14 +373,6 @@ export const useAppStore = create<AppState>()((set, get) => ({
         },
         selections: newSelections,
       };
-
-      // === LOGGING ===
-      console.log("State AFTER update:", {
-        selections: { ...finalState.selections },
-        docState: { ...finalState.ui.documentCreationState },
-      });
-      console.groupEnd();
-      // ===
 
       return finalState;
     });
