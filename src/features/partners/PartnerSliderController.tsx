@@ -129,7 +129,7 @@ export const PartnerSliderController: React.FC<
               className={styles.controlButton}
               disabled={isMoveDisabled}
             >
-              ▲
+              ▲ Up
             </button>
           )}
           {canMoveDown && (
@@ -138,7 +138,7 @@ export const PartnerSliderController: React.FC<
               className={styles.controlButton}
               disabled={isMoveDisabled}
             >
-              ▼
+              ▼ Down
             </button>
           )}
         </div>

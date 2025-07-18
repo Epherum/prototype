@@ -1,4 +1,4 @@
-/* src/features/journals/components/journalhierachyslider */
+/* src/features/journals/components/JournalHierarchySlider.module.css */
 /* Row 2: Container for the Filter Buttons */
 .headerFilterRow {
   text-align: center;
@@ -106,7 +106,7 @@
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
   transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease;
+    border-color 0.2s ease, outline-color 0.2s ease;
   white-space: nowrap;
   min-width: 50px;
   text-align: center;
@@ -128,12 +128,23 @@
   font-weight: 600;
 }
 
-/* This is the key rule: It applies the custom pastel color ONLY when
-   a button is both active and has been assigned a color variable. */
 .level2Button.colored.level2ButtonActive,
 .level2Button.colored.level2ButtonActive:hover {
   background-color: var(--item-color);
   border-color: var(--item-color);
   color: #333; /* A dark color for better contrast on pastel backgrounds */
   font-weight: 600;
+}
+
+/* ✅ --- ADDED STYLES FOR TERMINAL NODES --- */
+/* Apply a red outline to any button marked as a terminal node. */
+/* The outline is drawn outside the border and won't affect layout. */
+.terminalNode {
+  outline: 1px solid #ef4444; /* A clear, strong red */
+  outline-offset: 1px; /* A small gap between the button and the outline */
+}
+
+/* Ensure the outline remains on hover for consistency. */
+.terminalNode:hover {
+  outline-color: #f87171; /* A slightly lighter red on hover */
 }

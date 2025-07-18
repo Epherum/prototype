@@ -173,7 +173,7 @@ export const GoodsSliderController = forwardRef<
                 className={styles.controlButton}
                 disabled={isMoveDisabled}
               >
-                ▲
+                ▲ Up
               </button>
             )}
             {canMoveDown && (
@@ -182,7 +182,7 @@ export const GoodsSliderController = forwardRef<
                 className={styles.controlButton}
                 disabled={isMoveDisabled}
               >
-                ▼
+                ▼ Down
               </button>
             )}
           </div>

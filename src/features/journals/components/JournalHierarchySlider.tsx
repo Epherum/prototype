@@ -57,8 +57,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     [hierarchyData]
   );
 
-  // ✅ FIX: The color map now depends on the STABLE display list (`level2NodesForScroller`),
-  // not the dynamic selection list (`selectedLevel2Ids`). This ensures colors never change.
   const colorMap = useMemo(() => {
     const map = new Map<string, string>();
     level2NodesForScroller.forEach((node, index) => {
@@ -68,22 +66,15 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   }, [level2NodesForScroller]);
 
   const level3NodesForScroller = useMemo(() => {
-    // For efficient lookup, create a Set of the selected IDs.
     const selectedL2IdSet = new Set(selectedLevel2Ids);
-
-    // Iterate over the STABLE `level2NodesForScroller` array, not the unstable selection array.
-    // This ensures the groups of children appear in the same order as their parents in the 1st row.
     return level2NodesForScroller.flatMap((l1Node) => {
-      // If the parent node in the stable list is currently selected...
       if (selectedL2IdSet.has(l1Node.id)) {
-        // ...then return its children to be included in the final list.
         return (
           l1Node.children?.filter(
             (child): child is AccountNodeData => !!child?.id
           ) || []
         );
       }
-      // Otherwise, return an empty array, which flatMap will ignore.
       return [];
     });
   }, [level2NodesForScroller, selectedLevel2Ids]);
@@ -137,8 +128,10 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
         >
           {level2NodesForScroller.map((l1Node) => {
             const isActive = selectedLevel2Ids.includes(l1Node.id);
-            // The color is now stable, retrieved from the pre-built map.
             const color = colorMap.get(l1Node.id);
+            // ✅ ADDED: Check if the node is terminal (has no children).
+            const isTerminal = !l1Node.children || l1Node.children.length === 0;
+
             return (
               <SwiperSlide
                 key={l1Node.id}
@@ -147,10 +140,12 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                 <button
                   onClick={() => onL1ItemInteract(l1Node.id)}
                   onContextMenu={(e) => e.preventDefault()}
-                  // The color is only APPLIED when active, but it's always the SAME color for this item.
+                  // ✅ MODIFIED: Conditionally add the 'terminalNode' class.
                   className={`${styles.level2Button} ${
                     isActive ? styles.level2ButtonActive : ""
-                  } ${isActive && color ? styles.colored : ""}`}
+                  } ${isActive && color ? styles.colored : ""} ${
+                    isTerminal ? styles.terminalNode : ""
+                  }`}
                   style={{ "--item-color": color } as React.CSSProperties}
                   title={`${l1Node.code} - ${l1Node.name}. Click to cycle, Dbl-click to drill.`}
                   disabled={isLocked}
@@ -176,8 +171,11 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
             {level3NodesForScroller.map((l2Node) => {
               const isActive = selectedLevel3Ids.includes(l2Node.id);
               const parent = findParentOfNode(l2Node.id, fullHierarchyData);
-              // The parent's color is retrieved from the same stable map.
               const color = parent ? colorMap.get(parent.id) : undefined;
+              // ✅ ADDED: Check if the node is terminal.
+              const isTerminal =
+                !l2Node.children || l2Node.children.length === 0;
+
               return (
                 <SwiperSlide
                   key={l2Node.id}
@@ -186,9 +184,12 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                   <button
                     onClick={() => onL2ItemInteract(l2Node.id)}
                     onContextMenu={(e) => e.preventDefault()}
+                    // ✅ MODIFIED: Conditionally add the 'terminalNode' class.
                     className={`${styles.level2Button} ${
                       isActive ? styles.level2ButtonActive : ""
-                    } ${color ? styles.colored : ""}`} // Child buttons always show the parent color tint
+                    } ${color ? styles.colored : ""} ${
+                      isTerminal ? styles.terminalNode : ""
+                    }`}
                     style={{ "--item-color": color } as React.CSSProperties}
                     title={`${l2Node.code} - ${l2Node.name}`}
                     disabled={isLocked}

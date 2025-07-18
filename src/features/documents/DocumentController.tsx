@@ -87,7 +87,7 @@ export const DocumentController = forwardRef<
                     className={styles.controlButton}
                     disabled={isMoveDisabled}
                   >
-                    ▲
+                    ▲ Up
                   </button>
                 )}
                 {canMoveDown && (
@@ -96,7 +96,7 @@ export const DocumentController = forwardRef<
                     className={styles.controlButton}
                     disabled={isMoveDisabled}
                   >
-                    ▼
+                    ▼ Down
                   </button>
                 )}
               </div>
