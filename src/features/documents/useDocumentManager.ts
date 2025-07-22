@@ -19,6 +19,8 @@ import type {
   Document,
 } from "@/lib/types";
 
+import { useChainedQuery } from "@/hooks/useChainedQuery";
+
 export const useDocumentManager = () => {
   const queryClient = useQueryClient();
 
@@ -256,11 +258,7 @@ export const useDocumentManager = () => {
     [documentCreationState, items, createDocMutation]
   );
 
-  const documentsQuery = useQuery({
-    queryKey: documentKeys.list(selections.partner),
-    queryFn: () => fetchDocuments(selections.partner!),
-    enabled: !!selections.partner && !isCreating,
-  });
+  const documentsQuery = useQuery(useChainedQuery(SLIDER_TYPES.DOCUMENT));
 
   return {
     isCreating,

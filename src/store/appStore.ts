@@ -3,19 +3,38 @@ import { create } from "zustand";
 import { type Session } from "next-auth";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
 import type { ExtendedUser } from "@/lib/auth/authOptions";
-import type { DocumentCreationMode, DocumentItem, Good } from "@/lib/types";
+import type {
+  DocumentCreationMode,
+  DocumentItem,
+  Good,
+  AccountNodeData,
+} from "@/lib/types";
 
 // --- (Interfaces are unchanged) ---
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];
+
 export type SliderVisibility = Record<SliderType, boolean>;
+
 export type AccordionState = Partial<Record<SliderType, boolean>>;
+
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
+
 interface AuthSlice {
   sessionStatus: SessionStatus;
   user: Partial<ExtendedUser>;
   effectiveRestrictedJournalId: string;
   isAdmin: boolean;
 }
+
+const CYCLE_STATES = {
+  UNSELECTED: "UNSELECTED",
+  CHILDREN_VISIBLE_ALL_SELECTED: "CHILDREN_VISIBLE_ALL_SELECTED",
+  CHILDREN_VISIBLE_NONE_SELECTED: "CHILDREN_VISIBLE_NONE_SELECTED",
+  CHILDREN_HIDDEN: "CHILDREN_HIDDEN",
+} as const;
+
+type JournalItemCycleState = (typeof CYCLE_STATES)[keyof typeof CYCLE_STATES];
+
 interface SelectionsSlice {
   journal: {
     topLevelId: string;
@@ -29,6 +48,7 @@ interface SelectionsSlice {
   project: string | null;
   document: string | null;
   gpgContextJournalId: string | null;
+  effectiveJournalIds: string[];
 }
 interface DocumentCreationSlice {
   isCreating: boolean;
@@ -88,6 +108,7 @@ const getInitialSelections = (
   project: null,
   document: null,
   gpgContextJournalId: null,
+  effectiveJournalIds: [],
 });
 
 const getInitialDocumentCreationState = (): DocumentCreationSlice => ({
@@ -312,8 +333,17 @@ export const useAppStore = create<AppState>()((set, get) => ({
         newSelections.journal.rootFilter = Array.from(newFilterSet);
         clearSubsequent = false;
       } else if (sliderType === "journal") {
-        newSelections.journal = { ...newSelections.journal, ...value };
+        // ✅ SIMPLIFIED LOGIC:
+        // The manager hook now does the calculation. The store just saves the result.
+        const { effectiveJournalIds, ...journalUpdates } = value;
+        newSelections.journal = { ...newSelections.journal, ...journalUpdates };
+
+        // If the manager provided the calculated IDs, use them.
+        if (effectiveJournalIds !== undefined) {
+          newSelections.effectiveJournalIds = effectiveJournalIds;
+        }
       } else {
+        // Handle all other sliders (unchanged)
         (newSelections[sliderType as keyof SelectionsSlice] as any) = value;
       }
 

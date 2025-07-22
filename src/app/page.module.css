@@ -180,3 +180,14 @@
 .finishDocumentButton:hover {
   background-color: #d68f63; /* Darker shade of --accent-warm, maybe var(--accent-warm-dark) */
 }
+
+.disabledControlText {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  margin-top: calc(var(--spacing-unit) * -0.5);
+  word-break: break-all;
+  min-height: 1rem;
+}

@@ -1,4 +1,4 @@
-// File: src/lib/helpers.ts
+// File: src / lib / helpers.ts;
 import { AccountNodeData, Journal } from "@/lib/types";
 
 import type { JournalForAdminSelection as BackendJournalForAdminSelection } from "@/app/services/journalService"; // Or from clientJournalService

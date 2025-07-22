@@ -1,30 +1,61 @@
-// src/features/journals/components/JournalHierarchySlider.tsx
+//src/features/journals/components/JournalHierarchySlider.tsx
 import React, { useMemo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+
 import "swiper/css";
 import "swiper/css/navigation";
 import styles from "./JournalHierarchySlider.module.css";
-import { findNodeById, findParentOfNode } from "@/lib/helpers";
+import { findParentOfNode } from "@/lib/helpers";
 import type {
   AccountNodeData,
   ActivePartnerFilters,
   PartnerGoodFilterStatus,
 } from "@/lib/types";
 
-// A designer-curated palette with better distinction and harmony.
 const pastelColors = [
-  "#FFB3BA", // Soft Coral Pink (Warm)
-  "#BAE1FF", // Baby Blue (Cool)
-  "#BFFCC6", // Mint Green (Cool)
-  "#FFFFBA", // Pastel Yellow (Warm/Neutral)
-  "#FFDAC1", // Peachy Pink (Warm)
-  "#D5AAFF", // Lavender Violet (Cool)
-  "#C2F0FC", // Icy Sky Blue (Cool)
-  "#FFD6FC", // Cotton Candy Pink (Warm/Cool)
-  "#B5EAD7", // Light Teal (Cool)
-  "#E6E6FA", // Lavender Mist (Neutral)
+  "#BFFCC6",
+  "#FFFFBA",
+  "#B5EAD7",
+  "#E6E6FA",
+  "#FFB3BA",
+  "#BAE1FF",
+  "#FFDAC1",
+  "#D5AAFF",
+  "#C2F0FC",
+  "#FFD6FC",
 ];
+
+// A premium, gentle easing curve for all primary animations.
+const gentleEase = { duration: 0.4, ease: [0.22, 1, 0.36, 1] };
+
+// Variants for a container that staggers its children's animations.
+const containerVariants: Variants = {
+  hidden: {
+    opacity: 0,
+    transition: {
+      when: "afterChildren",
+      staggerChildren: 0.03,
+      staggerDirection: -1,
+    },
+  },
+  visible: {
+    opacity: 1,
+    transition: {
+      when: "beforeChildren",
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+// Variants for individual items within a staggered container.
+const itemVariants: Variants = {
+  hidden: { y: 20, opacity: 0, transition: gentleEase },
+  visible: { y: 0, opacity: 1, transition: gentleEase },
+  // A slightly faster exit animation for individual items if needed.
+  exit: { opacity: 0, y: -20, transition: { duration: 0.2, ease: "easeIn" } },
+};
 
 interface JournalHierarchySliderProps {
   sliderId: string;
@@ -32,6 +63,8 @@ interface JournalHierarchySliderProps {
   fullHierarchyData: AccountNodeData[];
   selectedLevel2Ids: string[];
   selectedLevel3Ids: string[];
+  visibleChildrenMap: Record<string, boolean>;
+  effectiveJournalIds: string[];
   onL1ItemInteract: (id: string) => void;
   onL2ItemInteract: (id: string) => void;
   isLoading?: boolean;
@@ -45,6 +78,8 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   fullHierarchyData,
   selectedLevel2Ids,
   selectedLevel3Ids,
+  visibleChildrenMap,
+  effectiveJournalIds,
   onL1ItemInteract,
   onL2ItemInteract,
   isLoading,
@@ -65,19 +100,50 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     return map;
   }, [level2NodesForScroller]);
 
+  // This calculation now correctly determines if ANY L3 nodes are visible.
   const level3NodesForScroller = useMemo(() => {
-    const selectedL2IdSet = new Set(selectedLevel2Ids);
-    return level2NodesForScroller.flatMap((l1Node) => {
-      if (selectedL2IdSet.has(l1Node.id)) {
-        return (
+    return level2NodesForScroller.flatMap(
+      (l1Node) =>
+        (visibleChildrenMap[l1Node.id] &&
           l1Node.children?.filter(
             (child): child is AccountNodeData => !!child?.id
-          ) || []
-        );
-      }
-      return [];
-    });
-  }, [level2NodesForScroller, selectedLevel2Ids]);
+          )) ||
+        []
+    );
+  }, [level2NodesForScroller, visibleChildrenMap]);
+
+  const renderFilterInfo = () => {
+    const text =
+      effectiveJournalIds.length === 0
+        ? "none"
+        : activeFilters
+            .map((filter) => `${filter}[${effectiveJournalIds.join(",")}]`)
+            .join(" ");
+
+    const isNone = effectiveJournalIds.length === 0;
+
+    return (
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={text}
+          className={isNone ? styles.filterInfoNone : undefined}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.3, ease: "easeOut" },
+          }}
+          exit={{
+            opacity: 0,
+            y: 10,
+            transition: { duration: 0.15, ease: "easeIn" },
+          }}
+        >
+          {text}
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
 
   if (isLoading)
     return <div className={styles.noData}>Loading Journals...</div>;
@@ -85,39 +151,34 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   return (
     <>
       <div className={styles.headerFilterRow}>
-        <div className={styles.rootFilterControls}>
-          <button
-            className={
-              activeFilters.includes("affected") ? styles.activeFilter : ""
-            }
-            onClick={() => onToggleFilter("affected")}
-            disabled={isLocked}
-          >
-            Affected
-          </button>
-          <button
-            className={
-              activeFilters.includes("unaffected") ? styles.activeFilter : ""
-            }
-            onClick={() => onToggleFilter("unaffected")}
-            disabled={isLocked}
-          >
-            Unaffected
-          </button>
-          <button
-            className={
-              activeFilters.includes("inProcess") ? styles.activeFilter : ""
-            }
-            onClick={() => onToggleFilter("inProcess")}
-            disabled={isLocked}
-          >
-            In Process
-          </button>
-        </div>
+        <motion.div className={styles.rootFilterControls}>
+          {["affected", "unaffected", "inProcess"].map((filter) => (
+            <motion.button
+              key={filter}
+              className={
+                activeFilters.includes(filter as PartnerGoodFilterStatus)
+                  ? styles.activeFilter
+                  : ""
+              }
+              onClick={() => onToggleFilter(filter as PartnerGoodFilterStatus)}
+              disabled={isLocked}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+            >
+              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </motion.button>
+          ))}
+        </motion.div>
       </div>
 
       <h3 className={styles.level2ScrollerTitle}>1st Row</h3>
-      <div className={styles.level2ScrollerContainer}>
+      <motion.div
+        className={styles.level2ScrollerContainer}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <Swiper
           modules={[Navigation]}
           navigation={level2NodesForScroller.length > 5}
@@ -126,86 +187,123 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
           className={styles.levelScrollerSwiper}
           slidesPerGroupAuto
         >
-          {level2NodesForScroller.map((l1Node) => {
-            const isActive = selectedLevel2Ids.includes(l1Node.id);
-            const color = colorMap.get(l1Node.id);
-            // ✅ ADDED: Check if the node is terminal (has no children).
-            const isTerminal = !l1Node.children || l1Node.children.length === 0;
-
-            return (
-              <SwiperSlide
-                key={l1Node.id}
-                className={styles.level2ScrollerSlideNoOverflow}
-              >
-                <button
+          {level2NodesForScroller.map((l1Node) => (
+            <SwiperSlide
+              key={l1Node.id}
+              className={styles.level2ScrollerSlideNoOverflow}
+            >
+              <motion.div variants={itemVariants}>
+                <motion.button
                   onClick={() => onL1ItemInteract(l1Node.id)}
                   onContextMenu={(e) => e.preventDefault()}
-                  // ✅ MODIFIED: Conditionally add the 'terminalNode' class.
                   className={`${styles.level2Button} ${
-                    isActive ? styles.level2ButtonActive : ""
-                  } ${isActive && color ? styles.colored : ""} ${
-                    isTerminal ? styles.terminalNode : ""
+                    selectedLevel2Ids.includes(l1Node.id)
+                      ? styles.level2ButtonActive
+                      : ""
+                  } ${
+                    selectedLevel2Ids.includes(l1Node.id) &&
+                    colorMap.get(l1Node.id)
+                      ? styles.colored
+                      : ""
+                  } ${
+                    !l1Node.children || l1Node.children.length === 0
+                      ? styles.terminalNode
+                      : ""
                   }`}
-                  style={{ "--item-color": color } as React.CSSProperties}
+                  style={
+                    {
+                      "--item-color": colorMap.get(l1Node.id),
+                    } as React.CSSProperties
+                  }
                   title={`${l1Node.code} - ${l1Node.name}. Click to cycle, Dbl-click to drill.`}
                   disabled={isLocked}
+                  whileHover={{
+                    scale: 1.08,
+                    zIndex: 1,
+                    transition: { duration: 0.2, ease: "easeOut" },
+                  }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   {l1Node.code || "N/A"}
-                </button>
-              </SwiperSlide>
-            );
-          })}
+                </motion.button>
+              </motion.div>
+            </SwiperSlide>
+          ))}
         </Swiper>
-      </div>
+      </motion.div>
 
       <h3 className={styles.level2ScrollerTitle}>2nd Row</h3>
-      <div className={styles.level2ScrollerContainer}>
-        {level3NodesForScroller.length > 0 ? (
-          <Swiper
-            modules={[Navigation]}
-            navigation={level3NodesForScroller.length > 5}
-            slidesPerView="auto"
-            spaceBetween={8}
-            className={styles.levelScrollerSwiper}
-          >
-            {level3NodesForScroller.map((l2Node) => {
-              const isActive = selectedLevel3Ids.includes(l2Node.id);
-              const parent = findParentOfNode(l2Node.id, fullHierarchyData);
-              const color = parent ? colorMap.get(parent.id) : undefined;
-              // ✅ ADDED: Check if the node is terminal.
-              const isTerminal =
-                !l2Node.children || l2Node.children.length === 0;
-
-              return (
-                <SwiperSlide
-                  key={l2Node.id}
-                  className={styles.level2ScrollerSlideNoOverflow}
-                >
-                  <button
-                    onClick={() => onL2ItemInteract(l2Node.id)}
-                    onContextMenu={(e) => e.preventDefault()}
-                    // ✅ MODIFIED: Conditionally add the 'terminalNode' class.
-                    className={`${styles.level2Button} ${
-                      isActive ? styles.level2ButtonActive : ""
-                    } ${color ? styles.colored : ""} ${
-                      isTerminal ? styles.terminalNode : ""
-                    }`}
-                    style={{ "--item-color": color } as React.CSSProperties}
-                    title={`${l2Node.code} - ${l2Node.name}`}
-                    disabled={isLocked}
-                  >
-                    {l2Node.code || "N/A"}
-                  </button>
-                </SwiperSlide>
-              );
-            })}
-          </Swiper>
-        ) : (
-          <div className={styles.noDataSmall}>
-            Select from 1st Row to see children.
-          </div>
-        )}
+      <div className={styles.filterInfoRow}>
+        {activeFilters.length > 0 && renderFilterInfo()}
       </div>
+
+      <AnimatePresence mode="popLayout">
+        {level3NodesForScroller.length > 0 ? (
+          <motion.div
+            key="l3-scroller-present" // Stable key for the "data is present" state
+            className={styles.level2ScrollerContainer}
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden" // On exit, it animates to the "hidden" variant, staggering children out.
+          >
+            <Swiper
+              modules={[Navigation]}
+              navigation={level3NodesForScroller.length > 5}
+              slidesPerView="auto"
+              spaceBetween={8}
+              className={styles.levelScrollerSwiper}
+            >
+              {level3NodesForScroller.map((l2Node) => {
+                const parent = findParentOfNode(l2Node.id, fullHierarchyData);
+                const color = parent ? colorMap.get(parent.id) : undefined;
+                return (
+                  <SwiperSlide
+                    key={l2Node.id}
+                    className={styles.level2ScrollerSlideNoOverflow}
+                  >
+                    <motion.div variants={itemVariants}>
+                      <motion.button
+                        onClick={() => onL2ItemInteract(l2Node.id)}
+                        onContextMenu={(e) => e.preventDefault()}
+                        className={`${styles.level2Button} ${
+                          selectedLevel3Ids.includes(l2Node.id)
+                            ? styles.level2ButtonActive
+                            : ""
+                        } ${color ? styles.colored : ""} ${
+                          !l2Node.children || l2Node.children.length === 0
+                            ? styles.terminalNode
+                            : ""
+                        }`}
+                        style={{ "--item-color": color } as React.CSSProperties}
+                        title={`${l2Node.code} - ${l2Node.name}`}
+                        disabled={isLocked}
+                        whileHover={{
+                          scale: 1.08,
+                          zIndex: 1,
+                          transition: { duration: 0.2, ease: "easeOut" },
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        {l2Node.code || "N/A"}
+                      </motion.button>
+                    </motion.div>
+                  </SwiperSlide>
+                );
+              })}
+            </Swiper>
+          </motion.div>
+        ) : (
+          // This placeholder has its own simple animation and a stable key.
+          <motion.div
+            key="l3-placeholder"
+            className={styles.noDataSmall}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { delay: 0.2, duration: 0.3 } }}
+            exit={{ opacity: 0, transition: { duration: 0.2 } }}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 };

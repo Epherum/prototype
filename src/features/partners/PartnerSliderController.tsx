@@ -146,7 +146,7 @@ export const PartnerSliderController: React.FC<
       <DynamicSlider
         sliderId={SLIDER_TYPES.PARTNER}
         title="Partner"
-        data={(partnerManager.partnersForSlider || []).map((p: Partner) => ({
+        data={(partnerManager.partnersForSlider || []).map((p) => ({
           id: String(p.id),
           label: p.name,
           code: p.registrationNumber,

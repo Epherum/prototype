@@ -1,4 +1,3 @@
-// src/features/shared/components/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import { IoFilterCircleOutline, IoCloseCircleOutline } from "react-icons/io5";
@@ -8,6 +7,17 @@ import styles from "./DynamicSlider.module.css";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
+
+// Define animation variants for the slider content area.
+const sliderContentVariants = {
+  hidden: { opacity: 0, y: 15 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  },
+  exit: { opacity: 0, y: -15, transition: { duration: 0.25, ease: "easeIn" } },
+};
 
 interface DynamicSliderItem {
   id: string;
@@ -70,8 +80,6 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   );
 
   const handleSwiperChange = (swiper: any) => {
-    // This logic is already correct. In multi-select mode, swiping changes the
-    // view but does NOT call onSlideChange, which is the desired behavior.
     if (isLocked || isMultiSelect) return;
     const currentRealIndex = swiper.activeIndex;
     if (data?.[currentRealIndex]) {
@@ -117,74 +125,114 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
         </div>
       )}
 
-      {isLoading && (
-        <div className={styles.loadingState}>Loading {title}...</div>
-      )}
-      {isError && (
-        <div className={styles.errorState}>Error loading {title}.</div>
-      )}
-      {!isLoading && !isError && data.length === 0 && (
-        <div className={styles.noData}>
-          {placeholderMessage || `No ${title.toLowerCase()} match criteria.`}
-        </div>
-      )}
-      {!isLoading && isLocked && !isMultiSelect && (
-        <div className={styles.lockedState}>
-          {title} is locked for document creation.
-        </div>
-      )}
-      {!isLoading && !isError && data.length > 0 && (
-        <Swiper
-          key={swiperKey}
-          modules={[Navigation, Pagination]}
-          initialSlide={initialSlideIndex}
-          loop={false}
-          spaceBetween={20}
-          slidesPerView={1}
-          navigation={data.length > 1 && !isLocked}
-          pagination={
-            data.length > 1 && !isLocked ? { clickable: true } : false
-          }
-          onSlideChangeTransitionEnd={handleSwiperChange}
-          observer={true}
-          observeParents={true}
-          className={`${styles.swiperInstance} ${
-            isLocked ? styles.swiperLocked : ""
-          } ${isMultiSelect ? styles.swiperMultiSelect : ""}`}
-          allowTouchMove={!isLocked}
-        >
-          {data.map((item) => {
-            if (!item) return null;
-            const isSelectedForDoc = isItemSelected
-              ? isItemSelected(item)
-              : false;
-
-            return (
-              <SwiperSlide
-                key={item.id}
-                className={`${styles.slide} ${
-                  isSelectedForDoc ? styles.slideSelectedForDocument : ""
-                }`}
-                onClick={() => onItemClick && onItemClick(item.id)}
-              >
-                <div className={styles.slideTextContent}>
-                  <span className={styles.slideName}>
-                    {item.label || "Unnamed Item"}
-                  </span>
-                  {(item.code || item.unit_code) && (
-                    <span className={styles.slideSubText}>
-                      {item.code || item.unit_code}
-                    </span>
-                  )}
+      <div className={styles.contentWrapper}>
+        <AnimatePresence mode="wait" initial={false}>
+          {isLoading ? (
+            <motion.div
+              key="loading"
+              className={styles.stateOverlay}
+              variants={sliderContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              Loading {title}...
+            </motion.div>
+          ) : isError ? (
+            <motion.div
+              key="error"
+              className={`${styles.stateOverlay} ${styles.errorState}`}
+              variants={sliderContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              Error loading {title}.
+            </motion.div>
+          ) : data.length === 0 ? (
+            <motion.div
+              key="no-data"
+              className={styles.stateOverlay}
+              variants={sliderContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {placeholderMessage ||
+                `No ${title.toLowerCase()} match criteria.`}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="data"
+              variants={sliderContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              {!isLocked && isMultiSelect && (
+                <div className={styles.lockedState}>
+                  Select items to include in the document.
                 </div>
-                {isSelectedForDoc && (
-                  <div className={styles.selectedIndicator}>✓</div>
-                )}
-              </SwiperSlide>
-            );
-          })}
-        </Swiper>
-      )}
+              )}
+              {isLocked && !isMultiSelect && (
+                <div className={styles.lockedState}>
+                  {title} is locked for document creation.
+                </div>
+              )}
+              <Swiper
+                key={swiperKey}
+                modules={[Navigation, Pagination]}
+                initialSlide={initialSlideIndex}
+                loop={false}
+                spaceBetween={20}
+                slidesPerView={1}
+                navigation={data.length > 1 && !isLocked}
+                pagination={
+                  data.length > 1 && !isLocked ? { clickable: true } : false
+                }
+                onSlideChangeTransitionEnd={handleSwiperChange}
+                observer={true}
+                observeParents={true}
+                className={`${styles.swiperInstance} ${
+                  isLocked ? styles.swiperLocked : ""
+                } ${isMultiSelect ? styles.swiperMultiSelect : ""}`}
+                allowTouchMove={!isLocked}
+              >
+                {data.map((item) => {
+                  if (!item) return null;
+                  const isSelectedForDoc = isItemSelected
+                    ? isItemSelected(item)
+                    : false;
+
+                  return (
+                    <SwiperSlide
+                      key={item.id}
+                      className={`${styles.slide} ${
+                        isSelectedForDoc ? styles.slideSelectedForDocument : ""
+                      }`}
+                      onClick={() => onItemClick && onItemClick(item.id)}
+                    >
+                      <div className={styles.slideTextContent}>
+                        <span className={styles.slideName}>
+                          {item.label || "Unnamed Item"}
+                        </span>
+                        {(item.code || item.unit_code) && (
+                          <span className={styles.slideSubText}>
+                            {item.code || item.unit_code}
+                          </span>
+                        )}
+                      </div>
+                      {isSelectedForDoc && (
+                        <div className={styles.selectedIndicator}>✓</div>
+                      )}
+                    </SwiperSlide>
+                  );
+                })}
+              </Swiper>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {!isLoading &&
         !isError &&
@@ -216,7 +264,10 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                     open: { opacity: 1, height: "auto", marginTop: "8px" },
                     collapsed: { opacity: 0, height: 0, marginTop: "0px" },
                   }}
-                  transition={{ duration: 0.3, ease: [0.04, 0.62, 0.23, 0.98] }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.04, 0.62, 0.23, 0.98],
+                  }}
                   className={styles.detailsContentWrapper}
                 >
                   <div className={styles.detailsContent}>

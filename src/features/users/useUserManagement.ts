@@ -63,7 +63,7 @@ export function useUserManagement(
   // Fetch the FULL journal hierarchy from the base manager
   const {
     hierarchyData: fullJournalHierarchy,
-    isHierarchyLoading: isLoadingJournals,
+    isJournalDataLoading: isLoadingJournals,
   } = useJournalManager();
 
   const [formState, setFormState] =

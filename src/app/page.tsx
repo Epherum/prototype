@@ -19,6 +19,7 @@ import {
   UsersController,
   type UsersControllerRef,
 } from "@/features/users/UsersController";
+import { SliderLayoutManager } from "@/components/layout/SliderLayoutManager";
 import { ProjectSliderController } from "@/features/projects/ProjectSliderController";
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
 import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
@@ -77,9 +78,7 @@ export default function Home() {
   // ✅ NEW: Logic to determine if document creation should be enabled.
   // This adheres to the new rule: creation is enabled only when a single, terminal journal is selected.
   const isCreationEnabled = useMemo(() => {
-    // The useJournalManager hook already provides the necessary derived state:
-    // - `selectedJournalId` is non-null only if there's a single selection.
-    // - `isTerminal` is true only if that single selection has no children.
+    // The useJournalManager hook now provides isTerminal:
     return (
       journalManager.isTerminal && journalManager.selectedJournalId !== null
     );
@@ -107,118 +106,11 @@ export default function Home() {
         visibleSliderOrder={visibleSliderOrder}
         sliderConfigs={sliderConfigs}
       />
-      <LayoutGroup id="main-sliders-layout-group">
-        <div
-          className={`${styles.slidersArea} ${
-            isCreating ? styles.slidersAreaWithToolbar : ""
-          }`}
-        >
-          <AnimatePresence initial={false}>
-            {sliderOrder.map((sliderId) => {
-              if (!visibility[sliderId]) return null;
-              const currentVisibleIndex = visibleSliderOrder.indexOf(sliderId);
-              const layoutControlProps = {
-                canMoveUp: currentVisibleIndex > 0,
-                canMoveDown:
-                  currentVisibleIndex < visibleSliderOrder.length - 1,
-                onMoveUp: () => moveSlider(sliderId, "up"),
-                onMoveDown: () => moveSlider(sliderId, "down"),
-                isMoveDisabled: isCreating,
-              };
-
-              return (
-                <motion.div
-                  key={sliderId}
-                  layoutId={sliderId}
-                  layout
-                  style={{ order: currentVisibleIndex }}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{
-                    duration: 0.3,
-                    layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] },
-                  }}
-                  className={styles.sliderWrapper}
-                >
-                  {sliderId === SLIDER_TYPES.JOURNAL && (
-                    <JournalSliderController
-                      ref={journalControllerRef}
-                      {...layoutControlProps}
-                    />
-                  )}
-
-                  {sliderId === SLIDER_TYPES.PARTNER && (
-                    <PartnerSliderController
-                      {...layoutControlProps}
-                      onOpenJournalSelector={openJournalSelectorForLinking}
-                      fullJournalHierarchy={journalManager.hierarchyData}
-                      isLocked={
-                        isCreating &&
-                        (mode === "LOCK_PARTNER" || mode === "SINGLE_ITEM")
-                      }
-                      isMultiSelect={
-                        isCreating &&
-                        (mode === "INTERSECT_FROM_GOOD" ||
-                          mode === "INTERSECT_FROM_PARTNER" ||
-                          mode === "LOCK_GOOD")
-                      }
-                      selectedPartnerIdsForDoc={lockedPartnerIds}
-                      onTogglePartnerForDoc={(id) =>
-                        toggleEntityForDocument("partner", id)
-                      }
-                    />
-                  )}
-
-                  {sliderId === SLIDER_TYPES.GOODS && (
-                    <GoodsSliderController
-                      {...layoutControlProps}
-                      onOpenJournalSelectorForLinking={
-                        openJournalSelectorForLinking
-                      }
-                      onOpenJournalSelectorForGPGContext={
-                        openJournalSelectorForGPGContext
-                      }
-                      fullJournalHierarchy={journalManager.hierarchyData}
-                      onOpenLinkGoodToPartnersModal={jpqlLinking.openLinkModal}
-                      onOpenUnlinkGoodFromPartnersModal={
-                        jpqlLinking.openUnlinkModal
-                      }
-                      isLocked={
-                        isCreating &&
-                        (mode === "LOCK_GOOD" || mode === "SINGLE_ITEM")
-                      }
-                      isMultiSelect={
-                        isCreating &&
-                        (mode === "LOCK_PARTNER" ||
-                          mode === "INTERSECT_FROM_PARTNER" ||
-                          mode === "INTERSECT_FROM_GOOD")
-                      }
-                      selectedGoodIdsForDoc={lockedGoodIds}
-                      onToggleGoodForDoc={(id) =>
-                        toggleEntityForDocument("good", id)
-                      }
-                    />
-                  )}
-
-                  {sliderId === SLIDER_TYPES.PROJECT && (
-                    <ProjectSliderController {...layoutControlProps} />
-                  )}
-
-                  {sliderId === SLIDER_TYPES.DOCUMENT && (
-                    <DocumentController
-                      manager={docManager}
-                      {...layoutControlProps}
-                      // ✅ PASS THE NEW PROP: The DocumentController will now know when to show its create button.
-                      isCreationEnabled={isCreationEnabled}
-                    />
-                  )}
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      </LayoutGroup>
+      <SliderLayoutManager
+        ref={journalControllerRef}
+        onOpenJournalSelectorForLinking={openJournalSelectorForLinking}
+        onOpenJournalSelectorForGPGContext={openJournalSelectorForGPGContext}
+      />
 
       {/* --- Other Modals --- */}
       <AnimatePresence>

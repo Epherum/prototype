@@ -1,15 +1,12 @@
-//src/features/journals/JournalSliderController.tsx
+// src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
   useState,
-  useCallback,
   useMemo,
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { journalKeys } from "@/lib/queryKeys";
 import { IoOptionsOutline } from "react-icons/io5";
 import styles from "@/app/page.module.css";
 
@@ -17,13 +14,8 @@ import styles from "@/app/page.module.css";
 import { useAppStore } from "@/store/appStore";
 import { useJournalManager } from "./useJournalManager";
 
-// Services & Libs
-import {
-  fetchJournalsLinkedToGood,
-  fetchJournalsLinkedToPartner,
-} from "@/services/clientJournalService";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
-import { findNodeById, findParentOfNode } from "@/lib/helpers";
+import { findNodeById } from "@/lib/helpers";
 
 // UI Components
 import JournalHierarchySlider from "@/features/journals/components/JournalHierarchySlider";
@@ -32,11 +24,7 @@ import JournalModal from "@/features/journals/components/JournalModal";
 import AddJournalModal from "@/features/journals/components/AddJournalModal";
 
 // Types
-import type {
-  AccountNodeData,
-  Journal,
-  PartnerGoodFilterStatus,
-} from "@/lib/types";
+import type { AccountNodeData, PartnerGoodFilterStatus } from "@/lib/types";
 
 export interface JournalSliderControllerRef {
   openJournalSelector: (cb: (node: AccountNodeData) => void) => void;
@@ -57,13 +45,6 @@ export const JournalSliderController = forwardRef<
 >(({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, isMoveDisabled }, ref) => {
   const journalManager = useJournalManager();
   const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
-  const restrictedJournalId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalId
-  );
-  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
-  const selectedPartnerId = useAppStore((state) => state.selections.partner);
-  const selectedGoodsId = useAppStore((state) => state.selections.goods);
-  const setSelection = useAppStore((state) => state.setSelection);
 
   const [isLinkingModalOpen, setIsLinkingModalOpen] = useState(false);
   const [onSelectForLinkingCallback, setOnSelectForLinkingCallback] = useState<
@@ -72,15 +53,16 @@ export const JournalSliderController = forwardRef<
   const [isGpgContextModalOpen, setIsGpgContextModalOpen] = useState(false);
 
   const topLevelContextNode = useMemo(() => {
+    // This logic is purely presentational and correctly remains here
     if (
       !journalManager.isJournalSliderPrimary ||
       !journalManager.selectedTopLevelId
-    )
+    ) {
       return null;
-    const isAtRoot =
-      journalManager.selectedTopLevelId ===
-      (restrictedJournalId || ROOT_JOURNAL_ID);
-    if (isAtRoot) return null; // Don't show top button in Admin View
+    }
+    if (journalManager.selectedTopLevelId === ROOT_JOURNAL_ID) {
+      return { id: ROOT_JOURNAL_ID, code: "ROOT", name: "All Accounts" };
+    }
     return findNodeById(
       journalManager.hierarchyData,
       journalManager.selectedTopLevelId
@@ -89,7 +71,6 @@ export const JournalSliderController = forwardRef<
     journalManager.isJournalSliderPrimary,
     journalManager.selectedTopLevelId,
     journalManager.hierarchyData,
-    restrictedJournalId,
   ]);
 
   useImperativeHandle(ref, () => ({
@@ -100,23 +81,8 @@ export const JournalSliderController = forwardRef<
     openJournalSelectorForGPG: () => setIsGpgContextModalOpen(true),
   }));
 
-  const flatJournalsByPartnerQuery = useQuery<Journal[], Error>({
-    queryKey: journalKeys.flatListByPartner(selectedPartnerId),
-    queryFn: () => fetchJournalsLinkedToPartner(selectedPartnerId!),
-    enabled:
-      sliderOrder.indexOf(SLIDER_TYPES.PARTNER) <
-        sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) && !!selectedPartnerId,
-  });
-  const flatJournalsByGoodQuery = useQuery<Journal[], Error>({
-    queryKey: journalKeys.flatListByGood(selectedGoodsId),
-    queryFn: () => fetchJournalsLinkedToGood(selectedGoodsId!),
-    enabled:
-      sliderOrder.indexOf(SLIDER_TYPES.GOODS) <
-        sliderOrder.indexOf(SLIDER_TYPES.JOURNAL) && !!selectedGoodsId,
-  });
-
   const renderSlider = () => {
-    if (journalManager.isJournalSliderPrimary) {
+    if (journalManager.isHierarchyMode) {
       return (
         <JournalHierarchySlider
           isLocked={isCreating}
@@ -125,59 +91,39 @@ export const JournalSliderController = forwardRef<
           fullHierarchyData={journalManager.hierarchyData}
           selectedLevel2Ids={journalManager.selectedLevel2Ids}
           selectedLevel3Ids={journalManager.selectedLevel3Ids}
-          // ✅ PASS THE CORRECTED HANDLERS
+          visibleChildrenMap={journalManager.visibleChildrenMap}
           onL1ItemInteract={journalManager.handleL1Interaction}
           onL2ItemInteract={journalManager.handleL2Interaction}
-          isLoading={journalManager.isHierarchyLoading}
+          // Use the unified loading state from the manager
+          isLoading={journalManager.isJournalDataLoading}
           onToggleFilter={journalManager.handleToggleJournalRootFilter}
           activeFilters={
             journalManager.activeJournalRootFilters as PartnerGoodFilterStatus[]
           }
+          effectiveJournalIds={journalManager.effectiveSelectedJournalIds}
         />
       );
     }
-    // ... (rest of the rendering logic is unchanged)
-    let queryToUse = null;
-    if (
-      sliderOrder.indexOf(SLIDER_TYPES.PARTNER) <
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL)
-    )
-      queryToUse = flatJournalsByPartnerQuery;
-    else if (
-      sliderOrder.indexOf(SLIDER_TYPES.GOODS) <
-      sliderOrder.indexOf(SLIDER_TYPES.JOURNAL)
-    )
-      queryToUse = flatJournalsByGoodQuery;
-    if (queryToUse)
-      return (
-        <DynamicSlider
-          isLocked={isCreating}
-          sliderId={SLIDER_TYPES.JOURNAL}
-          title="Journal (Filtered)"
-          data={(queryToUse.data || []).map((j) => ({
-            id: String(j.id),
-            name: j.name,
-            code: String(j.id),
-          }))}
-          isLoading={queryToUse.isLoading}
-          isError={queryToUse.isError}
-          error={queryToUse.error}
-          activeItemId={journalManager.selectedFlatJournalId}
-          onSlideChange={journalManager.setSelectedFlatJournalId}
-          isAccordionOpen={false}
-          onToggleAccordion={() => {}}
-        />
-      );
+
+    // If it's not in hierarchy mode, it must be a flat list.
     return (
       <DynamicSlider
-        isLocked={false}
+        isLocked={isCreating}
         sliderId={SLIDER_TYPES.JOURNAL}
-        title="Journal"
-        data={[]}
-        isLoading={false}
-        placeholderMessage="Context determined by preceding slider."
-        activeItemId={null}
-        onSlideChange={() => {}}
+        title="Journal (Filtered)"
+        // Use the flat list data from the manager
+        data={(journalManager.flatJournalData || []).map((j) => ({
+          id: String(j.id),
+          name: j.name,
+          code: String(j.id),
+          label: j.name, // Added label property to fix type error
+        }))}
+        // Use the unified loading and error states from the manager
+        isLoading={journalManager.isJournalDataLoading}
+        isError={journalManager.isJournalDataError}
+        error={journalManager.journalDataError}
+        activeItemId={journalManager.selectedFlatJournalId}
+        onSlideChange={journalManager.setSelectedFlatJournalId}
         isAccordionOpen={false}
         onToggleAccordion={() => {}}
       />
@@ -201,8 +147,6 @@ export const JournalSliderController = forwardRef<
               className={`${styles.journalParentInfo} ${
                 isCreating ? styles.locked : ""
               }`}
-              // ✅ FIX: Use the single, unified click handler.
-              // This now correctly handles both single and double clicks.
               onClick={journalManager.handleTopButtonClick}
               title={`${topLevelContextNode.code} - ${topLevelContextNode.name}. Single-click to cycle selections. Double-click to navigate up.`}
             >
@@ -211,6 +155,7 @@ export const JournalSliderController = forwardRef<
           )}
         </div>
         <div className={styles.moveButtonGroup}>
+          {/* Movement controls are unchanged */}
           {canMoveUp && (
             <button
               onClick={onMoveUp}
@@ -232,7 +177,7 @@ export const JournalSliderController = forwardRef<
         </div>
       </div>
       {renderSlider()}
-      {/* Modals are unchanged */}
+      {/* All modal logic below this is purely presentational and remains unchanged */}
       <AddJournalModal
         isOpen={journalManager.isAddJournalModalOpen}
         onClose={journalManager.closeAddJournalModal}
@@ -275,8 +220,9 @@ export const JournalSliderController = forwardRef<
               }
             : undefined
         }
+        // This logic needs to use the new loading state from the manager
         hierarchy={
-          journalManager.isHierarchyLoading
+          journalManager.isJournalDataLoading
             ? []
             : [
                 {
@@ -288,7 +234,7 @@ export const JournalSliderController = forwardRef<
                 },
               ]
         }
-        isLoading={journalManager.isHierarchyLoading}
+        isLoading={journalManager.isJournalDataLoading}
         onTriggerAddChild={(parentId, parentCode) => {
           const pNode = findNodeById(journalManager.hierarchyData, parentId);
           journalManager.openAddJournalModal({

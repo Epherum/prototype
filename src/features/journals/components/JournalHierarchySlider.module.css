@@ -136,15 +136,52 @@
   font-weight: 600;
 }
 
-/* ✅ --- ADDED STYLES FOR TERMINAL NODES --- */
-/* Apply a red outline to any button marked as a terminal node. */
-/* The outline is drawn outside the border and won't affect layout. */
-.terminalNode {
-  outline: 1px solid #ef4444; /* A clear, strong red */
-  outline-offset: 1px; /* A small gap between the button and the outline */
+/* ✅ --- ADDED STYLE FOR THE NEW FILTER INFO ROW --- */
+.filterInfoRow {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: monospace;
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  margin-top: calc(var(--spacing-unit) * -0.5);
+  word-break: break-all;
+  min-height: 1rem;
 }
 
-/* Ensure the outline remains on hover for consistency. */
-.terminalNode:hover {
-  outline-color: #f87171; /* A slightly lighter red on hover */
+.level2Button.colored.level2ButtonActive,
+.level2Button.colored.level2ButtonActive:hover {
+  background-color: var(--item-color);
+  border-color: var(--item-color);
+  color: #333; /* A dark color for better contrast on pastel backgrounds */
+  font-weight: 600;
+}
+
+/* ✅ --- REFINED STYLES FOR TERMINAL NODES --- */
+/* A dotted border is more subtle and thematic than a harsh outline. */
+.terminalNode {
+  border-style: dotted;
+  border-width: 2px; /* Make it a bit thicker to stand out */
+}
+
+/* When a terminal node is active, we keep the dotted style but use its active color. */
+.terminalNode.level2ButtonActive {
+  border-color: var(--accent-warm);
+}
+
+.terminalNode.colored.level2ButtonActive {
+  border-color: #333; /* Use the dark text color for the border on colored active items */
+}
+
+.filterInfoNone {
+  font-style: italic;
+  opacity: 0.7;
+  font-family: var(--font-sans); /* Use a standard font instead of monospace */
+}
+
+.noDataSmall {
+  width: 100%;
+  height: 65px; /* Roughly the height of a scroller row */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

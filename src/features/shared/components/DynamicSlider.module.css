@@ -1,4 +1,4 @@
-/* src/components/sliders/DynamicSlider.module.css */
+/* src/features/shared/components/DynamicSlider.module.css */
 
 .sliderTitle {
   margin-top: 0;
@@ -20,13 +20,13 @@
   padding-right: 45px;
   position: relative;
   margin-bottom: var(--spacing-unit);
-  min-height: 100px; /* Default, can be overridden for specific sliders if needed */
+  min-height: 150px; /* ✅ FIXED: Ensure this matches the slide's min-height */
   box-sizing: border-box;
 }
 
 .swiperInstance .swiper-button-next,
 .swiperInstance .swiper-button-prev {
-  background-color: rgba(147, 24, 24, 0.85);
+  background-color: var(--accent-slider);
   border-radius: 50%;
   width: 38px;
   height: 38px;
@@ -46,7 +46,7 @@
 }
 .swiperInstance .swiper-button-next:hover,
 .swiperInstance .swiper-button-prev:hover {
-  background-color: rgba(255, 255, 255, 1);
+  background-color: var(--accent-warm-light);
   box-shadow: 0 4px 10px rgba(100, 80, 70, 0.22);
 }
 .swiperInstance .swiper-button-disabled {
@@ -87,19 +87,18 @@
   display: none !important;
 }
 .swiperLocked .slide {
-  /* Applies to slide within a locked swiper */
   cursor: default !important;
   opacity: 0.7;
 }
 
 /* SLIDE CONTENT */
 .slide {
-  background-color: var(--accent-slider); /* Uses your global variable */
+  background-color: var(--accent-slider);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 150px; /* Default for dynamic slider, Journal may vary */
+  min-height: 150px;
   height: 100%;
   border-radius: var(--border-radius-md);
   padding: calc(var(--spacing-unit) * 1.5) var(--spacing-unit);
@@ -107,7 +106,7 @@
   cursor: grab;
   overflow: hidden;
   text-align: center;
-  position: relative; /* For selectedGoodIndicator */
+  position: relative;
 }
 
 .slideTextContent {
@@ -117,19 +116,6 @@
   gap: calc(var(--spacing-unit) * 0.5);
   width: 100%;
   box-sizing: border-box;
-}
-
-.slideTextContentWithIcon {
-  flex-direction: row;
-  justify-content: center;
-  text-align: left;
-}
-
-.slideIcon {
-  flex-shrink: 0;
-  font-size: 1.4em;
-  color: var(--accent-warm);
-  margin-right: calc(var(--spacing-unit) * 0.75);
 }
 
 .slideName {
@@ -144,7 +130,7 @@
   color: var(--text-secondary);
 }
 
-/* GOODS SLIDER - Document Creation Mode Specifics */
+/* Document Creation Mode Specifics */
 .slideSelectedForDocument {
   border: 3px solid var(--accent-warm) !important;
   box-shadow: 0 0 10px rgba(232, 159, 113, 0.7);
@@ -163,17 +149,22 @@
   pointer-events: none;
 }
 
-.selectedGoodIndicator {
+.selectedIndicator {
   position: absolute;
   top: 8px;
   right: 8px;
   background-color: var(--accent-warm);
   color: white;
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  font-size: 0.75em;
-  border-radius: var(--border-radius-sm);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1em;
   font-weight: bold;
   z-index: 5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* ACCORDION */
@@ -230,219 +221,121 @@
   margin-right: 4px;
 }
 
-/* Document Good Details in Accordion (Goods Slider) */
-.documentGoodDetails {
-  margin-top: calc(var(--spacing-unit) * 1.5);
-  padding-top: calc(var(--spacing-unit) * 1.5);
-  border-top: 1px solid var(--border-subtle);
-}
-.documentGoodDetails h4 {
-  margin-top: 0;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
-  font-size: 1em;
-  color: var(--text-primary);
-  text-align: center;
-}
-.documentGoodDetails .formGroup {
-  margin-bottom: calc(var(--spacing-unit) * 1.25);
+/* GPG Filtering Controls */
+.gpgFilterButton {
   display: flex;
-  flex-direction: row;
   align-items: center;
-  justify-content: space-between;
-}
-.documentGoodDetails .formGroup label {
-  font-size: 0.9em;
-  color: var(--text-secondary);
-  flex-basis: 40%;
-  margin-right: var(--spacing-unit);
-}
-.formInputSmall {
-  /* Reusable class for small inputs in accordion */
-  font-size: 0.95em;
-  padding: calc(var(--spacing-unit) * 0.75);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--border-radius-sm);
-  width: auto;
-  flex-grow: 1;
-  max-width: 150px;
-}
-/* .documentGoodDetails .formInputSmall {
-  /* Specific application if needed */
-
-.addButton, /* General add button style */
-.removeButton {
-  /* General remove button style */
+  gap: var(--spacing-unit);
   width: 100%;
-  margin-top: var(--spacing-unit);
-  margin-bottom: var(--spacing-unit);
-  justify-content: center;
-  font-size: 0.9em;
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-  /* These will become specific to their usage context, e.g. in .modalActionButton */
-  /* Or, if always used in .documentGoodDetails, they can be scoped here */
-  display: inline-flex; /* from .modalActionButton */
-  align-items: center; /* from .modalActionButton */
-  gap: calc(var(--spacing-unit) * 0.75); /* from .modalActionButton */
-  border-radius: var(--border-radius-md); /* from .modalActionButton */
-  cursor: pointer; /* from .modalActionButton */
-  border: none; /* from .modalActionButton */
-  transition: background-color 0.2s ease, opacity 0.2s ease; /* from .modalActionButton */
-}
-.addButton svg,
-.removeButton svg {
-  /* from .modalActionButton svg */
-  font-size: 1.2em;
-}
-
-.documentGoodDetails .addButton {
-  /* Scoped to accordion */
-  background-color: #28a745; /* Green */
-  color: white;
-}
-.documentGoodDetails .addButton:hover {
-  background-color: #218838;
-}
-.documentGoodDetails .removeButton {
-  /* Scoped to accordion */
-  background-color: #dc3545; /* Red */
-  color: white;
-}
-.documentGoodDetails .removeButton:hover {
-  background-color: #c82333;
-}
-
-.gpgFilterButton {
-  background-color: #4a90e2; /* A distinct color */
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  margin-bottom: 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.9em;
-  transition: background-color 0.2s ease;
-}
-
-.gpgFilterButton:hover {
-  background-color: #357abd;
-}
-
-.gpgContextDisplay {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px;
-  background-color: #f0f4f8; /* Light background for the display */
-  border-radius: 4px;
-  margin-bottom: 10px;
-  font-size: 0.9em;
-}
-
-.gpgContextDisplay span strong {
-  color: #333;
-}
-
-.gpgClearButton {
-  background: none;
-  border: none;
-  color: #d9534f; /* A "danger" or "remove" color */
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px; /* Small padding */
-}
-
-.gpgClearButton:hover {
-  color: #c9302c;
-  text-decoration: underline;
-}
-
-.gpgFilterButton {
-  display: flex; /* Already good */
-  align-items: center; /* Already good */
-  gap: var(--spacing-unit); /* Use variable */
-  width: 100%; /* Make it full width for better presence below title */
   justify-content: center;
   padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Consistent spacing */
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
   font-size: 0.9em;
-  font-weight: 500; /* Give it a bit of emphasis */
-  color: var(--accent-warm); /* Use warm accent for text */
-  background-color: var(--bg-card); /* Use card background */
-  border: 1px solid var(--accent-warm-light); /* Subtle warm border */
-  border-radius: var(--border-radius-sm); /* Consistent radius */
+  font-weight: 500;
+  color: var(--accent-warm);
+  background-color: var(--bg-card);
+  border: 1px solid var(--accent-warm-light);
+  border-radius: var(--border-radius-sm);
   cursor: pointer;
   transition: background-color 0.2s ease, border-color 0.2s ease,
     color 0.2s ease;
-  box-shadow: 0 2px 4px var(--shadow-color); /* Subtle shadow */
+  box-shadow: 0 2px 4px var(--shadow-color);
 }
-
 .gpgFilterButton:hover {
-  background-color: var(--accent-slider); /* Lighter warm accent on hover */
-  border-color: var(--accent-warm); /* Stronger border on hover */
-  color: var(--text-primary); /* Darker text on hover */
+  background-color: var(--accent-slider);
+  border-color: var(--accent-warm);
+  color: var(--text-primary);
 }
-
 .gpgFilterButton svg {
-  /* Style for the icon inside the button */
-  font-size: 1.2em; /* Make icon slightly larger */
-  /* color will inherit from button's color */
+  font-size: 1.2em;
 }
 
 .gpgContextDisplay {
-  display: flex; /* Already good */
-  justify-content: space-between; /* Already good */
-  align-items: center; /* Already good */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
-  background-color: var(
-    --accent-slider
-  ); /* Use a light warm accent for the display */
-  border: 1px solid var(--accent-warm-light); /* Subtle border */
-  border-radius: var(--border-radius-sm); /* Consistent radius */
-  margin-bottom: calc(var(--spacing-unit) * 1.5); /* Consistent spacing */
-  font-size: 0.85em; /* Slightly smaller than the button */
-  color: var(--text-secondary); /* Secondary text for general info */
+  background-color: var(--accent-slider);
+  border: 1px solid var(--accent-warm-light);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  font-size: 0.85em;
+  color: var(--text-secondary);
 }
-
 .gpgContextDisplay span strong {
-  color: var(--text-primary); /* Primary text for the journal name */
-  font-weight: 600; /* Make it stand out */
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .gpgClearButton {
-  display: flex; /* Already good */
-  align-items: center; /* Already good */
-  gap: calc(var(--spacing-unit) * 0.5); /* Use variable */
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
   background: none;
   border: none;
-  color: var(
-    --accent-warm
-  ); /* Use warm accent, can be made more "danger" like if needed */
+  color: var(--accent-warm);
   cursor: pointer;
   padding: calc(var(--spacing-unit) * 0.5);
-  margin-left: var(--spacing-unit); /* Add some space from the text */
-  font-size: 0.9em; /* Match text size */
+  margin-left: var(--spacing-unit);
+  font-size: 0.9em;
   font-weight: 500;
-  border-radius: var(
-    --border-radius-pill
-  ); /* Make it a small pill / circle for icon */
+  border-radius: var(--border-radius-pill);
   transition: color 0.2s ease, background-color 0.2s ease;
 }
 .gpgClearButton:hover {
   color: var(--text-primary);
-  background-color: var(--accent-warm-light); /* Subtle hover background */
+  background-color: var(--accent-warm-light);
 }
 .gpgClearButton svg {
-  font-size: 1.1em; /* Adjust icon size if needed */
+  font-size: 1.1em;
 }
 
-/* Ensure the noData message has some top margin if GPG controls are present */
-.noData {
-  /* (your existing .noData styles) */
-  /* Add this if it's not already spaced well after the GPG controls */
-  margin-top: calc(var(--spacing-unit) * 1.5);
+/* --- ANIMATION STYLES --- */
+
+.contentWrapper {
+  position: relative;
+  min-height: 150px; /* Must match the .slide min-height to prevent layout shifts */
+  width: 100%;
+  /* ✅ REMOVED flex properties from here to prevent collapsing the data container */
+}
+
+/* Container for the actual Swiper, ensures it takes full width */
+.dataContainer {
+  width: 100%;
+}
+
+.stateOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  background-color: var(--bg-card);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-unit);
+  box-sizing: border-box;
+  /* ✅ ADDED flex properties here to center the text content */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.errorState {
+  color: var(--accent-danger);
+  border-color: var(--accent-danger-light);
+}
+
+.lockedState {
+  text-align: center;
+  padding: var(--spacing-unit);
+  font-style: italic;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-unit);
 }
