@@ -8,15 +8,20 @@
 }
 
 .optionsMenu {
-  /* --- THIS IS THE KEY FIX --- */
-  position: fixed; /* Changed from absolute to fixed */
+  /* --- FIX: CHANGE POSITION BACK TO ABSOLUTE AND ADD TOP/LEFT --- */
+  position: absolute;
+  top: calc(
+    100% + 4px
+  ); /* Position it right below the parent container, with a 4px gap */
+  left: 0;
+
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-md);
   box-shadow: 0 4px 12px var(--shadow-color);
   padding: var(--spacing-unit) 0;
   min-width: 200px;
-  z-index: 901;
+  z-index: 901; /* Must be higher than sibling elements */
   overflow: hidden;
 }
 

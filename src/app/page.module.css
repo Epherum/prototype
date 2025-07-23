@@ -38,6 +38,11 @@
   gap: var(--spacing-unit);
 }
 
+.optionsButtonContainer {
+  position: relative; /* This is the magic! It "traps" the absolute menu. */
+  display: inline-flex; /* Aligns the button nicely. */
+}
+
 .title {
   text-align: center;
   color: var(--text-primary);
@@ -71,6 +76,7 @@
 }
 
 .controls {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;

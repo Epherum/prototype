@@ -62,14 +62,6 @@ const PartnerOptionsMenu: React.FC<PartnerOptionsMenuProps> = ({
   onUnlinkFromJournals, // +++ DESTRUCTURE
   onCreateGPGLink,
 }) => {
-  // Calculate style only if anchorEl exists
-  const menuStyle: React.CSSProperties | undefined = anchorEl
-    ? {
-        top: anchorEl.getBoundingClientRect().bottom + 8, // +8 for a small gap
-        left: anchorEl.getBoundingClientRect().left,
-      }
-    : undefined;
-
   return (
     <AnimatePresence>
       {isOpen && anchorEl && (
@@ -86,7 +78,6 @@ const PartnerOptionsMenu: React.FC<PartnerOptionsMenuProps> = ({
           <motion.div
             key="options-menu"
             className={styles.optionsMenu}
-            style={menuStyle}
             variants={menuVariants}
             initial="hidden"
             animate="visible"

@@ -4,7 +4,6 @@ import { findNodeById, findParentOfNode } from "@/lib/helpers";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
 import type { AccountNodeData } from "@/lib/types";
 
-// ... (constants, types, and the areStringArraysEqual helper remain unchanged)
 const CYCLE_STATES = {
   RESTORE_SAVED: "RESTORE_SAVED",
   CHILDREN_VISIBLE_ALL_SELECTED: "CHILDREN_VISIBLE_ALL_SELECTED",

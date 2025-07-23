@@ -52,13 +52,6 @@ const DocumentsOptionsMenu: React.FC<DocumentsOptionsMenuProps> = ({
     resource: "DOCUMENT",
   });
 
-  const menuStyle: React.CSSProperties | undefined = anchorEl
-    ? {
-        top: anchorEl.getBoundingClientRect().bottom + 8,
-        left: anchorEl.getBoundingClientRect().left,
-      }
-    : undefined;
-
   return (
     <AnimatePresence>
       {isOpen && anchorEl && (
@@ -75,7 +68,6 @@ const DocumentsOptionsMenu: React.FC<DocumentsOptionsMenuProps> = ({
           <motion.div
             key="docs-options-menu"
             className={styles.optionsMenu}
-            style={menuStyle}
             variants={menuVariants}
             initial="hidden"
             animate="visible"

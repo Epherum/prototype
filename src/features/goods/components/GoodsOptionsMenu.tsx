@@ -63,15 +63,6 @@ const GoodsOptionsMenu: React.FC<GoodsOptionsMenuProps> = ({
   canOpenUnlinkGoodFromPartnersModal,
   onOpenUnlinkGoodFromPartnersModal,
 }) => {
-  // --- THIS IS THE SECOND KEY FIX ---
-  // We calculate the position based on the viewport and don't add scroll offsets.
-  const menuStyle: React.CSSProperties | undefined = anchorEl
-    ? {
-        top: anchorEl.getBoundingClientRect().bottom + 8, // +8 for a small gap
-        left: anchorEl.getBoundingClientRect().left,
-      }
-    : undefined;
-
   return (
     <AnimatePresence>
       {isOpen && anchorEl && (
@@ -88,7 +79,6 @@ const GoodsOptionsMenu: React.FC<GoodsOptionsMenuProps> = ({
           <motion.div
             key="options-menu"
             className={styles.optionsMenu}
-            style={menuStyle} // Apply the corrected style
             variants={menuVariants}
             initial="hidden"
             animate="visible"

@@ -1,26 +1,18 @@
-// src/app/page.tsx
 "use client";
 
 import { useRef, useCallback, useMemo } from "react";
-import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion"; // <-- Import motion
 import styles from "./page.module.css";
 import { SLIDER_TYPES, INITIAL_ORDER } from "@/lib/constants";
 import "swiper/css";
 import { useAppStore } from "@/store/appStore";
 import { useAuthStoreInitializer } from "@/hooks/useAuthStoreInitializer";
-import { PartnerSliderController } from "@/features/partners/PartnerSliderController";
-import { GoodsSliderController } from "@/features/goods/GoodsSliderController";
-import {
-  JournalSliderController,
-  type JournalSliderControllerRef,
-} from "@/features/journals/JournalSliderController";
-import { DocumentController } from "@/features/documents/DocumentController";
+import { type JournalSliderControllerRef } from "@/features/journals/JournalSliderController";
 import {
   UsersController,
   type UsersControllerRef,
 } from "@/features/users/UsersController";
 import { SliderLayoutManager } from "@/components/layout/SliderLayoutManager";
-import { ProjectSliderController } from "@/features/projects/ProjectSliderController";
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
 import UserAuthDisplay from "@/components/layout/UserAuthDisplay";
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
@@ -31,6 +23,30 @@ import LinkGoodToPartnersViaJournalModal from "@/features/linking/components/Lin
 import UnlinkGoodFromPartnersViaJournalModal from "@/features/linking/components/UnlinkGoodFromPartnersViaJournalModal";
 import type { AccountNodeData } from "@/lib/types";
 import DocumentCreationToolbar from "@/features/documents/components/DocumentCreationToolbar";
+
+// Animation Variants for the initial page load
+const pageContainerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      duration: 0.5,
+      ease: [0.4, 0, 0.2, 1], // Decelerate curve for a professional feel
+    },
+  },
+};
 
 export default function Home() {
   useAuthStoreInitializer();
@@ -75,10 +91,7 @@ export default function Home() {
     [sliderOrder, visibility]
   );
 
-  // ✅ NEW: Logic to determine if document creation should be enabled.
-  // This adheres to the new rule: creation is enabled only when a single, terminal journal is selected.
   const isCreationEnabled = useMemo(() => {
-    // The useJournalManager hook now provides isTerminal:
     return (
       journalManager.isTerminal && journalManager.selectedJournalId !== null
     );
@@ -93,26 +106,43 @@ export default function Home() {
   };
 
   return (
-    <div className={styles.pageContainer}>
+    <motion.div
+      className={styles.pageContainer}
+      variants={pageContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <UsersController ref={usersControllerRef} />
-      <h1 className={styles.title}>ERP Application Interface</h1>
-      <UserAuthDisplay
-        onOpenCreateUserModal={() => usersControllerRef.current?.open()}
-      />
-      <StickyHeaderControls
-        visibility={visibility}
-        onToggleVisibility={toggleSliderVisibility}
-        allSliderIds={INITIAL_ORDER}
-        visibleSliderOrder={visibleSliderOrder}
-        sliderConfigs={sliderConfigs}
-      />
-      <SliderLayoutManager
-        ref={journalControllerRef}
-        onOpenJournalSelectorForLinking={openJournalSelectorForLinking}
-        onOpenJournalSelectorForGPGContext={openJournalSelectorForGPGContext}
-      />
 
-      {/* --- Other Modals --- */}
+      <motion.h1 variants={itemVariants} className={styles.title}>
+        ERP Application Interface
+      </motion.h1>
+
+      <motion.div variants={itemVariants}>
+        <UserAuthDisplay
+          onOpenCreateUserModal={() => usersControllerRef.current?.open()}
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <StickyHeaderControls
+          visibility={visibility}
+          onToggleVisibility={toggleSliderVisibility}
+          allSliderIds={INITIAL_ORDER}
+          visibleSliderOrder={visibleSliderOrder}
+          sliderConfigs={sliderConfigs}
+        />
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <SliderLayoutManager
+          ref={journalControllerRef}
+          onOpenJournalSelectorForLinking={openJournalSelectorForLinking}
+          onOpenJournalSelectorForGPGContext={openJournalSelectorForGPGContext}
+        />
+      </motion.div>
+
+      {/* --- Other Modals (animations handled by AnimatePresence) --- */}
       <AnimatePresence>
         {jpqlLinking.isLinkModalOpen && (
           <LinkGoodToPartnersViaJournalModal
@@ -155,6 +185,6 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }

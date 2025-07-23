@@ -28,6 +28,16 @@
   cursor: not-allowed;
 }
 
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: transparent;
+  z-index: 99; /* Below the menu, above everything else */
+}
+
 .menuList {
   position: absolute;
   top: calc(100% + 4px);
@@ -41,6 +51,7 @@
   border: 1px solid var(--border-subtle);
   min-width: 200px;
   box-shadow: 0 4px 12px var(--shadow-color-deep);
+  transform-origin: top right;
 }
 
 .menuList li {

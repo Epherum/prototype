@@ -1,3 +1,4 @@
+//src/components/layout/StickyHeaderControls.tsx
 "use client";
 
 import { motion, LayoutGroup } from "framer-motion";

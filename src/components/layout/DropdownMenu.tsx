@@ -1,8 +1,6 @@
-// src/components/layout/DropdownMenu.tsx
-
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./DropdownMenu.module.css";
 
@@ -18,40 +16,33 @@ interface DropdownMenuProps {
   isCreating?: boolean;
 }
 
-// A professional, non-spring ease-out curve
-const gentleEase = [0.22, 1, 0.36, 1];
-
-// Variants for the menu container to stagger its children
+// FIX: New variants copied from the OptionsMenu components for consistency.
+// This animates the entire menu as a single block.
 const menuVariants = {
   hidden: {
     opacity: 0,
-    transition: {
-      when: "afterChildren",
-      staggerChildren: 0.04,
-      staggerDirection: -1,
-    },
+    scale: 0.95,
+    y: -10,
   },
   visible: {
     opacity: 1,
-    transition: {
-      when: "beforeChildren",
-      staggerChildren: 0.05,
-    },
+    scale: 1,
+    y: 0,
+    transition: { duration: 0.15, ease: "easeOut" },
+  },
+  exit: {
+    opacity: 0,
+    scale: 0.95,
+    y: -10,
+    transition: { duration: 0.1, ease: "easeIn" },
   },
 };
 
-// Variants for each individual menu item
-const itemVariants = {
-  hidden: {
-    y: -10,
-    opacity: 0,
-    transition: { duration: 0.2, ease: gentleEase },
-  },
-  visible: {
-    y: 0,
-    opacity: 1,
-    transition: { duration: 0.3, ease: gentleEase },
-  },
+// FIX: Added overlay variants for the background dimmer effect.
+const overlayVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1, transition: { duration: 0.15 } },
+  exit: { opacity: 0, transition: { duration: 0.1 } },
 };
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
@@ -60,26 +51,12 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   isCreating,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const handleClose = useCallback(() => setIsOpen(false), []);
+  // FIX: Simplified closing logic. The overlay now handles clicks outside.
+  const handleClose = () => setIsOpen(false);
 
-  // Close on click outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        triggerRef.current &&
-        !triggerRef.current.contains(event.target as Node)
-      ) {
-        handleClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [handleClose]);
+  // FIX: The useEffect for 'click outside' is no longer needed.
 
   const handleActionClick = (action: DropdownAction) => {
     if (!action.disabled) {
@@ -89,7 +66,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   };
 
   return (
-    <div className={styles.dropdownContainer} ref={menuRef}>
+    // FIX: Changed container from div with menuRef to just div.
+    <div className={styles.dropdownContainer}>
       <button
         ref={triggerRef}
         className={styles.triggerButton}
@@ -101,27 +79,46 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         {trigger}
       </button>
 
-      {isOpen && (
-        <motion.ul
-          className={styles.menuList}
-          variants={menuVariants}
-          initial="hidden"
-          animate="visible"
-          exit="hidden"
-        >
-          {actions.map((action) => (
-            <motion.li key={action.label} variants={itemVariants}>
-              <button
-                className={styles.menuItem}
-                onClick={() => handleActionClick(action)}
-                disabled={action.disabled}
-              >
-                {action.label}
-              </button>
-            </motion.li>
-          ))}
-        </motion.ul>
-      )}
+      {/* FIX: Wrap the entire conditional render in AnimatePresence */}
+      <AnimatePresence>
+        {isOpen && (
+          <>
+            {/* FIX: Added the overlay div */}
+            <motion.div
+              key="dropdown-overlay"
+              className={styles.overlay}
+              onClick={handleClose}
+              variants={overlayVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            />
+            {/* FIX: Changed motion.ul to motion.div and applied new variants */}
+            <motion.div
+              className={styles.menuList}
+              variants={menuVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              // Stop clicks inside the menu from closing it
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* FIX: Removed motion from the li. No more staggering. */}
+              {actions.map((action) => (
+                <li key={action.label}>
+                  <button
+                    className={styles.menuItem}
+                    onClick={() => handleActionClick(action)}
+                    disabled={action.disabled}
+                  >
+                    {action.label}
+                  </button>
+                </li>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

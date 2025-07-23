@@ -19,7 +19,7 @@ import {
 } from "@/features/journals/JournalSliderController";
 import { PartnerSliderController } from "@/features/partners/PartnerSliderController";
 import { GoodsSliderController } from "@/features/goods/GoodsSliderController";
-import { DocumentController } from "@/features/documents/DocumentController";
+import { DocumentSliderController } from "@/features/documents/DocumentSliderController";
 import { ProjectSliderController } from "@/features/projects/ProjectSliderController"; // Keep for future use
 
 // Props for linking modals that remain in page.tsx
@@ -167,7 +167,7 @@ export const SliderLayoutManager = forwardRef<
                   )}
 
                   {sliderId === SLIDER_TYPES.DOCUMENT && (
-                    <DocumentController
+                    <DocumentSliderController
                       manager={docManager}
                       {...layoutControlProps}
                       isCreationEnabled={isCreationEnabled}

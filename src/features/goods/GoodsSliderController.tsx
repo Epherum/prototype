@@ -157,14 +157,41 @@ export const GoodsSliderController = forwardRef<
       <>
         <div className={styles.controls}>
           <div className={styles.controlsLeftGroup}>
-            <button
-              onClick={goodManager.handleOpenGoodsOptionsMenu}
-              className={`${styles.controlButton} ${styles.editButton}`}
-              aria-label="Options for Goods"
-              disabled={isCreating}
-            >
-              <IoOptionsOutline />
-            </button>
+            {/* --- FIX: STEP 1 - CREATE THE WRAPPER DIV --- */}
+            {/* This div becomes the positioning context for the menu. */}
+            <div className={styles.optionsButtonContainer}>
+              <button
+                onClick={goodManager.handleOpenGoodsOptionsMenu}
+                className={`${styles.controlButton} ${styles.editButton}`}
+                aria-label="Options for Goods"
+                disabled={isCreating}
+              >
+                <IoOptionsOutline />
+              </button>
+
+              {/* --- FIX: STEP 2 - MOVE THE MENU INSIDE THE WRAPPER --- */}
+              {/* Now the menu is a direct child of its positioning context. */}
+              <GoodsOptionsMenu
+                isOpen={goodManager.isGoodsOptionsMenuOpen}
+                onClose={goodManager.handleCloseGoodsOptionsMenu}
+                // The anchorEl is still useful to determine if the menu should be open
+                anchorEl={goodManager.goodsOptionsMenuAnchorEl}
+                selectedGoodsId={goodManager.selectedGoodsId}
+                onAdd={goodManager.handleOpenAddGoodModal}
+                onEdit={goodManager.handleOpenEditGoodModal}
+                onDelete={goodManager.handleDeleteCurrentGood}
+                onLinkToJournals={goodJournalLinking.openLinkModal}
+                onUnlinkFromJournals={goodJournalLinking.openUnlinkModal}
+                onOpenLinkGoodToPartnersModal={onOpenLinkGoodToPartnersModal}
+                canOpenLinkGoodToPartnersModal={canLinkGoodToPartnersViaJournal}
+                onOpenUnlinkGoodFromPartnersModal={
+                  onOpenUnlinkGoodFromPartnersModal
+                }
+                canOpenUnlinkGoodFromPartnersModal={
+                  canUnlinkGoodFromPartnersViaJournal
+                }
+              />
+            </div>
           </div>
           <div className={styles.moveButtonGroup}>
             {canMoveUp && (
@@ -226,23 +253,7 @@ export const GoodsSliderController = forwardRef<
               : undefined
           }
         />
-        <GoodsOptionsMenu
-          isOpen={goodManager.isGoodsOptionsMenuOpen}
-          onClose={goodManager.handleCloseGoodsOptionsMenu}
-          anchorEl={goodManager.goodsOptionsMenuAnchorEl}
-          selectedGoodsId={goodManager.selectedGoodsId}
-          onAdd={goodManager.handleOpenAddGoodModal}
-          onEdit={goodManager.handleOpenEditGoodModal}
-          onDelete={goodManager.handleDeleteCurrentGood}
-          onLinkToJournals={goodJournalLinking.openLinkModal}
-          onUnlinkFromJournals={goodJournalLinking.openUnlinkModal}
-          onOpenLinkGoodToPartnersModal={onOpenLinkGoodToPartnersModal}
-          canOpenLinkGoodToPartnersModal={canLinkGoodToPartnersViaJournal}
-          onOpenUnlinkGoodFromPartnersModal={onOpenUnlinkGoodFromPartnersModal}
-          canOpenUnlinkGoodFromPartnersModal={
-            canUnlinkGoodFromPartnersViaJournal
-          }
-        />
+
         <AddEditGoodModal
           isOpen={goodManager.isAddEditGoodModalOpen}
           onClose={goodManager.handleCloseAddEditGoodModal}

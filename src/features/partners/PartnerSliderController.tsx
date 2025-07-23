@@ -113,14 +113,31 @@ export const PartnerSliderController: React.FC<
     <>
       <div className={styles.controls}>
         <div className={styles.controlsLeftGroup}>
-          <button
-            onClick={partnerManager.handleOpenPartnerOptionsMenu}
-            className={`${styles.controlButton} ${styles.editButton}`}
-            aria-label="Options for Partner"
-            disabled={isCreating}
-          >
-            <IoOptionsOutline />
-          </button>
+          {/* --- FIX: WRAP THE BUTTON AND MOVE THE MENU HERE --- */}
+          <div className={styles.optionsButtonContainer}>
+            <button
+              onClick={partnerManager.handleOpenPartnerOptionsMenu}
+              className={`${styles.controlButton} ${styles.editButton}`}
+              aria-label="Options for Partner"
+              disabled={isCreating}
+            >
+              <IoOptionsOutline />
+            </button>
+            <PartnerOptionsMenu
+              isOpen={partnerManager.isPartnerOptionsMenuOpen}
+              onClose={partnerManager.handleClosePartnerOptionsMenu}
+              anchorEl={partnerManager.partnerOptionsMenuAnchorEl}
+              selectedPartnerId={partnerManager.selectedPartnerId}
+              onAdd={partnerManager.handleOpenAddPartnerModal}
+              onEdit={partnerManager.handleOpenEditPartnerModal}
+              onDelete={partnerManager.handleDeleteCurrentPartner}
+              onLinkToJournals={partnerJournalLinking.openLinkModal}
+              onUnlinkFromJournals={partnerJournalLinking.openUnlinkModal}
+              onCreateGPGLink={
+                canCreateGPGLink ? handleCreateGPGLink : undefined
+              }
+            />
+          </div>
         </div>
         <div className={styles.moveButtonGroup}>
           {canMoveUp && (
@@ -173,18 +190,7 @@ export const PartnerSliderController: React.FC<
         isAccordionOpen={isDetailsAccordionOpen}
         onToggleAccordion={() => toggleAccordion(SLIDER_TYPES.PARTNER)}
       />
-      <PartnerOptionsMenu
-        isOpen={partnerManager.isPartnerOptionsMenuOpen}
-        onClose={partnerManager.handleClosePartnerOptionsMenu}
-        anchorEl={partnerManager.partnerOptionsMenuAnchorEl}
-        selectedPartnerId={partnerManager.selectedPartnerId}
-        onAdd={partnerManager.handleOpenAddPartnerModal}
-        onEdit={partnerManager.handleOpenEditPartnerModal}
-        onDelete={partnerManager.handleDeleteCurrentPartner}
-        onLinkToJournals={partnerJournalLinking.openLinkModal}
-        onUnlinkFromJournals={partnerJournalLinking.openUnlinkModal}
-        onCreateGPGLink={canCreateGPGLink ? handleCreateGPGLink : undefined}
-      />
+
       <AddEditPartnerModal
         isOpen={partnerManager.isAddEditPartnerModalOpen}
         onClose={partnerManager.handleCloseAddEditPartnerModal}

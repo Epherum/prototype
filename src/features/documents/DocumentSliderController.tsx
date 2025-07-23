@@ -1,18 +1,18 @@
-//src/features/documents/DocumentController.tsx
+// src/features/documents/DocumentSliderController.tsx
 "use client";
 
-import React, { forwardRef, useMemo } from "react";
+import React, { forwardRef, useMemo, useState } from "react";
 import { useAppStore } from "@/store/appStore";
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
-// ✨ NEW: Import our new, prettier modal
 import DocumentConfirmationModal from "./components/DocumentConfirmationModal";
 import SingleItemQuantityModal from "./components/SingleItemQuantityModal";
 import { SLIDER_TYPES } from "@/lib/constants";
 import styles from "@/app/page.module.css";
-import { IoAddCircleOutline } from "react-icons/io5";
+import { IoAddCircleOutline, IoOptionsOutline } from "react-icons/io5";
 import type { useDocumentManager } from "./useDocumentManager";
+import DocumentsOptionsMenu from "./components/DocumentsOptionsMenu";
 
-interface DocumentControllerProps {
+interface DocumentSliderControllerProps {
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -22,9 +22,9 @@ interface DocumentControllerProps {
   isCreationEnabled: boolean;
 }
 
-export const DocumentController = forwardRef<
+export const DocumentSliderController = forwardRef<
   HTMLDivElement,
-  DocumentControllerProps
+  DocumentSliderControllerProps
 >(
   (
     {
@@ -41,6 +41,16 @@ export const DocumentController = forwardRef<
     const setSelection = useAppStore((state) => state.setSelection);
     const activeDocumentId = useAppStore((state) => state.selections.document);
 
+    const [isDocMenuOpen, setDocMenuOpen] = useState(false);
+    const [docMenuAnchorEl, setDocMenuAnchorEl] = useState<HTMLElement | null>(
+      null
+    );
+
+    const handleOpenDocMenu = (event: React.MouseEvent<HTMLElement>) => {
+      setDocMenuAnchorEl(event.currentTarget);
+      setDocMenuOpen(true);
+    };
+    const handleCloseDocMenu = () => setDocMenuOpen(false);
     const sliderData = useMemo(
       () =>
         (manager.documentsForSlider || []).map((doc: any) => ({
@@ -61,12 +71,34 @@ export const DocumentController = forwardRef<
     return (
       <div ref={ref}>
         <div className={styles.controls}>
-          {/* 🎨 MODIFIED: The old toolbar is gone. We only show the create button or the disabled text. */}
           {!manager.isCreating && (
             <>
-              <div
-                style={{ flexGrow: 1, display: "flex", alignItems: "center" }}
-              >
+              {/* --- FIX: Standardize on controlsLeftGroup for layout --- */}
+              <div className={styles.controlsLeftGroup}>
+                <div className={styles.optionsButtonContainer}>
+                  <button
+                    onClick={handleOpenDocMenu}
+                    className={`${styles.controlButton} ${styles.editButton}`}
+                    aria-label="Options for selected Document"
+                    // FIX: Button is now always enabled.
+                    title="Document Options"
+                  >
+                    <IoOptionsOutline />
+                  </button>
+                  <DocumentsOptionsMenu
+                    isOpen={isDocMenuOpen}
+                    onClose={handleCloseDocMenu}
+                    anchorEl={docMenuAnchorEl}
+                    // FIX: Pass the selected ID to the menu component
+                    selectedDocumentId={activeDocumentId}
+                    // FIX: Use correct prop names (onView, onEdit)
+                    onView={() =>
+                      alert(`Viewing details for doc ${activeDocumentId}`)
+                    }
+                    onEdit={() => alert(`Editing doc ${activeDocumentId}`)}
+                    onDelete={() => alert(`Deleting doc ${activeDocumentId}`)}
+                  />
+                </div>
                 {isCreationEnabled ? (
                   <button
                     onClick={manager.handleStartCreation}
@@ -148,4 +180,4 @@ export const DocumentController = forwardRef<
   }
 );
 
-DocumentController.displayName = "DocumentController";
+DocumentSliderController.displayName = "DocumentSliderController";
