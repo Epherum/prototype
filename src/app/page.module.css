@@ -191,3 +191,42 @@
   word-break: break-all;
   min-height: 1rem;
 }
+
+/* Container for the new split button (text display + dropdown trigger) */
+.splitButtonContainer {
+  display: flex;
+  align-items: stretch; /* Make items fill the container height */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary);
+  /* overflow: hidden; */ /* This must be commented out/removed to allow the dropdown to show */
+  height: 30px; /* Match height of other control buttons */
+  box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+/* The main part of the split button (text display) */
+.journalParentInfo.splitButtonMain {
+  border: none; /* The container has the border now */
+  /* ✅ FIX: Manually apply rounding to the left corners */
+  border-top-left-radius: var(--border-radius-md);
+  border-bottom-left-radius: var(--border-radius-md);
+  /* Ensure the right side is flat to meet the trigger button */
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 1px solid var(--border-subtle); /* Separator line */
+  cursor: pointer;
+  /* Use the original journalParentInfo class for base styles like padding, font, etc. */
+}
+
+/* Override the original journalParentInfo styles slightly for the split button context */
+.journalParentInfo.splitButtonMain:hover {
+  background-color: var(--accent-slider);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.journalParentInfo.splitButtonMain.locked,
+.journalParentInfo.splitButtonMain.locked:hover {
+  background-color: var(--bg-disabled);
+  cursor: not-allowed;
+  color: var(--text-disabled);
+}

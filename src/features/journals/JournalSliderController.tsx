@@ -1,4 +1,3 @@
-// src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
@@ -7,7 +6,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from "react";
-import { IoOptionsOutline } from "react-icons/io5";
+import { IoOptionsOutline, IoChevronDown } from "react-icons/io5";
 import styles from "@/app/page.module.css";
 
 // Store & Hooks
@@ -22,6 +21,10 @@ import JournalHierarchySlider from "@/features/journals/components/JournalHierar
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import JournalModal from "@/features/journals/components/JournalModal";
 import AddJournalModal from "@/features/journals/components/AddJournalModal";
+import {
+  DropdownMenu,
+  type DropdownAction,
+} from "@/components/layout/DropdownMenu";
 
 // Types
 import type { AccountNodeData, PartnerGoodFilterStatus } from "@/lib/types";
@@ -53,7 +56,6 @@ export const JournalSliderController = forwardRef<
   const [isGpgContextModalOpen, setIsGpgContextModalOpen] = useState(false);
 
   const topLevelContextNode = useMemo(() => {
-    // This logic is purely presentational and correctly remains here
     if (
       !journalManager.isJournalSliderPrimary ||
       !journalManager.selectedTopLevelId
@@ -94,7 +96,6 @@ export const JournalSliderController = forwardRef<
           visibleChildrenMap={journalManager.visibleChildrenMap}
           onL1ItemInteract={journalManager.handleL1Interaction}
           onL2ItemInteract={journalManager.handleL2Interaction}
-          // Use the unified loading state from the manager
           isLoading={journalManager.isJournalDataLoading}
           onToggleFilter={journalManager.handleToggleJournalRootFilter}
           activeFilters={
@@ -104,21 +105,17 @@ export const JournalSliderController = forwardRef<
         />
       );
     }
-
-    // If it's not in hierarchy mode, it must be a flat list.
     return (
       <DynamicSlider
         isLocked={isCreating}
         sliderId={SLIDER_TYPES.JOURNAL}
         title="Journal (Filtered)"
-        // Use the flat list data from the manager
         data={(journalManager.flatJournalData || []).map((j) => ({
           id: String(j.id),
           name: j.name,
           code: String(j.id),
-          label: j.name, // Added label property to fix type error
+          label: j.name,
         }))}
-        // Use the unified loading and error states from the manager
         isLoading={journalManager.isJournalDataLoading}
         isError={journalManager.isJournalDataError}
         error={journalManager.journalDataError}
@@ -129,6 +126,34 @@ export const JournalSliderController = forwardRef<
       />
     );
   };
+
+  const dropdownActions = useMemo((): DropdownAction[] => {
+    return [
+      {
+        label: "Restore Last Selection",
+        onClick: journalManager.handleRestoreLastSelection,
+        disabled: !journalManager.hasSavedSelection,
+      },
+      {
+        label: "Select All Visible",
+        onClick: journalManager.handleSelectAllVisible,
+      },
+      {
+        label: "Select Parents Only",
+        onClick: journalManager.handleSelectParentsOnly,
+      },
+      {
+        label: "Clear All Selections",
+        onClick: journalManager.handleClearAllSelections,
+      },
+    ];
+  }, [
+    journalManager.hasSavedSelection,
+    journalManager.handleRestoreLastSelection,
+    journalManager.handleSelectAllVisible,
+    journalManager.handleSelectParentsOnly,
+    journalManager.handleClearAllSelections,
+  ]);
 
   return (
     <>
@@ -143,19 +168,25 @@ export const JournalSliderController = forwardRef<
             <IoOptionsOutline />
           </button>
           {topLevelContextNode && (
-            <div
-              className={`${styles.journalParentInfo} ${
-                isCreating ? styles.locked : ""
-              }`}
-              onClick={journalManager.handleTopButtonClick}
-              title={`${topLevelContextNode.code} - ${topLevelContextNode.name}. Single-click to cycle selections. Double-click to navigate up.`}
-            >
-              {topLevelContextNode.code} - {topLevelContextNode.name}
+            <div className={styles.splitButtonContainer}>
+              <div
+                className={`${styles.journalParentInfo} ${
+                  styles.splitButtonMain
+                } ${isCreating ? styles.locked : ""}`}
+                onDoubleClick={journalManager.handleNavigateUpOneLevel}
+                title={`${topLevelContextNode.code} - ${topLevelContextNode.name}. Double-click to navigate up.`}
+              >
+                {topLevelContextNode.code} - {topLevelContextNode.name}
+              </div>
+              <DropdownMenu
+                actions={dropdownActions}
+                trigger={<IoChevronDown />}
+                isCreating={isCreating}
+              />
             </div>
           )}
         </div>
         <div className={styles.moveButtonGroup}>
-          {/* Movement controls are unchanged */}
           {canMoveUp && (
             <button
               onClick={onMoveUp}
@@ -177,7 +208,6 @@ export const JournalSliderController = forwardRef<
         </div>
       </div>
       {renderSlider()}
-      {/* All modal logic below this is purely presentational and remains unchanged */}
       <AddJournalModal
         isOpen={journalManager.isAddJournalModalOpen}
         onClose={journalManager.closeAddJournalModal}
@@ -220,7 +250,6 @@ export const JournalSliderController = forwardRef<
               }
             : undefined
         }
-        // This logic needs to use the new loading state from the manager
         hierarchy={
           journalManager.isJournalDataLoading
             ? []

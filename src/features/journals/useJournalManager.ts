@@ -1,9 +1,8 @@
-// src/features/journals/useJournalManager.ts
 "use client";
 
 import { useMemo, useCallback } from "react";
 import { useAppStore } from "@/store/appStore";
-import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants"; // 1. Import ROOT_JOURNAL_ID
+import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import { findNodeById } from "@/lib/helpers";
 
 // Import our new, focused hooks
@@ -55,23 +54,25 @@ export const useJournalManager = () => {
     if (!isHierarchyMode) {
       return [];
     }
-    // If the top-level selection is the conceptual root, the current hierarchy
-    // is the entire set of top-level nodes.
     if (topLevelId === ROOT_JOURNAL_ID) {
       return hierarchyData;
     }
-    // Otherwise, find the selected node and display its children.
     const topNode = findNodeById(hierarchyData, topLevelId);
     return topNode?.children || [];
   }, [isHierarchyMode, hierarchyData, topLevelId]);
 
-  // 3. UI Interaction Hook (depends on data and selection updaters)
+  // 3. UI Interaction Hook (now with simplified handlers)
   const {
     visibleChildrenMap,
     handleSelectTopLevelJournal,
     handleL1Interaction,
     handleL2Interaction,
-    handleTopButtonClick,
+    handleNavigateUpOneLevel,
+    handleRestoreLastSelection,
+    handleSelectAllVisible,
+    handleSelectParentsOnly,
+    handleClearAllSelections,
+    hasSavedSelection,
   } = useJournalInteraction({
     hierarchyData,
     topLevelId,
@@ -101,9 +102,6 @@ export const useJournalManager = () => {
     [setSelection]
   );
 
-  // The final return object remains consistent for the controller,
-  // but its values are now composed from our smaller hooks.
-
   // --- Add isTerminal logic ---
   const isTerminal = useMemo(() => {
     if (!selectedJournalId || !hierarchyData) return false;
@@ -129,7 +127,6 @@ export const useJournalManager = () => {
     isJournalDataLoading: isLoading,
     isJournalDataError: isError,
     journalDataError: error,
-    // --- Add isTerminal to return ---
     isTerminal,
     // Modal State & Handlers
     isAddJournalModalOpen,
@@ -150,6 +147,12 @@ export const useJournalManager = () => {
     handleToggleJournalRootFilter,
     handleL1Interaction,
     handleL2Interaction,
-    handleTopButtonClick,
+    // --- NEW EXPLICIT HANDLERS ---
+    handleNavigateUpOneLevel,
+    handleRestoreLastSelection,
+    handleSelectAllVisible,
+    handleSelectParentsOnly,
+    handleClearAllSelections,
+    hasSavedSelection,
   };
 };
