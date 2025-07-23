@@ -1,18 +1,22 @@
+//src/features/journals/JournalSliderController.tsx
 "use client";
 
 import React, {
-  useState,
   useMemo,
   forwardRef,
   useImperativeHandle,
+  useState,
 } from "react";
-import { IoOptionsOutline, IoChevronDown } from "react-icons/io5";
+// Import motion components
+import { motion, AnimatePresence } from "framer-motion";
+import { IoOptionsOutline } from "react-icons/io5";
+import { IoChevronDown } from "react-icons/io5";
 import styles from "@/app/page.module.css";
+import controllerStyles from "./JournalSliderController.module.css"; // We'll add a specific CSS file
 
 // Store & Hooks
 import { useAppStore } from "@/store/appStore";
 import { useJournalManager } from "./useJournalManager";
-
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import { findNodeById } from "@/lib/helpers";
 
@@ -28,6 +32,14 @@ import {
 
 // Types
 import type { AccountNodeData, PartnerGoodFilterStatus } from "@/lib/types";
+
+// --- ANIMATION VARIANTS ---
+// Variants for the top button's text fade/slide animation
+const textVariants = {
+  initial: { opacity: 0, y: -10 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 10 },
+};
 
 export interface JournalSliderControllerRef {
   openJournalSelector: (cb: (node: AccountNodeData) => void) => void;
@@ -49,6 +61,7 @@ export const JournalSliderController = forwardRef<
   const journalManager = useJournalManager();
   const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
 
+  // States for modals, unchanged
   const [isLinkingModalOpen, setIsLinkingModalOpen] = useState(false);
   const [onSelectForLinkingCallback, setOnSelectForLinkingCallback] = useState<
     ((node: AccountNodeData) => void) | null
@@ -84,6 +97,7 @@ export const JournalSliderController = forwardRef<
   }));
 
   const renderSlider = () => {
+    // ... (This function remains unchanged)
     if (journalManager.isHierarchyMode) {
       return (
         <JournalHierarchySlider
@@ -127,32 +141,56 @@ export const JournalSliderController = forwardRef<
     );
   };
 
+  // ✅ THE FIX IS HERE: More intelligent dropdown action generation.
   const dropdownActions = useMemo((): DropdownAction[] => {
-    return [
-      {
+    const actions: DropdownAction[] = [];
+
+    // 1. Conditionally build the "Restore" action.
+    if (journalManager.hasSavedSelection) {
+      // If a selection exists, show the real button.
+      // It's only disabled if a document creation is in progress.
+      actions.push({
         label: "Restore Last Selection",
         onClick: journalManager.handleRestoreLastSelection,
-        disabled: !journalManager.hasSavedSelection,
-      },
+        disabled: isCreating,
+      });
+    } else {
+      // If no selection exists, show an informative, disabled placeholder.
+      // The user now knows WHY they can't click it.
+      actions.push({
+        label: "(No saved selection)",
+        onClick: () => {}, // No-op
+        disabled: true,
+      });
+    }
+
+    // 2. Add the other standard actions.
+    actions.push(
       {
         label: "Select All Visible",
         onClick: journalManager.handleSelectAllVisible,
+        disabled: isCreating,
       },
       {
         label: "Select Parents Only",
         onClick: journalManager.handleSelectParentsOnly,
+        disabled: isCreating,
       },
       {
         label: "Clear All Selections",
         onClick: journalManager.handleClearAllSelections,
-      },
-    ];
+        disabled: isCreating,
+      }
+    );
+
+    return actions;
   }, [
-    journalManager.hasSavedSelection,
+    journalManager.hasSavedSelection, // This is the key dependency
     journalManager.handleRestoreLastSelection,
     journalManager.handleSelectAllVisible,
     journalManager.handleSelectParentsOnly,
     journalManager.handleClearAllSelections,
+    isCreating,
   ]);
 
   return (
@@ -167,17 +205,43 @@ export const JournalSliderController = forwardRef<
           >
             <IoOptionsOutline />
           </button>
+
+          {/* ✅ UPDATED Animated Button Section */}
           {topLevelContextNode && (
-            <div className={styles.splitButtonContainer}>
-              <div
-                className={`${styles.journalParentInfo} ${
-                  styles.splitButtonMain
-                } ${isCreating ? styles.locked : ""}`}
-                onDoubleClick={journalManager.handleNavigateUpOneLevel}
+            <div className={controllerStyles.topButtonContainer}>
+              <motion.div
+                // ✅ PROP 1: This tells Framer Motion to animate layout changes.
+                layout
+                // ✅ PROP 2: This customizes the layout animation to be a smooth ease, not a spring.
+                transition={{
+                  layout: { duration: 0.3, ease: [0.22, 1, 0.36, 1] },
+                }}
+                className={`${controllerStyles.mainButton} ${
+                  isCreating ? controllerStyles.disabled : ""
+                }`}
+                onDoubleClick={
+                  !isCreating
+                    ? journalManager.handleNavigateUpOneLevel
+                    : undefined
+                }
                 title={`${topLevelContextNode.code} - ${topLevelContextNode.name}. Double-click to navigate up.`}
               >
-                {topLevelContextNode.code} - {topLevelContextNode.name}
-              </div>
+                <div className={controllerStyles.animatedTextWrapper}>
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={topLevelContextNode.id}
+                      variants={textVariants}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                    >
+                      {topLevelContextNode.code} - {topLevelContextNode.name}
+                    </motion.span>
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+
               <DropdownMenu
                 actions={dropdownActions}
                 trigger={<IoChevronDown />}
@@ -207,7 +271,10 @@ export const JournalSliderController = forwardRef<
           )}
         </div>
       </div>
+
       {renderSlider()}
+
+      {/* All modals are unchanged */}
       <AddJournalModal
         isOpen={journalManager.isAddJournalModalOpen}
         onClose={journalManager.closeAddJournalModal}

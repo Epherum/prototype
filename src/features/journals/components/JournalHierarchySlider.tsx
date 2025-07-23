@@ -1,4 +1,3 @@
-//src/features/journals/components/JournalHierarchySlider.tsx
 import React, { useMemo } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
@@ -27,10 +26,8 @@ const pastelColors = [
   "#FFD6FC",
 ];
 
-// A premium, gentle easing curve for all primary animations.
 const gentleEase = { duration: 0.4, ease: [0.22, 1, 0.36, 1] };
 
-// Variants for a container that staggers its children's animations.
 const containerVariants: Variants = {
   hidden: {
     opacity: 0,
@@ -49,11 +46,9 @@ const containerVariants: Variants = {
   },
 };
 
-// Variants for individual items within a staggered container.
 const itemVariants: Variants = {
   hidden: { y: 20, opacity: 0, transition: gentleEase },
   visible: { y: 0, opacity: 1, transition: gentleEase },
-  // A slightly faster exit animation for individual items if needed.
   exit: { opacity: 0, y: -20, transition: { duration: 0.2, ease: "easeIn" } },
 };
 
@@ -100,8 +95,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     return map;
   }, [level2NodesForScroller]);
 
-  // This calculation now correctly determines if ANY L3 nodes are visible.
-  const level3NodesForScroller = useMemo(() => {
+  const level3Nodes = useMemo(() => {
     return level2NodesForScroller.flatMap(
       (l1Node) =>
         (visibleChildrenMap[l1Node.id] &&
@@ -113,15 +107,14 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   }, [level2NodesForScroller, visibleChildrenMap]);
 
   const renderFilterInfo = () => {
+    // ... (This function remains unchanged)
     const text =
       effectiveJournalIds.length === 0
         ? "none"
         : activeFilters
             .map((filter) => `${filter}[${effectiveJournalIds.join(",")}]`)
             .join(" ");
-
     const isNone = effectiveJournalIds.length === 0;
-
     return (
       <AnimatePresence mode="wait">
         <motion.div
@@ -150,6 +143,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
   return (
     <>
+      {/* --- Filter controls remain unchanged --- */}
       <div className={styles.headerFilterRow}>
         <motion.div className={styles.rootFilterControls}>
           {["affected", "unaffected", "inProcess"].map((filter) => (
@@ -172,6 +166,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
         </motion.div>
       </div>
 
+      {/* --- L1 / Row 1 remains a Swiper --- */}
       <h3 className={styles.level2ScrollerTitle}>1st Row</h3>
       <motion.div
         className={styles.level2ScrollerContainer}
@@ -232,69 +227,60 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
         </Swiper>
       </motion.div>
 
+      {/* --- L2 / Row 2 header and filter info --- */}
       <h3 className={styles.level2ScrollerTitle}>2nd Row</h3>
       <div className={styles.filterInfoRow}>
         {activeFilters.length > 0 && renderFilterInfo()}
       </div>
 
+      {/* --- THE REFACTORED L2 / ROW 2 DISPLAY --- */}
       <AnimatePresence mode="popLayout">
-        {level3NodesForScroller.length > 0 ? (
+        {level3Nodes.length > 0 ? (
           <motion.div
-            key="l3-scroller-present" // Stable key for the "data is present" state
-            className={styles.level2ScrollerContainer}
+            key="l3-grid-present"
+            className={styles.wrappingItemContainer}
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            exit="hidden" // On exit, it animates to the "hidden" variant, staggering children out.
+            exit="hidden"
           >
-            <Swiper
-              modules={[Navigation]}
-              navigation={level3NodesForScroller.length > 5}
-              slidesPerView="auto"
-              spaceBetween={8}
-              className={styles.levelScrollerSwiper}
-            >
-              {level3NodesForScroller.map((l2Node) => {
-                const parent = findParentOfNode(l2Node.id, fullHierarchyData);
-                const color = parent ? colorMap.get(parent.id) : undefined;
-                return (
-                  <SwiperSlide
-                    key={l2Node.id}
-                    className={styles.level2ScrollerSlideNoOverflow}
-                  >
-                    <motion.div variants={itemVariants}>
-                      <motion.button
-                        onClick={() => onL2ItemInteract(l2Node.id)}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className={`${styles.level2Button} ${
-                          selectedLevel3Ids.includes(l2Node.id)
-                            ? styles.level2ButtonActive
-                            : ""
-                        } ${color ? styles.colored : ""} ${
-                          !l2Node.children || l2Node.children.length === 0
-                            ? styles.terminalNode
-                            : ""
-                        }`}
-                        style={{ "--item-color": color } as React.CSSProperties}
-                        title={`${l2Node.code} - ${l2Node.name}`}
-                        disabled={isLocked}
-                        whileHover={{
-                          scale: 1.08,
-                          zIndex: 1,
-                          transition: { duration: 0.2, ease: "easeOut" },
-                        }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        {l2Node.code || "N/A"}
-                      </motion.button>
-                    </motion.div>
-                  </SwiperSlide>
-                );
-              })}
-            </Swiper>
+            {/* The change is in this map function */}
+            {level3Nodes.map((l2Node) => {
+              const parent = findParentOfNode(l2Node.id, fullHierarchyData);
+              const color = parent ? colorMap.get(parent.id) : undefined;
+              return (
+                // ✅ FIX: The key and variants are moved directly to the button.
+                // The redundant <motion.div> wrapper is REMOVED.
+                <motion.button
+                  key={l2Node.id}
+                  variants={itemVariants}
+                  onClick={() => onL2ItemInteract(l2Node.id)}
+                  onContextMenu={(e) => e.preventDefault()}
+                  className={`${styles.level2Button} ${
+                    selectedLevel3Ids.includes(l2Node.id)
+                      ? styles.level2ButtonActive
+                      : ""
+                  } ${color ? styles.colored : ""} ${
+                    !l2Node.children || l2Node.children.length === 0
+                      ? styles.terminalNode
+                      : ""
+                  }`}
+                  style={{ "--item-color": color } as React.CSSProperties}
+                  title={`${l2Node.code} - ${l2Node.name}`}
+                  disabled={isLocked}
+                  whileHover={{
+                    scale: 1.08,
+                    zIndex: 1,
+                    transition: { duration: 0.2, ease: "easeOut" },
+                  }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {l2Node.code || "N/A"}
+                </motion.button>
+              );
+            })}
           </motion.div>
         ) : (
-          // This placeholder has its own simple animation and a stable key.
           <motion.div
             key="l3-placeholder"
             className={styles.noDataSmall}

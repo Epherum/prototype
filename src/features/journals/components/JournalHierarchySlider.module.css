@@ -1,12 +1,11 @@
 /* src/features/journals/components/JournalHierarchySlider.module.css */
-/* Row 2: Container for the Filter Buttons */
+
+/* ... (all existing styles from .headerFilterRow down to .rootFilterControls button.activeFilter) ... */
 .headerFilterRow {
   text-align: center;
   width: 100%;
   margin-bottom: calc(var(--spacing-unit) * 1);
 }
-
-/* The group of filter buttons */
 .rootFilterControls {
   display: inline-flex;
   align-items: center;
@@ -16,7 +15,6 @@
   border-radius: var(--border-radius-md);
   border: 1px solid var(--border-subtle);
 }
-
 .rootFilterControls button {
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   border: none;
@@ -27,11 +25,9 @@
   font-size: 0.85em;
   transition: all 0.2s ease;
 }
-
 .rootFilterControls button:hover:not(.activeFilter) {
   color: var(--text-primary);
 }
-
 .rootFilterControls button.activeFilter {
   background-color: var(--accent-warm);
   color: var(--bg-card);
@@ -39,7 +35,7 @@
   box-shadow: 0 1px 3px var(--shadow-color);
 }
 
-/* --- L2 and L3 Scroller Styles --- */
+/* --- L2 and L3 Scroller / Container Styles --- */
 
 .level2ScrollerTitle {
   font-size: 0.9em;
@@ -59,6 +55,19 @@
   align-items: center;
 }
 
+/* ✅ --- NEW STYLE FOR THE WRAPPING CONTAINER --- */
+.wrappingItemContainer {
+  display: flex;
+  flex-direction: row; /* Explicitly set direction to row */
+  flex-wrap: wrap; /* The key property to allow wrapping */
+  justify-content: center; /* Center the items horizontally */
+  gap: 8px; /* Use a fixed gap for consistency */
+  padding: 4px 8px; /* Give it a little breathing room */
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Styles for the Swiper (used only for L1 now) */
 .level2ScrollerSwiper {
   padding: 0 calc(var(--spacing-unit) * 0.5);
   --swiper-navigation-size: 16px;
@@ -88,6 +97,7 @@
   padding: calc(var(--spacing-unit) * 0.5);
 }
 
+/* ... (all remaining styles from .l2ButtonInteractiveWrapper to .noDataSmall are unchanged) ... */
 .l2ButtonInteractiveWrapper {
   position: relative;
   display: flex;
@@ -95,7 +105,6 @@
   justify-content: center;
   border-radius: var(--border-radius-pill);
 }
-
 .level2Button {
   padding: calc(var(--spacing-unit) * 0.65) calc(var(--spacing-unit) * 1.25);
   font-size: 0.8em;
@@ -114,12 +123,10 @@
   z-index: 5;
   box-sizing: border-box;
 }
-
 .level2Button:hover:not(.level2ButtonActive) {
   border-color: var(--accent-warm-light);
   background-color: var(--accent-slider);
 }
-
 .level2ButtonActive,
 .level2ButtonActive:hover {
   background-color: var(--accent-warm);
@@ -127,16 +134,13 @@
   border-color: var(--accent-warm);
   font-weight: 600;
 }
-
 .level2Button.colored.level2ButtonActive,
 .level2Button.colored.level2ButtonActive:hover {
   background-color: var(--item-color);
   border-color: var(--item-color);
-  color: #333; /* A dark color for better contrast on pastel backgrounds */
+  color: #333;
   font-weight: 600;
 }
-
-/* ✅ --- ADDED STYLE FOR THE NEW FILTER INFO ROW --- */
 .filterInfoRow {
   text-align: center;
   font-size: 0.75rem;
@@ -147,40 +151,24 @@
   word-break: break-all;
   min-height: 1rem;
 }
-
-.level2Button.colored.level2ButtonActive,
-.level2Button.colored.level2ButtonActive:hover {
-  background-color: var(--item-color);
-  border-color: var(--item-color);
-  color: #333; /* A dark color for better contrast on pastel backgrounds */
-  font-weight: 600;
-}
-
-/* ✅ --- REFINED STYLES FOR TERMINAL NODES --- */
-/* A dotted border is more subtle and thematic than a harsh outline. */
 .terminalNode {
   border-style: dotted;
-  border-width: 2px; /* Make it a bit thicker to stand out */
+  border-width: 2px;
 }
-
-/* When a terminal node is active, we keep the dotted style but use its active color. */
 .terminalNode.level2ButtonActive {
   border-color: var(--accent-warm);
 }
-
 .terminalNode.colored.level2ButtonActive {
-  border-color: #333; /* Use the dark text color for the border on colored active items */
+  border-color: #333;
 }
-
 .filterInfoNone {
   font-style: italic;
   opacity: 0.7;
-  font-family: var(--font-sans); /* Use a standard font instead of monospace */
+  font-family: var(--font-sans);
 }
-
 .noDataSmall {
   width: 100%;
-  height: 65px; /* Roughly the height of a scroller row */
+  height: 65px;
   display: flex;
   align-items: center;
   justify-content: center;

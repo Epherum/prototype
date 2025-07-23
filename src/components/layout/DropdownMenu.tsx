@@ -1,3 +1,5 @@
+// src/components/layout/DropdownMenu.tsx
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -15,6 +17,42 @@ interface DropdownMenuProps {
   trigger: React.ReactNode;
   isCreating?: boolean;
 }
+
+// A professional, non-spring ease-out curve
+const gentleEase = [0.22, 1, 0.36, 1];
+
+// Variants for the menu container to stagger its children
+const menuVariants = {
+  hidden: {
+    opacity: 0,
+    transition: {
+      when: "afterChildren",
+      staggerChildren: 0.04,
+      staggerDirection: -1,
+    },
+  },
+  visible: {
+    opacity: 1,
+    transition: {
+      when: "beforeChildren",
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+// Variants for each individual menu item
+const itemVariants = {
+  hidden: {
+    y: -10,
+    opacity: 0,
+    transition: { duration: 0.2, ease: gentleEase },
+  },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: { duration: 0.3, ease: gentleEase },
+  },
+};
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   actions,
@@ -63,29 +101,27 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         {trigger}
       </button>
 
-      <AnimatePresence>
-        {isOpen && (
-          <motion.ul
-            className={styles.menuList}
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-          >
-            {actions.map((action) => (
-              <li key={action.label}>
-                <button
-                  className={styles.menuItem}
-                  onClick={() => handleActionClick(action)}
-                  disabled={action.disabled}
-                >
-                  {action.label}
-                </button>
-              </li>
-            ))}
-          </motion.ul>
-        )}
-      </AnimatePresence>
+      {isOpen && (
+        <motion.ul
+          className={styles.menuList}
+          variants={menuVariants}
+          initial="hidden"
+          animate="visible"
+          exit="hidden"
+        >
+          {actions.map((action) => (
+            <motion.li key={action.label} variants={itemVariants}>
+              <button
+                className={styles.menuItem}
+                onClick={() => handleActionClick(action)}
+                disabled={action.disabled}
+              >
+                {action.label}
+              </button>
+            </motion.li>
+          ))}
+        </motion.ul>
+      )}
     </div>
   );
 };

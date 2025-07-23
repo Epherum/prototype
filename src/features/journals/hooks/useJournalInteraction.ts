@@ -1,3 +1,4 @@
+//src/features/journals/hooks/useJournalInteraction.ts
 import { useState, useCallback, useRef, useEffect } from "react";
 import { findNodeById, findParentOfNode } from "@/lib/helpers";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
