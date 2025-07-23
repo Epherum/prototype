@@ -2,29 +2,37 @@
 .authContainer {
   display: flex;
   align-items: center;
+  justify-content: space-between; /* Pushes content to opposite ends */
   gap: calc(var(--spacing-unit) * 1.5);
-  padding: var(--spacing-unit) calc(var(--spacing-unit) * 1.5);
+
+  /* Restore the "card" look */
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
   border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-subtle);
   background-color: var(--bg-card);
 
-  /* These two properties are crucial for the overlay pattern */
-  position: relative;
+  position: relative; /* Crucial for the overlay */
   min-height: 52px;
-
   box-sizing: border-box;
+  width: 100%;
 }
 
-/* ... keep all other existing styles for .userInfo, .userName, .authButton ... */
+.buttonGroup {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 1.5);
+}
+
 .userInfo {
   font-size: 0.9em;
   color: var(--text-secondary);
   line-height: 1.3;
 }
+
 .userName {
   font-weight: 600;
   color: var(--text-primary);
 }
+
 .authButton {
   padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
   font-size: 0.85em;
@@ -37,36 +45,43 @@
   text-decoration: none;
   transition: all 0.2s ease;
   white-space: nowrap;
+
+  /* Remove the default browser outline */
+  outline: none;
 }
+
+/* ✅ ADD THIS: A custom, branded focus ring for accessibility */
+.authButton:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent-warm);
+}
+
 .authButton:hover {
   background-color: var(--accent-warm-light);
   color: var(--accent-warm);
   border-color: var(--accent-warm-light);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
 .createUserButton {
   color: var(--accent-warm);
   border-color: var(--accent-warm-light);
 }
+
 .createUserButton:hover {
   background-color: var(--accent-warm);
   color: var(--bg-card);
   border-color: var(--accent-warm);
 }
 
-/* --- ADD THESE NEW STYLES (same as Journal slider) --- */
-
 .stateOverlay {
   position: absolute;
-  /* Use 'inset' as a modern shorthand for top/right/bottom/left: 0 */
   inset: 0;
-  width: 100%;
-  height: 100%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
+  /* Add padding to match the container's padding */
+  padding: 0 calc(var(--spacing-unit) * 1.5);
   font-size: 0.9em;
   color: var(--text-secondary);
-  /* The overlay doesn't need a background or border as it sits inside the bordered container */
+  /* The overlay needs a background to hide the content underneath */
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-md); /* Match parent radius */
 }

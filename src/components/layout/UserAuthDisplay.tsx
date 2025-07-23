@@ -7,18 +7,35 @@ import { motion, AnimatePresence, Variants } from "framer-motion";
 import styles from "./UserAuthDisplay.module.css";
 import { usePermissions } from "@/hooks/usePermissions";
 
-// Variants for the initial reveal of the component
 const revealVariants: Variants = {
-  hidden: { opacity: 0, y: -15 },
+  hidden: { opacity: 0, x: -15 },
   visible: {
     opacity: 1,
-    y: 0,
+    x: 0,
     transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
-// Variants for the overlay fade in/out
-const overlayVariants: Variants = {
+const staggerContainerVariants: Variants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1, // Stagger the two main groups
+    },
+  },
+};
+
+const itemRevealUpVariants: Variants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: {
+    opacity: 1,
+    x: 0,
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+const fadeVariants: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1 },
   exit: { opacity: 0 },
@@ -38,58 +55,82 @@ export default function UserAuthDisplay({
   });
 
   return (
-    // This outer div handles the initial reveal animation
     <motion.div variants={revealVariants} initial="hidden" animate="visible">
-      {/* 
-        This is the STABLE layout container. It is always present and defines 
-        the layout, border, and background.
-      */}
       <div className={styles.authContainer}>
         <AnimatePresence>
           {status === "loading" && (
             <motion.div
               key="loading-overlay"
               className={styles.stateOverlay}
-              variants={overlayVariants}
+              variants={fadeVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
-              transition={{ duration: 0.2 }}
             >
               Loading User...
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* The actual content is rendered here, it will be covered by the overlay */}
-        {status === "authenticated" && session?.user ? (
-          <>
-            <span className={styles.userInfo}>
-              <span className={styles.userName}>
-                {session.user.name || session.user.email}
-              </span>
-            </span>
-            {canManageUsers && (
-              <button
-                onClick={onOpenCreateUserModal}
-                className={`${styles.authButton} ${styles.createUserButton}`}
-                title="Create a new user"
-              >
-                + Create User
-              </button>
-            )}
-            <button
-              onClick={() => signOut({ callbackUrl: "/login" })}
-              className={styles.authButton}
+        <AnimatePresence>
+          {status !== "loading" && (
+            <motion.div
+              key={status}
+              className={styles.authContainer} // Inherit flex layout
+              variants={staggerContainerVariants}
+              initial="hidden"
+              animate="visible"
+              exit={{ opacity: 0 }}
             >
-              Logout
-            </button>
-          </>
-        ) : (
-          <Link href="/login" className={styles.authButton}>
-            Login
-          </Link>
-        )}
+              {status === "authenticated" && session?.user ? (
+                <>
+                  {/* Item 1: User Info */}
+                  <motion.span
+                    variants={itemRevealUpVariants}
+                    className={styles.userInfo}
+                  >
+                    <span className={styles.userName}>
+                      {session.user.name || session.user.email}
+                    </span>
+                  </motion.span>
+
+                  {/* Item 2: Button Group */}
+                  <motion.div
+                    variants={itemRevealUpVariants}
+                    className={styles.buttonGroup}
+                  >
+                    {canManageUsers && (
+                      <button
+                        onClick={onOpenCreateUserModal}
+                        className={`${styles.authButton} ${styles.createUserButton}`}
+                        title="Create a new user"
+                      >
+                        + Create User
+                      </button>
+                    )}
+                    <button
+                      onClick={() => signOut({ callbackUrl: "/login" })}
+                      className={styles.authButton}
+                    >
+                      Logout
+                    </button>
+                  </motion.div>
+                </>
+              ) : (
+                // For the unauthenticated state, the button group is just one item
+                <motion.div
+                  variants={itemRevealUpVariants}
+                  className={styles.buttonGroup}
+                  style={{ marginLeft: "auto" }} // Push to the right
+                >
+                  <Link href="/login" className={styles.authButton}>
+                    Login
+                  </Link>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
