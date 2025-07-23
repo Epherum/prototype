@@ -69,6 +69,16 @@ export const useDocumentManager = () => {
       return;
     }
 
+    // ✅ FIX: Use the new, correct `selectedJournalId` from the store.
+    const journalContext = selections.journal.selectedJournalId;
+
+    // This check is now robust. The button to call this is already disabled if this is null,
+    // but this serves as an important safeguard within the logic itself.
+    if (!journalContext) {
+      alert("Please select a single, terminal journal to create a document.");
+      return;
+    }
+
     const visibleOrder = sliderOrder.filter((id) => visibility[id]);
     const docIdx = visibleOrder.indexOf(SLIDER_TYPES.DOCUMENT);
     const partnerIdx = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
@@ -76,10 +86,7 @@ export const useDocumentManager = () => {
 
     let creationMode: DocumentCreationMode = "IDLE";
     let initialState: Partial<typeof documentCreationState> = {};
-    const journalContext =
-      selections.journal.flatId || selections.journal.topLevelId;
 
-    // Scenarios...
     if (
       docIdx === visibleOrder.length - 1 &&
       partnerIdx !== -1 &&
@@ -95,9 +102,8 @@ export const useDocumentManager = () => {
       initialState = {
         lockedPartnerIds: [selections.partner],
         lockedGoodIds: [selections.goods],
-        lockedJournalId: journalContext,
+        lockedJournalId: journalContext, // Use correct context
       };
-      // For this specific flow, we call the action later
     } else if (partnerIdx < docIdx && docIdx < goodIdx) {
       if (!selections.partner) {
         alert("Please select a Partner to lock in.");
@@ -106,7 +112,7 @@ export const useDocumentManager = () => {
       creationMode = "LOCK_PARTNER";
       initialState = {
         lockedPartnerIds: [selections.partner],
-        lockedJournalId: journalContext,
+        lockedJournalId: journalContext, // Use correct context
       };
     } else if (goodIdx < docIdx && docIdx < partnerIdx) {
       if (!selections.goods) {
@@ -116,26 +122,15 @@ export const useDocumentManager = () => {
       creationMode = "LOCK_GOOD";
       initialState = {
         lockedGoodIds: [selections.goods],
-        lockedJournalId: journalContext,
+        lockedJournalId: journalContext, // Use correct context
       };
     } else if (docIdx < partnerIdx && partnerIdx < goodIdx) {
       creationMode = "INTERSECT_FROM_PARTNER";
-      initialState = { lockedJournalId: journalContext };
+      initialState = { lockedJournalId: journalContext }; // Use correct context
     } else if (docIdx < goodIdx && goodIdx < partnerIdx) {
       creationMode = "INTERSECT_FROM_GOOD";
-      initialState = { lockedJournalId: journalContext };
+      initialState = { lockedJournalId: journalContext }; // Use correct context
     }
-
-    // === START OF LOGGING ===
-    console.groupCollapsed(`[DEBUG: useDocumentManager] handleStartCreation`);
-    console.log("Visible slider order:", visibleOrder);
-    console.log(
-      `Determined creationMode: %c${creationMode}`,
-      "font-weight: bold;"
-    );
-    console.log("Initial state to be dispatched:", initialState);
-    console.groupEnd();
-    // === END OF LOGGING ===
 
     if (creationMode !== "IDLE") {
       startDocumentCreation(creationMode, initialState);
@@ -155,7 +150,6 @@ export const useDocumentManager = () => {
     startDocumentCreation,
   ]);
 
-  // ... rest of the file is unchanged
   const handleCancelCreation = useCallback(() => {
     cancelDocumentCreation();
     setIsFinalizeModalOpen(false);

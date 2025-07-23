@@ -42,6 +42,7 @@ interface SelectionsSlice {
     level3Ids: string[];
     flatId: string | null;
     rootFilter: string[];
+    selectedJournalId: string | null; // ✅ FIX: Add field to store the single terminal ID
   };
   partner: string | null;
   goods: string | null;
@@ -102,6 +103,7 @@ const getInitialSelections = (
     level3Ids: [],
     flatId: null,
     rootFilter: ["affected"],
+    selectedJournalId: null, // ✅ FIX: Initialize the new field
   },
   partner: null,
   goods: null,
@@ -333,17 +335,19 @@ export const useAppStore = create<AppState>()((set, get) => ({
         newSelections.journal.rootFilter = Array.from(newFilterSet);
         clearSubsequent = false;
       } else if (sliderType === "journal") {
-        // ✅ SIMPLIFIED LOGIC:
-        // The manager hook now does the calculation. The store just saves the result.
-        const { effectiveJournalIds, ...journalUpdates } = value;
-        newSelections.journal = { ...newSelections.journal, ...journalUpdates };
+        // ✅ FIX: The action now accepts and stores the derived selectedJournalId.
+        const { effectiveJournalIds, selectedJournalId, ...journalUpdates } =
+          value;
+        newSelections.journal = {
+          ...newSelections.journal,
+          ...journalUpdates,
+          selectedJournalId, // Persist the calculated single terminal ID
+        };
 
-        // If the manager provided the calculated IDs, use them.
         if (effectiveJournalIds !== undefined) {
           newSelections.effectiveJournalIds = effectiveJournalIds;
         }
       } else {
-        // Handle all other sliders (unchanged)
         (newSelections[sliderType as keyof SelectionsSlice] as any) = value;
       }
 
@@ -361,7 +365,10 @@ export const useAppStore = create<AppState>()((set, get) => ({
             if (key in newSelections && key !== "journal") {
               (newSelections[key] as any) = null;
             } else if (key === "journal") {
-              newSelections.journal.flatId = null;
+              // Also clear journal-specific selections if it's a dependent slider
+              newSelections.journal = getInitialSelections(
+                state.auth.effectiveRestrictedJournalId
+              ).journal;
             }
           });
         }

@@ -13,7 +13,6 @@ import { useJournalInteraction } from "./hooks/useJournalInteraction";
 import { useJournalMutations } from "./hooks/useJournalMutations";
 
 export const useJournalManager = () => {
-  // Determine primary status first, as it drives data fetching
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
   const restrictedJournalId = useAppStore(
@@ -25,7 +24,6 @@ export const useJournalManager = () => {
     [sliderOrder, visibility]
   );
 
-  // 1. Data Fetching Hook
   const {
     isHierarchyMode,
     hierarchyData,
@@ -35,7 +33,6 @@ export const useJournalManager = () => {
     error,
   } = useJournalData(isJournalSliderPrimary);
 
-  // 2. Selection Logic Hook (depends on data)
   const {
     topLevelId,
     level2Ids,
@@ -43,14 +40,13 @@ export const useJournalManager = () => {
     flatId,
     rootFilter,
     effectiveJournalIds,
-    selectedJournalId,
+    selectedJournalId, // This is now correctly calculated by the selection hook
     updateJournalSelections,
     resetJournalSelections,
     setSelectedFlatJournalId,
     setSelection,
   } = useJournalSelection(isHierarchyMode, hierarchyData);
 
-  // 2. ✅ FIX: Correctly calculate the hierarchy to be displayed.
   const currentHierarchy = useMemo(() => {
     if (!isHierarchyMode) {
       return [];
@@ -62,7 +58,6 @@ export const useJournalManager = () => {
     return topNode?.children || [];
   }, [isHierarchyMode, hierarchyData, topLevelId]);
 
-  // 3. UI Interaction Hook (now with simplified handlers)
   const {
     visibleChildrenMap,
     handleSelectTopLevelJournal,
@@ -83,7 +78,6 @@ export const useJournalManager = () => {
     restrictedJournalId,
   });
 
-  // 4. Mutations and Modals Hook (depends on selection reset)
   const {
     isAddJournalModalOpen,
     addJournalContext,
@@ -103,24 +97,20 @@ export const useJournalManager = () => {
     [setSelection]
   );
 
-  // --- Add isTerminal logic ---
-  const isTerminal = useMemo(() => {
-    if (!selectedJournalId || !hierarchyData) return false;
-    const node = findNodeById(hierarchyData, selectedJournalId);
-    return !!node && (!node.children || node.children.length === 0);
-  }, [selectedJournalId, hierarchyData]);
+  // --- ✅ FIX: REMOVED the flawed `isTerminal` logic ---
+  // The concept of a "terminal selection" is now fully encapsulated by `selectedJournalId` being non-null.
 
   return {
     // Data and State
     hierarchyData,
-    currentHierarchy, // This is now correctly calculated
+    currentHierarchy,
     selectedTopLevelId: topLevelId,
     selectedLevel2Ids: level2Ids,
     selectedLevel3Ids: level3Ids,
     selectedFlatJournalId: flatId,
     activeJournalRootFilters: rootFilter,
     isJournalSliderPrimary,
-    selectedJournalId,
+    selectedJournalId, // This is the single source of truth for the terminal selection.
     effectiveSelectedJournalIds: effectiveJournalIds,
     visibleChildrenMap,
     isHierarchyMode,
@@ -128,7 +118,6 @@ export const useJournalManager = () => {
     isJournalDataLoading: isLoading,
     isJournalDataError: isError,
     journalDataError: error,
-    isTerminal,
     // Modal State & Handlers
     isAddJournalModalOpen,
     addJournalContext,

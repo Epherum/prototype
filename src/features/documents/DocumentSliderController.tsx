@@ -102,7 +102,7 @@ export const DocumentSliderController = forwardRef<
                 {isCreationEnabled ? (
                   <button
                     onClick={manager.handleStartCreation}
-                    className={`${styles.controlButton} ${styles.createDocumentButton}`}
+                    className={styles.primaryActionButton}
                     title="Create a new document based on current slider order"
                   >
                     <IoAddCircleOutline /> Create Document

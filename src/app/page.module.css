@@ -1,55 +1,18 @@
-/* src/app/page.module.css */
-
+/* --- Page Layout --- */
 .pageContainer {
-  position: relative; /* <<< --- ADD THIS LINE */
-
-  max-width: 600px; /* This is specific, not a variable */
+  position: relative;
+  max-width: 600px;
   margin: 0 auto;
-  padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3)
-    calc(var(--spacing-unit) * 2);
+  padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
   min-height: 100vh;
-  /* box-sizing already global */
-}
-
-/* Style for the journal L1 'Root'/'Up' button in the controls bar */
-.journalParentInfo {
-  font-size: 0.9em;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background-color: var(--accent-warm-light);
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  border-radius: var(--border-radius-sm);
-  cursor: pointer;
-  white-space: nowrap;
-  display: inline-block;
-
-  /* --- NEW: Prevent text selection on double-click (for PC) --- */
-  -webkit-user-select: none; /* Safari */
-  -ms-user-select: none; /* IE 10+ */
-  user-select: none; /* Standard syntax */
-
-  /* --- NEW: Prevent zoom on double-tap (for Mobile) --- */
-  touch-action: manipulation;
-}
-
-.controlsLeftGroup {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-unit);
-}
-
-.optionsButtonContainer {
-  position: relative; /* This is the magic! It "traps" the absolute menu. */
-  display: inline-flex; /* Aligns the button nicely. */
 }
 
 .title {
   text-align: center;
   color: var(--text-primary);
-  font-size: 1.8em; /* Specific font size */
-  font-weight: 600; /* Specific font weight */
-  margin-top: calc(var(--spacing-unit) * 3);
-  margin-bottom: calc(var(--spacing-unit) * 3);
+  font-size: 1.8em;
+  font-weight: 600;
+  margin: calc(var(--spacing-unit) * 3) 0;
 }
 
 .slidersArea {
@@ -60,13 +23,11 @@
 }
 
 .slidersAreaWithToolbar {
-  padding-bottom: 100px; /* Adjust this value as needed. 120px is a safe starting point. */
+  padding-bottom: 100px;
 }
 
 .sliderWrapper {
-  flex: 1 1 350px; /* Allow sliders to have a base width and grow/shrink */
-  /* min-width: 320px; Prevent them from becoming too narrow */
-  /* max-width: 450px; Prevent them from becoming too wide on large screens */
+  flex: 1 1 350px;
   background-color: var(--bg-card);
   border-radius: var(--border-radius-lg);
   box-shadow: 0 4px 12px var(--shadow-color);
@@ -75,6 +36,7 @@
   flex-direction: column;
 }
 
+/* --- Slider Controls --- */
 .controls {
   position: relative;
   display: flex;
@@ -86,6 +48,19 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.controlsLeftGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-unit);
+}
+
+.moveButtonGroup {
+  display: flex;
+  gap: var(--spacing-unit);
+  flex-shrink: 0;
+}
+
+/* --- Generic Buttons --- */
 .controlButton {
   padding: calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 1.2);
   font-size: 0.85em;
@@ -105,7 +80,7 @@
 }
 .controlButton:hover {
   background-color: var(--accent-warm);
-  color: var(--bg-card); /* Ensure --bg-card is white or very light */
+  color: var(--bg-card);
 }
 .controlButton:active {
   transform: scale(0.95);
@@ -113,22 +88,18 @@
 .controlButton:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-  background-color: #e0e0e0; /* Consider a variable like --bg-disabled or --border-subtle */
+  background-color: var(--bg-disabled);
   color: var(--text-secondary);
   transform: none;
 }
 
+/* --- Specialized Buttons --- */
 .editButton {
-  background-color: rgba(
-    0,
-    0,
-    0,
-    0.05
-  ); /* This is a common pattern for subtle icon buttons */
+  background-color: rgba(0, 0, 0, 0.05);
   color: var(--text-secondary);
   padding: calc(var(--spacing-unit) * 0.8);
   flex-shrink: 0;
-  border-radius: 50%; /* Or var(--border-radius-pill) if you want consistency */
+  border-radius: 50%;
 }
 .editButton:hover {
   background-color: rgba(0, 0, 0, 0.1);
@@ -139,39 +110,62 @@
   display: block;
 }
 
-.moveButtonGroup {
-  display: flex;
-  gap: var(--spacing-unit);
-  flex-shrink: 0;
+.primaryActionButton {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+
+  /* Visuals from the split button */
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 1px 2px var(--shadow-color);
+
+  /* Text and Sizing */
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-primary);
+
+  /* Interaction */
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
 }
 
-.createDocumentButton {
-  /* Extends .controlButton */
-  background-color: #4caf50; /* Consider making these --accent-positive, --accent-negative variables */
-  color: white; /* Could be var(--bg-card) if it's white */
+.primaryActionButton:not(:disabled):hover {
+  background-color: var(--bg-hover);
 }
-.createDocumentButton:hover {
-  background-color: #45a049;
+
+.primaryActionButton:not(:disabled):active {
+  transform: scale(0.97);
 }
+
+.primaryActionButton:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .cancelDocumentButton {
-  /* Extends .controlButton */
-  background-color: #f44336;
-  color: white; /* Could be var(--bg-card) */
+  background-color: var(--accent-negative-light);
+  color: var(--accent-negative);
+  border-color: var(--accent-negative-light);
 }
 .cancelDocumentButton:hover {
-  background-color: #da190b;
+  background-color: var(--accent-negative);
+  color: white;
+  border-color: var(--accent-negative);
 }
 
 .finishDocumentContainer {
   display: flex;
   justify-content: center;
-  margin-top: calc(var(--spacing-unit) * 3);
-  margin-bottom: calc(var(--spacing-unit) * 3);
+  margin: calc(var(--spacing-unit) * 3);
   padding: var(--spacing-unit);
 }
+
 .finishDocumentButton {
-  /* This button is styled like a primary modal button in the original code */
-  /* It should use --accent-warm and --bg-card for colors */
   background-color: var(--accent-warm);
   color: var(--bg-card);
   padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 4);
@@ -179,12 +173,87 @@
   font-weight: 600;
   min-width: 280px;
   border-radius: var(--border-radius-lg);
-  border: none; /* Ensure no default border */
+  border: none;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 .finishDocumentButton:hover {
-  background-color: #d68f63; /* Darker shade of --accent-warm, maybe var(--accent-warm-dark) */
+  background-color: var(--accent-warm-dark);
+}
+
+/* --- Split Button System --- */
+.splitButtonContainer {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 1px 2px var(--shadow-color);
+}
+
+.splitButtonMain {
+  background-color: transparent;
+  border: none;
+  border-right: 1px solid var(--border-subtle);
+  border-top-left-radius: var(--border-radius-md);
+  border-bottom-left-radius: var(--border-radius-md);
+  padding: calc(var(--spacing-unit) * 0.75) var(--spacing-unit)
+    calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  touch-action: manipulation;
+}
+.splitButtonMain:not(.disabled):hover {
+  background-color: var(--bg-hover);
+}
+.splitButtonMain.disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.animatedTextWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20px;
+}
+.animatedTextWrapper span {
+  white-space: nowrap;
+}
+
+.splitButtonTrigger {
+  border-top-right-radius: var(--border-radius-md);
+  border-bottom-right-radius: var(--border-radius-md);
+  border: none;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  color: var(--text-secondary);
+}
+.splitButtonTrigger:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+.splitButtonTrigger:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* --- Misc & Helper Styles --- */
+.optionsButtonContainer {
+  position: relative;
+  display: inline-flex;
 }
 
 .disabledControlText {
@@ -192,47 +261,8 @@
   font-size: 0.75rem;
   color: var(--text-secondary);
   font-family: monospace;
-  padding-bottom: calc(var(--spacing-unit) * 0.5);
-  margin-top: calc(var(--spacing-unit) * -0.5);
   word-break: break-all;
   min-height: 1rem;
-}
-
-/* Container for the new split button (text display + dropdown trigger) */
-.splitButtonContainer {
-  display: flex;
-  align-items: stretch; /* Make items fill the container height */
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--border-radius-md);
-  background-color: var(--bg-secondary);
-  /* overflow: hidden; */ /* This must be commented out/removed to allow the dropdown to show */
-  height: 30px; /* Match height of other control buttons */
-  box-shadow: 0 1px 2px var(--shadow-color);
-}
-
-/* The main part of the split button (text display) */
-.journalParentInfo.splitButtonMain {
-  border: none; /* The container has the border now */
-  /* ✅ FIX: Manually apply rounding to the left corners */
-  border-top-left-radius: var(--border-radius-md);
-  border-bottom-left-radius: var(--border-radius-md);
-  /* Ensure the right side is flat to meet the trigger button */
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-  border-right: 1px solid var(--border-subtle); /* Separator line */
-  cursor: pointer;
-  /* Use the original journalParentInfo class for base styles like padding, font, etc. */
-}
-
-/* Override the original journalParentInfo styles slightly for the split button context */
-.journalParentInfo.splitButtonMain:hover {
-  background-color: var(--accent-slider);
-  transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.journalParentInfo.splitButtonMain.locked,
-.journalParentInfo.splitButtonMain.locked:hover {
-  background-color: var(--bg-disabled);
-  cursor: not-allowed;
-  color: var(--text-disabled);
+  padding-bottom: calc(var(--spacing-unit) * 0.5);
+  margin-top: calc(var(--spacing-unit) * -0.5);
 }

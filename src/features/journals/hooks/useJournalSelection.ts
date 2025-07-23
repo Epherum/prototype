@@ -51,57 +51,82 @@ const findFullPathToRootInternal = (
 };
 
 /**
- * ✅ --- BUG FIX IMPLEMENTED HERE --- ✅
- * Calculates the "effective" journal IDs, now with visibility context.
+ * ✅ --- NEW HELPER TO FIX THE BUG --- ✅
+ * Derives the single terminal selection ID from the array of effective path IDs.
+ * A terminal ID is one that is present in the effective set but is not a parent
+ * to any other ID also in the set.
  *
- * @param visibleChildrenMap - The crucial new parameter. A map indicating which L2 nodes have their children expanded in the UI.
+ * @param effectiveIds - The array of all IDs in the selection paths.
+ * @param hierarchyData - The full journal hierarchy for lookups.
+ * @returns The single terminal ID, or null if there isn't exactly one.
+ */
+const findTerminalIdFromEffectiveIds = (
+  effectiveIds: string[],
+  hierarchyData: AccountNodeData[]
+): string | null => {
+  if (effectiveIds.length === 0) {
+    return null;
+  }
+
+  const effectiveIdSet = new Set(effectiveIds);
+  const terminalNodes = effectiveIds.filter((id) => {
+    const node = findNodeById(hierarchyData, id);
+    // A node with no children is always a terminal node in the path.
+    if (!node?.children) return true;
+    // A node is terminal if none of its children are also in the effective path.
+    return !node.children.some((child) => effectiveIdSet.has(child.id));
+  });
+
+  // If there is exactly one terminal node, we have a valid single selection.
+  if (terminalNodes.length === 1) {
+    return terminalNodes[0];
+  }
+
+  return null;
+};
+
+/**
+ * Calculates the "effective" journal IDs, with visibility context.
+ * This function remains unchanged as its path-based output is correct for filtering.
  */
 const calculateEffectiveIds = (
   level2Ids: string[],
   level3Ids: string[],
   hierarchyData: AccountNodeData[],
-  visibleChildrenMap: Record<string, boolean> // The new context
+  visibleChildrenMap: Record<string, boolean>
 ): string[] => {
   if (!hierarchyData || hierarchyData.length === 0) return [];
 
   const finalPathIds = new Set<string>();
   const level3IdSet = new Set(level3Ids);
 
-  // 1. All selected 3rd-level nodes are always terminal selections.
   level3Ids.forEach((l3Id) => {
     const path = findFullPathToRootInternal(l3Id, hierarchyData);
     path.forEach((id) => finalPathIds.add(id));
   });
 
-  // 2. A 2nd-level node is a terminal selection if it meets specific criteria.
   level2Ids.forEach((l2Id) => {
     const node = findNodeById(hierarchyData, l2Id);
     if (!node) return;
 
-    // A. Is it a true terminal node (no children)? If so, it's always effective.
     const isTrueTerminal = !node.children || node.children.length === 0;
     if (isTrueTerminal) {
       const path = findFullPathToRootInternal(l2Id, hierarchyData);
       path.forEach((id) => finalPathIds.add(id));
-      return; // Continue to next l2Id
+      return;
     }
 
-    // B. Does it have selected children? If so, it's just a container and not terminal.
     const hasSelectedChildren =
       node.children?.some((child) => level3IdSet.has(child.id)) ?? false;
     if (hasSelectedChildren) {
-      return; // Skip, as the L3 selections are the terminal ones.
+      return;
     }
 
-    // C. Are its children VISIBLE in the UI? If so, the user has expanded it but
-    //    not selected a child, making the selection incomplete. It is NOT terminal.
     const childrenAreVisible = visibleChildrenMap[l2Id] === true;
     if (childrenAreVisible) {
-      return; // Skip, this is an incomplete selection.
+      return;
     }
 
-    // D. If it has children, none are selected, AND its children are hidden,
-    //    then the user intends for the L2 node itself to be the terminal selection.
     const path = findFullPathToRootInternal(l2Id, hierarchyData);
     path.forEach((id) => finalPathIds.add(id));
   });
@@ -115,17 +140,22 @@ export const useJournalSelection = (
   isHierarchyMode: boolean,
   hierarchyData: AccountNodeData[]
 ) => {
-  const selections = useAppStore((state) => state.selections);
+  const journalSelection = useAppStore((state) => state.selections.journal);
+  const effectiveJournalIds = useAppStore(
+    (state) => state.selections.effectiveJournalIds
+  );
   const setSelection = useAppStore((state) => state.setSelection);
   const auth = useAppStore((state) => state.auth);
 
-  const { topLevelId, level2Ids, level3Ids, flatId, rootFilter } =
-    selections.journal;
-  const effectiveJournalIds = selections.effectiveJournalIds;
+  const {
+    topLevelId,
+    level2Ids,
+    level3Ids,
+    flatId,
+    rootFilter,
+    selectedJournalId: selectedHierarchyId,
+  } = journalSelection;
 
-  /**
-   * ✅ The hook's update function now accepts the visibility map to pass to the calculator.
-   */
   const updateJournalSelections = useCallback(
     (
       newRawSelections: {
@@ -142,18 +172,24 @@ export const useJournalSelection = (
         finalL2Ids,
         finalL3Ids,
         hierarchyData,
-        visibleChildrenMap // Pass the context down
+        visibleChildrenMap
+      );
+
+      // ✅ FIX: Calculate the single terminal ID and pass it to the store.
+      const terminalId = findTerminalIdFromEffectiveIds(
+        effectiveIds,
+        hierarchyData
       );
 
       setSelection("journal", {
         ...newRawSelections,
         effectiveJournalIds: effectiveIds,
+        selectedJournalId: terminalId, // Pass the new, correctly derived ID
       });
     },
-    [hierarchyData, setSelection, level2Ids, level3Ids] // Dependencies are correct
+    [hierarchyData, setSelection, level2Ids, level3Ids]
   );
 
-  // ... (rest of the hook is unchanged)
   const resetJournalSelections = useCallback(() => {
     const initialSelections = getInitialSelections(
       auth.effectiveRestrictedJournalId
@@ -169,21 +205,18 @@ export const useJournalSelection = (
         topLevelId: auth.effectiveRestrictedJournalId || ROOT_JOURNAL_ID,
         level2Ids: [],
         level3Ids: [],
+        selectedJournalId: null, // Flat mode does not have a hierarchical selection
         effectiveJournalIds: id ? [id] : [],
       });
     },
     [setSelection, auth.effectiveRestrictedJournalId]
   );
 
+  // ✅ FIX: The final `selectedJournalId` is now correctly derived from the stored
+  // hierarchical value or the flat mode ID.
   const selectedJournalId = useMemo((): string | null => {
-    if (!isHierarchyMode) {
-      return flatId;
-    }
-    if (effectiveJournalIds.length === 1) {
-      return effectiveJournalIds[0];
-    }
-    return null;
-  }, [isHierarchyMode, flatId, effectiveJournalIds]);
+    return isHierarchyMode ? selectedHierarchyId : flatId;
+  }, [isHierarchyMode, selectedHierarchyId, flatId]);
 
   return {
     topLevelId,
@@ -192,8 +225,8 @@ export const useJournalSelection = (
     flatId,
     rootFilter,
     effectiveJournalIds,
-    selectedJournalId,
-    updateJournalSelections, // This now has the new signature
+    selectedJournalId, // This is now correct!
+    updateJournalSelections,
     resetJournalSelections,
     setSelectedFlatJournalId,
     setSelection,
@@ -207,6 +240,7 @@ const getInitialSelections = (restrictedJournalId = ROOT_JOURNAL_ID) => ({
     level3Ids: [],
     flatId: null,
     rootFilter: ["affected"],
+    selectedJournalId: null,
   },
   effectiveJournalIds: [],
 });

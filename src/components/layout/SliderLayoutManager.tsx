@@ -11,6 +11,8 @@ import { useAppStore } from "@/store/appStore";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 import { useDocumentManager } from "@/features/documents/useDocumentManager";
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
+import { usePartnerManager } from "@/features/partners/usePartnerManager";
+import { useGoodManager } from "@/features/goods/useGoodManager";
 
 // Import Slider Controllers
 import {
@@ -20,11 +22,16 @@ import {
 import { PartnerSliderController } from "@/features/partners/PartnerSliderController";
 import { GoodsSliderController } from "@/features/goods/GoodsSliderController";
 import { DocumentSliderController } from "@/features/documents/DocumentSliderController";
-import { ProjectSliderController } from "@/features/projects/ProjectSliderController"; // Keep for future use
+import { ProjectSliderController } from "@/features/projects/ProjectSliderController";
+
+// Types
+import type { AccountNodeData } from "@/lib/types";
 
 // Props for linking modals that remain in page.tsx
 interface SliderLayoutManagerProps {
-  onOpenJournalSelectorForLinking: (callback: (node: any) => void) => void;
+  onOpenJournalSelectorForLinking: (
+    callback: (node: AccountNodeData) => void
+  ) => void;
   onOpenJournalSelectorForGPGContext: () => void;
 }
 
@@ -37,15 +44,15 @@ export const SliderLayoutManager = forwardRef<
     ref
   ) => {
     // State from Zustand store
-    const { sliderOrder, visibility, documentCreationState } = useAppStore(
-      (state) => state.ui
-    );
+    const { sliderOrder, visibility } = useAppStore((state) => state.ui);
     const moveSlider = useAppStore((state) => state.moveSlider);
 
     // Manager hooks to get state needed by controllers
     const journalManager = useJournalManager();
     const docManager = useDocumentManager();
-    const jpqlLinking = useJournalPartnerGoodLinking(); // For linking modal triggers
+    const partnerManager = usePartnerManager();
+    const goodManager = useGoodManager();
+    const jpqlLinking = useJournalPartnerGoodLinking();
 
     const {
       isCreating,
@@ -60,10 +67,12 @@ export const SliderLayoutManager = forwardRef<
       [sliderOrder, visibility]
     );
 
+    // ✅ FIX: Corrected the logic to use the new authoritative state.
+    // The `isTerminal` flag has been removed. The single source of truth for a
+    // valid, single selection is now whether `selectedJournalId` has a value.
     const isCreationEnabled = useMemo(
-      () =>
-        journalManager.isTerminal && journalManager.selectedJournalId !== null,
-      [journalManager.isTerminal, journalManager.selectedJournalId]
+      () => journalManager.selectedJournalId !== null,
+      [journalManager.selectedJournalId]
     );
 
     return (
@@ -112,8 +121,6 @@ export const SliderLayoutManager = forwardRef<
                   {sliderId === SLIDER_TYPES.PARTNER && (
                     <PartnerSliderController
                       {...layoutControlProps}
-                      onOpenJournalSelector={onOpenJournalSelectorForLinking}
-                      fullJournalHierarchy={journalManager.hierarchyData}
                       isLocked={
                         isCreating &&
                         (mode === "LOCK_PARTNER" || mode === "SINGLE_ITEM")
@@ -128,6 +135,8 @@ export const SliderLayoutManager = forwardRef<
                       onTogglePartnerForDoc={(id) =>
                         toggleEntityForDocument("partner", id)
                       }
+                      onOpenJournalSelector={onOpenJournalSelectorForLinking}
+                      fullJournalHierarchy={journalManager.hierarchyData}
                     />
                   )}
 
@@ -140,7 +149,6 @@ export const SliderLayoutManager = forwardRef<
                       onOpenJournalSelectorForGPGContext={
                         onOpenJournalSelectorForGPGContext
                       }
-                      fullJournalHierarchy={journalManager.hierarchyData}
                       onOpenLinkGoodToPartnersModal={jpqlLinking.openLinkModal}
                       onOpenUnlinkGoodFromPartnersModal={
                         jpqlLinking.openUnlinkModal
@@ -159,6 +167,7 @@ export const SliderLayoutManager = forwardRef<
                       onToggleGoodForDoc={(id) =>
                         toggleEntityForDocument("good", id)
                       }
+                      fullJournalHierarchy={journalManager.hierarchyData}
                     />
                   )}
 

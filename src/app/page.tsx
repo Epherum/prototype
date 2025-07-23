@@ -1,7 +1,8 @@
+// src/app/page.tsx
 "use client";
 
 import { useRef, useCallback, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion"; // <-- Import motion
+import { motion, AnimatePresence } from "framer-motion";
 import styles from "./page.module.css";
 import { SLIDER_TYPES, INITIAL_ORDER } from "@/lib/constants";
 import "swiper/css";
@@ -24,7 +25,6 @@ import UnlinkGoodFromPartnersViaJournalModal from "@/features/linking/components
 import type { AccountNodeData } from "@/lib/types";
 import DocumentCreationToolbar from "@/features/documents/components/DocumentCreationToolbar";
 
-// Animation Variants for the initial page load
 const pageContainerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -43,7 +43,7 @@ const itemVariants = {
     opacity: 1,
     transition: {
       duration: 0.5,
-      ease: [0.4, 0, 0.2, 1], // Decelerate curve for a professional feel
+      ease: [0.4, 0, 0.2, 1],
     },
   },
 };
@@ -56,24 +56,13 @@ export default function Home() {
 
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
-  const moveSlider = useAppStore((state) => state.moveSlider);
-  const toggleSliderVisibility = useAppStore(
-    (state) => state.toggleSliderVisibility
-  );
 
   const docManager = useDocumentManager();
   const goodManager = useGoodManager();
-
-  const {
-    isCreating,
-    mode,
-    lockedPartnerIds,
-    lockedGoodIds,
-    toggleEntityForDocument,
-  } = docManager;
-
   const journalManager = useJournalManager();
   const jpqlLinking = useJournalPartnerGoodLinking();
+
+  const { isCreating } = docManager;
 
   const openJournalSelectorForLinking = useCallback(
     (callback: (node: AccountNodeData) => void) => {
@@ -91,11 +80,12 @@ export default function Home() {
     [sliderOrder, visibility]
   );
 
+  // ✅ FIX: The condition for enabling creation is now simpler and more robust.
+  // It relies on the intelligently derived `selectedJournalId` from the journal manager.
+  // If an ID exists, it means a valid, single, terminal selection has been made.
   const isCreationEnabled = useMemo(() => {
-    return (
-      journalManager.isTerminal && journalManager.selectedJournalId !== null
-    );
-  }, [journalManager.isTerminal, journalManager.selectedJournalId]);
+    return journalManager.selectedJournalId !== null;
+  }, [journalManager.selectedJournalId]);
 
   const sliderConfigs = {
     [SLIDER_TYPES.JOURNAL]: { title: "Journal" },
@@ -127,7 +117,7 @@ export default function Home() {
       <motion.div variants={itemVariants}>
         <StickyHeaderControls
           visibility={visibility}
-          onToggleVisibility={toggleSliderVisibility}
+          onToggleVisibility={useAppStore.getState().toggleSliderVisibility}
           allSliderIds={INITIAL_ORDER}
           visibleSliderOrder={visibleSliderOrder}
           sliderConfigs={sliderConfigs}
@@ -142,7 +132,6 @@ export default function Home() {
         />
       </motion.div>
 
-      {/* --- Other Modals (animations handled by AnimatePresence) --- */}
       <AnimatePresence>
         {jpqlLinking.isLinkModalOpen && (
           <LinkGoodToPartnersViaJournalModal
