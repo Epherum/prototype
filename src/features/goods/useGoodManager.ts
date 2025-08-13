@@ -1,63 +1,64 @@
 // src/features/goods/useGoodManager.ts
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import {
-  useQuery,
-  useMutation,
-  useQueryClient,
-  type UseQueryResult,
-} from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
 import { goodKeys } from "@/lib/queryKeys";
-import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
+import { SLIDER_TYPES } from "@/lib/constants";
 import {
-  fetchGoods,
+  // ✅ REMOVED: Old, individual service function imports
+  // fetchGoods,
   createGood,
   updateGood,
   deleteGood,
-  // ✅ IMPORT: Import the new unified service function
-  getGoodsForPartners,
+  // getGoodsForPartners,
 } from "@/services/clientGoodService";
-import type { Good, PaginatedGoodsResponse } from "@/lib/types";
+
+// ✅ ADDED: New, robust type imports
+import { GoodClient } from "@/lib/types/models.client";
+import {
+  CreateGoodPayload,
+  UpdateGoodPayload,
+} from "@/lib/schemas/good.schema";
 
 import { useChainedQuery } from "@/hooks/useChainedQuery";
 
 export const useGoodManager = () => {
   const queryClient = useQueryClient();
 
-  const selections = useAppStore((state) => state.selections);
-  const { sliderOrder, visibility, documentCreationState } = useAppStore(
-    (state) => state.ui
-  );
-  const auth = useAppStore((state) => state.auth);
+  // --- No changes to Zustand state consumption ---
+  const { documentCreationState } = useAppStore((state) => state.ui);
+  const selectedGoodsId = useAppStore((state) => state.selections.good);
   const setSelection = useAppStore((state) => state.setSelection);
-  const selectedGoodsId = useAppStore((state) => state.selections.goods);
-  const setSelectedGoodsId = (id: string | null) => setSelection("goods", id);
+  const setSelectedGoodsId = (id: string | null) => setSelection("good", id);
 
-  // State management for modals and menus (remains unchanged)
+  // --- State management for modals and menus ---
   const [isAddEditGoodModalOpen, setAddEditGoodModalOpen] = useState(false);
-  const [editingGoodData, setEditingGoodData] = useState<Good | null>(null);
+  // ✅ CHANGED: State now uses the robust GoodClient type
+  const [editingGoodData, setEditingGoodData] = useState<GoodClient | null>(
+    null
+  );
   const [isGoodsOptionsMenuOpen, setGoodsOptionsMenuOpen] = useState(false);
   const [goodsOptionsMenuAnchorEl, setGoodsOptionsMenuAnchorEl] =
     useState<null | HTMLElement>(null);
 
   // --- DATA FETCHING LOGIC ---
-
-  // ✅ The type is now inferred correctly from useChainedQuery.
+  // ✅ NO CHANGE NEEDED HERE: This hook correctly abstracts the new API calls.
   const queryOptions = useChainedQuery(SLIDER_TYPES.GOODS);
 
-  // ✅ No more generics needed here, and no more type errors.
+  // The activeQuery now correctly returns `PaginatedResponse<GoodClient>`
   const activeQuery = useQuery({
     ...queryOptions,
     staleTime: 5 * 60 * 1000,
   });
 
-  // --- Mutations and Handlers (remain unchanged) ---
+  // --- MUTATIONS (Major Refactor) ---
 
   const createGoodMutation = useMutation({
-    mutationFn: (data: Omit<Good, "id" | "createdAt" | "updatedAt">) =>
-      createGood(data),
+    // ✅ CHANGED: The mutation function now accepts the Zod-inferred payload.
+    mutationFn: (data: CreateGoodPayload) => createGood(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
       handleCloseAddEditGoodModal();
@@ -65,17 +66,20 @@ export const useGoodManager = () => {
   });
 
   const updateGoodMutation = useMutation({
-    mutationFn: (data: Good) => updateGood(String(data.id), data),
+    // ✅ CHANGED: The mutation now accepts the full GoodClient object,
+    // but the service function receives the id and the UpdateGoodPayload.
+    mutationFn: (data: GoodClient) => updateGood(data.id, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
       queryClient.invalidateQueries({
-        queryKey: goodKeys.detail(String(variables.id)),
+        queryKey: goodKeys.detail(variables.id),
       });
       handleCloseAddEditGoodModal();
     },
   });
 
   const deleteGoodMutation = useMutation({
+    // No change needed here, it already used a string ID.
     mutationFn: (goodId: string) => deleteGood(goodId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
@@ -83,15 +87,21 @@ export const useGoodManager = () => {
     },
   });
 
+  // --- DERIVED STATE ---
   const goodsForSlider = useMemo(() => {
+    // The data from activeQuery is already `GoodClient[]`.
+    // The `id` is already a string, and `label` exists.
+    // The map is now simpler and mainly for ensuring a consistent return shape.
     if (!activeQuery.data?.data) return [];
     return activeQuery.data.data.map((good) => ({
-      id: String(good.id),
+      ...good, // Spread the full GoodClient object
+      id: good.id,
       label: good.label,
-      ...good,
     }));
   }, [activeQuery.data]);
 
+  // --- SIDE EFFECTS (useEffect) ---
+  // No changes needed here, the logic remains sound.
   useEffect(() => {
     const isReadyForSelection =
       !activeQuery.isLoading && !activeQuery.isFetching;
@@ -117,23 +127,28 @@ export const useGoodManager = () => {
     documentCreationState.isCreating,
   ]);
 
+  // --- EVENT HANDLERS (Major Refactor) ---
+
   const handleOpenAddGoodModal = () => {
     setEditingGoodData(null);
     setAddEditGoodModalOpen(true);
     setGoodsOptionsMenuOpen(false);
   };
+
   const handleOpenEditGoodModal = () => {
     if (!selectedGoodsId) return;
+    // The `find` method returns `GoodClient | undefined`, which matches our state.
+    // The old `@ts-ignore` is no longer needed.
     const goodToEdit = activeQuery.data?.data?.find(
-      (g) => String(g.id) === selectedGoodsId
+      (g) => g.id === selectedGoodsId
     );
     if (goodToEdit) {
-      //@ts-ignore
       setEditingGoodData(goodToEdit);
       setAddEditGoodModalOpen(true);
       setGoodsOptionsMenuOpen(false);
     }
   };
+
   const handleDeleteCurrentGood = () => {
     if (
       selectedGoodsId &&
@@ -143,22 +158,32 @@ export const useGoodManager = () => {
       setGoodsOptionsMenuOpen(false);
     }
   };
+
   const handleCloseAddEditGoodModal = () => setAddEditGoodModalOpen(false);
-  const handleAddOrUpdateGoodSubmit = (
-    data: Omit<Good, "id" | "createdAt" | "updatedAt">
-  ) => {
+
+  // ✅ CHANGED: The submit handler now receives a Zod-validated payload.
+  const handleAddOrUpdateGoodSubmit = (data: CreateGoodPayload) => {
     if (editingGoodData) {
-      updateGoodMutation.mutate({ ...data, id: editingGoodData.id });
+      // For updates, we merge the existing data with the form data to create the full GoodClient object.
+      // The updateGood service function will correctly pick the fields it needs from the payload.
+      updateGoodMutation.mutate({
+        ...editingGoodData,
+        ...data,
+      });
     } else {
       createGoodMutation.mutate(data);
     }
   };
+
   const handleOpenGoodsOptionsMenu = (event: React.MouseEvent<HTMLElement>) => {
     setGoodsOptionsMenuAnchorEl(event.currentTarget);
     setGoodsOptionsMenuOpen(true);
   };
+
   const handleCloseGoodsOptionsMenu = () => setGoodsOptionsMenuOpen(false);
 
+  // --- RETURNED VALUES ---
+  // No changes to the shape of the returned object.
   return {
     goodsQueryState: {
       isLoading: activeQuery.isLoading,

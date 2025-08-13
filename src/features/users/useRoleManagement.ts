@@ -3,14 +3,19 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { permissionKeys, roleKeys } from "@/lib/queryKeys";
-
+import {
+  CreateRolePayload,
+  UpdateRolePayload,
+} from "@/lib/schemas/role.schema";
 import {
   createRole,
   updateRole,
   fetchAllPermissions,
-  RoleClientPayload,
 } from "@/services/clientRoleService";
-import type { RoleWithPermissions } from "@/lib/types";
+import type {
+  RoleWithPermissionsClient,
+  PermissionClient,
+} from "@/lib/types/models.client";
 
 export interface RoleFormState {
   id?: string;
@@ -28,8 +33,8 @@ const initialFormState: RoleFormState = {
 // This hook is now initialized with the role to edit and all available roles
 interface UseRoleManagementProps {
   roleIdToEdit?: string | null;
-  allRoles?: RoleWithPermissions[];
-  onSuccess: () => void; // Callback to run on successful mutation
+  allRoles?: RoleWithPermissionsClient[];
+  onSuccess: () => void;
 }
 
 export function useRoleManagement({
@@ -50,7 +55,7 @@ export function useRoleManagement({
           id: roleToEdit.id,
           name: roleToEdit.name,
           description: roleToEdit.description || "",
-          permissionIds: roleToEdit.permissions.map((p) => p.permissionId),
+          permissionIds: roleToEdit.permissions.map((p) => p.id), // Use p.id
         });
       }
     } else {
@@ -75,11 +80,13 @@ export function useRoleManagement({
   };
 
   const createMutation = useMutation({
-    mutationFn: createRole,
+    mutationFn: (payload: CreateRolePayload) => createRole(payload),
     ...mutationOptions,
   });
+
+  // ✨ MODIFIED: Use the correct Zod-inferred payload type and simplify the signature.
   const updateMutation = useMutation({
-    mutationFn: (vars: { roleId: string; payload: RoleClientPayload }) =>
+    mutationFn: (vars: { roleId: string; payload: UpdateRolePayload }) =>
       updateRole(vars.roleId, vars.payload),
     ...mutationOptions,
   });
@@ -101,7 +108,8 @@ export function useRoleManagement({
   }, []);
 
   const handleSubmit = useCallback(() => {
-    const payload: RoleClientPayload = {
+    const payload: CreateRolePayload = {
+      // This shape works for both create and update
       name: formState.name,
       description: formState.description,
       permissionIds: formState.permissionIds,

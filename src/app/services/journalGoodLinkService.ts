@@ -1,6 +1,7 @@
 // File: src/app/services/journalGoodLinkService.ts
 import prisma from "@/app/utils/prisma";
 import { JournalGoodLink, GoodsAndService, Journal } from "@prisma/client";
+import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
 
 export type CreateJournalGoodLinkData = {
   journalId: string;
@@ -9,32 +10,46 @@ export type CreateJournalGoodLinkData = {
 };
 
 const journalGoodLinkService = {
-  // RECIPE 1: Create a new link between a Journal and a Good/Service
+  // RECIPE 1: Create a new link (MODIFIED with hierarchical check)
   async createLink(data: CreateJournalGoodLinkData): Promise<JournalGoodLink> {
     console.log(
       `Chef (JGLService): Linking Journal '${data.journalId}' with Good ID '${data.goodId}'.`
     );
 
-    // Validation: Check if Journal exists
-    const journalExists = await prisma.journal.findUnique({
-      where: { id: data.journalId },
-    });
-    if (!journalExists) {
+    const [journal, goodExists] = await Promise.all([
+      prisma.journal.findUnique({
+        where: { id: data.journalId },
+        select: { id: true, parent_id: true },
+      }),
+      prisma.goodsAndService.findUnique({
+        where: { id: data.goodId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!journal) {
       throw new Error(`Journal with ID '${data.journalId}' not found.`);
     }
-
-    // Validation: Check if Good/Service exists
-    const goodExists = await prisma.goodsAndService.findUnique({
-      where: { id: data.goodId },
-    });
     if (!goodExists) {
       throw new Error(`Good/Service with ID '${data.goodId}' not found.`);
     }
 
-    // Prisma's @@unique([journalId, goodId]) constraint will handle exact duplicates.
-    const newLink = await prisma.journalGoodLink.create({
-      data: data,
-    });
+    // ✨ HIERARCHICAL INTEGRITY CHECK (as per spec) ✨
+    if (journal.parent_id) {
+      const parentLinkExists = await prisma.journalGoodLink.findFirst({
+        where: {
+          journalId: journal.parent_id,
+          goodId: data.goodId,
+        },
+      });
+      if (!parentLinkExists) {
+        throw new Error(
+          `Business Rule Violation: Cannot link Good '${data.goodId}' to child Journal '${data.journalId}' because a link does not exist with its parent Journal '${journal.parent_id}'.`
+        );
+      }
+    }
+
+    const newLink = await prisma.journalGoodLink.create({ data });
     console.log(`Chef (JGLService): Link created with ID '${newLink.id}'.`);
     return newLink;
   },
@@ -84,45 +99,19 @@ const journalGoodLinkService = {
     journalIds: string[],
     includeChildren: boolean = false
   ): Promise<GoodsAndService[]> {
-    console.log(
-      `Chef (JGLService): Getting goods for Journal IDs '${journalIds.join(
-        ","
-      )}', includeChildren: ${includeChildren}.`
-    );
     if (!journalIds || journalIds.length === 0) {
       return [];
     }
 
-    let targetJournalIds: string[] = [...journalIds];
-
+    let targetJournalIds = new Set<string>(journalIds);
     if (includeChildren) {
-      const allDescendantIds = new Set<string>(targetJournalIds);
-      for (const journalId of journalIds) {
-        const descendantJournals = await prisma.$queryRaw<
-          Array<{ id: string }>
-        >`
-          WITH RECURSIVE "JournalDescendants" AS (
-            SELECT id FROM "journals" WHERE id = ${journalId}
-            UNION ALL
-            SELECT j.id FROM "journals" j INNER JOIN "JournalDescendants" jd ON j.parent_id = jd.id
-          )
-          SELECT id FROM "JournalDescendants";
-        `;
-        descendantJournals.forEach((j) => allDescendantIds.add(j.id));
-      }
-      targetJournalIds = Array.from(allDescendantIds);
-      console.log(
-        `Chef (JGLService): Target journal IDs for goods (incl. children):`,
-        targetJournalIds
-      );
+      targetJournalIds = await getDescendantJournalIdsAsSet(journalIds);
     }
 
-    if (targetJournalIds.length === 0) return [];
+    if (targetJournalIds.size === 0) return [];
 
     const links = await prisma.journalGoodLink.findMany({
-      where: {
-        journalId: { in: targetJournalIds },
-      },
+      where: { journalId: { in: Array.from(targetJournalIds) } },
       select: { goodId: true },
       distinct: ["goodId"],
     });
@@ -131,65 +120,9 @@ const journalGoodLinkService = {
 
     const goodIds = links.map((link) => link.goodId);
     return prisma.goodsAndService.findMany({
-      where: {
-        id: { in: goodIds },
-      },
+      where: { id: { in: goodIds } },
       orderBy: { label: "asc" },
-      include: { taxCode: true, unitOfMeasure: true }, // Include details for display
-    });
-  },
-
-  // RECIPE 5.1: Get all Goods/Services linked to a specific Journal (optionally including its children)
-  async getGoodsForJournal(
-    journalId: string,
-    includeChildren: boolean = false
-  ): Promise<GoodsAndService[]> {
-    console.log(
-      `Chef (JGLService): Getting goods for Journal '${journalId}', includeChildren: ${includeChildren}.`
-    );
-    let targetJournalIds = [journalId];
-
-    if (includeChildren) {
-      const descendantJournals = await prisma.$queryRaw<Array<{ id: string }>>`
-        WITH RECURSIVE "JournalDescendants" AS (
-          SELECT id
-          FROM "journals"
-          WHERE id = ${journalId}
-          UNION ALL
-          SELECT j.id
-          FROM "journals" j
-          INNER JOIN "JournalDescendants" jd ON j.parent_id = jd.id
-        )
-        SELECT id FROM "JournalDescendants";
-      `;
-      targetJournalIds = descendantJournals.map((j) => j.id);
-      console.log(
-        `Chef (JGLService): Target journal IDs (incl. children of '${journalId}'):`,
-        targetJournalIds
-      );
-    }
-
-    if (targetJournalIds.length === 0) return [];
-
-    const links = await prisma.journalGoodLink.findMany({
-      where: {
-        journalId: { in: targetJournalIds },
-      },
-      select: { goodId: true },
-      distinct: ["goodId"],
-    });
-
-    if (links.length === 0) {
-      return [];
-    }
-
-    const goodIds = links.map((link) => link.goodId);
-    return prisma.goodsAndService.findMany({
-      where: {
-        id: { in: goodIds },
-      },
-      orderBy: { label: "asc" },
-      include: { taxCode: true, unitOfMeasure: true }, // Include details for display
+      include: { taxCode: true, unitOfMeasure: true },
     });
   },
 

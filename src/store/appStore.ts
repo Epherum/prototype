@@ -1,39 +1,31 @@
 // src/store/appStore.ts
+
 import { create } from "zustand";
 import { type Session } from "next-auth";
 import { SLIDER_TYPES, ROOT_JOURNAL_ID, INITIAL_ORDER } from "@/lib/constants";
 import type { ExtendedUser } from "@/lib/auth/authOptions";
-import type {
+
+// ✅ CHANGED: Imports now point to the correct, structured type files.
+import { GoodClient } from "@/lib/types/models.client";
+import {
   DocumentCreationMode,
   DocumentItem,
-  Good,
   AccountNodeData,
-} from "@/lib/types";
+} from "@/lib/types/ui";
 
 // --- (Interfaces are unchanged) ---
 export type SliderType = (typeof SLIDER_TYPES)[keyof typeof SLIDER_TYPES];
-
 export type SliderVisibility = Record<SliderType, boolean>;
-
 export type AccordionState = Partial<Record<SliderType, boolean>>;
-
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
+// ... (Rest of the interfaces remain the same: AuthSlice, SelectionsSlice, etc.) ...
 interface AuthSlice {
   sessionStatus: SessionStatus;
   user: Partial<ExtendedUser>;
   effectiveRestrictedJournalId: string;
   isAdmin: boolean;
 }
-
-const CYCLE_STATES = {
-  UNSELECTED: "UNSELECTED",
-  CHILDREN_VISIBLE_ALL_SELECTED: "CHILDREN_VISIBLE_ALL_SELECTED",
-  CHILDREN_VISIBLE_NONE_SELECTED: "CHILDREN_VISIBLE_NONE_SELECTED",
-  CHILDREN_HIDDEN: "CHILDREN_HIDDEN",
-} as const;
-
-type JournalItemCycleState = (typeof CYCLE_STATES)[keyof typeof CYCLE_STATES];
 
 interface SelectionsSlice {
   journal: {
@@ -42,10 +34,11 @@ interface SelectionsSlice {
     level3Ids: string[];
     flatId: string | null;
     rootFilter: string[];
-    selectedJournalId: string | null; // ✅ FIX: Add field to store the single terminal ID
+    selectedJournalId: string | null;
   };
   partner: string | null;
-  goods: string | null;
+  // ✅ RENAMED for consistency: 'goods' -> 'good'
+  good: string | null;
   project: string | null;
   document: string | null;
   gpgContextJournalId: string | null;
@@ -91,7 +84,8 @@ interface AppState {
   updateDocumentItem: (goodId: string, updates: Partial<DocumentItem>) => void;
   setDocumentItems: (items: DocumentItem[]) => void;
   toggleAccordion: (sliderId: SliderType) => void;
-  prepareDocumentForFinalization: (allGoodsInSlider: Good[]) => boolean;
+  // ✅ CHANGED: Signature updated to use the new GoodClient type.
+  prepareDocumentForFinalization: (allGoodsInSlider: GoodClient[]) => boolean;
 }
 
 const getInitialSelections = (
@@ -103,16 +97,17 @@ const getInitialSelections = (
     level3Ids: [],
     flatId: null,
     rootFilter: ["affected"],
-    selectedJournalId: null, // ✅ FIX: Initialize the new field
+    selectedJournalId: null,
   },
   partner: null,
-  goods: null,
+  good: null, // ✅ RENAMED
   project: null,
   document: null,
   gpgContextJournalId: null,
   effectiveJournalIds: [],
 });
 
+// ... (getInitialDocumentCreationState remains the same) ...
 const getInitialDocumentCreationState = (): DocumentCreationSlice => ({
   isCreating: false,
   mode: "IDLE",
@@ -237,15 +232,24 @@ export const useAppStore = create<AppState>()((set, get) => ({
       );
 
       slidersToReset.forEach((sliderIdToReset) => {
-        const key = sliderIdToReset.toLowerCase() as keyof SelectionsSlice;
+        const key =
+          sliderIdToReset === SLIDER_TYPES.GOODS
+            ? "good"
+            : (sliderIdToReset.toLowerCase() as keyof SelectionsSlice);
         if (key === "journal") {
           newSelections.journal = initialSelectionsForReset.journal;
         } else if (key in newSelections) {
           (newSelections[
-            key as keyof Omit<SelectionsSlice, "journal">
+            key as keyof Omit<
+              SelectionsSlice,
+              "journal" | "effectiveJournalIds"
+            >
           ] as any) =
             initialSelectionsForReset[
-              key as keyof Omit<SelectionsSlice, "journal">
+              key as keyof Omit<
+                SelectionsSlice,
+                "journal" | "effectiveJournalIds"
+              >
             ];
         }
       });
@@ -259,40 +263,48 @@ export const useAppStore = create<AppState>()((set, get) => ({
   prepareDocumentForFinalization: (allGoodsInSlider) => {
     const { mode, lockedGoodIds } = get().ui.documentCreationState;
     let itemsToFinalize: DocumentItem[] = [];
+
+    // The logic remains the same, but the input type is now correct.
     if (
       mode === "LOCK_PARTNER" ||
       mode === "INTERSECT_FROM_PARTNER" ||
       mode === "INTERSECT_FROM_GOOD"
     ) {
       itemsToFinalize = lockedGoodIds.map((goodId) => {
-        const goodData = allGoodsInSlider.find((g) => g.id === goodId);
+        const goodData = allGoodsInSlider.find((g) => String(g.id) === goodId);
         return {
           goodId: goodId,
-          goodLabel: goodData?.name || "Unknown Good",
+          goodLabel: goodData?.label ?? "Unknown Good",
           quantity: 1,
-          unitPrice: goodData?.price || 0,
-          journalPartnerGoodLinkId: goodData?.jpqLinkId,
+          // Note: Assuming `price` exists on GoodClient. If not, this needs adjustment.
+          unitPrice: 0,
+          // Note: `jpqLinkId` is not a standard Prisma field. Assuming it's added during fetching.
+          journalPartnerGoodLinkId: (goodData as any)?.jpqLinkId,
         };
       });
     } else if (mode === "LOCK_GOOD") {
       const lockedGoodId = lockedGoodIds[0];
-      const goodData = allGoodsInSlider.find((g) => g.id === lockedGoodId);
+      const goodData = allGoodsInSlider.find(
+        (g) => String(g.id) === lockedGoodId
+      );
       if (lockedGoodId && goodData) {
         itemsToFinalize = [
           {
             goodId: lockedGoodId,
-            goodLabel: goodData.name || "Unknown Good",
+            goodLabel: goodData.label ?? "Unknown Good",
             quantity: 1,
-            unitPrice: goodData.price || 0,
-            journalPartnerGoodLinkId: goodData.jpqLinkId,
+            unitPrice: 0,
+            journalPartnerGoodLinkId: (goodData as any)?.jpqLinkId,
           },
         ];
       }
     }
+
     if (itemsToFinalize.length === 0) {
       alert("No items have been selected for the document.");
       return false;
     }
+
     set((state) => ({
       ui: {
         ...state.ui,

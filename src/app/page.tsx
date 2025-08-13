@@ -22,7 +22,7 @@ import { useDocumentManager } from "@/features/documents/useDocumentManager";
 import { useGoodManager } from "@/features/goods/useGoodManager";
 import LinkGoodToPartnersViaJournalModal from "@/features/linking/components/LinkGoodToPartnersViaJournalModal";
 import UnlinkGoodFromPartnersViaJournalModal from "@/features/linking/components/UnlinkGoodFromPartnersViaJournalModal";
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
 import DocumentCreationToolbar from "@/features/documents/components/DocumentCreationToolbar";
 
 const pageContainerVariants = {

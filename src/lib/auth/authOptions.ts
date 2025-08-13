@@ -70,6 +70,11 @@ export const authOptions: NextAuthOptions = {
           },
         });
 
+        console.log(
+          "\n[DEBUG: authOptions.ts -> authorize] User object from DB:",
+          JSON.stringify(user, null, 2)
+        );
+
         if (!user) {
           return null;
         }
@@ -99,6 +104,12 @@ export const authOptions: NextAuthOptions = {
               resource: rp.permission.resource,
             })),
           })
+        );
+
+        //console log the user
+        console.log(
+          "\n[DEBUG: authOptions.ts -> authorize] User roles with permissions:",
+          JSON.stringify(rolesWithPermissions, null, 2)
         );
 
         // REFACTORED: The user object passed to JWT/Session now includes the direct restriction.

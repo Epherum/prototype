@@ -18,7 +18,6 @@ function LoginContent() {
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
   const handleSubmit = async (event: FormEvent) => {
-    // ... (handleSubmit logic as before) ...
     event.preventDefault();
     setError(null);
     setIsLoading(true);

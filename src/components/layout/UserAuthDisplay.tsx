@@ -8,11 +8,10 @@ import styles from "./UserAuthDisplay.module.css";
 import { usePermissions } from "@/hooks/usePermissions";
 
 const revealVariants: Variants = {
-  hidden: { opacity: 0, x: -15 },
+  hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    x: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
   },
 };
 
@@ -27,10 +26,9 @@ const staggerContainerVariants: Variants = {
 };
 
 const itemRevealUpVariants: Variants = {
-  hidden: { opacity: 0, x: -20 },
+  hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    x: 0,
     transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] },
   },
 };

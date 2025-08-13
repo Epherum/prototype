@@ -1,22 +1,24 @@
 // src/features/documents/components/ManageDocumentModal.tsx
-
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
-import styles from "./ManageDocumentModal.module.css"; // We will create this file next
-import type { Document, UpdateDocumentClientData } from "@/lib/types";
+import styles from "./ManageDocumentModal.module.css";
+// ✅ CHANGED: Import the new, correct types
+import type { DocumentClient } from "@/lib/types/models.client";
+import type { UpdateDocumentPayload } from "@/lib/schemas/document.schema";
 
 interface ManageDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: UpdateDocumentClientData) => void;
-  document: Document | null | undefined;
+  // ✅ CHANGED: onSave now uses the Zod-inferred payload type
+  onSave: (data: UpdateDocumentPayload) => void;
+  // ✅ CHANGED: document prop is now the client-side model
+  document: DocumentClient | null | undefined;
   isLoading: boolean;
   isSaving: boolean;
   isViewOnly: boolean;
 }
 
-// Re-using the animation variants from the confirmation modal
 const modalVariants = {
   open: {
     opacity: 1,
@@ -24,18 +26,9 @@ const modalVariants = {
     y: 0,
     transition: { delay: 0.05, duration: 0.25 },
   },
-  closed: {
-    opacity: 0,
-    scale: 0.95,
-    y: "5%",
-    transition: { duration: 0.2 },
-  },
+  closed: { opacity: 0, scale: 0.95, y: "5%", transition: { duration: 0.2 } },
 };
-
-const overlayVariants = {
-  open: { opacity: 1 },
-  closed: { opacity: 0 },
-};
+const overlayVariants = { open: { opacity: 1 }, closed: { opacity: 0 } };
 
 export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
   isOpen,
@@ -46,16 +39,16 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
   isSaving,
   isViewOnly,
 }) => {
-  const [formData, setFormData] = useState<UpdateDocumentClientData>({});
+  // ✅ CHANGED: State is now correctly typed
+  const [formData, setFormData] = useState<UpdateDocumentPayload>({});
 
   useEffect(() => {
     if (document) {
       setFormData({
-        refDoc: document.refDoc || "",
-        // Convert date string to YYYY-MM-DD for the input[type="date"]
+        refDoc: document.refDoc || undefined, // Use undefined for optional fields
         date: document.date
           ? new Date(document.date).toISOString().split("T")[0]
-          : "",
+          : undefined,
       });
     }
   }, [document]);
@@ -76,7 +69,7 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
 
   const getTitle = () => {
     if (isViewOnly) return "Document Details";
-    return document ? "Edit Document" : "New Document";
+    return "Edit Document";
   };
 
   return (
@@ -97,7 +90,8 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
         variants={modalVariants}
       >
         <button className={baseStyles.modalCloseButton} onClick={onClose}>
-          ×
+          {" "}
+          ×{" "}
         </button>
         <h2 className={baseStyles.modalTitle}>{getTitle()}</h2>
 
@@ -116,21 +110,9 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
                 value={formData.refDoc || ""}
                 onChange={handleChange}
                 readOnly={isViewOnly}
-                required
               />
             </div>
-            <div className={styles.formGroup}>
-              <label htmlFor="date">Date</label>
-              <input
-                id="date"
-                name="date"
-                type="date"
-                value={formData.date || ""}
-                onChange={handleChange}
-                readOnly={isViewOnly}
-                required
-              />
-            </div>
+
             <div className={baseStyles.modalActions}>
               <button
                 type="button"

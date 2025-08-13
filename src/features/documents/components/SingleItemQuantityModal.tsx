@@ -8,19 +8,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { fetchGoodById } from "@/services/clientGoodService";
 import { goodKeys } from "@/lib/queryKeys";
 import styles from "./SingleItemQuantityModal.module.css";
-import type { Good } from "@/lib/types";
-
-// Assume fetchGoodById exists in your client service. If not:
-// export async function fetchGoodById(id: string): Promise<Good> {
-//   const response = await fetch(`/api/goods/${id}`);
-//   if (!response.ok) throw new Error("Failed to fetch good details");
-//   return response.json();
-// }
+// ✅ CHANGED: Import the correct client-side model
+import type { GoodClient } from "@/lib/types/models.client";
 
 interface SingleItemQuantityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (item: { good: Good; quantity: number }) => void;
+  // ✅ CHANGED: onSubmit now expects a GoodClient
+  onSubmit: (item: { good: GoodClient; quantity: number }) => void;
   goodId: string | null;
 }
 
@@ -86,7 +81,7 @@ const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
               <form onSubmit={handleSubmit} className={styles.modalForm}>
                 <p className={styles.confirmationText}>
                   Enter the quantity for:{" "}
-                  <strong>{goodQuery.data.label || goodQuery.data.name}</strong>
+                  <strong>{goodQuery.data.label}</strong>
                 </p>
                 <div className={styles.formGroup}>
                   <label htmlFor="quantity">Quantity</label>

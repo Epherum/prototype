@@ -1,92 +1,92 @@
-// src/services/clientJournalPartnerLinkService.ts
-import type {
-  CreateJournalPartnerLinkClientData,
+//src/services/clientJournalPartnerLinkService.ts
+import {
+  JournalPartnerLink as PrismaJPL,
+  Journal,
+  Partner,
+} from "@prisma/client";
+import {
   JournalPartnerLinkClient,
-  JournalPartnerLinkWithDetails, // This type should match JournalLinkWithDetailsClientResponse
-} from "@/lib/types";
+  JournalPartnerLinkWithDetailsClient,
+} from "@/lib/types/models.client";
+import { CreateJournalPartnerLinkPayload } from "@/lib/schemas/journalPartnerLink.schema";
 
-export async function createJournalPartnerLink(
-  data: CreateJournalPartnerLinkClientData
-): Promise<JournalPartnerLinkClient> {
-  // The backend expects partnerId as BigInt, but the createLinkSchema preprocesses strings/numbers.
-  // Dates are sent as ISO strings; the backend transforms them.
-  const payload = {
-    ...data,
-    // Ensure partnerId is sent as a string if your form provides it that way,
-    // backend Zod schema will handle BigInt conversion with preprocess.
-    // If your form directly gives a BigInt-like string, it's fine.
-  };
+const API_BASE_URL = "/api/journal-partner-links";
 
-  const response = await fetch("/api/journal-partner-links", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: "Unknown error creating journal-partner link",
-    }));
-    throw new Error(
-      errorData.message || `Failed to create link: ${response.statusText}`
-    );
-  }
-  const newLink = await response.json();
-  // Ensure IDs from response are strings
+// --- Mapper Function ---
+function mapToJplClient(
+  raw: PrismaJPL & { journal?: Journal; partner?: Partner }
+): JournalPartnerLinkWithDetailsClient {
   return {
-    ...newLink,
-    id: String(newLink.id),
-    partnerId: String(newLink.partnerId), // Assuming backend returns partnerId as BigInt-string
+    ...raw,
+    id: String(raw.id),
+    partnerId: String(raw.partnerId),
+    // Map relations if they exist
+    partner: raw.partner
+      ? { ...raw.partner, id: String(raw.partner.id) }
+      : undefined,
   };
 }
 
-export async function deleteJournalPartnerLink(
+/**
+ * Fetches JournalPartnerLink records based on query parameters.
+ * @param params - Optional query parameters to filter links.
+ * @returns A promise resolving to an array of links.
+ */
+export async function getJournalPartnerLinks(params: {
+  linkId?: string;
+  journalId?: string;
+  partnerId?: string;
+}): Promise<JournalPartnerLinkClient[]> {
+  const query = new URLSearchParams(params as Record<string, string>);
+  const response = await fetch(`${API_BASE_URL}?${query.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch journal-partner links");
+  }
+  const rawLinks: PrismaJPL[] = await response.json();
+  return rawLinks.map(mapToJplClient);
+}
+
+/**
+ * Creates a new link between a Journal and a Partner.
+ * @param data - The payload for creating the link.
+ * @returns The newly created link.
+ */
+export async function createJournalPartnerLink(
+  data: CreateJournalPartnerLinkPayload
+): Promise<JournalPartnerLinkClient> {
+  const response = await fetch(API_BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to create journal-partner link");
+  }
+  const newLink: PrismaJPL = await response.json();
+  return mapToJplClient(newLink);
+}
+
+/**
+ * Deletes a JournalPartnerLink by its unique ID.
+ * @param linkId - The ID of the link to delete.
+ */
+export async function deleteJournalPartnerLinkById(
   linkId: string
-): Promise<{ message: string }> {
-  const response = await fetch(`/api/journal-partner-links/${linkId}`, {
+): Promise<void> {
+  const query = new URLSearchParams({ linkId });
+  const response = await fetch(`${API_BASE_URL}?${query.toString()}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Unknown error deleting link ID ${linkId}`,
-    }));
-    throw new Error(
-      errorData.message || `Failed to delete link: ${response.statusText}`
-    );
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to delete link");
   }
-  return response.json();
 }
-
-// UPDATED FUNCTION: Fetches links with details using the new endpoint
-export async function fetchJournalLinksForPartner(
-  partnerId: string
-): Promise<JournalPartnerLinkWithDetails[]> {
-  const response = await fetch(`/api/partners/${partnerId}/journal-links`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Failed to fetch links for partner ${partnerId}`,
-    }));
-    throw new Error(errorData.message || "Failed to fetch links");
-  }
-  const links: JournalPartnerLinkWithDetails[] = await response.json();
-  // The backend should already format IDs as strings and provide the necessary details.
-  // No complex client-side mapping should be needed if the backend does its job.
-  return links;
-}
-
-export const fetchJplByContext = async (
-  journalId: string,
-  partnerId: string
-): Promise<JournalPartnerLinkClient | null> => {
-  const response = await fetch(
-    `/api/journal-partner-links/findByContext?journalId=${encodeURIComponent(
-      journalId
-    )}&partnerId=${encodeURIComponent(partnerId)}`
-  );
-  if (!response.ok) {
-    if (response.status === 404) return null;
-    throw new Error(`Failed to fetch JPL by context: ${response.statusText}`);
-  }
-  return response.json();
-};

@@ -1,47 +1,49 @@
-// src/hooks/useGoodJournalLinking.ts
 "use client";
 
 import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { goodKeys, journalGoodLinkKeys, journalKeys } from "@/lib/queryKeys";
 
+// ✅ CHANGED: Services now import from the new, consistent client service files.
 import {
   createJournalGoodLink,
-  deleteJournalGoodLink,
-  fetchJournalLinksForGood,
+  deleteJournalGoodLinkById,
+  getJournalGoodLinks,
 } from "@/services/clientJournalGoodLinkService";
-// Assuming this service function exists, e.g., created from the partner one.
 import { fetchGoodById } from "@/services/clientGoodService";
 import { useAppStore } from "@/store/appStore";
 
-import type {
-  Good,
-  CreateJournalGoodLinkClientData,
-  JournalGoodLinkWithDetails,
-} from "@/lib/types";
+// ✅ CHANGED: All types are now imported from the new, type-safe locations.
+import { GoodClient, JournalGoodLinkClient } from "@/lib/types/models.client";
+import { CreateJournalGoodLinkPayload } from "@/lib/schemas/journalGoodLink.schema";
 
 // No props needed.
 export const useGoodJournalLinking = () => {
   const queryClient = useQueryClient();
 
-  const selectedGoodsId = useAppStore((state) => state.selections.goods);
+  // ✅ CHANGED: state.selections.goods -> state.selections.good (for consistency)
+  const selectedGoodId = useAppStore((state) => state.selections.good);
 
+  // ✅ CHANGED: Local state now uses the new GoodClient type.
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isUnlinkModalOpen, setIsUnlinkModalOpen] = useState(false);
-  const [goodForAction, setGoodForAction] = useState<Good | null>(null);
+  const [goodForAction, setGoodForAction] = useState<GoodClient | null>(null);
 
+  // ✅ CHANGED: The query now uses the new service function and correct type.
   const { data: linksForUnlinking, isLoading: isLoadingLinks } = useQuery<
-    JournalGoodLinkWithDetails[],
+    JournalGoodLinkClient[],
     Error
   >({
     queryKey: journalGoodLinkKeys.listForGood(goodForAction?.id),
-    queryFn: () => fetchJournalLinksForGood(goodForAction!.id),
+    queryFn: () => getJournalGoodLinks({ goodId: goodForAction!.id }),
     enabled: !!goodForAction && isUnlinkModalOpen,
   });
 
   const createJGLMutation = useMutation({
+    // ✅ CORRECT: This already uses the new service function.
     mutationFn: createJournalGoodLink,
     onSuccess: (newLink) => {
+      // Invalidation logic remains correct.
       queryClient.invalidateQueries({ queryKey: goodKeys.all });
       queryClient.invalidateQueries({
         queryKey: journalKeys.flatListByGood(newLink.goodId),
@@ -57,9 +59,12 @@ export const useGoodJournalLinking = () => {
   });
 
   const deleteJGLMutation = useMutation({
-    mutationFn: deleteJournalGoodLink,
-    onSuccess: (data) => {
-      alert(data.message || `Link unlinked successfully!`);
+    // ✅ CHANGED: Uses the new service function `deleteJournalGoodLinkById`.
+    mutationFn: deleteJournalGoodLinkById,
+    onSuccess: () => {
+      // ✅ CHANGED: The new service returns void, so we use a static message.
+      alert(`Link unlinked successfully!`);
+      // Invalidation logic remains correct.
       queryClient.invalidateQueries({
         queryKey: journalGoodLinkKeys.listForGood(goodForAction!.id),
       });
@@ -77,9 +82,10 @@ export const useGoodJournalLinking = () => {
   });
 
   const getGoodDetails = useCallback(
-    async (goodId: string): Promise<Good | null> => {
+    async (goodId: string): Promise<GoodClient | null> => {
       try {
-        const good = await queryClient.fetchQuery<Good, Error>({
+        // ✅ CHANGED: fetchQuery is now typed with GoodClient.
+        const good = await queryClient.fetchQuery<GoodClient, Error>({
           queryKey: goodKeys.detail(goodId),
           queryFn: () => fetchGoodById(goodId),
           staleTime: 5 * 60 * 1000,
@@ -95,16 +101,17 @@ export const useGoodJournalLinking = () => {
   );
 
   const openLinkModal = useCallback(async () => {
-    if (!selectedGoodsId) {
+    // ✅ CHANGED: selectedGoodsId -> selectedGoodId
+    if (!selectedGoodId) {
       alert("Please select a good/service first.");
       return;
     }
-    const good = await getGoodDetails(selectedGoodsId);
+    const good = await getGoodDetails(selectedGoodId);
     if (good) {
       setGoodForAction(good);
       setIsLinkModalOpen(true);
     }
-  }, [selectedGoodsId, getGoodDetails]);
+  }, [selectedGoodId, getGoodDetails]);
 
   const closeLinkModal = useCallback(() => {
     setIsLinkModalOpen(false);
@@ -112,7 +119,8 @@ export const useGoodJournalLinking = () => {
   }, []);
 
   const submitLinks = useCallback(
-    async (linksData: CreateJournalGoodLinkClientData[]) => {
+    // ✅ CHANGED: The payload type now comes from the Zod schema.
+    async (linksData: CreateJournalGoodLinkPayload[]) => {
       if (linksData.length === 0) {
         closeLinkModal();
         return;
@@ -136,16 +144,17 @@ export const useGoodJournalLinking = () => {
   );
 
   const openUnlinkModal = useCallback(async () => {
-    if (!selectedGoodsId) {
+    // ✅ CHANGED: selectedGoodsId -> selectedGoodId
+    if (!selectedGoodId) {
       alert("Please select a good/service to unlink from journals.");
       return;
     }
-    const good = await getGoodDetails(selectedGoodsId);
+    const good = await getGoodDetails(selectedGoodId);
     if (good) {
       setGoodForAction(good);
       setIsUnlinkModalOpen(true);
     }
-  }, [selectedGoodsId, getGoodDetails]);
+  }, [selectedGoodId, getGoodDetails]);
 
   const closeUnlinkModal = useCallback(() => {
     setIsUnlinkModalOpen(false);
@@ -159,6 +168,7 @@ export const useGoodJournalLinking = () => {
         closeUnlinkModal();
         return;
       }
+      // ✅ CHANGED: Calls the updated mutation that uses `deleteJournalGoodLinkById`.
       linkIdsToUnlink.forEach((linkId) => deleteJGLMutation.mutate(linkId));
     },
     [deleteJGLMutation, goodForAction, closeUnlinkModal]

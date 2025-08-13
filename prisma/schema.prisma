@@ -42,6 +42,20 @@ enum DocumentState {
   VOID
 }
 
+enum PartnershipType {
+  STANDARD_TRANSACTION
+  CONSIGNMENT
+  EXCLUSIVE_SUPPLIER
+}
+
+// ADDED: New table for flexible, database-driven system configuration.
+model SystemSetting {
+  key          String   @id
+  value        Json
+  description  String?
+  updatedAt    DateTime @updatedAt
+}
+
 // --- Core Auth Models (Single-Tenant) ---
 
 model User {
@@ -164,6 +178,7 @@ model Journal {
   
   // Back-relation for user-level restrictions
   userRestrictions User[] @relation("UserRestrictedJournal")
+  documents   Document[]          @relation("DocumentJournal")   
 
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
@@ -215,6 +230,8 @@ model Partner {
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
   @@map("partners")
+    @@index([name])
+  @@index([taxId])
 }
 
 model TaxCode {
@@ -265,6 +282,9 @@ model GoodsAndService {
   journalGoodLinks        JournalGoodLink[]
   journalPartnerGoodLinks JournalPartnerGoodLink[]
 
+  documentLines           DocumentLine[]
+
+
   // Audit, State, and Workflow Fields
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
   approvalStatus    ApprovalStatus  @default(PENDING) @map("approval_status")
@@ -288,10 +308,13 @@ model GoodsAndService {
   goodsNextVersionOf       GoodsAndService?  @relation("GoodsPreviousVersion")
 
 
+
   createdAt             DateTime        @default(now()) @map("created_at")
   updatedAt             DateTime        @updatedAt @map("updated_at")
 
   @@map("goods_and_services")
+    @@index([label])
+  @@index([referenceCode])
 }
 
 // --- Linking Tables ---
@@ -300,7 +323,7 @@ model JournalPartnerLink {
   id                  BigInt    @id @default(autoincrement()) @db.BigInt
   journalId           String    @map("journal_id") @db.VarChar(100)
   partnerId           BigInt    @map("partner_id") @db.BigInt
-  partnershipType     String?   @map("partnership_type") @db.VarChar(50)
+  partnershipType     PartnershipType? @map("partnership_type")
   exoneration         Boolean?  @default(false)
   periodType          String?   @map("period_type") @db.VarChar(50)
   dateDebut           DateTime? @map("date_debut") @db.Date
@@ -360,6 +383,9 @@ model JournalPartnerGoodLink {
 model Document {
   id                  BigInt        @id @default(autoincrement()) @db.BigInt
 
+    journalId           String        @map("journal_id")
+  journal             Journal       @relation("DocumentJournal", fields: [journalId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
   // Core Fields
   refDoc              String        @unique @map("ref_doc")
   type                DocumentType  @map("type_document")
@@ -410,6 +436,8 @@ model Document {
   updatedAt           DateTime      @updatedAt @map("updated_at")
 
   @@map("documents")
+    @@index([date])
+
 }
 
 model DocumentLine {
@@ -422,6 +450,9 @@ model DocumentLine {
   // Link to the specific Good/Partner/Journal relationship
   journalPartnerGoodLinkId BigInt    @map("journal_partner_good_link_id")
   journalPartnerGoodLink  JournalPartnerGoodLink @relation(fields: [journalPartnerGoodLinkId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  goodId                  BigInt    @map("good_id")
+  good                    GoodsAndService @relation(fields: [goodId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   // Line item details
   designation             String    @db.Text // Can be overridden from the good's default label

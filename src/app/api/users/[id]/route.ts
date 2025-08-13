@@ -1,44 +1,31 @@
 // src/app/api/users/[id]/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/app/utils/prisma";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { ExtendedSession } from "@/lib/auth/authOptions";
-import bcrypt from "bcryptjs";
-import { z } from "zod";
-import { isDescendantOf } from "@/app/services/journalService"; // <-- IMPORT HELPER
+import { updateUserSchema, UpdateUserPayload } from "@/lib/schemas/user.schema";
+import userService from "@/app/services/userService";
+import { isDescendantOf } from "@/app/services/journalService";
 
 const getHandler = async (
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: { id: string } }
 ) => {
-  const { id } = params;
   const user = await prisma.user.findUnique({
-    where: { id },
-    include: {
-      userRoles: {
-        include: {
-          role: true,
-        },
-      },
-    },
+    where: { id: params.id },
+    // Include userRoles and the nested role for the client to display
+    include: { userRoles: { include: { role: true } } },
   });
 
   if (!user) {
     return NextResponse.json({ message: "User not found" }, { status: 404 });
   }
 
+  // Always exclude password hash for security
   const { passwordHash, ...userWithoutPassword } = user;
   return NextResponse.json(userWithoutPassword);
 };
-
-// REFACTORED: Zod schema for updating a user with the flat structure
-const updateUserSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(6).optional().or(z.literal("")),
-  roleAssignments: z.array(z.object({ roleId: z.string().min(1) })).min(1),
-  restrictedTopLevelJournalId: z.string().nullable().optional().default(null),
-});
 
 const putHandler = async (
   req: NextRequest,
@@ -48,86 +35,99 @@ const putHandler = async (
   const { id: userIdToUpdate } = params;
   const adminUser = session.user!;
 
-  const body = await req.json();
-  const validation = updateUserSchema.safeParse(body);
-
-  if (!validation.success) {
-    return NextResponse.json(
-      { errors: validation.error.format() },
-      { status: 400 }
-    );
-  }
-
-  const {
-    name,
-    email,
-    password,
-    roleAssignments,
-    restrictedTopLevelJournalId,
-  } = validation.data;
-
-  // --- REFINED SECURITY CHECK FOR SUB-ADMINS ---
-  const adminRestrictionId = adminUser.restrictedTopLevelJournalId;
-  if (adminRestrictionId) {
-    // A restricted admin CANNOT make a user unrestricted.
-    if (!restrictedTopLevelJournalId) {
-      return NextResponse.json(
-        {
-          message:
-            "Forbidden: You cannot set a user's restriction to 'No Restriction'.",
-        },
-        { status: 403 }
-      );
-    }
-
-    // The user's new restriction must be within the admin's hierarchy.
-    const isAllowed = await isDescendantOf(
-      restrictedTopLevelJournalId,
-      adminRestrictionId
-    );
-    if (!isAllowed) {
-      return NextResponse.json(
-        {
-          message:
-            "Forbidden: You can only set a journal restriction that is within your own hierarchy.",
-        },
-        { status: 403 }
-      );
-    }
-  }
-
   try {
-    const updatedUser = await prisma.$transaction(async (tx) => {
-      // ... (transaction logic remains the same)
-      const userUpdateData: any = { name, email, restrictedTopLevelJournalId };
-      if (password) {
-        userUpdateData.passwordHash = await bcrypt.hash(password, 10);
-      }
-      const user = await tx.user.update({
-        where: { id: userIdToUpdate },
-        data: userUpdateData,
-      });
-      await tx.userRole.deleteMany({ where: { userId: userIdToUpdate } });
-      await tx.userRole.createMany({
-        data: roleAssignments.map((assignment) => ({
-          userId: userIdToUpdate,
-          roleId: assignment.roleId,
-        })),
-      });
-      return user;
-    });
+    const rawBody = await req.json();
+    // ✅ CORRECT: Use the authoritative schema for validation
+    const validation = updateUserSchema.safeParse(rawBody);
 
-    const { passwordHash, ...userWithoutPassword } = updatedUser;
-    return NextResponse.json(userWithoutPassword);
+    if (!validation.success) {
+      return NextResponse.json(
+        {
+          message: "Invalid update data.",
+          errors: validation.error.format(),
+        },
+        { status: 400 }
+      );
+    }
+
+    // Optional: Add a check if the payload is empty after validation.
+    // If updateUserSchema allows all fields to be optional, `validation.data`
+    // could be an empty object `{}`. If an empty update is not desired:
+    if (Object.keys(validation.data).length === 0) {
+      return NextResponse.json(
+        {
+          message:
+            "Update body cannot be empty. No fields provided for update.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // `validation.data` now correctly matches `UpdateUserPayload` structure from user.schema.ts
+    const updateData: UpdateUserPayload = validation.data;
+
+    // --- REFINED SECURITY CHECK FOR SUB-ADMINS (Logic is robust) ---
+    const adminRestrictionId = adminUser.restrictedTopLevelJournalId;
+    // This check is only needed if the payload is trying to change the restriction
+    if (
+      adminRestrictionId &&
+      updateData.restrictedTopLevelJournalId !== undefined // Check if the property is present in the payload
+    ) {
+      const newRestrictionId = updateData.restrictedTopLevelJournalId;
+      // If a restricted admin tries to make a user unrestricted (setting to null)
+      if (!newRestrictionId) {
+        return NextResponse.json(
+          { message: "Forbidden: You cannot make a user unrestricted." },
+          { status: 403 }
+        );
+      }
+      // Verify the new restriction is within the admin's hierarchy
+      const isAllowed = await isDescendantOf(
+        newRestrictionId,
+        adminRestrictionId
+      );
+      if (!isAllowed) {
+        return NextResponse.json(
+          {
+            message:
+              "Forbidden: You can only set a journal restriction within your own hierarchy.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // ✅ CORRECT: The handler is now a thin wrapper around the service call.
+    // All business logic (transactions, password hashing, role synchronization) is in the service.
+    const updatedUser = await userService.update(userIdToUpdate, updateData);
+
+    return NextResponse.json(updatedUser);
   } catch (error: any) {
-    // ... (error handling remains the same)
-    console.error(`Error updating user ${userIdToUpdate}:`, error);
+    console.error(
+      `API /users/${userIdToUpdate} PUT (Admin: ${adminUser.id}) Error:`,
+      error.message
+    );
+
+    // ✅ CORRECT: Catch specific Prisma error codes
+    if (error.code === "P2025") {
+      // Record not found
+      return NextResponse.json(
+        { message: `User with ID '${userIdToUpdate}' not found.` },
+        { status: 404 }
+      );
+    }
     if (error.code === "P2002" && error.meta?.target?.includes("email")) {
+      // Unique constraint violation
       return NextResponse.json(
         { message: "A user with this email already exists." },
         { status: 409 }
       );
     }
+    if (error.message.includes("Journal with ID")) {
+      // Error from service about non-existent journal
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
       { message: "Failed to update user." },
       { status: 500 }
@@ -137,9 +137,9 @@ const putHandler = async (
 
 export const GET = withAuthorization(getHandler, {
   action: "MANAGE",
-  resource: "USERS",
+  resource: "USER",
 });
 export const PUT = withAuthorization(putHandler, {
   action: "MANAGE",
-  resource: "USERS",
+  resource: "USER",
 });

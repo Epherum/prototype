@@ -1,192 +1,119 @@
-// src/services/clientJournalService.ts
-import type { AccountNodeData, Journal } from "@/lib/types";
-import type { Journal as PrismaJournal } from "@prisma/client";
-import { JournalForAdminSelection, buildTree } from "@/lib/helpers";
+//src/services/clientJournalService.ts
+import { Journal as PrismaJournal } from "@prisma/client";
+import { JournalClient } from "@/lib/types/models.client";
+import { CreateJournalPayload } from "@/lib/schemas/journal.schema";
+import { AccountNodeData } from "@/lib/types/ui"; // This UI-specific type can remain for now
+import { buildTree } from "@/lib/helpers";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
 
+// --- Mapper Function ---
+// Even though JournalClient = PrismaJournal, this is a good pattern to maintain.
+function mapToJournalClient(raw: PrismaJournal): JournalClient {
+  return raw; // No transformation needed as per models.client.ts
+}
+
+// --- Fetching Logic ---
+
+/**
+ * Fetches the journal hierarchy or a sub-hierarchy for a restricted user.
+ * @param restrictedJournalId - The user's top-level journal permission.
+ * @returns A promise resolving to the tree structure used by the UI.
+ */
 export async function fetchJournalHierarchy(
-  restrictedTopLevelJournalId?: string | null
+  restrictedJournalId?: string | null
 ): Promise<AccountNodeData[]> {
-  let apiUrl = "/api/journals";
   const params = new URLSearchParams();
-
-  // If a user is restricted to a specific journal (not the conceptual root),
-  // fetch only the subtree starting from that journal.
-  if (
-    restrictedTopLevelJournalId &&
-    restrictedTopLevelJournalId !== ROOT_JOURNAL_ID
-  ) {
-    params.append("fetchSubtree", "true");
-    params.append("restrictedTopLevelJournalId", restrictedTopLevelJournalId);
-    console.log(
-      `[clientJournalService] Fetching RESTRICTED journal sub-hierarchy for: ${restrictedTopLevelJournalId}`
-    );
-  } else {
-    // For admins or unrestricted users, the default API call fetches the complete hierarchy.
-    console.log(
-      "[clientJournalService] Fetching COMPLETE journal hierarchy for admin/unrestricted user."
-    );
+  if (restrictedJournalId && restrictedJournalId !== ROOT_JOURNAL_ID) {
+    // This aligns with the new API spec: GET /api/journals?rootJournalId=...
+    params.append("rootJournalId", restrictedJournalId);
   }
 
-  if (params.toString()) {
-    apiUrl += `?${params.toString()}`;
-  }
-
-  console.log(`[clientJournalService] Calling API: ${apiUrl}`);
+  const apiUrl = `/api/journals?${params.toString()}`;
   const response = await fetch(apiUrl);
 
   if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error fetching journals" }));
-    console.error(
-      "[clientJournalService] Error fetching journal hierarchy:",
-      errorData
-    );
-    throw new Error(
-      errorData.message ||
-        `Failed to fetch journal hierarchy: ${response.statusText}`
-    );
+    throw new Error("Failed to fetch journal hierarchy");
   }
 
-  const flatJournals: Journal[] = await response.json();
-  const hierarchy = buildTree(flatJournals);
-  console.log(
-    `[clientJournalService] Built journal hierarchy, count: ${hierarchy.length} top-level nodes.`
-  );
-  return hierarchy;
+  const flatJournals: PrismaJournal[] = await response.json();
+  const clientJournals = flatJournals.map(mapToJournalClient);
+
+  // The buildTree helper now operates on the consistent JournalClient type.
+  return buildTree(clientJournals);
 }
 
-export async function createJournalEntry(
-  journalData: Omit<Journal, "children" | "parent">
-): Promise<Journal> {
+/**
+ * Finds all unique journals linked to one or more partners.
+ * @param partnerIds - An array of partner IDs (string format).
+ * @returns A promise resolving to an array of JournalClient objects.
+ */
+export async function fetchJournalsForPartners(
+  partnerIds: string[]
+): Promise<JournalClient[]> {
+  if (!partnerIds || partnerIds.length === 0) return [];
+
+  const params = new URLSearchParams({
+    findByPartnerIds: partnerIds.join(","),
+  });
+  const response = await fetch(`/api/journals?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch journals for partners");
+  }
+  const journals: PrismaJournal[] = await response.json();
+  return journals.map(mapToJournalClient);
+}
+
+/**
+ * Finds all unique journals linked to one or more goods.
+ * @param goodIds - An array of good IDs (string format).
+ * @returns A promise resolving to an array of JournalClient objects.
+ */
+export async function fetchJournalsForGoods(
+  goodIds: string[]
+): Promise<JournalClient[]> {
+  if (!goodIds || goodIds.length === 0) return [];
+
+  const params = new URLSearchParams({ findByGoodIds: goodIds.join(",") });
+  const response = await fetch(`/api/journals?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch journals for goods");
+  }
+  const journals: PrismaJournal[] = await response.json();
+  return journals.map(mapToJournalClient);
+}
+
+// --- CRUD Operations ---
+
+export async function createJournal(
+  journalData: CreateJournalPayload
+): Promise<JournalClient> {
   const response = await fetch("/api/journals", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(journalData),
   });
 
   if (!response.ok) {
-    const errorData = await response
+    const error = await response
       .json()
-      .catch(() => ({ message: "Unknown error creating journal" }));
-    throw new Error(
-      errorData.message || `Failed to create journal: ${response.statusText}`
-    );
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to create journal");
   }
-  return response.json();
+  const newJournal: PrismaJournal = await response.json();
+  return mapToJournalClient(newJournal);
 }
 
-export async function deleteJournalEntry(journalId: string): Promise<any> {
+export async function deleteJournal(journalId: string): Promise<any> {
   const response = await fetch(`/api/journals/${journalId}`, {
     method: "DELETE",
   });
-
   if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Unknown error deleting journal" }));
-    throw new Error(
-      errorData.message || `Failed to delete journal: ${response.statusText}`
-    );
+    throw new Error("Failed to delete journal");
   }
   if (response.status === 204) {
     return { message: `Journal ${journalId} deleted successfully.` };
   }
   return response.json();
-}
-
-export async function fetchJournalsLinkedToPartner(
-  partnerId: string
-): Promise<Journal[]> {
-  if (!partnerId) return [];
-  const response = await fetch(`/api/journals?linkedToPartnerId=${partnerId}`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Failed to fetch journals linked to partner ${partnerId}`,
-    }));
-    throw new Error(errorData.message || "Failed to fetch journals");
-  }
-  const journals: Journal[] = await response.json();
-  return journals.map((j) => ({ ...j, id: String(j.id) }));
-}
-
-export async function fetchJournalsLinkedToGood(
-  goodId: string
-): Promise<Journal[]> {
-  if (!goodId) {
-    console.warn("[fetchJournalsLinkedToGood] No goodId provided.");
-    return [];
-  }
-  const response = await fetch(`/api/journals?linkedToGoodId=${goodId}`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Failed to fetch journals linked to good ${goodId}`,
-    }));
-    throw new Error(errorData.message || "Failed to fetch journals");
-  }
-  const journals: Journal[] = await response.json();
-  return journals.map((j) => ({ ...j, id: String(j.id) }));
-}
-
-export interface TopLevelJournalAdminSelection
-  extends Pick<PrismaJournal, "id" | "name"> {}
-
-export async function fetchTopLevelJournalsForAdmin(): Promise<
-  TopLevelJournalAdminSelection[]
-> {
-  const response = await fetch("/api/journals/top-level", {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ message: "Failed to fetch top-level journals" }));
-    throw new Error(
-      errorData?.message ||
-        `Failed to fetch top-level journals: ${response.statusText}`
-    );
-  }
-  return response.json();
-}
-
-export async function fetchAllJournalsForAdminRestriction(): Promise<
-  JournalForAdminSelection[]
-> {
-  const apiUrl = "/api/journals/all-for-admin-selection";
-  console.log(`[clientJournalService] Attempting to fetch: ${apiUrl}`);
-  try {
-    const response = await fetch(apiUrl);
-    console.log(
-      `[clientJournalService] Response status for ${apiUrl}: ${response.status}`
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(
-        `[clientJournalService] Raw error from ${apiUrl}:`,
-        errorText
-      );
-      throw new Error(`Failed to fetch all journals: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    console.log(
-      "[clientJournalService] Successfully fetched all journals for admin restriction, count:",
-      data.length
-    );
-    return data;
-  } catch (error) {
-    console.error(
-      `[clientJournalService] Network or other error in fetchAllJournalsForAdminRestriction for ${apiUrl}:`,
-      error
-    );
-    throw error;
-  }
 }

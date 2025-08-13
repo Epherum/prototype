@@ -25,7 +25,7 @@ import { DocumentSliderController } from "@/features/documents/DocumentSliderCon
 import { ProjectSliderController } from "@/features/projects/ProjectSliderController";
 
 // Types
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
 
 // Props for linking modals that remain in page.tsx
 interface SliderLayoutManagerProps {

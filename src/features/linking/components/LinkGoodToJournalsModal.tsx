@@ -1,11 +1,9 @@
 // src/features/linking/components/LinkPartnerToJournalsModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import type {
-  Good,
-  AccountNodeData,
-  CreateJournalGoodLinkClientData,
-} from "@/lib/types";
+import type { GoodClient } from "@/lib/types/models.client";
+import type { AccountNodeData } from "@/lib/types/ui";
+import type { CreateJournalGoodLinkPayload } from "@/lib/schemas/journalGoodLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 
 // Reusing the CSS module from partner linking for similar structure.
@@ -15,13 +13,12 @@ import linkStyles from "./LinkItemToJournalsModal.module.css";
 interface LinkGoodToJournalsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitLinks: (linksData: CreateJournalGoodLinkClientData[]) => void;
-  goodToLink: Good | null;
+  onSubmitLinks: (linksData: CreateJournalGoodLinkPayload[]) => void;
+  goodToLink: GoodClient | null;
   isSubmitting: boolean;
   onOpenJournalSelector: (
     onSelectCallback: (journalNode: AccountNodeData) => void
   ) => void;
-  // fullJournalHierarchy: AccountNodeData[]; // Not directly used by this modal, but passed to JournalModal via Home
 }
 
 export default function LinkGoodToJournalsModal({
@@ -69,11 +66,12 @@ export default function LinkGoodToJournalsModal({
       alert("Please select at least one journal to link.");
       return;
     }
-    const linksToCreate: CreateJournalGoodLinkClientData[] =
-      selectedJournals.map((journal) => ({
-        goodId: String(goodToLink.id), // Ensure goodId is string for the client data type
+    const linksToCreate: CreateJournalGoodLinkPayload[] = selectedJournals.map(
+      (journal) => ({
+        goodId: goodToLink.id,
         journalId: journal.id,
-      }));
+      })
+    );
     onSubmitLinks(linksToCreate);
   };
 

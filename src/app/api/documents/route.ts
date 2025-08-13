@@ -1,116 +1,136 @@
-//src/app/api/documents/route.ts
+// src/app/api/documents/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import {
-  authOptions,
-  ExtendedSession,
-  ExtendedUser,
-} from "@/lib/auth/authOptions";
-import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
-// REMOVED: withAuthorization is no longer used here.
+import { z } from "zod";
 import documentService, {
+  CreateDocumentData,
   createDocumentSchema,
 } from "@/app/services/documentService";
-import { ZodError } from "zod";
+import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { withAuthorization } from "@/lib/auth/withAuthorization";
+import { ExtendedSession } from "@/lib/auth/authOptions";
 
-// --- GET Handler (Now Fully Public) ---
-export async function GET(request: NextRequest) {
-  // REMOVED: Manual session check is gone.
+// ... (your zod schemas remain unchanged)
+const getDocumentsQuerySchema = z.object({
+  take: z.coerce.number().int().positive().optional(),
+  skip: z.coerce.number().int().nonnegative().optional(),
+  filterByJournalIds: z
+    .string()
+    .transform((val) => val.split(","))
+    .optional(),
+  filterByPartnerIds: z
+    .string()
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => parseBigInt(id, "partner ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+  filterByGoodIds: z
+    .string()
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => parseBigInt(id, "good ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+});
 
-  const { searchParams } = new URL(request.url);
-  const partnerIdStr = searchParams.get("partnerId");
+const apiCreateDocumentSchema = createDocumentSchema.extend({
+  journalId: z.string().min(1, "Journal ID is required for creation."),
+});
 
-  if (!partnerIdStr) {
-    return NextResponse.json(
-      { message: "Missing required 'partnerId' query parameter." },
-      { status: 400 }
-    );
-  }
+/**
+ * GET /api/documents
+ * Fetches documents. Requires full management permission for the DOCUMENT resource.
+ */
+export const GET = withAuthorization(
+  async function GET(request: NextRequest, _context, session: ExtendedSession) {
+    try {
+      const queryParams = Object.fromEntries(request.nextUrl.searchParams);
+      const validation = getDocumentsQuerySchema.safeParse(queryParams);
 
-  const partnerId = parseBigIntParam(partnerIdStr, "partnerId");
-  if (partnerId === null) {
-    return NextResponse.json(
-      { message: "Invalid 'partnerId' format." },
-      { status: 400 }
-    );
-  }
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            message: "Invalid query parameters.",
+            errors: validation.error.format(),
+          },
+          { status: 400 }
+        );
+      }
 
-  try {
-    const result = await documentService.getDocuments({ partnerId });
-    const body = JSON.stringify(
-      { data: result.documents, total: result.totalCount },
-      jsonBigIntReplacer
-    );
-    return new NextResponse(body, {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("API /documents GET Error:", error);
-    return NextResponse.json(
-      { message: "Failed to retrieve documents." },
-      { status: 500 }
-    );
-  }
-}
+      const result = await documentService.getAllDocuments({
+        ...validation.data,
+        restrictedJournalId: session.user?.restrictedTopLevelJournalId,
+      });
 
-// --- POST Handler (Requires Authentication, Not Authorization) ---
-export async function POST(request: NextRequest) {
-  // MODIFIED: Manually get session for authentication.
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-
-  // This check is for AUTHENTICATION, which is required.
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { message: "Authentication is required to perform this action." },
-      { status: 401 }
-    );
-  }
-
-  const createdById = session.user.id;
-  const createdByIp =
-    request.headers.get("x-forwarded-for") ||
-    request.headers.get("x-real-ip") ||
-    "unknown";
-
-  try {
-    const rawData = await request.json();
-    const validation = createDocumentSchema.safeParse(rawData);
-
-    if (!validation.success) {
+      const body = JSON.stringify(result, jsonBigIntReplacer);
+      return new NextResponse(body, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error("API GET /api/documents Error:", e);
       return NextResponse.json(
-        {
-          message: "Invalid document payload.",
-          errors: validation.error.format(),
-        },
-        { status: 400 }
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
       );
     }
+  },
+  // CORRECTED: Uses the exact, type-safe values from our central definition.
+  { action: "MANAGE", resource: "DOCUMENT" }
+);
 
-    const newDocument = await documentService.createDocument(
-      validation.data,
-      createdById,
-      createdByIp
-    );
+/**
+ * POST /api/documents
+ * Creates a new Document. This is part of 'managing' documents.
+ */
+export const POST = withAuthorization(
+  async function POST(
+    request: NextRequest,
+    _context,
+    session: ExtendedSession
+  ) {
+    try {
+      const rawBody = await request.json();
+      const validation = apiCreateDocumentSchema.safeParse(rawBody);
 
-    const body = JSON.stringify(newDocument, jsonBigIntReplacer);
-    return new NextResponse(body, {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("API /documents POST Error:", error);
-    if (error instanceof ZodError) {
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            message: "Invalid request body for creating a document.",
+            errors: validation.error.format(),
+          },
+          { status: 400 }
+        );
+      }
+
+      const { journalId, ...documentData } = validation.data;
+      const newDocument = await documentService.createDocument(
+        documentData as CreateDocumentData,
+        session.user!.id,
+        journalId
+      );
+
+      const body = JSON.stringify(newDocument, jsonBigIntReplacer);
+      return new NextResponse(body, {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error("API POST /api/documents Error:", e);
       return NextResponse.json(
-        { message: "Validation error.", errors: error.format() },
-        { status: 400 }
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
       );
     }
-    return NextResponse.json(
-      { message: "Failed to create document." },
-      { status: 500 }
-    );
-  }
-}
+  },
+  // CORRECTED: Creating a document falls under the 'MANAGE' permission.
+  // This aligns with our central definition and simplifies the permission model.
+  { action: "MANAGE", resource: "DOCUMENT" }
+);

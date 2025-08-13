@@ -5,19 +5,16 @@ import { useMemo, useCallback, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
 import { documentKeys } from "@/lib/queryKeys";
-import {
-  fetchDocuments,
-  createDocument,
-  createBulkDocuments,
-} from "@/services/clientDocumentService";
+import { createDocument } from "@/services/clientDocumentService";
 import { SLIDER_TYPES } from "@/lib/constants";
+
+// ✅ NEW: Correct, structured imports
+import type { DocumentClient, GoodClient } from "@/lib/types/models.client";
 import type {
-  DocumentCreationMode,
-  DocumentItem,
-  Good,
-  CreateDocumentClientData,
-  Document,
-} from "@/lib/types";
+  CreateDocumentPayload,
+  DocumentLinePayload,
+} from "@/lib/schemas/document.schema";
+import type { DocumentCreationMode, DocumentItem } from "@/lib/types/ui";
 
 import { useChainedQuery } from "@/hooks/useChainedQuery";
 
@@ -68,12 +65,8 @@ export const useDocumentManager = () => {
       );
       return;
     }
-
-    // ✅ FIX: Use the new, correct `selectedJournalId` from the store.
     const journalContext = selections.journal.selectedJournalId;
 
-    // This check is now robust. The button to call this is already disabled if this is null,
-    // but this serves as an important safeguard within the logic itself.
     if (!journalContext) {
       alert("Please select a single, terminal journal to create a document.");
       return;
@@ -92,7 +85,8 @@ export const useDocumentManager = () => {
       partnerIdx !== -1 &&
       goodIdx !== -1
     ) {
-      if (!selections.partner || !selections.goods) {
+      if (!selections.partner || !selections.good) {
+        // ✅ RENAMED: selections.goods -> selections.good
         alert(
           "Please select a Partner and a Good before creating the document."
         );
@@ -101,8 +95,8 @@ export const useDocumentManager = () => {
       creationMode = "SINGLE_ITEM";
       initialState = {
         lockedPartnerIds: [selections.partner],
-        lockedGoodIds: [selections.goods],
-        lockedJournalId: journalContext, // Use correct context
+        lockedGoodIds: [selections.good], // ✅ RENAMED
+        lockedJournalId: journalContext,
       };
     } else if (partnerIdx < docIdx && docIdx < goodIdx) {
       if (!selections.partner) {
@@ -112,30 +106,31 @@ export const useDocumentManager = () => {
       creationMode = "LOCK_PARTNER";
       initialState = {
         lockedPartnerIds: [selections.partner],
-        lockedJournalId: journalContext, // Use correct context
+        lockedJournalId: journalContext,
       };
     } else if (goodIdx < docIdx && docIdx < partnerIdx) {
-      if (!selections.goods) {
+      if (!selections.good) {
+        // ✅ RENAMED
         alert("Please select a Good to lock in.");
         return;
       }
       creationMode = "LOCK_GOOD";
       initialState = {
-        lockedGoodIds: [selections.goods],
-        lockedJournalId: journalContext, // Use correct context
+        lockedGoodIds: [selections.good], // ✅ RENAMED
+        lockedJournalId: journalContext,
       };
     } else if (docIdx < partnerIdx && partnerIdx < goodIdx) {
       creationMode = "INTERSECT_FROM_PARTNER";
-      initialState = { lockedJournalId: journalContext }; // Use correct context
+      initialState = { lockedJournalId: journalContext };
     } else if (docIdx < goodIdx && goodIdx < partnerIdx) {
       creationMode = "INTERSECT_FROM_GOOD";
-      initialState = { lockedJournalId: journalContext }; // Use correct context
+      initialState = { lockedJournalId: journalContext };
     }
 
     if (creationMode !== "IDLE") {
       startDocumentCreation(creationMode, initialState);
       if (creationMode === "SINGLE_ITEM") {
-        setQuantityModalState({ isOpen: true, goodId: selections.goods });
+        setQuantityModalState({ isOpen: true, goodId: selections.good }); // ✅ RENAMED
       }
     } else {
       alert(
@@ -157,12 +152,15 @@ export const useDocumentManager = () => {
   }, [cancelDocumentCreation]);
 
   const handleSingleItemSubmit = useCallback(
-    ({ good, quantity }: { good: Good; quantity: number }) => {
+    ({ good, quantity }: { good: GoodClient; quantity: number }) => {
+      // ✅ TYPE: Good -> GoodClient
       const newItem: DocumentItem = {
         goodId: good.id,
-        goodLabel: good.label || good.name || "Unknown Good",
+        goodLabel: good.label || good.label || "Unknown Good",
         quantity: quantity,
-        unitPrice: good.price || 0,
+        unitPrice: 0,
+        // ✅ NEW: Pass the required link ID
+        journalPartnerGoodLinkId: (good as any).jpqLinkId,
       };
       setDocumentItems([newItem]);
       setQuantityModalState({ isOpen: false, goodId: null });
@@ -171,34 +169,26 @@ export const useDocumentManager = () => {
     [setDocumentItems]
   );
 
+  // ✅ REFACTORED: Mutation now handles a single document creation.
   const createDocMutation = useMutation<
-    Document | { success: boolean; createdCount: number },
+    DocumentClient,
     Error,
-    CreateDocumentClientData | CreateDocumentClientData[]
+    CreateDocumentPayload
   >({
-    mutationFn: (
-      data: CreateDocumentClientData | CreateDocumentClientData[]
-    ) => {
-      if (Array.isArray(data)) {
-        return createBulkDocuments(data);
-      }
-      return createDocument(data);
-    },
+    mutationFn: createDocument,
+    // Note: onSuccess will now fire for each successful creation.
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
-      alert(`Document(s) created successfully!`);
-      handleCancelCreation();
     },
     onError: (error: Error) => {
-      alert(`Error creating document(s): ${error.message}`);
-    },
-    onSettled: () => {
-      setIsFinalizeModalOpen(false);
+      // This will alert for each failure.
+      alert(`Error creating a document: ${error.message}`);
     },
   });
 
   const handlePrepareFinalization = useCallback(
-    (allGoodsInSlider: Good[]) => {
+    (allGoodsInSlider: GoodClient[]) => {
+      // ✅ TYPE: Good[] -> GoodClient[]
       const success = prepareDocumentForFinalization(allGoodsInSlider);
       if (success) {
         setIsFinalizeModalOpen(true);
@@ -207,20 +197,35 @@ export const useDocumentManager = () => {
     [prepareDocumentForFinalization]
   );
 
+  // ✅ REFACTORED: Logic now iterates and calls the single-item mutation.
   const handleSubmit = useCallback(
-    (headerData: { refDoc: string; date: Date; type: any }) => {
+    async (headerData: { refDoc: string; date: Date; type: any }) => {
+      if (!lockedJournalId) {
+        alert("Critical Error: Journal ID is missing for document creation.");
+        return;
+      }
       if (items.length === 0) {
         alert("Cannot create a document with no lines.");
         return;
       }
-      const lines = items.map((item) => ({
-        journalPartnerGoodLinkId:
-          item.journalPartnerGoodLinkId || `NEEDS_REAL_ID_FOR_${item.goodId}`,
-        designation: item.goodLabel,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        taxRate: 0.2,
-      }));
+
+      const lines: DocumentLinePayload[] = items.map((item) => {
+        if (!item.journalPartnerGoodLinkId) {
+          throw new Error(
+            `Could not find required Link ID for item: ${item.goodLabel}`
+          );
+        }
+        return {
+          journalPartnerGoodLinkId: item.journalPartnerGoodLinkId,
+          designation: item.goodLabel,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          taxRate: 0.2, // This should likely come from data, but 0.2 is the placeholder
+        };
+      });
+
+      let payloadsToCreate: CreateDocumentPayload[] = [];
+
       if (
         mode === "LOCK_GOOD" ||
         mode === "INTERSECT_FROM_PARTNER" ||
@@ -230,26 +235,51 @@ export const useDocumentManager = () => {
           alert("Error: No partners selected for document creation.");
           return;
         }
-        const payloads = lockedPartnerIds.map((partnerId) => ({
+        payloadsToCreate = lockedPartnerIds.map((partnerId) => ({
           ...headerData,
+          journalId: lockedJournalId,
           partnerId,
           lines,
         }));
-        createDocMutation.mutate(payloads);
       } else {
         if (lockedPartnerIds.length !== 1) {
           alert("Error: Exactly one partner must be locked for this mode.");
           return;
         }
-        const payload = {
+        payloadsToCreate.push({
           ...headerData,
+          journalId: lockedJournalId,
           partnerId: lockedPartnerIds[0],
           lines,
-        };
-        createDocMutation.mutate(payload);
+        });
       }
+
+      // Create documents sequentially
+      let successCount = 0;
+      for (const payload of payloadsToCreate) {
+        try {
+          await createDocMutation.mutateAsync(payload);
+          successCount++;
+        } catch (e) {
+          // Error is already handled by the mutation's onError, but we stop processing.
+          break;
+        }
+      }
+
+      if (successCount > 0) {
+        alert(`${successCount} document(s) created successfully!`);
+        handleCancelCreation();
+      }
+
+      setIsFinalizeModalOpen(false);
     },
-    [documentCreationState, items, createDocMutation]
+    [
+      documentCreationState,
+      items,
+      createDocMutation,
+      handleCancelCreation,
+      lockedJournalId,
+    ]
   );
 
   const documentsQuery = useQuery(useChainedQuery(SLIDER_TYPES.DOCUMENT));
@@ -268,7 +298,7 @@ export const useDocumentManager = () => {
     setDocumentItems,
     handleSubmit,
     handleSingleItemSubmit,
-    documentsForSlider: documentsQuery.data?.data || [],
+    documentsForSlider: (documentsQuery.data?.data || []) as DocumentClient[], // ✅ TYPE CAST
     documentsQuery,
     handlePrepareFinalization,
     isFinalizeModalOpen,

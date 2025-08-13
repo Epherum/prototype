@@ -11,7 +11,7 @@ import type {
   AccountNodeData,
   ActivePartnerFilters,
   PartnerGoodFilterStatus,
-} from "@/lib/types";
+} from "@/lib/types/ui";
 
 const pastelColors = [
   "#BFFCC6",

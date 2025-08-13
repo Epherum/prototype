@@ -6,21 +6,26 @@ import { userKeys, roleKeys } from "@/lib/queryKeys";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useJournalManager } from "@/features/journals/useJournalManager";
+// ✨ MODIFIED: Import new, correct types from schemas and client models.
+import {
+  CreateUserPayload,
+  UpdateUserPayload,
+} from "@/lib/schemas/user.schema";
 import {
   createUser,
   updateUser,
   fetchUserById,
-  CreateUserClientPayload,
-  UpdateUserClientPayload,
 } from "@/services/clientUserService";
 import { fetchAllRoles } from "@/services/clientRoleService";
-import type { RoleWithPermissions, AccountNodeData } from "@/lib/types";
+import type { RoleWithPermissionsClient } from "@/lib/types/models.client";
+import type { UserWithRolesClient } from "@/lib/types/models.client";
+import type { AccountNodeData } from "@/lib/types/ui";
 
-// ... (interfaces remain the same)
 interface RoleAssignmentFormState {
   roleId: string;
   roleName?: string;
 }
+
 export interface UserManagementFormState {
   id?: string;
   name: string;
@@ -29,6 +34,7 @@ export interface UserManagementFormState {
   roleAssignments: RoleAssignmentFormState[];
   restrictedTopLevelJournalId: string | null;
 }
+
 const initialFormState: UserManagementFormState = {
   name: "",
   email: "",
@@ -86,26 +92,28 @@ export function useUserManagement(
     return adminJournalRoot ? [adminJournalRoot] : [];
   }, [fullJournalHierarchy, isCurrentUserRestricted, currentUser]);
 
+  // ✨ MODIFIED: The query will now return the correct `UserWithRolesClient` type.
   const { data: userToEditData, isLoading: isLoadingUserToEdit } = useQuery({
     queryKey: userKeys.detail(userIdToEdit!),
-    queryFn: () => fetchUserById(userIdToEdit!),
+    queryFn: (): Promise<UserWithRolesClient> => fetchUserById(userIdToEdit!),
     enabled: isEditMode,
   });
 
-  // Now fetching roles is part of this hook's responsibility
+  // ✨ MODIFIED: The query now returns the correct `RoleWithPermissionsClient[]` type.
   const { data: assignableRoles, isLoading: isLoadingRoles } = useQuery({
     queryKey: roleKeys.all,
-    queryFn: fetchAllRoles,
+    queryFn: (): Promise<RoleWithPermissionsClient[]> => fetchAllRoles(),
   });
 
+  // ✨ MODIFIED: Use the correct Zod-inferred payload types.
   const mutation = useMutation({
     mutationFn: (data: {
       id?: string;
-      payload: CreateUserClientPayload | UpdateUserClientPayload;
+      payload: CreateUserPayload | UpdateUserPayload;
     }) => {
       return data.id
-        ? updateUser(data.id, data.payload as UpdateUserClientPayload)
-        : createUser(data.payload as CreateUserClientPayload);
+        ? updateUser(data.id, data.payload as UpdateUserPayload)
+        : createUser(data.payload as CreateUserPayload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: userKeys.all });
@@ -171,6 +179,11 @@ export function useUserManagement(
     (selectedRoleIds: string[]) => {
       setFormState((prev) => {
         const newAssignments = selectedRoleIds.map((roleId) => {
+          const existing = prev.roleAssignments.find(
+            (ra) => ra.roleId === roleId
+          );
+          if (existing) return existing;
+
           const role = assignableRoles?.find((r) => r.id === roleId);
           return {
             roleId,
@@ -194,21 +207,38 @@ export function useUserManagement(
     []
   );
 
+  // ✨ MODIFIED: Build a payload that strictly matches the Zod schema.
   const handleSubmit = useCallback(async () => {
     if (formState.roleAssignments.length === 0) {
       alert("A user must have at least one role.");
       return;
     }
 
-    const payload = {
+    // The user's single top-level journal restriction is applied to ALL role assignments.
+    // This bridges the gap between the UI's single selection and the schema's per-role structure.
+    const mappedRoleAssignments = formState.roleAssignments.map(
+      ({ roleId }) => ({
+        roleId: roleId,
+        // The journalId for each assignment is the user's overall restriction.
+        journalId: formState.restrictedTopLevelJournalId,
+      })
+    );
+
+    const payload: CreateUserPayload | UpdateUserPayload = {
       name: formState.name,
       email: formState.email,
-      password: formState.password || undefined,
-      roleAssignments: formState.roleAssignments.map(({ roleId }) => ({
-        roleId,
-      })),
+      // This now matches the schema: { roleAssignments: [...] }
+      roleAssignments: mappedRoleAssignments,
       restrictedTopLevelJournalId: formState.restrictedTopLevelJournalId,
     };
+
+    // Only include password if it's not empty. The Zod schema handles validation.
+    if (formState.password) {
+      // The `as any` is a small concession because the base type doesn't include password,
+      // but it's added conditionally. The Zod schemas handle this correctly.
+      (payload as any).password = formState.password;
+    }
+
     mutation.mutate({ id: formState.id, payload });
   }, [formState, mutation]);
 

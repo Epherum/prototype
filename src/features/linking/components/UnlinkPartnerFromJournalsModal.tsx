@@ -2,16 +2,19 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Partner, JournalPartnerLinkWithDetails } from "@/lib/types";
+import type {
+  PartnerClient,
+  JournalPartnerLinkWithDetailsClient,
+} from "@/lib/types/models.client";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./UnlinkPartnerFromJournalsModal.module.css"; // Create this
 
 interface UnlinkPartnerFromJournalsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  partner: Partner;
+  partner: PartnerClient;
   onUnlink: (linkIdsToUnlink: string[]) => void;
-  fetchLinksFn: () => Promise<JournalPartnerLinkWithDetails[]>;
+  fetchLinksFn: () => Promise<JournalPartnerLinkWithDetailsClient[]>;
   isUnlinking: boolean; // To disable buttons during unlinking
 }
 
@@ -33,7 +36,7 @@ export default function UnlinkPartnerFromJournalsModal({
     isLoading,
     isError,
     error,
-  } = useQuery<JournalPartnerLinkWithDetails[], Error>({
+  } = useQuery<JournalPartnerLinkWithDetailsClient[], Error>({
     queryKey: queryKey,
     queryFn: async () => {
       // Wrap fetchLinksFn to ensure partner.id is valid before calling
@@ -144,8 +147,8 @@ export default function UnlinkPartnerFromJournalsModal({
                       className={styles.checkboxInput}
                     />
                     <span className={styles.linkLabel}>
-                      {link.journalName || `Journal ID: ${link.journalId}`}
-                      {link.journalCode && ` (${link.journalCode})`}
+                      {link.journal?.name || `Journal ID: ${link.journalId}`}
+                      {link.journal?.id && ` (${link.journal.id})`}
                     </span>
                   </label>
                 </li>

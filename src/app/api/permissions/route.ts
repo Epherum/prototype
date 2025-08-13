@@ -2,14 +2,16 @@
 
 import { NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
-import { getAllPermissions } from "@/app/services/roleService";
+// CORRECT: Import the service object
+import roleService from "@/app/services/roleService";
 
 const getHandler = async () => {
   try {
-    const permissions = await getAllPermissions();
+    // CORRECT: Call the method on the service object
+    const permissions = await roleService.getAllPermissions();
     return NextResponse.json(permissions);
   } catch (error) {
-    console.error("API Error fetching all permissions:", error);
+    console.error("API GET /api/permissions Error:", error);
     return NextResponse.json(
       { message: "Failed to fetch permissions" },
       { status: 500 }
@@ -17,8 +19,8 @@ const getHandler = async () => {
   }
 };
 
-// Only users who can manage other users should be able to see the available permissions.
+// CORRECT: Resource should be 'Roles'. A user needs to manage roles to see the permissions.
 export const GET = withAuthorization(getHandler, {
-  action: "MANAGE",
-  resource: "USERS",
+  action: "READ",
+  resource: "ROLE",
 });

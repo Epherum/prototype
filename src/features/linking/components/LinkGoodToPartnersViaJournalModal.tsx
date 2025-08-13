@@ -1,12 +1,9 @@
 // src/components/modals/LinkGoodToPartnersViaJournalModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import type {
-  Good,
-  Partner,
-  AccountNodeData,
-  CreateJournalPartnerGoodLinkClientData,
-} from "@/lib/types";
+import type { GoodClient, PartnerClient } from "@/lib/types/models.client";
+import type { AccountNodeData } from "@/lib/types/ui";
+import type { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import listStyles from "./LinkGoodToPartnersViaJournalModal.module.css"; // A new CSS module for the list items
 import { IoClose } from "react-icons/io5";
@@ -14,10 +11,10 @@ import { IoClose } from "react-icons/io5";
 interface LinkGoodToPartnersViaJournalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitLinks: (linksData: CreateJournalPartnerGoodLinkClientData[]) => void;
-  goodToLink: Good | null;
+  onSubmitLinks: (linksData: CreateJournalPartnerGoodLinkPayload[]) => void;
+  goodToLink: GoodClient | null;
   targetJournal: AccountNodeData | null;
-  availablePartners: Partner[]; // Pre-fetched list of partners linked to targetJournal
+  availablePartners: PartnerClient[]; // Pre-fetched list of partners linked to targetJournal
   isSubmitting: boolean;
 }
 
@@ -58,12 +55,12 @@ export default function LinkGoodToPartnersViaJournalModal({
       return;
     }
 
-    const linksToCreate: CreateJournalPartnerGoodLinkClientData[] = Array.from(
+    const linksToCreate: CreateJournalPartnerGoodLinkPayload[] = Array.from(
       selectedPartnerIds
     ).map((partnerId) => ({
       journalId: targetJournal.id,
       partnerId: partnerId,
-      goodId: String(goodToLink.id),
+      goodId: goodToLink.id, // This is already a string on GoodClient
       partnershipType: "STANDARD_TRANSACTION", // IMPORTANT: Or make this configurable/derived
       // descriptiveText: `Link for ${goodToLink.label} with partner ${partnerId} under ${targetJournal.name}`,
     }));

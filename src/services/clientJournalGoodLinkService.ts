@@ -1,72 +1,77 @@
-// src/services/clientJournalGoodLinkService.ts
-import type {
-  CreateJournalGoodLinkClientData,
-  JournalGoodLinkClient,
-  JournalGoodLinkWithDetails,
-} from "@/lib/types"; // We'll define/update these types next
+//src/services/clientJournalGoodLinkService.ts
+import { JournalGoodLink as PrismaJGL } from "@prisma/client";
+import { JournalGoodLinkClient } from "@/lib/types/models.client";
+import { CreateJournalGoodLinkPayload } from "@/lib/schemas/journalGoodLink.schema";
 
-export async function createJournalGoodLink(
-  data: CreateJournalGoodLinkClientData
-): Promise<JournalGoodLinkClient> {
-  const payload = {
-    ...data,
-    // goodId will be sent as string from client, backend Zod schema handles BigInt conversion
-  };
+const API_BASE_URL = "/api/journal-good-links";
 
-  const response = await fetch("/api/journal-good-links", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: "Unknown error creating journal-good link",
-    }));
-    throw new Error(
-      errorData.message ||
-        `Failed to create journal-good link: ${response.statusText}`
-    );
-  }
-  const newLink = await response.json();
-  // Ensure IDs from response are strings
+// --- Mapper Function ---
+function mapToJglClient(raw: PrismaJGL): JournalGoodLinkClient {
   return {
-    ...newLink,
-    id: String(newLink.id),
-    goodId: String(newLink.goodId),
-    journalId: String(newLink.journalId),
+    ...raw,
+    id: String(raw.id),
+    goodId: String(raw.goodId),
   };
 }
 
-export async function deleteJournalGoodLink(
-  linkId: string
-): Promise<{ message: string }> {
-  const response = await fetch(`/api/journal-good-links/${linkId}`, {
+/**
+ * Fetches JournalGoodLink records based on query parameters.
+ * @param params - Optional query parameters to filter links.
+ * @returns A promise resolving to an array of links.
+ */
+export async function getJournalGoodLinks(params: {
+  linkId?: string;
+  journalId?: string;
+  goodId?: string;
+}): Promise<JournalGoodLinkClient[]> {
+  const query = new URLSearchParams(params as Record<string, string>);
+  const response = await fetch(`${API_BASE_URL}?${query.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch journal-good links");
+  }
+  const rawLinks: PrismaJGL[] = await response.json();
+  return rawLinks.map(mapToJglClient);
+}
+
+/**
+ * Creates a new link between a Journal and a Good.
+ * @param data - The payload for creating the link.
+ * @returns The newly created link.
+ */
+export async function createJournalGoodLink(
+  data: CreateJournalGoodLinkPayload
+): Promise<JournalGoodLinkClient> {
+  const response = await fetch(API_BASE_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to create journal-good link");
+  }
+  const newLink: PrismaJGL = await response.json();
+  return mapToJglClient(newLink);
+}
+
+/**
+ * Deletes a JournalGoodLink by its unique ID.
+ * @param linkId - The ID of the link to delete.
+ */
+export async function deleteJournalGoodLinkById(linkId: string): Promise<void> {
+  const query = new URLSearchParams({ linkId });
+  const response = await fetch(`${API_BASE_URL}?${query.toString()}`, {
     method: "DELETE",
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Unknown error deleting journal-good link ID ${linkId}`,
-    }));
-    throw new Error(
-      errorData.message || `Failed to delete link: ${response.statusText}`
-    );
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to delete link");
   }
-  return response.json();
-}
-
-// Fetches all journals a specific good is linked to, with journal details
-export async function fetchJournalLinksForGood(
-  goodId: string
-): Promise<JournalGoodLinkWithDetails[]> {
-  const response = await fetch(`/api/goods/${goodId}/journal-links`);
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({
-      message: `Failed to fetch journal links for good ${goodId}`,
-    }));
-    throw new Error(errorData.message || "Failed to fetch journal links");
-  }
-  const links: JournalGoodLinkWithDetails[] = await response.json();
-  return links;
 }

@@ -2,7 +2,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { findNodeById, findParentOfNode } from "@/lib/helpers";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
 
 const CYCLE_STATES = {
   RESTORE_SAVED: "RESTORE_SAVED",

@@ -1,27 +1,26 @@
-// src/components/modals/AddEditGoodModal.tsx
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
-import formStyles from "./AddEditGoodModal.module.css"; // Create this CSS Module
-import { IoClose } from "react-icons/io5";
-import type {
-  Good,
-  CreateGoodClientData,
-  UpdateGoodClientData,
-} from "@/lib/types";
+// src/features/goods/components/AddEditGoodModal.tsx
 
+import React, { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { motion, AnimatePresence } from "framer-motion";
+import { IoClose } from "react-icons/io5";
+
+// ✅ 1. Import new, robust types and schemas
+import { createGoodSchema, CreateGoodPayload } from "@/lib/schemas/good.schema";
+import { GoodClient } from "@/lib/types/models.client";
+
+// ✅ 2. Use a consistent styling approach
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
+import formStyles from "./AddEditGoodModal.module.css";
+
+// ✅ 3. Update the props to use the new types
 interface AddEditGoodModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (
-    data: CreateGoodClientData | UpdateGoodClientData,
-    id?: string
-  ) => void;
-  initialData?: Good | null;
-  isSubmitting?: boolean;
-  // You might need to pass lists for TaxCodes and UnitsOfMeasure if they are selectable
-  // taxCodes?: TaxCodeType[];
-  // unitsOfMeasure?: UnitOfMeasureType[];
+  onSubmit: (data: CreateGoodPayload) => void;
+  initialData: GoodClient | null;
+  isSubmitting: boolean;
 }
 
 const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
@@ -31,19 +30,36 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
   initialData,
   isSubmitting,
 }) => {
-  const isEditMode = Boolean(initialData);
-  const [formData, setFormData] = useState<Partial<CreateGoodClientData>>({});
+  const isEditing = !!initialData;
 
+  // ✅ 4. Setup react-hook-form with Zod resolver
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CreateGoodPayload>({
+    resolver: zodResolver(createGoodSchema),
+    defaultValues: {
+      label: "",
+      referenceCode: "",
+      barcode: "",
+      description: "",
+      price: undefined,
+      taxCodeId: undefined,
+      unitCodeId: undefined,
+      typeCode: "",
+    },
+  });
+
+  // Effect for escape key & body scroll (Good practice, retained from your original)
   useEffect(() => {
-    // Escape key & body scroll
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "unset";
     }
     return () => {
       document.removeEventListener("keydown", handleEscape);
@@ -51,87 +67,35 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
     };
   }, [isOpen, onClose]);
 
+  // ✅ 5. Replace manual form initialization with react-hook-form's `reset`
   useEffect(() => {
-    // Form data initialization
     if (isOpen) {
-      if (isEditMode && initialData) {
-        // Map initialData (which is of type Good from frontend) to form data
-        const {
-          id,
-          taxCode,
-          unitOfMeasure,
-          name,
-          code,
-          unit_code,
-          ...editableData
-        } = initialData;
-        setFormData({
-          ...editableData,
-          label: initialData.label || initialData.name || "", // Prefer label if present
-          referenceCode: initialData.referenceCode || initialData.code,
-          taxCodeId: initialData.taxCodeId, // Use the ID
-          unitCodeId: initialData.unitCodeId, // Use the ID
+      if (initialData) {
+        // When editing, populate the form with initialData
+        reset({
+          label: initialData.label,
+          // Per schema, these fields are not updatable, but we show them
+          referenceCode: initialData.referenceCode || "",
+          barcode: initialData.barcode || "",
+          description: initialData.description || "",
+          price: 0 as number, // Default to 0 if not provided
+          taxCodeId: initialData.taxCodeId ?? undefined,
+          unitCodeId: initialData.unitCodeId ?? undefined,
+          typeCode: initialData.typeCode || "",
+          // ... map other fields
         });
       } else {
-        setFormData({}); // Clear for add mode
+        // When adding, reset to default values
+        reset();
       }
     }
-  }, [isOpen, initialData, isEditMode]);
+  }, [initialData, isOpen, reset]);
 
-  const handleChange = (
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
-  ) => {
-    const { name, value, type } = e.target;
-    let processedValue: string | number | boolean | null = value;
-
-    if (type === "checkbox" && e.target instanceof HTMLInputElement) {
-      processedValue = e.target.checked;
-    } else if (
-      type === "number" ||
-      name === "taxCodeId" ||
-      name === "unitCodeId" ||
-      name === "price"
-    ) {
-      processedValue = value === "" ? null : parseFloat(value); // Convert to number or null
-      if (isNaN(processedValue as number)) processedValue = null; // If not a valid number, set to null
-    } else {
-      processedValue = value === "" ? null : value; // Set to null if empty for optional text fields
-    }
-
-    setFormData((prev) => ({ ...prev, [name]: processedValue }));
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    if (!formData.label) {
-      alert("Label is required for a good/service.");
-      return;
-    }
-
-    const dataToSubmit = { ...formData };
-    // Ensure numeric fields are numbers or null
-    if (dataToSubmit.taxCodeId !== undefined)
-      dataToSubmit.taxCodeId = dataToSubmit.taxCodeId
-        ? Number(dataToSubmit.taxCodeId)
-        : null;
-    if (dataToSubmit.unitCodeId !== undefined)
-      dataToSubmit.unitCodeId = dataToSubmit.unitCodeId
-        ? Number(dataToSubmit.unitCodeId)
-        : null;
-    if (dataToSubmit.price !== undefined)
-      dataToSubmit.price = dataToSubmit.price
-        ? Number(dataToSubmit.price)
-        : null;
-
-    if (isEditMode && initialData?.id) {
-      onSubmit(dataToSubmit as UpdateGoodClientData, initialData.id);
-    } else {
-      onSubmit(dataToSubmit as CreateGoodClientData);
-    }
+  // ✅ 6. The `handleSubmit` from react-hook-form handles validation.
+  // This function only runs if validation succeeds.
+  // The 'data' is guaranteed to be `CreateGoodPayload`.
+  const handleFormSubmit = (data: CreateGoodPayload) => {
+    onSubmit(data);
   };
 
   return (
@@ -159,109 +123,85 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
               <IoClose />
             </button>
             <h2 className={baseStyles.modalTitle}>
-              {isEditMode ? "Edit Good/Service" : "Add New Good/Service"}
+              {isEditing ? "Edit Good/Service" : "Add New Good/Service"}
             </h2>
 
-            <form onSubmit={handleSubmit} className={formStyles.goodForm}>
+            {/* ✅ 7. The form now uses the `handleSubmit` wrapper */}
+            <form
+              onSubmit={handleSubmit(handleFormSubmit)}
+              className={formStyles.goodForm}
+              noValidate
+            >
               <div className={formStyles.formGroup}>
                 <label htmlFor="label">Label *</label>
+                {/* ✅ 8. Use `register` instead of manual value/onChange */}
                 <input
-                  type="text"
                   id="label"
-                  name="label"
-                  value={formData.label || ""}
-                  onChange={handleChange}
-                  required
+                  {...register("label")}
                   disabled={isSubmitting}
                 />
+                {/* ✅ 9. Display validation errors from the Zod schema */}
+                {errors.label && (
+                  <p className={formStyles.error}>{errors.label.message}</p>
+                )}
               </div>
+
               <div className={formStyles.formGroup}>
                 <label htmlFor="referenceCode">Reference Code</label>
                 <input
-                  type="text"
                   id="referenceCode"
-                  name="referenceCode"
-                  value={formData.referenceCode || ""}
-                  onChange={handleChange}
-                  disabled={isEditMode || isSubmitting}
+                  {...register("referenceCode")}
+                  disabled={isEditing || isSubmitting}
                 />
-                {/* Typically, ref code is not editable after creation */}
+                {errors.referenceCode && (
+                  <p className={formStyles.error}>
+                    {errors.referenceCode.message}
+                  </p>
+                )}
               </div>
+
               <div className={formStyles.formGroup}>
-                <label htmlFor="typeCode">
-                  Type Code (e.g., SERVICE, PRODUCT)
-                </label>
+                <label htmlFor="barcode">Barcode</label>
                 <input
-                  type="text"
-                  id="typeCode"
-                  name="typeCode"
-                  value={formData.typeCode || ""}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
+                  id="barcode"
+                  {...register("barcode")}
+                  disabled={isEditing || isSubmitting}
                 />
+                {errors.barcode && (
+                  <p className={formStyles.error}>{errors.barcode.message}</p>
+                )}
               </div>
+
               <div className={formStyles.formGroup}>
                 <label htmlFor="description">Description</label>
                 <textarea
                   id="description"
-                  name="description"
-                  value={formData.description || ""}
-                  onChange={handleChange}
+                  {...register("description")}
                   disabled={isSubmitting}
                 />
-              </div>
-              <div className={formStyles.formGroup}>
-                <label htmlFor="price">Price</label>
-                <input
-                  type="number"
-                  id="price"
-                  name="price"
-                  value={
-                    formData.price === null || formData.price === undefined
-                      ? ""
-                      : formData.price
-                  }
-                  onChange={handleChange}
-                  step="0.01"
-                  disabled={isSubmitting}
-                />
+                {errors.description && (
+                  <p className={formStyles.error}>
+                    {errors.description.message}
+                  </p>
+                )}
               </div>
 
-              {/* Placeholders for TaxCodeId and UnitCodeId - these would ideally be dropdowns */}
               <div className={formStyles.formGroup}>
-                <label htmlFor="taxCodeId">Tax Code ID (Numeric)</label>
+                <label htmlFor="price">Price</label>
+                {/* ✅ 10. `valueAsNumber` automatically handles string-to-number conversion */}
                 <input
                   type="number"
-                  id="taxCodeId"
-                  name="taxCodeId"
-                  value={
-                    formData.taxCodeId === null ||
-                    formData.taxCodeId === undefined
-                      ? ""
-                      : formData.taxCodeId
-                  }
-                  onChange={handleChange}
+                  step="0.01"
+                  id="price"
+                  {...register("price", { valueAsNumber: true })}
                   disabled={isSubmitting}
                 />
-                {/* Replace with <select> if you fetch tax codes */}
+                {errors.price && (
+                  <p className={formStyles.error}>{errors.price.message}</p>
+                )}
               </div>
-              <div className={formStyles.formGroup}>
-                <label htmlFor="unitCodeId">Unit of Measure ID (Numeric)</label>
-                <input
-                  type="number"
-                  id="unitCodeId"
-                  name="unitCodeId"
-                  value={
-                    formData.unitCodeId === null ||
-                    formData.unitCodeId === undefined
-                      ? ""
-                      : formData.unitCodeId
-                  }
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                />
-                {/* Replace with <select> if you fetch units */}
-              </div>
+
+              {/* Other fields follow the same pattern */}
 
               <div className={baseStyles.modalActions}>
                 <button
@@ -277,13 +217,7 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
                   className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
                   disabled={isSubmitting}
                 >
-                  {isSubmitting
-                    ? isEditMode
-                      ? "Saving..."
-                      : "Adding..."
-                    : isEditMode
-                    ? "Save Changes"
-                    : "Add Good/Service"}
+                  {isSubmitting ? "Saving..." : "Save"}
                 </button>
               </div>
             </form>

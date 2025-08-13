@@ -12,6 +12,10 @@ import { IoAddCircleOutline, IoOptionsOutline } from "react-icons/io5";
 import type { useDocumentManager } from "./useDocumentManager";
 import DocumentsOptionsMenu from "./components/DocumentsOptionsMenu";
 
+// ✅ NEW: Import client model
+import type { DocumentClient } from "@/lib/types/models.client";
+import type { DocumentItem } from "@/lib/types/ui";
+
 interface DocumentSliderControllerProps {
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -51,11 +55,13 @@ export const DocumentSliderController = forwardRef<
       setDocMenuOpen(true);
     };
     const handleCloseDocMenu = () => setDocMenuOpen(false);
+
+    // ✅ REFACTORED: Use DocumentClient type, no need for String() conversion on id.
     const sliderData = useMemo(
       () =>
-        (manager.documentsForSlider || []).map((doc: any) => ({
-          id: String(doc.id),
-          label: doc.refDoc,
+        manager.documentsForSlider.map((doc: DocumentClient) => ({
+          id: doc.id,
+          label: doc.refDoc || `Document #${doc.id}`,
           code: `Date: ${new Date(doc.date).toLocaleDateString()}`,
         })),
       [manager.documentsForSlider]
@@ -73,14 +79,12 @@ export const DocumentSliderController = forwardRef<
         <div className={styles.controls}>
           {!manager.isCreating && (
             <>
-              {/* --- FIX: Standardize on controlsLeftGroup for layout --- */}
               <div className={styles.controlsLeftGroup}>
                 <div className={styles.optionsButtonContainer}>
                   <button
                     onClick={handleOpenDocMenu}
                     className={`${styles.controlButton} ${styles.editButton}`}
                     aria-label="Options for selected Document"
-                    // FIX: Button is now always enabled.
                     title="Document Options"
                   >
                     <IoOptionsOutline />
@@ -89,9 +93,7 @@ export const DocumentSliderController = forwardRef<
                     isOpen={isDocMenuOpen}
                     onClose={handleCloseDocMenu}
                     anchorEl={docMenuAnchorEl}
-                    // FIX: Pass the selected ID to the menu component
                     selectedDocumentId={activeDocumentId}
-                    // FIX: Use correct prop names (onView, onEdit)
                     onView={() =>
                       alert(`Viewing details for doc ${activeDocumentId}`)
                     }
@@ -135,7 +137,6 @@ export const DocumentSliderController = forwardRef<
               </div>
             </>
           )}
-          {/* If we are creating, this area is now intentionally blank. */}
         </div>
 
         <DynamicSlider
@@ -151,7 +152,7 @@ export const DocumentSliderController = forwardRef<
           placeholderMessage={
             manager.isCreating
               ? `Building document in '${manager.mode}' mode... Use the toolbar at the bottom to proceed.`
-              : "No documents for selected partner."
+              : "No documents matching the current filters."
           }
         />
         <SingleItemQuantityModal
@@ -161,12 +162,13 @@ export const DocumentSliderController = forwardRef<
           goodId={manager.quantityModalState.goodId}
         />
 
+        {/* ✅ REFACTORED: `manager.items` is now typed as DocumentItem[] */}
         <DocumentConfirmationModal
           isOpen={manager.isFinalizeModalOpen}
           onClose={() => manager.setIsFinalizeModalOpen(false)}
-          onValidate={manager.handleSubmit} // Pass the correct handler
+          onValidate={manager.handleSubmit}
           title="Finalize Document Creation"
-          goods={manager.items.map((item: any) => ({
+          goods={manager.items.map((item: DocumentItem) => ({
             id: item.goodId,
             name: item.goodLabel,
             quantity: item.quantity,

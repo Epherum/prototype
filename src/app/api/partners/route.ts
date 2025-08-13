@@ -1,200 +1,122 @@
 // src/app/api/partners/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
-import partnerService, {
-  createPartnerSchema,
-  GetAllPartnersOptions,
-  CreatePartnerData as ServiceCreatePartnerData,
-} from "@/app/services/partnerService";
-import { Partner } from "@prisma/client";
-import { jsonBigIntReplacer, parseBigIntParam } from "@/app/utils/jsonBigInt";
-import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
-import { getServerSession } from "next-auth/next";
-import {
-  authOptions,
-  ExtendedSession,
-  ExtendedUser,
-} from "@/lib/auth/authOptions";
-import { PartnerGoodFilterStatus } from "@/lib/types";
+import { z } from "zod";
+import partnerService from "@/app/services/partnerService";
+import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { withAuthorization } from "@/lib/auth/withAuthorization";
+import { ExtendedSession } from "@/lib/auth/authOptions";
+import { createPartnerSchema } from "@/lib/schemas/partner.schema";
 
-export async function GET(request: NextRequest) {
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-  if (!session?.user?.id) {
-    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  }
-  const user = session.user as ExtendedUser;
-  const currentUserId = user.id;
-
-  const { searchParams } = new URL(request.url);
-
-  const limitParam = searchParams.get("limit");
-  const offsetParam = searchParams.get("offset");
-  const take = limitParam ? parseInt(limitParam, 10) : undefined;
-  const skip = offsetParam ? parseInt(offsetParam, 10) : undefined;
-
-  const filterStatusesParam = searchParams.get("filterStatuses");
-  const contextJournalIdsParam = searchParams.get("contextJournalIds");
-  const restrictedJournalId = searchParams.get("restrictedJournalId");
-
-  const linkedToJournalIdsParam = searchParams.get("linkedToJournalIds");
-  const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
-  const includeChildrenParam = searchParams.get("includeChildren");
-
-  try {
-    let partnersResult: { partners: Partner[]; totalCount: number };
-
-    const serviceCallOptions: GetAllPartnersOptions = {
-      currentUserId,
-      take,
-      skip,
-    };
-
-    // Priority 1: Linking flows (J-G-P / G-J-P)
-    if (linkedToJournalIdsParam && linkedToGoodIdStr) {
-      console.log(
-        `API /partners: J-G-P/G-J-P flow. Journals: '${linkedToJournalIdsParam}', Good: '${linkedToGoodIdStr}'.`
-      );
-      const journalIds = linkedToJournalIdsParam
+const getPartnersQuerySchema = z.object({
+  take: z.coerce.number().int().positive().optional(),
+  skip: z.coerce.number().int().nonnegative().optional(),
+  filterMode: z.enum(["affected", "unaffected", "inProcess"]).optional(),
+  permissionRootId: z.string().optional(),
+  selectedJournalIds: z
+    .string()
+    .transform((val) => val.split(","))
+    .optional(),
+  intersectionOfGoodIds: z
+    .string()
+    .transform((val) =>
+      val
         .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean);
-      if (journalIds.length === 0) {
+        .map((id) => parseBigInt(id, "good ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+});
+
+export const GET = withAuthorization(
+  async function GET(request: NextRequest, _context, session: ExtendedSession) {
+    // ... (no changes in this function)
+    try {
+      const queryParams = Object.fromEntries(request.nextUrl.searchParams);
+      const validation = getPartnersQuerySchema.safeParse(queryParams);
+      if (!validation.success) {
         return NextResponse.json(
-          { message: "No valid journal IDs provided for J-G-P/G-J-P." },
+          {
+            message: "Invalid query parameters.",
+            errors: validation.error.format(),
+          },
           { status: 400 }
         );
       }
-      const goodId = parseBigIntParam(linkedToGoodIdStr, "linkedToGoodId");
-      if (goodId === null) {
+      const { intersectionOfGoodIds, selectedJournalIds, ...restOfOptions } =
+        validation.data;
+      let result;
+      if (intersectionOfGoodIds && intersectionOfGoodIds.length > 0) {
+        result = await partnerService.findPartnersForGoods({
+          goodIds: intersectionOfGoodIds,
+          journalIds: selectedJournalIds,
+        });
+      } else {
+        result = await partnerService.getAllPartners({
+          ...restOfOptions,
+          selectedJournalIds,
+          restrictedJournalId: session.user?.restrictedTopLevelJournalId,
+          where: {},
+        });
+      }
+      const body = JSON.stringify(result, jsonBigIntReplacer);
+      return new NextResponse(body, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error("API GET /api/partners Error:", e);
+      return NextResponse.json(
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
+      );
+    }
+  },
+  { action: "READ", resource: "PARTNER" }
+);
+
+export const POST = withAuthorization(
+  async function POST(
+    request: NextRequest,
+    _context,
+    session: ExtendedSession
+  ) {
+    try {
+      const rawBody = await request.json();
+      // ✅ This now uses the centralized schema for validation.
+      const validation = createPartnerSchema.safeParse(rawBody);
+
+      if (!validation.success) {
         return NextResponse.json(
-          { message: "Invalid linkedToGoodId provided." },
+          {
+            message: "Invalid request body.",
+            errors: validation.error.format(),
+          },
           { status: 400 }
         );
       }
-      const partnerIds = await jpgLinkService.getPartnerIdsForJournalsAndGood(
-        journalIds,
-        goodId,
-        includeChildrenParam !== "false"
+
+      // ✅ SIMPLIFIED: `validation.data` is now guaranteed to be the correct
+      // `CreatePartnerPayload` type that the service expects. No more intermediate types.
+      const newPartner = await partnerService.createPartner(
+        validation.data,
+        session.user!.id
       );
-      serviceCallOptions.where = { id: { in: partnerIds } };
-      partnersResult =
-        partnerIds.length === 0
-          ? { partners: [], totalCount: 0 }
-          : await partnerService.getAllPartners(serviceCallOptions);
-    }
-    // Priority 2: Standard Journal-as-Root filtering flow
-    else {
-      console.log(
-        `API /partners: Standard flow. Filters: '${
-          filterStatusesParam || "none"
-        }'`
-      );
-      const filterStatuses = filterStatusesParam
-        ? (filterStatusesParam
-            .split(",")
-            .filter(Boolean) as PartnerGoodFilterStatus[])
-        : [];
-      const contextJournalIds =
-        contextJournalIdsParam
-          ?.split(",")
-          .map((id) => id.trim())
-          .filter(Boolean) || [];
 
-      serviceCallOptions.filterStatuses = filterStatuses;
-      serviceCallOptions.contextJournalIds = contextJournalIds;
-      serviceCallOptions.restrictedJournalId = restrictedJournalId || null;
-
-      partnersResult = await partnerService.getAllPartners(serviceCallOptions);
-    }
-
-    const responsePayload = {
-      data: partnersResult.partners,
-      total: partnersResult.totalCount,
-    };
-    const body = JSON.stringify(responsePayload, jsonBigIntReplacer);
-    return new NextResponse(body, {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const e = error as Error;
-    if (
-      e.message.includes("Cannot convert") &&
-      e.message.includes("to a BigInt")
-    ) {
+      const body = JSON.stringify(newPartner, jsonBigIntReplacer);
+      return new NextResponse(body, {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error("API POST /api/partners Error:", e);
       return NextResponse.json(
-        { message: "Invalid ID format provided.", error: e.message },
-        { status: 400 }
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
       );
     }
-    console.error("API /partners GET Error:", e.message, e.stack);
-    return NextResponse.json(
-      { message: "Failed to retrieve partner list.", error: e.message },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  console.log("API /partners: Received request to add a new partner.");
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { message: "Unauthorized: User session is missing" },
-      { status: 401 }
-    );
-  }
-  const createdById = session.user.id;
-  const createdByIp =
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() || null;
-
-  try {
-    const rawOrder = await request.json();
-    console.log("API /partners: Raw payload for new partner:", rawOrder);
-
-    const validation = createPartnerSchema.safeParse(rawOrder);
-    if (!validation.success) {
-      console.warn(
-        "API /partners: Invalid payload for new partner:",
-        validation.error.format()
-      );
-      return NextResponse.json(
-        {
-          message: "Invalid partner payload.",
-          errors: validation.error.format(),
-        },
-        { status: 400 }
-      );
-    }
-
-    const partnerDataForService: ServiceCreatePartnerData = validation.data;
-    console.log("API /partners: Payload is valid. Passing to service.");
-
-    // Call the service without companyId
-    const newPartner = await partnerService.createPartner(
-      partnerDataForService,
-      createdById,
-      createdByIp
-    );
-
-    const body = JSON.stringify(newPartner, jsonBigIntReplacer);
-    return new NextResponse(body, {
-      status: 201,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const e = error as Error;
-    console.error(
-      "API /partners: Failed to add new partner!",
-      e.message,
-      e.stack
-    );
-    return NextResponse.json(
-      { message: "Failed to add the new partner.", error: e.message },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { action: "CREATE", resource: "PARTNER" }
+);

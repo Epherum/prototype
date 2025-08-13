@@ -1,21 +1,25 @@
-//src/features/documents/components/DocumentConfirmationModal.tsx
+// src/features/documents/components/DocumentConfirmationModal.tsx
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 // Import styles
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./DocumentConfirmationModal.module.css";
-import type { Document, Good } from "@/lib/types";
 
-// --- NEW --- Define more specific props
+// ✅ CHANGED: Import the Zod schema payload type for strong typing
+import type { CreateDocumentPayload } from "@/lib/schemas/document.schema";
+
+// --- Prop definitions ---
+// ✅ CHANGED: onValidate uses a Pick from the Zod payload for header data
+type DocumentHeaderData = Pick<
+  CreateDocumentPayload,
+  "refDoc" | "date" | "type"
+>;
+
 interface ConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onValidate: (data: {
-    refDoc: string;
-    date: Date;
-    type: Document["type"];
-  }) => void;
+  onValidate: (data: DocumentHeaderData) => void;
   goods: {
     id: string;
     name: string;
@@ -26,8 +30,8 @@ interface ConfirmationModalProps {
   isLoading: boolean;
   isDestructive?: boolean;
   title?: string;
-  message?: string;
   confirmButtonText?: string;
+  message?: string;
 }
 
 export const DocumentConfirmationModal = ({
@@ -39,14 +43,12 @@ export const DocumentConfirmationModal = ({
   isDestructive = false,
   title = "Finalize Document",
   confirmButtonText = "Validate Document",
-  message, // Allow optional message
 }: ConfirmationModalProps) => {
-  // --- NEW --- State to manage the form inputs for the document header
   const [refDoc, setRefDoc] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]); // Default to today
-  const [type, setType] = useState<Document["type"]>("INVOICE");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  // ✅ CHANGED: The type is now correctly inferred from the payload type
+  const [type, setType] = useState<CreateDocumentPayload["type"]>("INVOICE");
 
-  // Reset form when the modal is opened
   useEffect(() => {
     if (isOpen) {
       setRefDoc("");
@@ -58,12 +60,8 @@ export const DocumentConfirmationModal = ({
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission
-    if (!refDoc) {
-      alert("Please enter a document reference.");
-      return;
-    }
-    onValidate({ refDoc, date: new Date(date), type });
+    e.preventDefault();
+    onValidate({ refDoc: refDoc || null, date: new Date(date), type });
   };
 
   const totalAmount = (goods || [])
@@ -106,21 +104,18 @@ export const DocumentConfirmationModal = ({
         </button>
         <h2 className={baseStyles.modalTitle}>{title}</h2>
 
-        {/* MODIFIED: Wrapped in a form element */}
         <form onSubmit={handleSubmit} className={styles.formContainer}>
-          {/* Form for document header */}
           <div className={styles.formSection}>
             <div className={styles.formGroup}>
-              <label htmlFor="refDoc">Reference</label>
+              <label htmlFor="refDoc">Reference (Optional)</label>
               <input
                 id="refDoc"
                 type="text"
-                value={refDoc}
+                value={refDoc || ""}
                 onChange={(e) => setRefDoc(e.target.value)}
                 placeholder="e.g., INV-2025-001"
-                className={styles.formInput} // Use local styles for consistency
-                required // Added for form validation
-                autoFocus // Good UX
+                className={styles.formInput}
+                autoFocus
               />
             </div>
             <div className={styles.formGroupGrid}>
@@ -132,6 +127,7 @@ export const DocumentConfirmationModal = ({
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   className={styles.formInput}
+                  required
                 />
               </div>
               <div className={styles.formGroup}>
@@ -139,18 +135,21 @@ export const DocumentConfirmationModal = ({
                 <select
                   id="type"
                   value={type}
-                  onChange={(e) => setType(e.target.value as Document["type"])}
+                  // ✅ CHANGED: Type cast is now strongly typed
+                  onChange={(e) =>
+                    setType(e.target.value as CreateDocumentPayload["type"])
+                  }
                   className={styles.formInput}
                 >
                   <option value="INVOICE">Invoice</option>
-                  <option value="CREDIT_NOTE">Credit Note</option>
                   <option value="QUOTE">Quote</option>
+                  <option value="PURCHASE_ORDER">Purchase Order</option>
+                  <option value="CREDIT_NOTE">Credit Note</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Section for displaying goods */}
           {goods && goods.length > 0 && (
             <div className={styles.confirmationSection}>
               <h3 className={styles.sectionHeader}>
@@ -181,12 +180,8 @@ export const DocumentConfirmationModal = ({
               Cancel
             </button>
             <button
-              type="submit" // Changed to submit
-              className={`${baseStyles.modalActionButton} ${
-                isDestructive
-                  ? baseStyles.modalButtonDestructive
-                  : baseStyles.modalButtonPrimary
-              }`}
+              type="submit"
+              className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
               disabled={isLoading}
             >
               {isLoading ? "Saving..." : confirmButtonText}

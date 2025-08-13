@@ -3,11 +3,11 @@ import { useState, useCallback } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { journalKeys } from "@/lib/queryKeys";
 import {
-  createJournalEntry,
-  deleteJournalEntry,
+  createJournal as createJournalApi,
+  deleteJournal as deleteJournalApi,
 } from "@/services/clientJournalService";
 import type { CreateJournalData } from "@/app/services/journalService";
-import type { Journal } from "@/lib/types";
+import type { JournalClient } from "@/lib/types/models.client";
 
 interface MutationProps {
   restrictedJournalId: string | null;
@@ -41,8 +41,12 @@ export const useJournalMutations = ({
     []
   );
 
-  const createJournalMutation = useMutation<Journal, Error, CreateJournalData>({
-    mutationFn: createJournalEntry,
+  const createJournalMutation = useMutation<
+    JournalClient,
+    Error,
+    CreateJournalData
+  >({
+    mutationFn: createJournalApi,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: journalKeys.hierarchy(restrictedJournalId),
@@ -53,7 +57,7 @@ export const useJournalMutations = ({
 
   const deleteJournalMutation = useMutation<{ message: string }, Error, string>(
     {
-      mutationFn: deleteJournalEntry,
+      mutationFn: deleteJournalApi,
       onSuccess: () => {
         queryClient.invalidateQueries({
           queryKey: journalKeys.hierarchy(restrictedJournalId),

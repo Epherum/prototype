@@ -1,44 +1,29 @@
-//src/features/partners/usePartnerManager.ts
+// src/features/partners/usePartnerManager.ts
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
-import {
-  useQuery,
-  useQueryClient,
-  useMutation,
-  type UseQueryResult,
-} from "@tanstack/react-query";
+import { useState, useCallback, useEffect } from "react";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { partnerKeys } from "@/lib/queryKeys";
 import { useAppStore } from "@/store/appStore";
-import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import { getFirstId } from "@/lib/helpers";
 import {
-  fetchPartners,
   createPartner,
   updatePartner,
   deletePartner,
-  getPartnersForGoods,
 } from "@/services/clientPartnerService";
-import { useJournalManager } from "@/features/journals/useJournalManager";
-import type {
-  Partner,
-  CreatePartnerClientData,
-  UpdatePartnerClientData,
-  PaginatedPartnersResponse,
-} from "@/lib/types";
 import { useChainedQuery } from "@/hooks/useChainedQuery";
+import { PartnerClient } from "@/lib/types/models.client";
+import {
+  CreatePartnerPayload,
+  UpdatePartnerPayload,
+} from "@/lib/schemas/partner.schema";
+import { SLIDER_TYPES } from "@/lib/constants";
 
 export const usePartnerManager = () => {
   const queryClient = useQueryClient();
-
-  const { sliderOrder, visibility, documentCreationState } = useAppStore(
-    (state) => state.ui
-  );
+  const { documentCreationState } = useAppStore((state) => state.ui);
   const selections = useAppStore((state) => state.selections);
   const setSelection = useAppStore((state) => state.setSelection);
-  const effectiveRestrictedJournalId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalId
-  );
 
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
     useState(false);
@@ -46,9 +31,8 @@ export const usePartnerManager = () => {
     useState<HTMLElement | null>(null);
   const [isAddEditPartnerModalOpen, setIsAddEditPartnerModalOpen] =
     useState(false);
-  const [editingPartnerData, setEditingPartnerData] = useState<Partner | null>(
-    null
-  );
+  const [editingPartnerData, setEditingPartnerData] =
+    useState<PartnerClient | null>(null);
 
   const setSelectedPartnerId = useCallback(
     (id: string | null) => {
@@ -57,19 +41,12 @@ export const usePartnerManager = () => {
     [setSelection]
   );
 
-  const {
-    journal: journalSelections,
-    goods: selectedGoodsId,
-    partner: selectedPartnerId,
-  } = selections;
+  const { partner: selectedPartnerId } = selections;
 
-  // ✅ The type is now inferred correctly from useChainedQuery.
+  // The useChainedQuery hook now correctly returns a query for { data: PartnerClient[], totalCount: number }
   const queryOptions = useChainedQuery(SLIDER_TYPES.PARTNER);
-
-  // ✅ No more generics needed, resolving both the 'No overload' and 'property data does not exist' errors.
   const activeQuery = useQuery(queryOptions);
 
-  // --- (useEffect for selection, Mutations and Modal Handlers are unchanged) ---
   useEffect(() => {
     if (
       activeQuery.isSuccess &&
@@ -79,7 +56,7 @@ export const usePartnerManager = () => {
       const fetchedPartners = activeQuery.data.data;
       const currentSelectionInList =
         selectedPartnerId &&
-        fetchedPartners.some((p) => String(p.id) === selectedPartnerId);
+        fetchedPartners.some((p) => p.id === selectedPartnerId);
 
       if (fetchedPartners.length > 0 && !currentSelectionInList) {
         setSelectedPartnerId(getFirstId(fetchedPartners));
@@ -95,25 +72,30 @@ export const usePartnerManager = () => {
     documentCreationState.isCreating,
   ]);
 
-  //... all mutations and handlers remain the same from here
-
   const createPartnerMutation = useMutation<
-    Partner,
+    PartnerClient,
     Error,
-    CreatePartnerClientData
+    CreatePartnerPayload
   >({
     mutationFn: createPartner,
     onSuccess: (newPartner) => {
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
       alert(`Partner '${newPartner.name}' created successfully!`);
-      setSelectedPartnerId(String(newPartner.id));
+      // Select the newly created partner
+      setSelectedPartnerId(newPartner.id);
+    },
+    // Optional: Add onError for better user feedback
+    onError: (error) => {
+      alert(`Error creating partner: ${error.message}`);
+      setIsAddEditPartnerModalOpen(false);
     },
   });
+
   const updatePartnerMutation = useMutation<
-    Partner,
+    PartnerClient,
     Error,
-    { id: string; data: UpdatePartnerClientData }
+    { id: string; data: UpdatePartnerPayload }
   >({
     mutationFn: (variables) => updatePartner(variables.id, variables.data),
     onSuccess: (updatedPartner) => {
@@ -121,7 +103,13 @@ export const usePartnerManager = () => {
       setIsAddEditPartnerModalOpen(false);
       alert(`Partner '${updatedPartner.name}' updated successfully!`);
     },
+    // Optional: Add onError for better user feedback
+    onError: (error) => {
+      alert(`Error updating partner: ${error.message}`);
+      setIsAddEditPartnerModalOpen(false);
+    },
   });
+
   const deletePartnerMutation = useMutation<{ message: string }, Error, string>(
     {
       mutationFn: deletePartner,
@@ -131,7 +119,12 @@ export const usePartnerManager = () => {
           response.message ||
             `Partner ${deletedPartnerId} deleted successfully!`
         );
-        if (selectedPartnerId === deletedPartnerId) setSelectedPartnerId(null);
+        if (selectedPartnerId === deletedPartnerId) {
+          setSelectedPartnerId(null);
+        }
+      },
+      onError: (error, deletedPartnerId) => {
+        alert(`Error deleting partner ${deletedPartnerId}: ${error.message}`);
       },
     }
   );
@@ -143,61 +136,82 @@ export const usePartnerManager = () => {
     },
     []
   );
-  const handleClosePartnerOptionsMenu = useCallback(
-    () => setIsPartnerOptionsMenuOpen(false),
-    []
-  );
+
+  const handleClosePartnerOptionsMenu = useCallback(() => {
+    setPartnerOptionsMenuAnchorEl(null);
+    setIsPartnerOptionsMenuOpen(false);
+  }, []);
+
   const handleOpenAddPartnerModal = useCallback(() => {
     setEditingPartnerData(null);
     setIsAddEditPartnerModalOpen(true);
     handleClosePartnerOptionsMenu();
   }, [handleClosePartnerOptionsMenu]);
+
   const handleOpenEditPartnerModal = useCallback(() => {
     if (selectedPartnerId && activeQuery.data?.data) {
       const partnerToEdit = activeQuery.data.data.find(
-        (p) => String(p.id) === selectedPartnerId
+        (p) => p.id === selectedPartnerId
       );
-      //@ts-ignore
-
-      if (partnerToEdit) setEditingPartnerData(partnerToEdit);
+      if (partnerToEdit) {
+        setEditingPartnerData(partnerToEdit);
+        setIsAddEditPartnerModalOpen(true);
+        handleClosePartnerOptionsMenu();
+      }
     }
-    setIsAddEditPartnerModalOpen(true);
-    handleClosePartnerOptionsMenu();
-  }, [selectedPartnerId, activeQuery.data, handleClosePartnerOptionsMenu]);
+  }, [
+    selectedPartnerId,
+    activeQuery.data?.data,
+    handleClosePartnerOptionsMenu,
+  ]);
+
   const handleCloseAddEditPartnerModal = useCallback(
     () => setIsAddEditPartnerModalOpen(false),
     []
   );
+
+  // ✅ REFINED: The handler now accepts the most complete type, `CreatePartnerPayload`,
+  // which works for both create and update scenarios, eliminating the need for casts.
   const handleAddOrUpdatePartnerSubmit = useCallback(
-    (data: CreatePartnerClientData | UpdatePartnerClientData) => {
+    (data: CreatePartnerPayload) => {
       if (editingPartnerData) {
         updatePartnerMutation.mutate({
           id: editingPartnerData.id,
-          data: data as UpdatePartnerClientData,
+          data: data, // `data` is a valid `UpdatePartnerPayload`
         });
       } else {
-        createPartnerMutation.mutate(data as CreatePartnerClientData);
+        createPartnerMutation.mutate(data);
       }
     },
     [editingPartnerData, createPartnerMutation, updatePartnerMutation]
   );
+
   const handleDeleteCurrentPartner = useCallback(() => {
-    if (selectedPartnerId) deletePartnerMutation.mutate(selectedPartnerId);
+    if (selectedPartnerId) {
+      if (window.confirm("Are you sure you want to delete this partner?")) {
+        deletePartnerMutation.mutate(selectedPartnerId);
+      }
+    }
     handleClosePartnerOptionsMenu();
   }, [selectedPartnerId, deletePartnerMutation, handleClosePartnerOptionsMenu]);
 
   return {
+    // State
     selectedPartnerId,
-    setSelectedPartnerId,
-    partnersForSlider: activeQuery.data?.data || [],
+    partnersForSlider: activeQuery.data?.data ?? [],
     partnerQuery: activeQuery,
     isPartnerOptionsMenuOpen,
     partnerOptionsMenuAnchorEl,
     isAddEditPartnerModalOpen,
     editingPartnerData,
+
+    // Mutations (exposing the whole mutation allows UI to read isPending, etc.)
     createPartnerMutation,
     updatePartnerMutation,
     deletePartnerMutation,
+
+    // Handlers
+    setSelectedPartnerId,
     handleOpenPartnerOptionsMenu,
     handleClosePartnerOptionsMenu,
     handleOpenAddPartnerModal,

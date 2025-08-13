@@ -1,63 +1,88 @@
-// src/services/clientRoleService.ts
+//src/services/clientRoleService.ts
+import {
+  RoleWithPermissionsClient,
+  PermissionClient,
+  RoleClient,
+} from "@/lib/types/models.client";
+import {
+  CreateRolePayload,
+  UpdateRolePayload,
+} from "@/lib/schemas/role.schema";
+import {
+  Permission as PrismaPermission,
+  Role as PrismaRole,
+} from "@prisma/client";
 
-import { RoleWithPermissions } from "@/lib/types";
-import { Permission } from "@prisma/client";
+const API_BASE_URL = "/api/roles";
 
-export type RoleClientPayload = {
-  name: string;
-  description?: string;
-  permissionIds: string[];
-};
-
-export async function fetchAllRoles(): Promise<RoleWithPermissions[]> {
-  const response = await fetch("/api/roles");
-  if (!response.ok) throw new Error("Failed to fetch roles");
-  return response.json();
+// --- Mapper Functions (for consistency, even if they are identity functions) ---
+function mapToRoleWithPermissionsClient(raw: any): RoleWithPermissionsClient {
+  return raw; // Prisma types match client types here
 }
 
-export async function fetchAllPermissions(): Promise<Permission[]> {
+function mapToPermissionClient(raw: PrismaPermission): PermissionClient {
+  return raw;
+}
+
+// --- API Functions ---
+
+export async function fetchAllRoles(): Promise<RoleWithPermissionsClient[]> {
+  const response = await fetch(API_BASE_URL);
+  if (!response.ok) throw new Error("Failed to fetch roles");
+  const rawRoles = await response.json();
+  return rawRoles.map(mapToRoleWithPermissionsClient);
+}
+
+export async function fetchAllPermissions(): Promise<PermissionClient[]> {
   const response = await fetch("/api/permissions");
   if (!response.ok) throw new Error("Failed to fetch permissions");
-  return response.json();
+  const rawPermissions = await response.json();
+  return rawPermissions.map(mapToPermissionClient);
 }
 
 export async function createRole(
-  payload: RoleClientPayload
-): Promise<RoleWithPermissions> {
-  const response = await fetch("/api/roles", {
+  payload: CreateRolePayload
+): Promise<RoleWithPermissionsClient> {
+  const response = await fetch(API_BASE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "Failed to create role");
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to create role");
   }
   return response.json();
 }
 
 export async function updateRole(
   roleId: string,
-  payload: RoleClientPayload
-): Promise<RoleWithPermissions> {
-  const response = await fetch(`/api/roles/${roleId}`, {
+  payload: UpdateRolePayload
+): Promise<RoleWithPermissionsClient> {
+  const response = await fetch(`${API_BASE_URL}/${roleId}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "Failed to update role");
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to update role");
   }
   return response.json();
 }
 
 export async function deleteRole(roleId: string): Promise<void> {
-  const response = await fetch(`/api/roles/${roleId}`, {
+  const response = await fetch(`${API_BASE_URL}/${roleId}`, {
     method: "DELETE",
   });
   if (!response.ok && response.status !== 204) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || "Failed to delete role");
+    const error = await response
+      .json()
+      .catch(() => ({ message: "Unknown error" }));
+    throw new Error(error.message || "Failed to delete role");
   }
 }

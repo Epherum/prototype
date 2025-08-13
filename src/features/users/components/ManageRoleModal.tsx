@@ -4,7 +4,7 @@ import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { IoClose } from "react-icons/io5";
 import type { RoleFormState } from "@/features/users/useRoleManagement"; // Import the type for our form state
-import type { Permission } from "@prisma/client";
+import type { PermissionClient } from "@/lib/types/models.client";
 
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./ManageUserModal.module.css"; // Re-using styles for consistency
@@ -17,7 +17,7 @@ interface ManageRoleModalProps {
   onClose: () => void;
   formState: RoleFormState;
   isEditMode: boolean;
-  allPermissions?: Permission[];
+  allPermissions?: PermissionClient[];
   isLoadingPermissions: boolean;
   isSubmitting: boolean;
   handleInputChange: (

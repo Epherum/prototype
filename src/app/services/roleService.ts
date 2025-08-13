@@ -2,145 +2,126 @@
 
 import prisma from "@/app/utils/prisma";
 import { Permission, Role } from "@prisma/client";
-import { RoleWithPermissions } from "@/lib/types";
+import { z } from "zod";
+import { roleSchema } from "@/lib/schemas/role.schema"; // Import the schema
 
-// Define a reusable type for create/update payloads
-export interface RolePayload {
-  name: string;
-  description?: string;
-  permissionIds: string[];
-}
+export type RoleWithPermissions = Role & {
+  permissions: Permission[];
+};
 
-/**
- * Fetches all roles in the system, including the permissions for each role.
- *
- * @returns A promise that resolves to an array of roles, each with its permissions included.
- */
-export const getAllRoles = async (): Promise<RoleWithPermissions[]> => {
-  try {
+// ========================================================================
+// The schema is now imported from the central schema file.
+// ========================================================================
+export const rolePayloadSchema = roleSchema;
+
+// Derive the TypeScript type from the schema.
+export type RolePayload = z.infer<typeof rolePayloadSchema>;
+
+const roleService = {
+  /**
+   * Fetches all roles in the system, including their associated permissions.
+   */
+  async getAll(): Promise<RoleWithPermissions[]> {
+    // ✅ This now correctly references the local type.
     const roles = await prisma.role.findMany({
       include: {
         permissions: {
-          include: {
-            permission: true,
+          select: {
+            permission: true, // Select the nested permission object
           },
         },
       },
-      orderBy: {
-        name: "asc",
-      },
+      orderBy: { name: "asc" },
     });
 
-    return roles as RoleWithPermissions[];
-  } catch (error) {
-    console.error(`Error fetching roles:`, error);
-    throw new Error("An error occurred while fetching roles.");
-  }
-};
+    return roles.map((role) => ({
+      ...role,
+      permissions: role.permissions.map((p) => p.permission),
+    }));
+  },
 
-/**
- * Fetches the master list of all available permissions in the system.
- * @returns A promise that resolves to an array of all Permission records.
- */
-export const getAllPermissions = async (): Promise<Permission[]> => {
-  try {
-    return await prisma.permission.findMany({
+  /**
+   * Fetches the master list of all available permissions in the system.
+   */
+  async getAllPermissions(): Promise<Permission[]> {
+    return prisma.permission.findMany({
       orderBy: [{ resource: "asc" }, { action: "asc" }],
     });
-  } catch (error) {
-    console.error(`Error fetching all permissions:`, error);
-    throw new Error("An error occurred while fetching permissions.");
-  }
-};
+  },
 
-/**
- * Creates a new role and connects it to a set of permissions.
- * @param payload The role data.
- * @returns The newly created role.
- */
-export const createRole = async (payload: RolePayload): Promise<Role> => {
-  const { name, description, permissionIds } = payload;
-
-  return prisma.role.create({
-    data: {
-      name,
-      description: description || undefined,
-      permissions: {
-        create: permissionIds.map((pid) => ({
-          permission: {
-            connect: { id: pid },
-          },
-        })),
-      },
-    },
-  });
-};
-
-/**
- * Updates an existing role's name, description, and its set of permissions.
- * @param roleId The ID of the role to update.
- * @param payload The new role data.
- * @returns The updated role.
- */
-export const updateRole = async (
-  roleId: string,
-  payload: RolePayload
-): Promise<Role> => {
-  const { name, description, permissionIds } = payload;
-
-  // First, verify the role exists.
-  const role = await prisma.role.findUnique({
-    where: { id: roleId },
-  });
-
-  if (!role) {
-    throw new Error("Role not found.");
-  }
-
-  // Use a transaction to ensure atomicity
-  return prisma.$transaction(async (tx) => {
-    // 1. Delete all existing permission links for this role.
-    await tx.rolePermission.deleteMany({
-      where: { roleId: roleId },
-    });
-
-    // 2. Update the role's details and create the new permission links.
-    const updatedRole = await tx.role.update({
-      where: { id: roleId },
+  /**
+   * Creates a new role and connects it to a set of permissions.
+   * @param payload - The role data including name, description, and permission IDs.
+   */
+  async create(payload: RolePayload): Promise<Role> {
+    const { name, description, permissionIds } = payload;
+    // Note: This assumes permissionIds are validated in the API layer to exist.
+    return prisma.role.create({
       data: {
         name,
         description,
         permissions: {
           create: permissionIds.map((pid) => ({
-            permission: {
-              connect: { id: pid },
-            },
+            permissionId: pid,
           })),
         },
       },
-      // Include permissions in the return object for consistency
-      include: {
-        permissions: { include: { permission: true } },
-      },
     });
+  },
 
-    return updatedRole;
-  });
-};
+  /**
+   * Updates an existing role's details and synchronizes its permissions.
+   * @param roleId - The ID of the role to update.
+   * @param payload - The new role data.
+   */
+  async update(roleId: string, payload: RolePayload): Promise<Role> {
+    const { name, description, permissionIds } = payload;
 
-/**
- * Deletes a role.
- * Prisma's `onDelete: Cascade` on UserRole and RolePermission handles cleanup.
- * @param roleId The ID of the role to delete.
- */
-export const deleteRole = async (roleId: string): Promise<void> => {
-  try {
-    await prisma.role.delete({
+    // Use a transaction to ensure the update is atomic.
+    return prisma.$transaction(async (tx) => {
+      // 1. Delete all existing permission links for this role.
+      // This "sync" approach is simpler and safer than calculating diffs.
+      await tx.rolePermission.deleteMany({
+        where: { roleId },
+      });
+
+      // 2. Update the role's details and create the new permission links.
+      const updatedRole = await tx.role.update({
+        where: { id: roleId },
+        data: {
+          name,
+          description,
+          permissions: {
+            create: permissionIds.map((pid) => ({
+              permissionId: pid,
+            })),
+          },
+        },
+        include: {
+          permissions: { select: { permission: true } },
+        },
+      });
+
+      // Flatten the result to match the expected return type
+      return {
+        ...updatedRole,
+        permissions: updatedRole.permissions.map((p) => p.permission),
+      };
+    });
+  },
+
+  /**
+   * Deletes a role by its ID.
+   * Relies on Prisma schema's `onDelete: Cascade` for related UserRole
+   * and RolePermission records.
+   * @param roleId - The ID of the role to delete.
+   * @throws {Prisma.PrismaClientKnownRequestError} with code 'P2025' if role not found.
+   */
+  async delete(roleId: string): Promise<Role> {
+    return prisma.role.delete({
       where: { id: roleId },
     });
-  } catch (error) {
-    // Handle cases where the role doesn't exist (e.g., Prisma's P2025 error)
-    console.error(`Failed to delete role with ID ${roleId}:`, error);
-    throw new Error("Role not found or could not be deleted.");
-  }
+  },
 };
+
+export default roleService;

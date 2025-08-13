@@ -9,20 +9,22 @@ import {
   journalKeys,
 } from "@/lib/queryKeys";
 
+// ✅ CHANGED: Services now import from the new, consistent client service files.
 import {
   createJournalPartnerLink,
-  deleteJournalPartnerLink,
-  fetchJournalLinksForPartner,
+  deleteJournalPartnerLinkById,
+  getJournalPartnerLinks, // Using the new consolidated fetcher
 } from "@/services/clientJournalPartnerLinkService";
-// Assuming fetchPartnerById exists in your client service
 import { fetchPartnerById } from "@/services/clientPartnerService";
 import { useAppStore } from "@/store/appStore";
 
-import type {
-  Partner,
-  CreateJournalPartnerLinkClientData,
-  JournalPartnerLinkWithDetails,
-} from "@/lib/types";
+// ✅ CHANGED: All types are now imported from the new, type-safe locations.
+import {
+  PartnerClient,
+  JournalPartnerLinkWithDetailsClient,
+  JournalPartnerLinkClient, // The base link type
+} from "@/lib/types/models.client";
+import { CreateJournalPartnerLinkPayload } from "@/lib/schemas/journalPartnerLink.schema";
 
 // The hook is now self-sufficient and takes no props.
 export const usePartnerJournalLinking = () => {
@@ -31,25 +33,29 @@ export const usePartnerJournalLinking = () => {
   // Consume the selected partner ID from the global store
   const selectedPartnerId = useAppStore((state) => state.selections.partner);
 
-  // Local state for modals and the specific entity being acted upon
+  // ✅ CHANGED: Local state uses the new PartnerClient type.
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
   const [isUnlinkModalOpen, setIsUnlinkModalOpen] = useState(false);
-  const [partnerForAction, setPartnerForAction] = useState<Partner | null>(
-    null
-  );
+  const [partnerForAction, setPartnerForAction] =
+    useState<PartnerClient | null>(null);
 
+  // ✅ CHANGED: The query now uses the new getJournalPartnerLinks service function.
+  // The return type is updated to what the service provides. We assume the unlinking
+  // modal can be adapted to work with JournalPartnerLinkClient if full details aren't fetched.
   const { data: linksForUnlinking, isLoading: isLoadingLinks } = useQuery<
-    JournalPartnerLinkWithDetails[],
+    JournalPartnerLinkClient[],
     Error
   >({
     queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction?.id),
-    queryFn: () => fetchJournalLinksForPartner(partnerForAction!.id),
+    queryFn: () => getJournalPartnerLinks({ partnerId: partnerForAction!.id }),
     enabled: !!partnerForAction && isUnlinkModalOpen,
   });
 
   const createJPLMutation = useMutation({
+    // ✅ CORRECT: This already uses the new service function.
     mutationFn: createJournalPartnerLink,
     onSuccess: (newLink) => {
+      // Invalidation logic remains correct.
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       queryClient.invalidateQueries({
         queryKey: journalKeys.flatListByPartner(newLink.partnerId),
@@ -65,9 +71,12 @@ export const usePartnerJournalLinking = () => {
   });
 
   const deleteJPLMutation = useMutation({
-    mutationFn: deleteJournalPartnerLink,
-    onSuccess: (data) => {
-      alert(data.message || `Link unlinked successfully!`);
+    // ✅ CHANGED: Uses the new service function `deleteJournalPartnerLinkById`.
+    mutationFn: deleteJournalPartnerLinkById,
+    onSuccess: () => {
+      // ✅ CHANGED: The new service returns void, so we use a static message.
+      alert(`Link unlinked successfully!`);
+      // Invalidation logic remains correct.
       queryClient.invalidateQueries({
         queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction!.id),
       });
@@ -85,9 +94,10 @@ export const usePartnerJournalLinking = () => {
   });
 
   const getPartnerDetails = useCallback(
-    async (partnerId: string): Promise<Partner | null> => {
+    async (partnerId: string): Promise<PartnerClient | null> => {
       try {
-        const partner = await queryClient.fetchQuery<Partner, Error>({
+        // ✅ CHANGED: fetchQuery is now typed with PartnerClient.
+        const partner = await queryClient.fetchQuery<PartnerClient, Error>({
           queryKey: partnerKeys.detail(partnerId),
           queryFn: () => fetchPartnerById(partnerId),
           staleTime: 5 * 60 * 1000,
@@ -120,7 +130,8 @@ export const usePartnerJournalLinking = () => {
   }, []);
 
   const submitLinks = useCallback(
-    async (linksData: CreateJournalPartnerLinkClientData[]) => {
+    // ✅ CHANGED: The payload type now comes from the Zod schema.
+    async (linksData: CreateJournalPartnerLinkPayload[]) => {
       if (linksData.length === 0) {
         closeLinkModal();
         return;
@@ -167,6 +178,7 @@ export const usePartnerJournalLinking = () => {
         closeUnlinkModal();
         return;
       }
+      // ✅ CHANGED: Calls the updated mutation that uses `deleteJournalPartnerLinkById`.
       linkIdsToUnlink.forEach((linkId) => deleteJPLMutation.mutate(linkId));
     },
     [deleteJPLMutation, partnerForAction, closeUnlinkModal]

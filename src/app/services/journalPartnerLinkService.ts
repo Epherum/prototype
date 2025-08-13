@@ -1,7 +1,7 @@
 // src/app/services/journalPartnerLinkService.ts
 import prisma from "@/app/utils/prisma";
 import { JournalPartnerLink, Partner, Journal } from "@prisma/client";
-
+import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
 export type CreateJournalPartnerLinkData = {
   journalId: string;
   partnerId: bigint;
@@ -14,7 +14,7 @@ export type CreateJournalPartnerLinkData = {
 };
 
 const journalPartnerLinkService = {
-  // RECIPE 1: Create a new link between a Journal and a Partner
+  // RECIPE 1: Create a new link (MODIFIED with hierarchical check)
   async createLink(
     data: CreateJournalPartnerLinkData
   ): Promise<JournalPartnerLink> {
@@ -22,34 +22,42 @@ const journalPartnerLinkService = {
       `Chef (JPLService): Linking Journal '${data.journalId}' with Partner ID '${data.partnerId}'.`
     );
 
-    // Validation: Check if Journal exists
-    const journalExists = await prisma.journal.findUnique({
-      where: { id: data.journalId },
-    });
-    if (!journalExists) {
+    // Validation: Check if Journal and Partner exist
+    const [journal, partnerExists] = await Promise.all([
+      prisma.journal.findUnique({
+        where: { id: data.journalId },
+        select: { id: true, parent_id: true },
+      }),
+      prisma.partner.findUnique({
+        where: { id: data.partnerId },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!journal) {
       throw new Error(`Journal with ID '${data.journalId}' not found.`);
     }
-
-    // Validation: Check if Partner exists
-    const partnerExists = await prisma.partner.findUnique({
-      where: { id: data.partnerId },
-    });
     if (!partnerExists) {
       throw new Error(`Partner with ID '${data.partnerId}' not found.`);
     }
 
-    // Prisma's @@unique constraint on [journalId, partnerId, partnershipType] will handle duplicates.
-    const linkDataToCreate: any = { ...data };
-    if (data.dateDebut && typeof data.dateDebut === "string") {
-      linkDataToCreate.dateDebut = new Date(data.dateDebut);
-    }
-    if (data.dateFin && typeof data.dateFin === "string") {
-      linkDataToCreate.dateFin = new Date(data.dateFin);
+    // ✨ HIERARCHICAL INTEGRITY CHECK (as per spec) ✨
+    if (journal.parent_id) {
+      const parentLinkExists = await prisma.journalPartnerLink.findFirst({
+        where: {
+          journalId: journal.parent_id,
+          partnerId: data.partnerId,
+        },
+      });
+      if (!parentLinkExists) {
+        throw new Error(
+          `Business Rule Violation: Cannot link Partner '${data.partnerId}' to child Journal '${data.journalId}' because a link does not exist with its parent Journal '${journal.parent_id}'.`
+        );
+      }
     }
 
-    const newLink = await prisma.journalPartnerLink.create({
-      data: linkDataToCreate,
-    });
+    // Proceed with creation
+    const newLink = await prisma.journalPartnerLink.create({ data });
     console.log(`Chef (JPLService): Link created with ID '${newLink.id}'.`);
     return newLink;
   },
@@ -104,105 +112,24 @@ const journalPartnerLinkService = {
   },
 
   // RECIPE 5: Get all Partners linked to a specific Journal (optionally including its children)
-  async getPartnersForJournal(
-    journalId: string,
-    includeChildren: boolean = false
-  ): Promise<Partner[]> {
-    console.log(
-      `Chef (JPLService): Getting partners for Journal '${journalId}', includeChildren: ${includeChildren}.`
-    );
-    let targetJournalIds = [journalId];
-
-    if (includeChildren) {
-      // Recursive CTE to find all descendant journal IDs
-      const descendantJournals = await prisma.$queryRaw<Array<{ id: string }>>`
-        WITH RECURSIVE "JournalDescendants" AS (
-          SELECT id
-          FROM "journals"
-          WHERE id = ${journalId}
-          UNION ALL
-          SELECT j.id
-          FROM "journals" j
-          INNER JOIN "JournalDescendants" jd ON j.parent_id = jd.id
-        )
-        SELECT id FROM "JournalDescendants";
-      `;
-      targetJournalIds = descendantJournals.map((j) => j.id);
-      console.log(
-        `Chef (JPLService): Target journal IDs (incl. children of '${journalId}'):`,
-        targetJournalIds
-      );
-    }
-
-    if (targetJournalIds.length === 0) {
-      return [];
-    }
-
-    const links = await prisma.journalPartnerLink.findMany({
-      where: {
-        journalId: { in: targetJournalIds },
-      },
-      select: { partnerId: true }, // Only select partnerId to get distinct partners
-      distinct: ["partnerId"], // Get distinct partner IDs
-    });
-
-    if (links.length === 0) {
-      return [];
-    }
-
-    const partnerIds = links.map((link) => link.partnerId);
-    return prisma.partner.findMany({
-      where: {
-        id: { in: partnerIds },
-      },
-      orderBy: { name: "asc" },
-    });
-  },
-
-  //RECIPE 6: Get all Partners linked to multiple Journals (optionally including their children)
   async getPartnersForJournals(
     journalIds: string[],
     includeChildren: boolean = false
   ): Promise<Partner[]> {
-    console.log(
-      `Chef (JPLService): Getting partners for Journal IDs '${journalIds.join(
-        ","
-      )}', includeChildren: ${includeChildren}.`
-    );
     if (!journalIds || journalIds.length === 0) {
       return [];
     }
 
-    let targetJournalIds: string[] = [...journalIds];
-
+    let targetJournalIds = new Set<string>(journalIds);
     if (includeChildren) {
-      const allDescendantIds = new Set<string>(targetJournalIds);
-      for (const journalId of journalIds) {
-        const descendantJournals = await prisma.$queryRaw<
-          Array<{ id: string }>
-        >`
-          WITH RECURSIVE "JournalDescendants" AS (
-            SELECT id FROM "journals" WHERE id = ${journalId}
-            UNION ALL
-            SELECT j.id FROM "journals" j INNER JOIN "JournalDescendants" jd ON j.parent_id = jd.id
-          )
-          SELECT id FROM "JournalDescendants";
-        `;
-        descendantJournals.forEach((j) => allDescendantIds.add(j.id));
-      }
-      targetJournalIds = Array.from(allDescendantIds);
-      console.log(
-        `Chef (JPLService): Target journal IDs (incl. children):`,
-        targetJournalIds
-      );
+      // Replaced raw query with a call to a reusable utility for DRY principle
+      targetJournalIds = await getDescendantJournalIdsAsSet(journalIds);
     }
 
-    if (targetJournalIds.length === 0) return [];
+    if (targetJournalIds.size === 0) return [];
 
     const links = await prisma.journalPartnerLink.findMany({
-      where: {
-        journalId: { in: targetJournalIds },
-      },
+      where: { journalId: { in: Array.from(targetJournalIds) } },
       select: { partnerId: true },
       distinct: ["partnerId"],
     });
@@ -211,9 +138,7 @@ const journalPartnerLinkService = {
 
     const partnerIds = links.map((link) => link.partnerId);
     return prisma.partner.findMany({
-      where: {
-        id: { in: partnerIds },
-      },
+      where: { id: { in: partnerIds } },
       orderBy: { name: "asc" },
     });
   },

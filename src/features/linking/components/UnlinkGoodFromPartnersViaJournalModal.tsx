@@ -2,21 +2,28 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import type {
-  Good,
-  AccountNodeData,
-  JournalPartnerGoodLinkClient, // We'll display these
-} from "@/lib/types";
+  GoodClient,
+  JournalPartnerGoodLinkClient,
+  JournalPartnerLinkWithDetailsClient,
+} from "@/lib/types/models.client";
+import type { AccountNodeData } from "@/lib/types/ui";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import listStyles from "./UnlinkPartnerFromJournalsModal.module.css"; // Reuse the list styling
 import { IoClose } from "react-icons/io5";
+
+// Define a local view-model for the component's needs, combining the new base types
+type JournalPartnerGoodLinkWithDetails = JournalPartnerGoodLinkClient & {
+  descriptiveText?: string;
+  journalPartnerLink?: JournalPartnerLinkWithDetailsClient; // This includes the nested partner
+};
 
 interface UnlinkGoodFromPartnersViaJournalModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirmUnlink: (linkIdsToUnlink: string[]) => void; // Callback with array of JPGL IDs
-  goodToUnlink: Good | null;
+  goodToUnlink: GoodClient | null;
   contextJournal: AccountNodeData | null;
-  existingLinks: JournalPartnerGoodLinkClient[]; // Pre-fetched list of JPGLs
+  existingLinks: JournalPartnerGoodLinkWithDetails[]; // Pre-fetched list of JPGLs
   isSubmitting: boolean; // For the overall unlink operation
   isLoadingLinks?: boolean; // To show loading state for the list initially
 }

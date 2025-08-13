@@ -30,7 +30,7 @@ import {
 } from "@/components/layout/DropdownMenu";
 
 // Types
-import type { AccountNodeData, PartnerGoodFilterStatus } from "@/lib/types";
+import type { AccountNodeData, PartnerGoodFilterStatus } from "@/lib/types/ui";
 
 // --- ANIMATION VARIANTS ---
 const textVariants = {

@@ -1,381 +1,207 @@
 // src/app/services/partnerService.ts
+
 import prisma from "@/app/utils/prisma";
-import {
-  Partner,
-  PartnerType,
-  Prisma,
-  EntityState,
-  ApprovalStatus,
-} from "@prisma/client";
-import { z } from "zod";
+import { Partner, Prisma, EntityState, ApprovalStatus } from "@prisma/client";
 import { journalService } from "./journalService";
-import { ROOT_JOURNAL_ID } from "@/lib/constants";
-import { PartnerGoodFilterStatus } from "@/lib/types";
+import {
+  GetAllItemsOptions,
+  IntersectionFindOptions,
+} from "@/lib/types/serviceOptions";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
-
-export const createPartnerSchema = z.object({
-  name: z.string().min(1, "Partner name is required").max(255),
-  partnerType: z.nativeEnum(PartnerType),
-  notes: z.string().optional().nullable(),
-  logoUrl: z.string().url("Invalid logo URL format").optional().nullable(),
-  photoUrl: z.string().url("Invalid photo URL format").optional().nullable(),
-  isUs: z.boolean().optional().nullable(),
-  registrationNumber: z.string().max(100).optional().nullable(),
-  taxId: z.string().max(100).optional().nullable(),
-  bioFatherName: z.string().max(100).optional().nullable(),
-  bioMotherName: z.string().max(100).optional().nullable(),
-  additionalDetails: z.any().optional().nullable(),
-});
-
-export type CreatePartnerData = z.infer<typeof createPartnerSchema>;
-export type UpdatePartnerData = Partial<Omit<CreatePartnerData, "partnerType">>;
-
-export interface GetAllPartnersOptions {
-  where?: Prisma.PartnerWhereInput;
-  take?: number;
-  skip?: number;
-  partnerType?: PartnerType;
-  filterStatuses?: PartnerGoodFilterStatus[];
-
-  contextJournalIds?: string[];
-  currentUserId?: string;
-  restrictedJournalId?: string | null;
-}
+import {
+  CreatePartnerPayload,
+  UpdatePartnerPayload,
+} from "@/lib/schemas/partner.schema";
 
 const partnerService = {
-  // --- (createPartner, getAllPartners, getPartnerById, updatePartner, deletePartner functions are unchanged) ---
+  // ✅ CHANGED: The function signature now uses the Zod-inferred type.
   async createPartner(
-    data: CreatePartnerData,
-    createdById: string,
-    createdByIp?: string | null
+    data: CreatePartnerPayload,
+    createdById: string
   ): Promise<Partner> {
-    console.log(
-      "Chef (PartnerService): Adding new partner:",
-      data.name,
-      "by user:",
-      createdById
-    );
+    console.log("partnerService.createPartner: Input", { data, createdById });
     const newPartner = await prisma.partner.create({
       data: {
         ...data,
         createdById: createdById,
-        createdByIp: createdByIp,
         entityState: EntityState.ACTIVE,
         approvalStatus: ApprovalStatus.PENDING,
       },
     });
-    console.log(
-      "Chef (PartnerService): Partner",
-      newPartner.name,
-      "added with ID:",
-      newPartner.id,
-      "Status:",
-      newPartner.approvalStatus
-    );
+    console.log("partnerService.createPartner: Output", newPartner);
     return newPartner;
   },
 
-  async getAllPartners(
-    options: GetAllPartnersOptions
-  ): Promise<{ partners: Partner[]; totalCount: number }> {
-    console.log(
-      "Chef (PartnerService): Fetching partners with MULTI-SELECT RULES:",
-      options
-    );
-
-    const {
-      filterStatuses = [],
-      contextJournalIds = [],
-      currentUserId,
-      restrictedJournalId,
-      where: externalWhere,
-      ...restOfOptions
-    } = options;
-
-    if (filterStatuses.length > 0 && !currentUserId) {
-      console.warn(
-        `Chef (PartnerService): Filters require a currentUserId. Returning empty.`
-      );
-      return { partners: [], totalCount: 0 };
-    }
-
-    let prismaWhere: Prisma.PartnerWhereInput = {
-      entityState: "ACTIVE",
-      ...externalWhere,
-    };
-
-    const isRootUser =
-      !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
-
-    if (filterStatuses.length > 0) {
-      const orConditions: Prisma.PartnerWhereInput[] = [];
-      const descendantIds =
-        !isRootUser && filterStatuses.includes("unaffected")
-          ? await journalService.getDescendantJournalIds(restrictedJournalId!)
-          : [];
-
-      for (const status of filterStatuses) {
-        switch (status) {
-          case "affected":
-            if (contextJournalIds.length > 0) {
-              orConditions.push({
-                journalPartnerLinks: {
-                  some: { journalId: { in: contextJournalIds } },
-                },
-              });
-            }
-            break;
-
-          case "unaffected":
-            if (isRootUser) {
-              orConditions.push({
-                AND: [
-                  { journalPartnerLinks: { none: {} } },
-                  { createdById: { not: currentUserId } },
-                ],
-              });
-            } else {
-              orConditions.push({
-                AND: [
-                  {
-                    journalPartnerLinks: {
-                      some: { journalId: restrictedJournalId! },
-                    },
-                  },
-                  ...(descendantIds.length > 0
-                    ? [
-                        {
-                          NOT: {
-                            journalPartnerLinks: {
-                              some: { journalId: { in: descendantIds } },
-                            },
-                          },
-                        },
-                      ]
-                    : []),
-                ],
-              });
-            }
-            break;
-
-          case "inProcess":
-            if (isRootUser) {
-              orConditions.push({
-                AND: [
-                  { journalPartnerLinks: { none: {} } },
-                  { createdById: currentUserId },
-                ],
-              });
-            } else {
-              orConditions.push({
-                AND: [
-                  {
-                    journalPartnerLinks: {
-                      none: { journalId: restrictedJournalId! },
-                    },
-                  },
-                  { createdById: currentUserId },
-                ],
-              });
-            }
-            break;
-        }
-      }
-
-      if (orConditions.length > 0) {
-        prismaWhere.OR = orConditions;
-      } else {
-        return { partners: [], totalCount: 0 };
-      }
-    }
-
-    console.log(
-      "Chef (PartnerService): Final Prisma 'where' clause:",
-      JSON.stringify(prismaWhere, jsonBigIntReplacer, 2)
-    );
-
-    const totalCount = await prisma.partner.count({ where: prismaWhere });
-    const partners = await prisma.partner.findMany({
-      where: prismaWhere,
-      take: restOfOptions.take,
-      skip: restOfOptions.skip,
-      orderBy: { name: "asc" },
-      include: {
-        _count: { select: { journalPartnerLinks: true } },
-      },
-    });
-
-    console.log(
-      `Chef (PartnerService): Fetched ${partners.length} partners. Total matching query: ${totalCount}`
-    );
-    return { partners, totalCount };
-  },
-
   async getPartnerById(id: bigint): Promise<Partner | null> {
-    console.log("Chef (PartnerService): Looking up partner with ID:", id);
-    const partner = await prisma.partner.findUnique({
-      where: { id },
-    });
-    if (partner) {
-      console.log("Chef (PartnerService): Found partner:", partner.name);
-    } else {
-      console.log("Chef (PartnerService): Partner with ID:", id, "not found.");
-    }
+    console.log("partnerService.getPartnerById: Input", { id });
+    const partner = await prisma.partner.findUnique({ where: { id } });
+    console.log("partnerService.getPartnerById: Output", partner);
     return partner;
   },
 
-  async updatePartner(
-    id: bigint,
-    data: UpdatePartnerData
-  ): Promise<Partner | null> {
+  async getAllPartners(
+    options: GetAllItemsOptions<Prisma.PartnerWhereInput>
+  ): Promise<{ data: Partner[]; totalCount: number }> {
     console.log(
-      "Chef (PartnerService): Updating details for partner ID:",
-      id,
-      "with data:",
-      data
+      "partnerService.getAllPartners: Input",
+      JSON.stringify(options, jsonBigIntReplacer)
     );
-    try {
-      const updatedPartner = await prisma.partner.update({
-        where: { id },
-        data: data,
-      });
-      console.log(
-        "Chef (PartnerService): Partner",
-        updatedPartner.name,
-        "updated successfully."
+    const {
+      take,
+      skip,
+      restrictedJournalId,
+      filterMode,
+      permissionRootId,
+      selectedJournalIds = [],
+      where: externalWhere,
+    } = options;
+    let prismaWhere: Prisma.PartnerWhereInput = {
+      entityState: EntityState.ACTIVE,
+      ...externalWhere,
+    };
+    if (filterMode) {
+      if (selectedJournalIds.length === 0) {
+        console.warn(
+          "partnerService.getAllPartners: 'filterMode' was provided without 'selectedJournalIds'. Returning empty."
+        );
+        return { data: [], totalCount: 0 };
+      }
+      const lastJournalId = selectedJournalIds[selectedJournalIds.length - 1];
+      switch (filterMode) {
+        case "affected":
+          prismaWhere.journalPartnerLinks = {
+            some: { journalId: lastJournalId },
+          };
+          break;
+        case "unaffected":
+          if (!permissionRootId) {
+            console.warn(
+              "partnerService.getAllPartners: 'unaffected' filter requires 'permissionRootId'. Returning empty."
+            );
+            return { data: [], totalCount: 0 };
+          }
+          const affectedLinks = await prisma.journalPartnerLink.findMany({
+            where: { journalId: lastJournalId },
+            select: { partnerId: true },
+          });
+          const affectedPartnerIds = affectedLinks.map((p) => p.partnerId);
+          const descendantIds = await journalService.getDescendantJournalIds(
+            permissionRootId
+          );
+          prismaWhere.AND = [
+            {
+              journalPartnerLinks: {
+                some: {
+                  journalId: { in: [...descendantIds, permissionRootId] },
+                },
+              },
+            },
+            {
+              id: { notIn: affectedPartnerIds },
+            },
+          ];
+          break;
+        case "inProcess":
+          prismaWhere.AND = [
+            { approvalStatus: "PENDING" },
+            {
+              journalPartnerLinks: {
+                some: { journalId: { in: selectedJournalIds } },
+              },
+            },
+          ];
+          break;
+      }
+    } else if (restrictedJournalId) {
+      const descendantIds = await journalService.getDescendantJournalIds(
+        restrictedJournalId
       );
-      return updatedPartner;
-    } catch (error) {
-      console.warn(
-        "Chef (PartnerService): Could not update partner ID:",
-        id,
-        ". It might not exist.",
-        error
-      );
-      return null;
+      prismaWhere.journalPartnerLinks = {
+        some: { journalId: { in: [...descendantIds, restrictedJournalId] } },
+      };
     }
-  },
-
-  async deletePartner(id: bigint): Promise<Partner | null> {
-    console.log("Chef (PartnerService): Removing partner with ID:", id);
-    try {
-      const deletedPartner = await prisma.partner.delete({
-        where: { id },
-      });
-      console.log(
-        "Chef (PartnerService): Partner",
-        deletedPartner.name,
-        "removed successfully."
-      );
-      return deletedPartner;
-    } catch (error) {
-      console.warn(
-        "Chef (PartnerService): Could not delete partner ID:",
-        id,
-        ". It might not exist.",
-        error
-      );
-      return null;
-    }
-  },
-  /**
-   * ✅ CORRECTED LOGIC
-   * Finds partners that are linked to ALL specified goods within a given journal context.
-   * This logic now correctly handles the schema asymmetry and mirrors the logic of the working
-   * `goodsService.findGoodsForPartners` function.
-   *
-   * @param goodIds - An array of Good IDs.
-   * @param journalId - The Journal ID context.
-   * @returns A response of partners that are common to all specified goods in that journal.
-   */
-  async findPartnersForGoods(
-    goodIds: bigint[],
-    journalId: string
-  ): Promise<{ partners: Partner[]; totalCount: number }> {
-    console.groupCollapsed(
-      `[DATABASE-SERVICE: findPartnersForGoods (FINAL CORRECTED LOGIC)]`
-    );
-    console.log("INPUTS -> goodIds:", goodIds, `| journalId: "${journalId}"`);
-
-    if (goodIds.length === 0 || !journalId) {
-      console.log("EXIT: No good IDs or journalId provided.");
-      console.groupEnd();
-      return { partners: [], totalCount: 0 };
-    }
-
-    const uniqueInputGoodIds = new Set(goodIds);
-
-    // Step 1: Use a nested 'where' to query through the relationship.
-    // Fetch all links that match the desired goods AND are within the desired journal.
-    // This is the Prisma equivalent of an INNER JOIN with a WHERE clause.
-    const relevantLinks = await prisma.journalPartnerGoodLink.findMany({
-      where: {
-        goodId: { in: Array.from(uniqueInputGoodIds) },
-        // This nested clause is the key: it filters based on the parent table.
-        journalPartnerLink: {
-          journalId: journalId,
-          partner: {
-            entityState: "ACTIVE", // Only consider links to active partners
-          },
-        },
-      },
-      select: {
-        goodId: true,
-        journalPartnerLink: {
-          select: {
-            partnerId: true, // We need the partnerId for grouping
-          },
-        },
-      },
+    const totalCount = await prisma.partner.count({ where: prismaWhere });
+    const data = await prisma.partner.findMany({
+      where: prismaWhere,
+      take,
+      skip,
+      orderBy: { name: "asc" },
     });
+    console.log("partnerService.getAllPartners: Output", {
+      count: data.length,
+      totalCount,
+    });
+    return { data, totalCount };
+  },
 
-    if (relevantLinks.length === 0) {
-      console.log("EXIT: No links found for these goods in this journal.");
-      console.groupEnd();
-      return { partners: [], totalCount: 0 };
-    }
-
-    // Step 2: Perform the intersection logic in code.
-    // Create a map of { partnerId => Set<goodId> }.
-    const partnerToGoodIdsMap = new Map<bigint, Set<bigint>>();
-    for (const link of relevantLinks) {
-      const partnerId = link.journalPartnerLink.partnerId;
-      if (!partnerToGoodIdsMap.has(partnerId)) {
-        partnerToGoodIdsMap.set(partnerId, new Set());
-      }
-      partnerToGoodIdsMap.get(partnerId)!.add(link.goodId);
-    }
-
-    // Step 3: Filter the map to find partners who have all the required goods.
-    const intersectingPartnerIds: bigint[] = [];
-    for (const [partnerId, linkedGoodIds] of partnerToGoodIdsMap.entries()) {
-      if (linkedGoodIds.size === uniqueInputGoodIds.size) {
-        intersectingPartnerIds.push(partnerId);
-      }
-    }
-
+  async findPartnersForGoods(
+    options: IntersectionFindOptions
+  ): Promise<{ data: Partner[]; totalCount: number }> {
     console.log(
-      `Found ${intersectingPartnerIds.length} partners matching the intersection criteria.`
+      "partnerService.findPartnersForGoods: Input",
+      JSON.stringify(options, jsonBigIntReplacer)
     );
-
-    if (intersectingPartnerIds.length === 0) {
-      console.log("EXIT: No partners satisfied the intersection count.");
-      console.groupEnd();
-      return { partners: [], totalCount: 0 };
+    const { goodIds, journalIds } = options;
+    if (!goodIds || goodIds.length === 0) {
+      return { data: [], totalCount: 0 };
     }
-
-    // Step 4: Fetch the full partner details for the final list of IDs.
-    const partners = await prisma.partner.findMany({
+    const uniqueGoodIds = [...new Set(goodIds)];
+    const journalFilterClause =
+      journalIds && journalIds.length > 0
+        ? Prisma.sql`AND jpl."journal_id" IN (${Prisma.join(journalIds)})`
+        : Prisma.empty;
+    const intersectingPartnerRows = await prisma.$queryRaw<
+      Array<{ partner_id: bigint }>
+    >`
+      SELECT
+        jpl."partner_id"
+      FROM "journal_partner_good_links" AS jpgl
+      INNER JOIN "journal_partner_links" AS jpl ON jpgl."journal_partner_link_id" = jpl."id"
+      WHERE
+        jpgl."good_id" IN (${Prisma.join(uniqueGoodIds)})
+        ${journalFilterClause}
+      GROUP BY
+        jpl."partner_id"
+      HAVING
+        COUNT(DISTINCT jpgl."good_id") = ${uniqueGoodIds.length};
+    `;
+    const intersectingPartnerIds = intersectingPartnerRows.map(
+      (row) => row.partner_id
+    );
+    if (intersectingPartnerIds.length === 0) {
+      return { data: [], totalCount: 0 };
+    }
+    const data = await prisma.partner.findMany({
       where: {
         id: { in: intersectingPartnerIds },
+        entityState: "ACTIVE",
       },
       orderBy: { name: "asc" },
     });
+    console.log("partnerService.findPartnersForGoods: Output", {
+      count: data.length,
+    });
+    return { data, totalCount: data.length };
+  },
 
-    console.log(`Returning ${partners.length} final partner records.`);
-    console.groupEnd();
+  // ✅ CHANGED: The function signature now uses the Zod-inferred type.
+  async updatePartner(
+    id: bigint,
+    data: UpdatePartnerPayload
+  ): Promise<Partner | null> {
+    console.log("partnerService.updatePartner: Input", { id, data });
+    // Note: The `updatePartnerSchema` on the client side now correctly matches the fields
+    // from `createPartnerSchema`, so a simple spread is safe.
+    const updatedPartner = await prisma.partner.update({ where: { id }, data });
+    console.log("partnerService.updatePartner: Output", updatedPartner);
+    return updatedPartner;
+  },
 
-    return { partners, totalCount: partners.length };
+  async deletePartner(id: bigint): Promise<Partner | null> {
+    console.log("partnerService.deletePartner: Input", { id });
+    const deletedPartner = await prisma.partner.delete({ where: { id } });
+    console.log("partnerService.deletePartner: Output", deletedPartner);
+    return deletedPartner;
   },
 };
 

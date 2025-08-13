@@ -5,7 +5,7 @@ import styles from "./JournalModal.module.css";
 import AccountNode from "./AccountNode";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
 import { findNodeById } from "@/lib/helpers";
-import { AccountNodeData } from "@/lib/types";
+import { AccountNodeData } from "@/lib/types/ui";
 
 // Define props interface for better type checking and to make certain props optional.
 interface JournalModalProps {

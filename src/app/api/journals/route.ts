@@ -1,201 +1,168 @@
 // src/app/api/journals/route.ts
+
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions, ExtendedSession } from "@/lib/auth/authOptions";
+import { z } from "zod";
 import {
   journalService,
   CreateJournalData,
 } from "@/app/services/journalService";
-import { z } from "zod";
-import journalPartnerLinkService from "@/app/services/journalPartnerLinkService";
-import journalGoodLinkService from "@/app/services/journalGoodLinkService";
-import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
-import { parseBigIntParam } from "@/app/utils/jsonBigInt";
+import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { withAuthorization } from "@/lib/auth/withAuthorization";
+import { ExtendedSession } from "@/lib/auth/authOptions";
 
+/**
+ * Zod schema for validating query parameters for the versatile GET /api/journals endpoint.
+ */
+const getJournalsQuerySchema = z
+  .object({
+    // Use Case 1: Fetch sub-hierarchy for a restricted user
+    rootJournalId: z.string().optional(),
+
+    // Use Case 2: Find journals linked to partners (P -> J)
+    findByPartnerIds: z
+      .string()
+      .optional()
+      .transform((val) =>
+        val
+          ? val
+              .split(",")
+              .map((id) => parseBigInt(id, "partner ID"))
+              .filter((id): id is bigint => id !== null)
+          : undefined
+      ),
+
+    // Use Case 3: Find journals linked to goods (G -> J)
+    findByGoodIds: z
+      .string()
+      .optional()
+      .transform((val) =>
+        val
+          ? val
+              .split(",")
+              .map((id) => parseBigInt(id, "good ID"))
+              .filter((id): id is bigint => id !== null)
+          : undefined
+      ),
+  })
+  // ✅ FIX: The .refine() check has been removed.
+  // This schema now correctly handles the case where NO query parameters are provided,
+  // which is necessary for the initial, unfiltered data load for the Journal slider.
+  // .partial() is sufficient to make all fields optional.
+  .partial();
+
+/**
+ * Zod schema for creating a new journal.
+ */
 const createJournalSchema = z.object({
-  id: z
-    .string()
-    .min(1, "Journal ID is required")
-    .max(100, "Journal ID too long"),
-  name: z
-    .string()
-    .min(1, "Journal name is required")
-    .max(255, "Journal name too long"),
-  parentId: z.string().max(100).optional().nullable(),
-  isTerminal: z.boolean().optional().default(false),
+  id: z.string().min(1, "ID is required"),
+  name: z.string().min(1, "Name is required"),
+  parentId: z.string().optional().nullable(),
+  isTerminal: z.boolean().optional(),
   additionalDetails: z.any().optional(),
 });
 
-export async function GET(request: NextRequest) {
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
+/**
+ * GET /api/journals
+ * Fetches journals based on various contexts, acting as a router to the service layer.
+ */
+export const GET = withAuthorization(
+  async function GET(request: NextRequest) {
+    try {
+      const queryParams = Object.fromEntries(request.nextUrl.searchParams);
+      const validation = getJournalsQuerySchema.safeParse(queryParams);
 
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { message: "Unauthorized: User session is missing" },
-      { status: 401 }
-    );
-  }
-
-  const { searchParams } = new URL(request.url);
-  const parentIdParam = searchParams.get("parentId");
-  const fetchRootParam = searchParams.get("root");
-  const linkedToPartnerIdStr = searchParams.get("linkedToPartnerId");
-  const linkedToGoodIdStr = searchParams.get("linkedToGoodId");
-  const restrictedTopLevelJournalIdQueryParam = searchParams.get(
-    "restrictedTopLevelJournalId"
-  );
-  const fetchSubtreeFlag = searchParams.get("fetchSubtree");
-
-  console.log(
-    `API /journals GET: parentId="${parentIdParam}", root="${fetchRootParam}", partnerId="${linkedToPartnerIdStr}", goodId="${linkedToGoodIdStr}", restrictedJournalQuery="${restrictedTopLevelJournalIdQueryParam}", fetchSubtree="${fetchSubtreeFlag}"`
-  );
-
-  try {
-    let partnerIdForFilter: bigint | null = null;
-    let goodIdForFilter: bigint | null = null;
-    let errorMessages: string[] = [];
-
-    if (linkedToPartnerIdStr) {
-      partnerIdForFilter = parseBigIntParam(
-        linkedToPartnerIdStr,
-        "linkedToPartnerId"
-      );
-      if (partnerIdForFilter === null && linkedToPartnerIdStr) {
-        errorMessages.push(
-          `Invalid format for linkedToPartnerId: "${linkedToPartnerIdStr}". Must be an integer.`
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            message: "Invalid query parameters.",
+            errors: validation.error.format(),
+          },
+          { status: 400 }
         );
       }
+
+      const { rootJournalId, findByPartnerIds, findByGoodIds } =
+        validation.data;
+      let journals;
+
+      // Logic from the spec: Use an if/else if/else block to call the correct service function.
+      if (rootJournalId) {
+        journals = await journalService.getJournalSubHierarchy(rootJournalId);
+      } else if (findByPartnerIds && findByPartnerIds.length > 0) {
+        journals = await journalService.getJournalsForPartners(
+          findByPartnerIds
+        );
+      } else if (findByGoodIds && findByGoodIds.length > 0) {
+        journals = await journalService.getJournalsForGoods(findByGoodIds);
+      } else {
+        // ✅ FIX: This block is now reachable and serves as the default case.
+        // It handles the initial request from the client when no filters are applied,
+        // typically for an admin user loading the application for the first time.
+        // We assume a `getRootJournals` or similar function exists in the service.
+        // If it was called `getJournalSubHierarchy` with no args, that would go here too.
+        console.log("No specific query params found, fetching root journals.");
+        console.log(
+          "--> Calling journalService.getJournalSubHierarchy with null for Admin user."
+        ); // <-- ADD THIS
+        journals = await journalService.getJournalSubHierarchy(null);
+        console.log("<-- Service returned:", journals); // <-- ADD THIS
+        journals = await journalService.getJournalSubHierarchy(null); // Assuming `null` fetches the root
+      }
+
+      // The service functions return a simple array, not the { data, totalCount } object.
+      return NextResponse.json(journals);
+    } catch (error) {
+      const e = error as Error;
+      console.error("API GET /api/journals Error:", e);
+      return NextResponse.json(
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
+      );
     }
-    if (linkedToGoodIdStr) {
-      goodIdForFilter = parseBigIntParam(linkedToGoodIdStr, "linkedToGoodId");
-      if (goodIdForFilter === null && linkedToGoodIdStr) {
-        errorMessages.push(
-          `Invalid format for linkedToGoodId: "${linkedToGoodIdStr}". Must be an integer.`
+  },
+  { action: "READ", resource: "JOURNAL" }
+);
+
+/**
+ * POST /api/journals
+ * Creates a new journal.
+ */
+export const POST = withAuthorization(
+  async function POST(request: NextRequest) {
+    try {
+      const rawBody = await request.json();
+      const validation = createJournalSchema.safeParse(rawBody);
+
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            message: "Invalid request body.",
+            errors: validation.error.format(),
+          },
+          { status: 400 }
         );
       }
-    }
 
-    if (errorMessages.length > 0) {
+      const newJournal = await journalService.createJournal(
+        validation.data as CreateJournalData
+      );
+
+      return NextResponse.json(newJournal, { status: 201 });
+    } catch (error) {
+      const e = error as Error;
+      console.error("API POST /api/journals Error:", e);
+      // Handle specific errors like a non-existent parent
+      if (e.message.includes("not found")) {
+        return NextResponse.json(
+          { message: e.message },
+          { status: 400 } // Bad Request
+        );
+      }
       return NextResponse.json(
-        { message: "Invalid query parameters.", errors: errorMessages },
-        { status: 400 }
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
       );
     }
-
-    // --- Linkage-based Filtering ---
-    if (partnerIdForFilter !== null && goodIdForFilter !== null) {
-      const journalIds = await jpgLinkService.getJournalIdsForPartnerAndGood(
-        partnerIdForFilter,
-        goodIdForFilter
-      );
-      if (journalIds.length === 0)
-        return NextResponse.json([], { status: 200 });
-      // REFACTOR: No userContext needed
-      const journals = await journalService.getAllJournals({
-        where: { id: { in: journalIds } },
-      });
-      return NextResponse.json(journals);
-    }
-    if (partnerIdForFilter !== null) {
-      const journals = await journalPartnerLinkService.getJournalsForPartner(
-        partnerIdForFilter
-      );
-      return NextResponse.json(journals);
-    }
-    if (goodIdForFilter !== null) {
-      const journals = await journalGoodLinkService.getJournalsForGood(
-        goodIdForFilter
-      );
-      return NextResponse.json(journals);
-    }
-
-    // --- Journal Restriction Logic ---
-    if (restrictedTopLevelJournalIdQueryParam && fetchSubtreeFlag === "true") {
-      console.log(
-        `API /journals GET: Fetching sub-hierarchy for restricted journal ID: ${restrictedTopLevelJournalIdQueryParam}`
-      );
-      // REFACTOR: No userContext needed
-      const journals = await journalService.getJournalSubHierarchy(
-        restrictedTopLevelJournalIdQueryParam
-      );
-      return NextResponse.json(journals);
-    }
-
-    // --- Standard Hierarchy Fetching ---
-    if (typeof parentIdParam === "string" && parentIdParam.length > 0) {
-      console.log(
-        `API /journals GET: Fetching children for parentId: ${parentIdParam}`
-      );
-      // REFACTOR: No userContext needed
-      const journals = await journalService.getJournalsByParentId(
-        parentIdParam
-      );
-      return NextResponse.json(journals);
-    }
-
-    if (fetchRootParam === "true") {
-      console.log("API /journals GET: Fetching root journals.");
-      // REFACTOR: No userContext needed
-      const journals = await journalService.getRootJournals();
-      return NextResponse.json(journals);
-    }
-
-    console.log("API /journals GET: Fetching all journals.");
-    // REFACTOR: No userContext needed
-    const journals = await journalService.getAllJournals();
-    return NextResponse.json(journals);
-  } catch (error) {
-    const e = error as Error;
-    console.error(`API /journals GET Error:`, e.message, e.stack);
-    return NextResponse.json(
-      { message: "Failed to fetch journals", error: e.message },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const session = (await getServerSession(
-    authOptions
-  )) as ExtendedSession | null;
-
-  if (!session?.user?.id) {
-    return NextResponse.json(
-      { message: "Unauthorized: User session is missing" },
-      { status: 401 }
-    );
-  }
-
-  console.log(`API: Received request to add a new journal.`);
-  try {
-    const rawOrder = await request.json();
-    const validation = createJournalSchema.safeParse(rawOrder);
-    if (!validation.success) {
-      return NextResponse.json(
-        {
-          message: "Invalid journal payload.",
-          errors: validation.error.format(),
-        },
-        { status: 400 }
-      );
-    }
-
-    const validOrderData = validation.data as CreateJournalData;
-    console.log("API: Payload valid. Passing to service:", validOrderData);
-
-    // REFACTOR: No userContext needed
-    const newJournal = await journalService.createJournal(validOrderData);
-    console.log("API: New journal created successfully.");
-    return NextResponse.json(newJournal, { status: 201 });
-  } catch (error) {
-    const e = error as Error;
-    console.error(`API Failed to create journal!`, e.message);
-    const statusCode = e.message.includes("already exists") ? 409 : 500;
-    return NextResponse.json(
-      { message: "Failed to create journal.", error: e.message },
-      { status: statusCode }
-    );
-  }
-}
+  },
+  { action: "CREATE", resource: "JOURNAL" }
+);

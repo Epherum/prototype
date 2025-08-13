@@ -2,18 +2,27 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import type { Good, JournalGoodLinkWithDetails } from "@/lib/types";
+import type {
+  GoodClient,
+  JournalGoodLinkClient,
+  JournalClient,
+} from "@/lib/types/models.client";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 // Reusing the CSS module from partner unlinking for similar structure.
 // You can create a dedicated one if distinctions grow.
 import unlinkStyles from "./UnlinkPartnerFromJournalsModal.module.css"; // Assuming this exists from previous step
 
+// Define a local view-model for the component's needs
+type JournalGoodLinkWithDetailsClient = JournalGoodLinkClient & {
+  journal?: JournalClient;
+};
+
 interface UnlinkGoodFromJournalsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  good: Good; // The Good/Service from which to unlink journals
+  good: GoodClient; // The Good/Service from which to unlink journals
   onUnlink: (linkIdsToUnlink: string[]) => void; // Expects JournalGoodLink.id
-  fetchLinksFn: () => Promise<JournalGoodLinkWithDetails[]>;
+  fetchLinksFn: () => Promise<JournalGoodLinkWithDetailsClient[]>;
   isUnlinking: boolean;
 }
 
@@ -34,7 +43,7 @@ export default function UnlinkGoodFromJournalsModal({
     isLoading,
     isError,
     error,
-  } = useQuery<JournalGoodLinkWithDetails[], Error>({
+  } = useQuery<JournalGoodLinkWithDetailsClient[], Error>({
     queryKey: queryKey,
     queryFn: fetchLinksFn,
     enabled: isOpen && !!good && typeof good.id === "string" && good.id !== "", // Ensure good and good.id are valid
@@ -136,10 +145,10 @@ export default function UnlinkGoodFromJournalsModal({
                         className={unlinkStyles.checkboxInput}
                       />
                       <span className={unlinkStyles.linkLabel}>
-                        {linkDetail.journalName ||
-                          `Journal ID: ${linkDetail.journalId}`}
-                        {linkDetail.journalCode &&
-                          ` (${linkDetail.journalCode})`}
+                        {linkDetail.journal?.name ||
+                          `Journal ID: ${linkDetail.journalId}`}{" "}
+                        {linkDetail.journal?.id &&
+                          ` (${linkDetail.journal.id})`}
                       </span>
                     </label>
                   </li>

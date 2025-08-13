@@ -1,37 +1,18 @@
 // src/app/api/roles/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
-import {
-  getAllRoles,
-  createRole,
-  RolePayload,
-} from "@/app/services/roleService";
-
-const rolePayloadSchema = z
-  .object({
-    name: z.string().min(2, "Role name must be at least 2 characters long"),
-    description: z.string().optional(),
-    permissionIds: z
-      .array(z.string())
-      .min(1, "A role must have at least one permission"),
-  })
-  .refine(
-    (data): data is RolePayload => {
-      return typeof data.name === "string" && Array.isArray(data.permissionIds);
-    },
-    {
-      message: "Name and permissionIds are required fields",
-    }
-  );
+// CORRECT: Import the service object and the schema from the service file
+import roleService, { rolePayloadSchema } from "@/app/services/roleService";
 
 // GET all roles
 const getHandler = async () => {
   try {
-    const roles = await getAllRoles();
+    // CORRECT: Call the method on the imported service object
+    const roles = await roleService.getAll();
     return NextResponse.json(roles);
   } catch (error) {
+    console.error("API GET /api/roles Error:", error);
     return NextResponse.json(
       { message: "Failed to fetch roles" },
       { status: 500 }
@@ -41,21 +22,25 @@ const getHandler = async () => {
 
 // POST to create a new role
 const postHandler = async (req: NextRequest) => {
-  const body = await req.json();
-  const validation = rolePayloadSchema.safeParse(body);
-
-  if (!validation.success) {
-    return NextResponse.json(
-      { errors: validation.error.format() },
-      { status: 400 }
-    );
-  }
-
   try {
-    const newRole = await createRole(validation.data);
+    const body = await req.json();
+    // CORRECT: Use the schema imported from the service
+    const validation = rolePayloadSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { message: "Invalid role data.", errors: validation.error.format() },
+        { status: 400 }
+      );
+    }
+
+    // CORRECT: Call the 'create' method on the service object
+    const newRole = await roleService.create(validation.data);
     return NextResponse.json(newRole, { status: 201 });
   } catch (error) {
-    console.error("API Error creating role:", error);
+    console.error("API POST /api/roles Error:", error);
+    // You could add more specific error handling here for things like
+    // duplicate role names (P2002) if needed.
     return NextResponse.json(
       { message: "Failed to create role" },
       { status: 500 }
@@ -64,10 +49,10 @@ const postHandler = async (req: NextRequest) => {
 };
 
 export const GET = withAuthorization(getHandler, {
-  action: "MANAGE",
-  resource: "USERS",
+  action: "READ",
+  resource: "ROLE",
 });
 export const POST = withAuthorization(postHandler, {
-  action: "MANAGE",
-  resource: "USERS",
+  action: "READ",
+  resource: "ROLE",
 });

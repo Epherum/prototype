@@ -1,3 +1,4 @@
+//src/features/users/components/ManageUserModal.tsx
 import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,7 +12,8 @@ import JournalModal from "@/features/journals/components/JournalModal";
 import { useUserManagement } from "../useUserManagement"; // Corrected Path
 import { deleteRole } from "@/services/clientRoleService";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
+import { roleKeys } from "@/lib/queryKeys";
 
 interface ManageUserModalProps {
   isOpen: boolean; // Though always true when rendered, useful for AnimatePresence
@@ -74,7 +76,7 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
       try {
         await deleteRole(roleId);
         // Refresh the list of roles after a successful deletion
-        await queryClient.invalidateQueries({ queryKey: ["allRoles"] });
+        await queryClient.invalidateQueries({ queryKey: roleKeys.all });
       } catch (error: any) {
         alert(`Error: ${error.message}`);
       }

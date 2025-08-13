@@ -1,44 +1,19 @@
-// src/app/services/goodsService.ts
+//src/app/services/goodsService.ts
 import prisma from "@/app/utils/prisma";
 import { GoodsAndService, Prisma, EntityState } from "@prisma/client";
 import { journalService } from "./journalService";
-import { ROOT_JOURNAL_ID } from "@/lib/constants";
-import { PartnerGoodFilterStatus } from "@/lib/types";
-
-export interface GetAllGoodsOptions {
-  where?: Prisma.GoodsAndServiceWhereInput;
-  take?: number;
-  skip?: number;
-  typeCode?: string;
-  filterStatuses?: PartnerGoodFilterStatus[];
-  contextJournalIds?: string[];
-  currentUserId?: string;
-  restrictedJournalId?: string | null;
-}
-
-export type CreateGoodsData = {
-  createdById: string;
-  label: string;
-  referenceCode?: string | null;
-  barcode?: string | null;
-  taxCodeId?: number | null;
-  typeCode?: string | null;
-  description?: string | null;
-  unitCodeId?: number | null;
-  stockTrackingMethod?: string | null;
-  packagingTypeCode?: string | null;
-  photoUrl?: string | null;
-  additionalDetails?: any;
-};
-
-export type UpdateGoodsData = Partial<
-  Omit<CreateGoodsData, "referenceCode" | "barcode">
->;
+import {
+  GetAllItemsOptions,
+  IntersectionFindOptions,
+} from "@/lib/types/serviceOptions";
+import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
+// ✅ CORRECTED IMPORT: Import from the new shared types file
+import { CreateGoodsData, UpdateGoodsData } from "./service.types";
 
 const goodsService = {
   async createGood(data: CreateGoodsData): Promise<GoodsAndService> {
-    console.log("GoodsService: Creating new item:", data.label);
-
+    console.log("goodsService.createGood: Input", data);
+    // ... existing implementation ...
     if (data.taxCodeId) {
       const taxCodeExists = await prisma.taxCode.findUnique({
         where: { id: data.taxCodeId },
@@ -64,223 +39,180 @@ const goodsService = {
         createdBy: { connect: { id: createdById } },
       },
     });
-
-    console.log(
-      "GoodsService: Item",
-      newGood.label,
-      "created with ID:",
-      newGood.id
-    );
+    console.log("goodsService.createGood: Output", newGood);
     return newGood;
   },
 
   async getGoodById(id: bigint): Promise<GoodsAndService | null> {
-    return prisma.goodsAndService.findUnique({
+    console.log("goodsService.getGoodById: Input", { id });
+    const good = await prisma.goodsAndService.findUnique({
       where: { id },
       include: { taxCode: true, unitOfMeasure: true },
     });
+    console.log("goodsService.getGoodById: Output", good);
+    return good;
   },
 
+  /**
+   * ✏️ MODIFIED: A comprehensive fetch function for Goods.
+   * Handles initial population and filtering by Journal selection with 'affected', 'unaffected', and 'inProcess' modes.
+   */
   async getAllGoods(
-    options: GetAllGoodsOptions
-  ): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
-    console.log("GoodsService: Fetching items with rules:", options);
+    options: GetAllItemsOptions<Prisma.GoodsAndServiceWhereInput>
+  ): Promise<{ data: GoodsAndService[]; totalCount: number }> {
+    console.log(
+      "goodsService.getAllGoods: Input",
+      JSON.stringify(options, jsonBigIntReplacer)
+    );
 
     const {
-      filterStatuses = [],
-      contextJournalIds = [],
-      currentUserId,
+      take,
+      skip,
       restrictedJournalId,
+      filterMode,
+      permissionRootId,
+      selectedJournalIds = [],
       where: externalWhere,
-      typeCode,
-      ...restOfOptions
     } = options;
-
-    if (filterStatuses.length > 0 && !currentUserId) {
-      console.warn(
-        "GoodsService: Filters require a currentUserId, but none provided."
-      );
-      return { goods: [], totalCount: 0 };
-    }
 
     let prismaWhere: Prisma.GoodsAndServiceWhereInput = {
       entityState: EntityState.ACTIVE,
-      ...(typeCode && { typeCode: typeCode }),
       ...externalWhere,
     };
 
-    const isRootUser =
-      !restrictedJournalId || restrictedJournalId === ROOT_JOURNAL_ID;
+    if (filterMode) {
+      const lastJournalId =
+        selectedJournalIds.length > 0
+          ? selectedJournalIds[selectedJournalIds.length - 1]
+          : null;
 
-    if (filterStatuses.length > 0) {
-      const orConditions: Prisma.GoodsAndServiceWhereInput[] = [];
-      const descendantIds =
-        !isRootUser && filterStatuses.includes("unaffected")
-          ? await journalService.getDescendantJournalIds(restrictedJournalId!) // companyId removed
-          : [];
+      if (!lastJournalId) {
+        console.warn(
+          "goodsService.getAllGoods: 'filterMode' was provided without 'selectedJournalIds'. Returning empty."
+        );
+        return { data: [], totalCount: 0 };
+      }
 
-      for (const status of filterStatuses) {
-        switch (status) {
-          case "affected":
-            if (contextJournalIds.length > 0) {
-              orConditions.push({
-                journalGoodLinks: {
-                  some: { journalId: { in: contextJournalIds } },
+      switch (filterMode) {
+        case "affected":
+          // Find goods linked to the very last selected journal.
+          prismaWhere.journalGoodLinks = {
+            some: { journalId: lastJournalId },
+          };
+          break;
+
+        case "unaffected":
+          if (!permissionRootId) {
+            console.warn(
+              "goodsService.getAllGoods: 'unaffected' filter requires 'permissionRootId'. Returning empty."
+            );
+            return { data: [], totalCount: 0 };
+          }
+          // 1. Get all good IDs linked to the last selected journal.
+          const affectedGoodLinks = await prisma.journalGoodLink.findMany({
+            where: { journalId: lastJournalId },
+            select: { goodId: true },
+          });
+          const affectedGoodIds = affectedGoodLinks.map((p) => p.goodId);
+
+          // 2. Get all descendant journals for the overall permission scope.
+          const descendantIds = await journalService.getDescendantJournalIds(
+            permissionRootId
+          );
+
+          // 3. Find goods linked anywhere in the permission scope...
+          // 4. ...but exclude those found in the 'affected' list.
+          prismaWhere.AND = [
+            {
+              journalGoodLinks: {
+                some: {
+                  journalId: { in: [...descendantIds, permissionRootId] },
                 },
-              });
-            }
-            break;
-          case "unaffected":
-            if (isRootUser) {
-              orConditions.push({
-                AND: [
-                  { journalGoodLinks: { none: {} } },
-                  { createdById: { not: currentUserId } },
-                ],
-              });
-            } else {
-              orConditions.push({
-                AND: [
-                  {
-                    journalGoodLinks: {
-                      some: { journalId: restrictedJournalId! },
-                    },
-                  },
-                  ...(descendantIds.length > 0
-                    ? [
-                        {
-                          NOT: {
-                            journalGoodLinks: {
-                              some: { journalId: { in: descendantIds } },
-                            },
-                          },
-                        },
-                      ]
-                    : []),
-                ],
-              });
-            }
-            break;
-          case "inProcess":
-            if (isRootUser) {
-              orConditions.push({
-                AND: [
-                  { journalGoodLinks: { none: {} } },
-                  { createdById: currentUserId },
-                ],
-              });
-            } else {
-              orConditions.push({
-                AND: [
-                  {
-                    journalGoodLinks: {
-                      none: { journalId: restrictedJournalId! },
-                    },
-                  },
-                  { createdById: currentUserId },
-                ],
-              });
-            }
-            break;
-        }
-      }
+              },
+            },
+            {
+              id: { notIn: affectedGoodIds },
+            },
+          ];
+          break;
 
-      if (orConditions.length > 0) {
-        prismaWhere.OR = orConditions;
-      } else {
-        return { goods: [], totalCount: 0 };
+        case "inProcess":
+          // The spec `{ approvalStatus: 'PENDING' }` doesn't apply to the Goods model.
+          // This mode is not applicable to Goods as they lack a status field.
+          console.warn(
+            "goodsService.getAllGoods: 'inProcess' filter is not applicable to Goods. Returning empty."
+          );
+          return { data: [], totalCount: 0 };
       }
+    } else if (restrictedJournalId) {
+      // Default behavior: Fetch all goods within the user's permitted journal hierarchy.
+      const descendantIds = await journalService.getDescendantJournalIds(
+        restrictedJournalId
+      );
+      prismaWhere.journalGoodLinks = {
+        some: { journalId: { in: [...descendantIds, restrictedJournalId] } },
+      };
     }
 
     const totalCount = await prisma.goodsAndService.count({
       where: prismaWhere,
     });
-    const goods = await prisma.goodsAndService.findMany({
+    const data = await prisma.goodsAndService.findMany({
       where: prismaWhere,
-      take: restOfOptions.take,
-      skip: restOfOptions.skip,
+      take,
+      skip,
       orderBy: { label: "asc" },
       include: { taxCode: true, unitOfMeasure: true },
     });
 
-    return { goods, totalCount };
-  },
-
-  async updateGood(
-    id: bigint,
-    data: UpdateGoodsData
-  ): Promise<GoodsAndService | null> {
-    // This function's logic remains largely the same
-    try {
-      return await prisma.goodsAndService.update({ where: { id }, data: data });
-    } catch (error) {
-      return null;
-    }
-  },
-
-  async deleteGood(id: bigint): Promise<GoodsAndService | null> {
-    // This function's logic remains the same
-    try {
-      return await prisma.goodsAndService.delete({ where: { id } });
-    } catch (error) {
-      return null;
-    }
+    console.log("goodsService.getAllGoods: Output", {
+      count: data.length,
+      totalCount,
+    });
+    return { data, totalCount };
   },
 
   /**
-   * ✅ RENAMED & REFACTORED
-   * This single function now finds goods for partners based on the number of IDs provided.
-   * - If one partnerId is given, it finds all goods for that partner.
-   * - If multiple partnerIds are given, it finds the INTERSECTION of goods common to ALL of them.
-   *
-   * @param partnerIds - An array of one or more Partner IDs.
-   * @param journalId - The Journal ID context.
-   * @returns A response containing the relevant goods.
+   * ✏️ MODIFIED: Finds goods that are common to ALL specified partners.
+   * Can be optionally filtered to a specific set of journals.
    */
   async findGoodsForPartners(
-    partnerIds: bigint[],
-    journalId: string
-  ): Promise<{ goods: GoodsAndService[]; totalCount: number }> {
-    console.groupCollapsed(
-      `[DATABASE-SERVICE: findGoodsForPartners (UNIFIED LOGIC)]`
-    );
+    options: IntersectionFindOptions
+  ): Promise<{ data: GoodsAndService[]; totalCount: number }> {
     console.log(
-      "INPUTS -> partnerIds:",
-      partnerIds,
-      `| journalId: "${journalId}"`
+      "goodsService.findGoodsForPartners: Input",
+      JSON.stringify(options, jsonBigIntReplacer)
     );
+    const { partnerIds, journalIds } = options;
 
-    if (partnerIds.length === 0 || !journalId) {
-      console.log("EXIT: No partner IDs or journalId provided.");
-      console.groupEnd();
-      return { goods: [], totalCount: 0 };
+    if (!partnerIds || partnerIds.length === 0) {
+      return { data: [], totalCount: 0 };
     }
 
-    const uniqueInputPartnerIds = new Set(partnerIds);
+    const uniquePartnerIds = [...new Set(partnerIds)];
 
-    // Step 1: Find all `journalPartnerLink` records that match our specific partners AND the journal.
+    // 1. Find all `journalPartnerLink` records that match our partners, optionally filtered by journal.
+    const jplWhere: Prisma.JournalPartnerLinkWhereInput = {
+      partnerId: { in: uniquePartnerIds },
+    };
+    if (journalIds && journalIds.length > 0) {
+      jplWhere.journalId = { in: journalIds };
+    }
+
     const relevantLinks = await prisma.journalPartnerLink.findMany({
-      where: {
-        journalId: journalId,
-        partnerId: { in: Array.from(uniqueInputPartnerIds) },
-      },
-      select: {
-        id: true,
-      },
+      where: jplWhere,
+      select: { id: true },
     });
 
-    if (relevantLinks.length < uniqueInputPartnerIds.size) {
-      console.log("EXIT: Not all partners have links in this journal.");
-      console.groupEnd();
-      return { goods: [], totalCount: 0 };
+    // Optimization: If not all partners have links in the given context, no intersection is possible.
+    if (relevantLinks.length < uniquePartnerIds.length) {
+      return { data: [], totalCount: 0 };
     }
 
     const relevantLinkIds = relevantLinks.map((link) => link.id);
 
-    // Step 2: This is the core logic. It finds `goodId`s that are linked to a number of our
-    // relevant partners that EQUALS the number of unique partners we're searching for.
-    // This naturally handles the N=1 case (finds goods linked to 1 partner) and the N>1
-    // case (finds goods linked to ALL N partners).
+    // 2. Group by `goodId` and find those that are linked to a count of partners
+    // equal to the number of partners we're searching for.
     const goodIdGroups = await prisma.journalPartnerGoodLink.groupBy({
       by: ["goodId"],
       where: {
@@ -292,22 +224,19 @@ const goodsService = {
       having: {
         journalPartnerLinkId: {
           _count: {
-            equals: uniqueInputPartnerIds.size,
+            equals: uniquePartnerIds.length,
           },
         },
       },
     });
 
     const intersectingGoodIds = goodIdGroups.map((group) => group.goodId);
-
     if (intersectingGoodIds.length === 0) {
-      console.log("EXIT: No goods found matching the criteria.");
-      console.groupEnd();
-      return { goods: [], totalCount: 0 };
+      return { data: [], totalCount: 0 };
     }
 
-    // Step 3: Fetch the full good details for the resulting IDs.
-    const goods = await prisma.goodsAndService.findMany({
+    // 3. Fetch the full good details for the resulting IDs.
+    const data = await prisma.goodsAndService.findMany({
       where: {
         id: { in: intersectingGoodIds },
         entityState: "ACTIVE",
@@ -316,10 +245,32 @@ const goodsService = {
       include: { taxCode: true, unitOfMeasure: true },
     });
 
-    console.log(`Found ${goods.length} goods. Total matching: ${goods.length}`);
-    console.groupEnd();
+    console.log("goodsService.findGoodsForPartners: Output", {
+      count: data.length,
+    });
+    return { data, totalCount: data.length };
+  },
 
-    return { goods, totalCount: goods.length };
+  async updateGood(
+    id: bigint,
+    data: UpdateGoodsData
+  ): Promise<GoodsAndService | null> {
+    console.log("goodsService.updateGood: Input", { id, data });
+    // ... existing implementation ...
+    const updatedGood = await prisma.goodsAndService.update({
+      where: { id },
+      data: data,
+    });
+    console.log("goodsService.updateGood: Output", updatedGood);
+    return updatedGood;
+  },
+
+  async deleteGood(id: bigint): Promise<GoodsAndService | null> {
+    console.log("goodsService.deleteGood: Input", { id });
+    // ... existing implementation ...
+    const deletedGood = await prisma.goodsAndService.delete({ where: { id } });
+    console.log("goodsService.deleteGood: Output", deletedGood);
+    return deletedGood;
   },
 };
 

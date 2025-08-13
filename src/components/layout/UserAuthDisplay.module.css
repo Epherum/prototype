@@ -6,7 +6,7 @@
   gap: calc(var(--spacing-unit) * 1.5);
 
   /* Restore the "card" look */
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1.5);
   border-radius: var(--border-radius-md);
   background-color: var(--bg-card);
 

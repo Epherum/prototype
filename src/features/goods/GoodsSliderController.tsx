@@ -8,14 +8,14 @@ import styles from "@/app/page.module.css";
 import { useAppStore } from "@/store/appStore";
 import { useGoodManager } from "./useGoodManager";
 import { useGoodJournalLinking } from "@/features/linking/useGoodJournalLinking";
-import { fetchJournalLinksForGood } from "@/services/clientJournalGoodLinkService";
+import { getJournalGoodLinks } from "@/services/clientJournalGoodLinkService";
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import GoodsOptionsMenu from "./components/GoodsOptionsMenu";
 import AddEditGoodModal from "./components/AddEditGoodModal";
 import LinkGoodToJournalsModal from "@/features/linking/components/LinkGoodToJournalsModal";
 import UnlinkGoodFromJournalsModal from "@/features/linking/components/UnlinkGoodFromJournalsModal";
 import { SLIDER_TYPES } from "@/lib/constants";
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
 
 export interface GoodsSliderControllerProps {
   canMoveUp: boolean;
@@ -282,9 +282,9 @@ export const GoodsSliderController = forwardRef<
               good={goodJournalLinking.goodForUnlinking}
               onUnlink={goodJournalLinking.submitUnlink}
               fetchLinksFn={() =>
-                fetchJournalLinksForGood(
-                  goodJournalLinking.goodForUnlinking!.id
-                )
+                getJournalGoodLinks({
+                  goodId: goodJournalLinking.goodForUnlinking!.id,
+                })
               }
               isUnlinking={goodJournalLinking.isSubmittingUnlink}
             />

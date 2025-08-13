@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 import { useAppStore } from "@/store/appStore";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
-import type { AccountNodeData } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
 
 // --- Co-located Hierarchical Logic Helpers ---
 

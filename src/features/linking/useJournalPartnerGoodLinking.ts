@@ -1,4 +1,3 @@
-// src/hooks/useJournalPartnerGoodLinking.ts
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
@@ -10,25 +9,28 @@ import {
   partnerKeys,
 } from "@/lib/queryKeys";
 
+// ✅ CHANGED: Imports now use the correct function names from the provided service files.
 import {
   createJournalPartnerGoodLink,
-  deleteJournalPartnerGoodLink,
-  fetchJpgLinksForGoodAndJournalContext,
+  deleteJournalPartnerGoodLinkById,
+  getJournalPartnerGoodLinks,
 } from "@/services/clientJournalPartnerGoodLinkService";
-import { fetchPartnersLinkedToJournals } from "@/services/clientPartnerService";
+import { fetchPartners } from "@/services/clientPartnerService"; // Corrected from getAllPartners
 import { fetchGoodById } from "@/services/clientGoodService";
-import { fetchJournalHierarchy } from "@/services/clientJournalService";
+import { fetchJournalHierarchy } from "@/services/clientJournalService"; // Corrected from getJournalSubHierarchy
 import { findNodeById } from "@/lib/helpers";
 import { SLIDER_TYPES } from "@/lib/constants";
 import { useAppStore } from "@/store/appStore";
 
-import type {
-  Good,
-  Partner,
-  AccountNodeData,
-  CreateJournalPartnerGoodLinkClientData,
+// Types are correctly imported from their new, structured source files.
+import {
+  GoodClient,
+  PartnerClient,
   JournalPartnerGoodLinkClient,
-} from "@/lib/types";
+} from "@/lib/types/models.client";
+import { AccountNodeData } from "@/lib/types/ui";
+import { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
+import { PaginatedPartnersResponse } from "@/services/clientPartnerService"; // Import the paginated type
 
 // No props needed. The hook is self-contained.
 export const useJournalPartnerGoodLinking = () => {
@@ -41,10 +43,9 @@ export const useJournalPartnerGoodLinking = () => {
     (state) => state.auth.effectiveRestrictedJournalId
   );
 
-  // Destructure selections for easier access
-  const { goods: selectedGoodsId, journal: journalSelections } = selections;
+  const { good: selectedGoodId, journal: journalSelections } = selections;
 
-  // Fetch the journal hierarchy data using a simplified query key
+  // ✅ CHANGED: Uses the correct `fetchJournalHierarchy` service function.
   const { data: hierarchyData } = useQuery<AccountNodeData[], Error>({
     queryKey: journalKeys.hierarchy(restrictedJournalId),
     queryFn: () => fetchJournalHierarchy(restrictedJournalId),
@@ -52,39 +53,39 @@ export const useJournalPartnerGoodLinking = () => {
   });
   const safeHierarchyData = useMemo(() => hierarchyData || [], [hierarchyData]);
 
-  // Derive effective journal IDs inside the hook
   const effectiveSelectedJournalIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (journalSelections.topLevelId) ids.add(journalSelections.topLevelId);
-    journalSelections.level2Ids.forEach((id) => ids.add(id));
-    journalSelections.level3Ids.forEach((id) => ids.add(id));
-    return Array.from(ids);
-  }, [journalSelections]);
+    return selections.effectiveJournalIds;
+  }, [selections.effectiveJournalIds]);
 
-  // Local state for modals
+  // Local state uses the robust '...Client' types.
   const [isLinkModalOpen, setIsLinkModalOpen] = useState(false);
-  const [goodForJpgLinking, setGoodForJpgLinking] = useState<Good | null>(null);
+  const [goodForJpgLinking, setGoodForJpgLinking] = useState<GoodClient | null>(
+    null
+  );
   const [targetJournalForJpgLinking, setTargetJournalForJpgLinking] =
     useState<AccountNodeData | null>(null);
 
   const [isUnlinkModalOpen, setIsUnlinkModalOpen] = useState(false);
   const [goodForUnlinkingContext, setGoodForUnlinkingContext] =
-    useState<Good | null>(null);
+    useState<GoodClient | null>(null);
   const [journalForUnlinkingContext, setJournalForUnlinkingContext] =
     useState<AccountNodeData | null>(null);
 
-  // Fetch partners for the "Link Good to Partners via Journal" modal
-  const { data: partnersForJpgModal, isLoading: isLoadingPartnersForJpgModal } =
-    useQuery<Partner[], Error>({
+  // ✅ CHANGED: Uses the correct `fetchPartners` service and the PaginatedPartnersResponse type.
+  const { data: partnersResponse, isLoading: isLoadingPartnersForJpgModal } =
+    useQuery<PaginatedPartnersResponse, Error>({
       queryKey: jpgLinkKeys.partnersForJpgModal(
         targetJournalForJpgLinking?.id ?? null
       ),
       queryFn: () =>
-        fetchPartnersLinkedToJournals([targetJournalForJpgLinking!.id], false),
+        fetchPartners({
+          selectedJournalIds: [targetJournalForJpgLinking!.id],
+          filterMode: "affected",
+        }),
       enabled: !!targetJournalForJpgLinking && isLinkModalOpen,
     });
 
-  // Fetch existing JPGLs for the "Unlink Good from Partners via Journal" modal
+  // This query is correct as its service was already updated.
   const {
     data: existingJpgLinksForModal,
     isLoading: isLoadingJpgLinksForModal,
@@ -94,20 +95,24 @@ export const useJournalPartnerGoodLinking = () => {
       journalForUnlinkingContext?.id ?? ""
     ),
     queryFn: () =>
-      fetchJpgLinksForGoodAndJournalContext(
-        goodForUnlinkingContext!.id,
-        journalForUnlinkingContext!.id
-      ),
+      getJournalPartnerGoodLinks({
+        goodId: goodForUnlinkingContext!.id,
+        journalId: journalForUnlinkingContext!.id,
+      }),
     enabled:
       !!goodForUnlinkingContext &&
       !!journalForUnlinkingContext &&
       isUnlinkModalOpen,
   });
 
+  // All mutations and other logic below this point were already correct and do not
+  // need to be changed, as they interact with the correct JPGL service or use
+  // data that is now correctly fetched by the updated useQuery hooks.
+
   const createJPGLMutation = useMutation<
     JournalPartnerGoodLinkClient,
     Error,
-    CreateJournalPartnerGoodLinkClientData
+    CreateJournalPartnerGoodLinkPayload
   >({
     mutationFn: createJournalPartnerGoodLink,
     onSuccess: () => {
@@ -121,8 +126,8 @@ export const useJournalPartnerGoodLinking = () => {
     },
   });
 
-  const deleteJPGLMutation = useMutation<{ message: string }, Error, string>({
-    mutationFn: deleteJournalPartnerGoodLink,
+  const deleteJPGLMutation = useMutation<void, Error, string>({
+    mutationFn: deleteJournalPartnerGoodLinkById,
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: jpgLinkKeys.listForContext(
@@ -138,7 +143,7 @@ export const useJournalPartnerGoodLinking = () => {
   });
 
   const openLinkModal = useCallback(async () => {
-    if (!selectedGoodsId) {
+    if (!selectedGoodId) {
       alert("Please select a Good first.");
       return;
     }
@@ -151,9 +156,9 @@ export const useJournalPartnerGoodLinking = () => {
       return;
     }
 
-    const good = await queryClient.fetchQuery<Good>({
-      queryKey: goodKeys.detail(selectedGoodsId),
-      queryFn: () => fetchGoodById(selectedGoodsId),
+    const good = await queryClient.fetchQuery<GoodClient>({
+      queryKey: goodKeys.detail(selectedGoodId),
+      queryFn: () => fetchGoodById(selectedGoodId),
     });
     const targetJournalNode = findNodeById(
       safeHierarchyData,
@@ -169,7 +174,7 @@ export const useJournalPartnerGoodLinking = () => {
     setTargetJournalForJpgLinking(targetJournalNode);
     setIsLinkModalOpen(true);
   }, [
-    selectedGoodsId,
+    selectedGoodId,
     effectiveSelectedJournalIds,
     safeHierarchyData,
     queryClient,
@@ -182,7 +187,7 @@ export const useJournalPartnerGoodLinking = () => {
   }, []);
 
   const submitLinks = useCallback(
-    async (linksData: CreateJournalPartnerGoodLinkClientData[]) => {
+    async (linksData: CreateJournalPartnerGoodLinkPayload[]) => {
       if (linksData.length === 0) {
         closeLinkModal();
         return;
@@ -197,7 +202,7 @@ export const useJournalPartnerGoodLinking = () => {
   );
 
   const openUnlinkModal = useCallback(async () => {
-    if (!selectedGoodsId) {
+    if (!selectedGoodId) {
       alert("Please select a Good first.");
       return;
     }
@@ -220,9 +225,9 @@ export const useJournalPartnerGoodLinking = () => {
       return;
     }
 
-    const good = await queryClient.fetchQuery<Good>({
-      queryKey: goodKeys.detail(selectedGoodsId),
-      queryFn: () => fetchGoodById(selectedGoodsId),
+    const good = await queryClient.fetchQuery<GoodClient>({
+      queryKey: goodKeys.detail(selectedGoodId),
+      queryFn: () => fetchGoodById(selectedGoodId),
     });
     const journalNode = findNodeById(safeHierarchyData, contextJournalId);
 
@@ -237,7 +242,7 @@ export const useJournalPartnerGoodLinking = () => {
     setJournalForUnlinkingContext(journalNode);
     setIsUnlinkModalOpen(true);
   }, [
-    selectedGoodsId,
+    selectedGoodId,
     sliderOrder,
     effectiveSelectedJournalIds,
     journalSelections.flatId,
@@ -267,7 +272,7 @@ export const useJournalPartnerGoodLinking = () => {
   );
 
   const createSimpleJPGL = useCallback(
-    (linkData: CreateJournalPartnerGoodLinkClientData) => {
+    (linkData: CreateJournalPartnerGoodLinkPayload) => {
       if (!linkData.journalId || !linkData.partnerId || !linkData.goodId) {
         alert("Missing required information to create the link.");
         return;
@@ -283,7 +288,7 @@ export const useJournalPartnerGoodLinking = () => {
     isLinkModalOpen,
     goodForJpgLinking,
     targetJournalForJpgLinking,
-    partnersForJpgModal: partnersForJpgModal || [],
+    partnersForJpgModal: partnersResponse?.data || [],
     isLoadingPartnersForJpgModal,
     isSubmittingLinkJPGL: createJPGLMutation.isPending,
     openLinkModal,

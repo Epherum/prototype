@@ -1,15 +1,15 @@
-// File: src/app/api/goods/[id]/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import goodsService, { UpdateGoodsData } from "@/app/services/goodsService";
-import { z } from "zod";
-import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+// src/app/api/goods/[id]/route.ts
 
-// Waiter's checklist for "Update Good/Service"
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import goodsService from "@/app/services/goodsService";
+import { UpdateGoodsData } from "@/app/services/service.types";
+import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { withAuthorization } from "@/lib/auth/withAuthorization";
+
 const updateGoodsSchema = z
   .object({
     label: z.string().min(1).max(255).optional(),
-    // referenceCode: z.string().max(50).optional(), // Typically not updated or handled carefully
-    // barcode: z.string().max(50).optional(),       // Same as referenceCode
     taxCodeId: z.number().int().positive().optional().nullable(),
     typeCode: z.string().max(25).optional().nullable(),
     description: z.string().optional().nullable(),
@@ -19,145 +19,148 @@ const updateGoodsSchema = z
     photoUrl: z.string().url().optional().nullable(),
     additionalDetails: z.any().optional().nullable(),
   })
-  .strict();
-
-export async function GET(
-  _request: NextRequest, // You can use _request if request object isn't used in this specific handler
-  { params: paramsPromise }: { params: Promise<{ id: string }> } // Type params as a Promise
-) {
-  // Await the paramsPromise to get the actual params object
-  const resolvedParams = await paramsPromise;
-  const goodIdStr = resolvedParams.id; // Access id from the resolved object
-
-  console.log(
-    `Waiter (API /goods/[id]): Customer wants details for good ID '${goodIdStr}'.`
+  .strict()
+  .refine(
+    (data) => Object.keys(data).length > 0,
+    "Update body cannot be empty."
   );
-  const goodId = parseBigInt(goodIdStr, "good ID");
-  if (goodId === null) {
-    return NextResponse.json(
-      { message: `Invalid good ID format: '${goodIdStr}'.` },
-      { status: 400 }
-    );
-  }
 
-  try {
-    const good = await goodsService.getGoodById(goodId);
-    if (!good) {
+type RouteContext = { params: { id: string } };
+
+/**
+ * GET /api/goods/[id]
+ */
+export const GET = withAuthorization(
+  async function GET(_request: NextRequest, { params }: RouteContext) {
+    try {
+      const goodId = parseBigInt(params.id, "good ID");
+      if (goodId === null) {
+        return NextResponse.json(
+          { message: `Invalid good ID format: '${params.id}'.` },
+          { status: 400 }
+        );
+      }
+
+      const good = await goodsService.getGoodById(goodId);
+      if (!good) {
+        return NextResponse.json(
+          { message: `Good/Service with ID '${params.id}' not found.` },
+          { status: 404 }
+        );
+      }
+
+      const body = JSON.stringify(good, jsonBigIntReplacer);
+      return new NextResponse(body, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const e = error as Error;
+      console.error(`API GET /api/goods/${params.id} Error:`, e);
       return NextResponse.json(
-        { message: `Good/Service with ID '${goodId}' not found.` },
-        { status: 404 }
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
       );
     }
-    const body = JSON.stringify(good, jsonBigIntReplacer);
-    return new NextResponse(body, {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const e = error as Error;
-    return NextResponse.json(
-      { message: "Chef couldn't get good details.", error: e.message },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { action: "READ", resource: "GOODS" }
+);
 
-export async function PUT(
-  request: NextRequest, // Keep NextRequest if you need its specific methods (like request.json())
-  { params: paramsPromise }: { params: Promise<{ id: string }> }
-) {
-  const resolvedParams = await paramsPromise;
-  const goodIdStr = resolvedParams.id;
+/**
+ * PUT /api/goods/[id]
+ */
+export const PUT = withAuthorization(
+  async function PUT(request: NextRequest, { params }: RouteContext) {
+    try {
+      const goodId = parseBigInt(params.id, "good ID");
+      if (goodId === null) {
+        return NextResponse.json(
+          { message: `Invalid good ID format: '${params.id}'.` },
+          { status: 400 }
+        );
+      }
 
-  const goodId = parseBigInt(goodIdStr, "good ID");
+      const rawBody = await request.json();
+      const validation = updateGoodsSchema.safeParse(rawBody);
 
-  if (goodId === null) {
-    return NextResponse.json(
-      { message: `Invalid good ID format: '${goodIdStr}'.` },
-      { status: 400 }
-    );
-  }
+      if (!validation.success) {
+        return NextResponse.json(
+          {
+            message: "Invalid request body for update.",
+            errors: validation.error.format(),
+          },
+          { status: 400 }
+        );
+      }
 
-  try {
-    const rawOrderChanges = await request.json();
-    const validation = updateGoodsSchema.safeParse(rawOrderChanges);
-    if (!validation.success) {
+      const updatedGood = await goodsService.updateGood(
+        goodId,
+        validation.data as UpdateGoodsData
+      );
+
+      const body = JSON.stringify(updatedGood, jsonBigIntReplacer);
+      return new NextResponse(body, {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (error) {
+      const e = error as Error & { code?: string };
+      console.error(`API PUT /api/goods/${params.id} Error:`, e);
+
+      // REFINED: Specifically catch Prisma's "record not found" error
+      if (e.code === "P2025") {
+        return NextResponse.json(
+          { message: `Good with ID '${params.id}' not found for update.` },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json(
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
+      );
+    }
+  },
+  { action: "UPDATE", resource: "GOODS" }
+);
+
+/**
+ * DELETE /api/goods/[id]
+ */
+export const DELETE = withAuthorization(
+  async function DELETE(_request: NextRequest, { params }: RouteContext) {
+    try {
+      const goodId = parseBigInt(params.id, "good ID");
+      if (goodId === null) {
+        return NextResponse.json(
+          { message: `Invalid good ID format: '${params.id}'.` },
+          { status: 400 }
+        );
+      }
+
+      await goodsService.deleteGood(goodId);
+
       return NextResponse.json(
         {
-          message: "Update order is unclear.",
-          errors: validation.error.format(),
+          message: `Good/Service with ID '${params.id}' successfully deleted.`,
         },
-        { status: 400 }
+        { status: 200 }
+      );
+    } catch (error) {
+      const e = error as Error & { code?: string };
+      console.error(`API DELETE /api/goods/${params.id} Error:`, e);
+
+      // REFINED: Specifically catch Prisma's "record not found" error
+      if (e.code === "P2025") {
+        return NextResponse.json(
+          { message: `Good with ID '${params.id}' not found for deletion.` },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json(
+        { message: "An internal error occurred.", error: e.message },
+        { status: 500 }
       );
     }
-    if (Object.keys(validation.data).length === 0) {
-      return NextResponse.json(
-        { message: "No changes provided for update." },
-        { status: 400 }
-      );
-    }
-
-    const validChanges = validation.data as UpdateGoodsData;
-    const updatedGood = await goodsService.updateGood(goodId, validChanges);
-    if (!updatedGood) {
-      return NextResponse.json(
-        { message: `Good/Service with ID '${goodId}' not found for update.` },
-        { status: 404 }
-      );
-    }
-    const body = JSON.stringify(updatedGood, jsonBigIntReplacer);
-    return new NextResponse(body, {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const e = error as Error;
-    if (e.message.includes("not found")) {
-      // For FK violations like TaxCode not found during update
-      return NextResponse.json(
-        { message: "Failed to update good.", error: e.message },
-        { status: 400 }
-      ); // Bad request
-    }
-    return NextResponse.json(
-      { message: "Chef couldn't update good.", error: e.message },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  _request: NextRequest,
-  { params: paramsPromise }: { params: Promise<{ id: string }> }
-) {
-  const resolvedParams = await paramsPromise;
-  const goodIdStr = resolvedParams.id;
-
-  const goodId = parseBigInt(goodIdStr, "good ID");
-
-  if (goodId === null) {
-    return NextResponse.json(
-      { message: `Invalid good ID format: '${goodIdStr}'.` },
-      { status: 400 }
-    );
-  }
-
-  try {
-    const deletedGood = await goodsService.deleteGood(goodId);
-    if (!deletedGood) {
-      return NextResponse.json(
-        { message: `Good/Service with ID '${goodId}' not found for deletion.` },
-        { status: 404 }
-      );
-    }
-    return NextResponse.json({
-      message: `Good/Service with ID '${goodId}' successfully deleted.`,
-    });
-  } catch (error) {
-    const e = error as Error;
-    return NextResponse.json(
-      { message: "Chef couldn't delete good.", error: e.message },
-      { status: 500 }
-    );
-  }
-}
+  },
+  { action: "DELETE", resource: "GOODS" }
+);

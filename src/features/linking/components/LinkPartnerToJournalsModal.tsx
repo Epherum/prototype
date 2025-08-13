@@ -1,19 +1,17 @@
 //src/features/linking/components/LinkPartnerToJournalsModal.tsx
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import type {
-  Partner,
-  AccountNodeData,
-  CreateJournalPartnerLinkClientData,
-} from "@/lib/types";
+import type { PartnerClient } from "@/lib/types/models.client";
+import type { AccountNodeData } from "@/lib/types/ui";
+import type { CreateJournalPartnerLinkPayload } from "@/lib/schemas/journalPartnerLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./LinkItemToJournalsModal.module.css"; // Create this CSS module
 
 interface LinkPartnerToJournalsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitLinks: (linksData: CreateJournalPartnerLinkClientData[]) => void;
-  partnerToLink: Partner | null;
+  onSubmitLinks: (linksData: CreateJournalPartnerLinkPayload[]) => void;
+  partnerToLink: PartnerClient | null;
   isSubmitting: boolean;
   onOpenJournalSelector: (
     onSelectCallback: (journalNode: AccountNodeData) => void
@@ -74,7 +72,7 @@ LinkPartnerToJournalsModalProps) {
       alert("Please select at least one journal to link.");
       return;
     }
-    const linksToCreate: CreateJournalPartnerLinkClientData[] =
+    const linksToCreate: CreateJournalPartnerLinkPayload[] =
       selectedJournals.map((journal) => ({
         partnerId: partnerToLink.id, // Ensure partnerId is string if your type expects string
         journalId: journal.id,

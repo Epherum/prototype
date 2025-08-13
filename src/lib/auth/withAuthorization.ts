@@ -1,4 +1,3 @@
-// src/lib/auth/withAuthorization.ts
 import { type NextRequest, type NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import {
@@ -6,11 +5,8 @@ import {
   ExtendedSession,
   ExtendedUser,
 } from "@/lib/auth/authOptions";
-
-type PermissionObject = {
-  action: string;
-  resource: string;
-};
+// Step 1: Import the new, strong Permission type from our single source of truth.
+import { type Permission } from "@/lib/auth/permissions";
 
 type ApiHandler = (
   req: NextRequest,
@@ -18,39 +14,50 @@ type ApiHandler = (
   session: ExtendedSession
 ) => Promise<NextResponse> | NextResponse;
 
+// The `normalizeResource` function is no longer needed and has been removed.
+// Our type system now enforces correctness at the source, making manual normalization obsolete.
+
 /**
- * Checks if a user possesses a specific permission.
+ * Checks if a user possesses a specific, strongly-typed permission.
+ *
  * @param user The extended user object from the session.
- * @param requiredPermission The permission object to check for.
+ * @param requiredPermission The permission object to check for. This is now strongly typed.
  * @returns `true` if the user has the permission, `false` otherwise.
  */
 function checkUserPermission(
   user: ExtendedUser,
-  requiredPermission: PermissionObject
+  requiredPermission: Permission // Step 2: Use the strong type here.
 ): boolean {
   if (!user?.roles) {
+    console.error(
+      "[Authorization] User object is missing the 'roles' property."
+    );
     return false;
   }
-  // Check if any of the user's roles contain the required permission.
+
+  // The logic is now simpler and more robust. We don't need to normalize anything.
+  // We compare the exact strings, which TypeScript has already validated.
+  const requiredAction = requiredPermission.action;
+  const requiredResource = requiredPermission.resource;
+
   return user.roles.some((role) =>
-    role.permissions.some(
-      (p) =>
-        p.action.toUpperCase() === requiredPermission.action.toUpperCase() &&
-        p.resource.toUpperCase() === requiredPermission.resource.toUpperCase()
-    )
+    role.permissions.some((p) => {
+      // Direct, case-sensitive comparison is now safe and correct.
+      return p.action === requiredAction && p.resource === requiredResource;
+    })
   );
 }
 
 /**
- * A Higher-Order Function to wrap API route handlers with authorization checks.
+ * A Higher-Order Function to wrap API route handlers with type-safe authorization checks.
  *
  * @param handler The original API route handler.
- * @param requiredPermission The permission required to access this handler.
+ * @param requiredPermission The strongly-typed permission required to access this handler.
  * @returns A new handler that performs checks before executing the original handler.
  */
 export function withAuthorization(
   handler: ApiHandler,
-  requiredPermission: PermissionObject
+  requiredPermission: Permission // Step 3: And use the strong type here.
 ) {
   return async function (req: NextRequest, context: { params: any }) {
     const session = (await getServerSession(
@@ -71,9 +78,7 @@ export function withAuthorization(
 
     if (!userHasPermission) {
       console.warn(
-        `FORBIDDEN: User ${
-          session.user.id
-        } attempted action [${requiredPermission.action.toUpperCase()}] on resource [${requiredPermission.resource.toUpperCase()}] without permission.`
+        `FORBIDDEN: User ${session.user.id} attempted action [${requiredPermission.action}] on resource [${requiredPermission.resource}] without permission.`
       );
       return new Response(JSON.stringify({ message: "Forbidden" }), {
         status: 403,
@@ -81,7 +86,6 @@ export function withAuthorization(
       });
     }
 
-    // If authorized, pass control to the original handler, including the session.
     return handler(req, context, session);
   };
 }

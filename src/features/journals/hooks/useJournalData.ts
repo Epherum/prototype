@@ -3,7 +3,8 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useChainedQuery } from "@/hooks/useChainedQuery";
 import { SLIDER_TYPES } from "@/lib/constants";
-import type { AccountNodeData, Journal } from "@/lib/types";
+import type { AccountNodeData } from "@/lib/types/ui";
+import type { JournalClient } from "@/lib/types/models.client";
 
 export const useJournalData = (isJournalSliderPrimary: boolean) => {
   const journalQueryOptions = useChainedQuery(SLIDER_TYPES.JOURNAL);
@@ -17,17 +18,17 @@ export const useJournalData = (isJournalSliderPrimary: boolean) => {
       (queryKey.includes("hierarchy") || queryKey[0] === "journalHierarchy")
     );
   }, [journalQueryOptions.queryKey, isJournalSliderPrimary]);
-
   const hierarchyData = useMemo(() => {
     return isHierarchyMode
-      ? (journalQuery.data?.data as AccountNodeData[]) || []
+      ? (journalQuery.data?.data as unknown as AccountNodeData[]) || []
       : [];
   }, [journalQuery.data, isHierarchyMode]);
 
   const flatJournalData = useMemo(() => {
-    return !isHierarchyMode ? (journalQuery.data?.data as Journal[]) || [] : [];
+    return !isHierarchyMode
+      ? (journalQuery.data?.data as unknown as JournalClient[]) || []
+      : [];
   }, [journalQuery.data, isHierarchyMode]);
-
   return {
     isHierarchyMode,
     hierarchyData,

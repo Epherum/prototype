@@ -5,6 +5,7 @@ import {
   GoodsAndService,
   JournalPartnerLink as PrismaJPL,
 } from "@prisma/client";
+import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
 
 import { z } from "zod";
 
@@ -316,75 +317,10 @@ const jpgLinkService = {
     });
   },
 
-  // RECIPE 7: The Core Filtering Logic - Get Goods based on Journal (and its children) AND a specific Partner
-  async getGoodsForJournalAndPartner(
-    journalId: string, // The selected Journal in UI
-    partnerId: bigint, // The selected Partner in UI
-    includeJournalChildren: boolean = true
-  ): Promise<GoodsAndService[]> {
-    console.log(
-      `Chef (JPGLService): Getting goods for Journal '${journalId}' (children: ${includeJournalChildren}) AND Partner ID '${partnerId}'.`
-    );
-    let targetJournalIds = [journalId];
-
-    if (includeJournalChildren) {
-      const descendantJournals = await prisma.$queryRaw<Array<{ id: string }>>`
-        WITH RECURSIVE "JournalDescendants" AS (
-          SELECT id FROM "journals" WHERE id = ${journalId}
-          UNION ALL
-          SELECT j.id FROM "journals" j INNER JOIN "JournalDescendants" jd ON j.parent_id = jd.id
-        )
-        SELECT id FROM "JournalDescendants";
-      `;
-      targetJournalIds = descendantJournals.map((j) => j.id);
-    }
-    if (targetJournalIds.length === 0) return [];
-
-    // Find all JournalPartnerLink.id's that match the journal(s) and the specific partner
-    const relevantJPLs = await prisma.journalPartnerLink.findMany({
-      where: {
-        journalId: { in: targetJournalIds },
-        partnerId: partnerId,
-      },
-      select: { id: true }, // We only need the IDs of these JournalPartnerLinks
-    });
-
-    if (relevantJPLs.length === 0) {
-      console.log(
-        `Chef (JPGLService): No JournalPartnerLinks found for Journal(s) '${targetJournalIds.join(
-          ","
-        )}' and Partner ID '${partnerId}'.`
-      );
-      return []; // No relevant J-P links, so no goods can be associated
-    }
-
-    const relevantJPLIds = relevantJPLs.map((jpl) => jpl.id);
-
-    // Now find all goods linked to these specific JournalPartnerLink IDs
-    const goodLinks = await prisma.journalPartnerGoodLink.findMany({
-      where: {
-        journalPartnerLinkId: { in: relevantJPLIds },
-      },
-      select: { goodId: true },
-      distinct: ["goodId"],
-    });
-
-    if (goodLinks.length === 0) return [];
-    const goodIds = goodLinks.map((link) => link.goodId);
-
-    return prisma.goodsAndService.findMany({
-      where: { id: { in: goodIds } },
-      orderBy: { label: "asc" },
-      include: { taxCode: true, unitOfMeasure: true },
-    });
-  },
-
-  // RECIPE 7: The Core Filtering Logic - Get Goods based on Journal(s) (and their children) AND a specific Partner
-  // MODIFIED to accept an array of journal IDs
+  // RECIPE 7  The Core Filtering Logic - Get Goods based on Journal (and its children) AND a specific Partner
   async getGoodsForJournalsAndPartner(
-    // Renamed
-    journalIds: string[], // The selected Journal IDs in UI
-    partnerId: bigint, // The selected Partner in UI
+    journalIds: string[],
+    partnerId: bigint,
     includeJournalChildren: boolean = true
   ): Promise<GoodsAndService[]> {
     console.log(
@@ -395,57 +331,26 @@ const jpgLinkService = {
 
     if (!journalIds || journalIds.length === 0) return [];
 
-    let targetJournalIds: string[] = [...journalIds];
-
+    let targetJournalIds = new Set<string>(journalIds);
     if (includeJournalChildren) {
-      const allDescendantIds = new Set<string>(targetJournalIds);
-      for (const initialJournalId of journalIds) {
-        // Iterate over initially provided journalIds
-        const descendantJournals = await prisma.$queryRaw<
-          Array<{ id: string }>
-        >`
-          WITH RECURSIVE "JournalDescendants" AS (
-            SELECT id FROM "journals" WHERE id = ${initialJournalId}
-            UNION ALL
-            SELECT j.id FROM "journals" j INNER JOIN "JournalDescendants" jd ON j.parent_id = jd.id
-          )
-          SELECT id FROM "JournalDescendants";
-        `;
-        descendantJournals.forEach((j) => allDescendantIds.add(j.id));
-      }
-      targetJournalIds = Array.from(allDescendantIds);
+      targetJournalIds = await getDescendantJournalIdsAsSet(journalIds);
     }
-
-    if (targetJournalIds.length === 0) return [];
-
-    const relevantJPLs = await prisma.journalPartnerLink.findMany({
-      where: {
-        journalId: { in: targetJournalIds }, // Use the expanded list of journal IDs
-        partnerId: partnerId,
-      },
-      select: { id: true },
-    });
-
-    if (relevantJPLs.length === 0) {
-      console.log(
-        `Chef (JPGLService): No JournalPartnerLinks found for Journal(s) '${targetJournalIds.join(
-          ","
-        )}' and Partner ID '${partnerId}'.`
-      );
-      return []; // No relevant J-P links, so no goods can be associated
-    }
-
-    const relevantJPLIds = relevantJPLs.map((jpl) => jpl.id);
+    if (targetJournalIds.size === 0) return [];
 
     const goodLinks = await prisma.journalPartnerGoodLink.findMany({
-      where: { journalPartnerLinkId: { in: relevantJPLIds } },
+      where: {
+        journalPartnerLink: {
+          partnerId: partnerId,
+          journalId: { in: Array.from(targetJournalIds) },
+        },
+      },
       select: { goodId: true },
       distinct: ["goodId"],
     });
 
     if (goodLinks.length === 0) return [];
-    const goodIds = goodLinks.map((link) => link.goodId);
 
+    const goodIds = goodLinks.map((link) => link.goodId);
     return prisma.goodsAndService.findMany({
       where: { id: { in: goodIds } },
       orderBy: { label: "asc" },
@@ -453,56 +358,40 @@ const jpgLinkService = {
     });
   },
 
-  // RECIPE 8: Get all partner IDs for a specific Good
+  // RECIPE 8: OPTIMIZED to a single query
   async getPartnerIdsForGood(goodId: bigint): Promise<bigint[]> {
     console.log(
       `Chef (JPGLService): Getting partner IDs for Good ID '${goodId}'.`
     );
-    const links = await prisma.journalPartnerGoodLink.findMany({
-      where: { goodId },
-      select: {
-        journalPartnerLink: {
-          // Navigate to the JournalPartnerLink
-          select: {
-            partnerId: true, // Select the partnerId from it
-          },
+    const links = await prisma.journalPartnerLink.findMany({
+      where: {
+        journalPartnerGoodLinks: {
+          some: { goodId: goodId },
         },
       },
+      select: { partnerId: true },
+      distinct: ["partnerId"],
     });
 
-    if (links.length === 0) return [];
-
-    // Extract distinct partner IDs
-    const partnerIds = [
-      ...new Set(links.map((link) => link.journalPartnerLink.partnerId)),
-    ];
-    return partnerIds as bigint[];
+    return links.map((link) => link.partnerId);
   },
 
-  // RECIPE 9: Get all good IDs for a specific Partner
+  // RECIPE 9: OPTIMIZED to a single query
   async getGoodIdsForPartner(partnerId: bigint): Promise<bigint[]> {
     console.log(
       `Chef (JPGLService): Getting good IDs for Partner ID '${partnerId}'.`
     );
-
-    // Find JournalPartnerLinks for the given partner
-    const jpls = await prisma.journalPartnerLink.findMany({
-      where: { partnerId },
-      select: { id: true }, // We only need the IDs of these JournalPartnerLinks
-    });
-
-    if (jpls.length === 0) return [];
-    const jplIds = jpls.map((jpl) => jpl.id);
-
-    // Find JournalPartnerGoodLinks that use these JournalPartnerLink IDs
     const links = await prisma.journalPartnerGoodLink.findMany({
-      where: { journalPartnerLinkId: { in: jplIds } },
+      where: {
+        journalPartnerLink: {
+          partnerId: partnerId,
+        },
+      },
       select: { goodId: true },
+      distinct: ["goodId"],
     });
 
-    if (links.length === 0) return [];
-    const goodIds = [...new Set(links.map((link) => link.goodId))];
-    return goodIds as bigint[];
+    return links.map((link) => link.goodId);
   },
 
   // Recipe 10: Get all partner IDs for a specific Journal and Good
