@@ -22,7 +22,14 @@ function mapToJplClient(
     partnerId: String(raw.partnerId),
     // Map relations if they exist
     partner: raw.partner
-      ? { ...raw.partner, id: String(raw.partner.id) }
+      ? { 
+          ...raw.partner, 
+          id: String(raw.partner.id),
+          createdById: raw.partner.createdById ? String(raw.partner.createdById) : null,
+          deletedById: raw.partner.deletedById ? String(raw.partner.deletedById) : null,
+          previousVersionId: raw.partner.previousVersionId ? String(raw.partner.previousVersionId) : null,
+          nextVersionId: raw.partner.nextVersionId ? String(raw.partner.nextVersionId) : null,
+        }
       : undefined,
   };
 }

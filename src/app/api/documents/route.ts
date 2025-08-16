@@ -94,9 +94,20 @@ export const POST = withAuthorization(
   ) {
     try {
       const rawBody = await request.json();
+      
+      // Log the raw body for debugging
+      apiLogger.debug("Document creation request body:", rawBody);
+      
       const validation = apiCreateDocumentSchema.safeParse(rawBody);
 
       if (!validation.success) {
+        // Log the detailed validation errors
+        apiLogger.error("Document validation failed:", {
+          rawBody,
+          errors: validation.error.format(),
+          issues: validation.error.issues
+        });
+        
         return NextResponse.json(
           {
             message: "Invalid request body for creating a document.",
@@ -115,6 +126,7 @@ export const POST = withAuthorization(
         lines: lines?.map(line => ({
           ...line,
           journalPartnerGoodLinkId: BigInt(line.journalPartnerGoodLinkId),
+          goodId: BigInt(line.goodId),
         })) || [],
       };
 

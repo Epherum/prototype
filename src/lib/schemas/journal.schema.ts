@@ -29,6 +29,10 @@ export const getJournalsQuerySchema = z.object({
         .filter((id): id is bigint => id !== null)
     )
     .optional(),
+  findByDocumentId: z
+    .string()
+    .transform((val) => parseBigInt(val, "document ID"))
+    .optional(),
 });
 
 export type CreateJournalPayload = z.infer<typeof createJournalSchema>;

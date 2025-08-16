@@ -43,10 +43,12 @@ export const GET = withAuthorization(
           { status: 400 }
         );
       }
-      const { intersectionOfGoodIds, selectedJournalIds, filterMode, permissionRootId, ...restOfOptions } =
+      const { intersectionOfGoodIds, findByDocumentId, selectedJournalIds, filterMode, permissionRootId, ...restOfOptions } =
         validation.data;
       let result;
-      if (intersectionOfGoodIds && intersectionOfGoodIds.length > 0) {
+      if (findByDocumentId) {
+        result = await partnerService.findPartnersForDocument(findByDocumentId);
+      } else if (intersectionOfGoodIds && intersectionOfGoodIds.length > 0) {
         result = await partnerService.findPartnersForGoods({
           goodIds: intersectionOfGoodIds,
           journalIds: selectedJournalIds,

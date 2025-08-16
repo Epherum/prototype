@@ -41,8 +41,8 @@ interface DynamicSliderProps {
   data?: DynamicSliderItem[];
   onSlideChange: (id: string | null) => void;
   activeItemId: string | null;
-  isAccordionOpen: boolean;
-  onToggleAccordion: () => void;
+  isAccordionOpen?: boolean;
+  onToggleAccordion?: () => void;
   isLoading?: boolean;
   isError?: boolean;
   error?: Error | null;
@@ -54,6 +54,10 @@ interface DynamicSliderProps {
   onOpenContextJournalFilterModal?: () => void;
   gpgContextJournalInfo?: GPGContextJournalInfo | null;
   placeholderMessage?: string;
+  // New props for document creation
+  showDocumentItemInputs?: boolean;
+  documentItems?: Array<{ goodId: string; quantity: number; unitPrice: number; goodLabel: string }>;
+  onUpdateDocumentItem?: (goodId: string, updates: { quantity?: number; unitPrice?: number }) => void;
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -62,7 +66,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   data = [],
   onSlideChange,
   activeItemId,
-  isAccordionOpen,
+  isAccordionOpen = false,
   onToggleAccordion,
   isLoading,
   isError,
@@ -74,6 +78,9 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   onOpenContextJournalFilterModal,
   gpgContextJournalInfo,
   placeholderMessage,
+  showDocumentItemInputs = false,
+  documentItems = [],
+  onUpdateDocumentItem,
 }) => {
   const initialSlideIndex = Math.max(
     0,
@@ -277,25 +284,91 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                   className={styles.detailsContentWrapper}
                 >
                   <div className={styles.detailsContent}>
-                    {Object.entries(currentItemForAccordion).map(
-                      ([key, value]) => {
-                        if (
-                          ["id", "label", "children"].includes(key) ||
-                          value === null ||
-                          typeof value === "object"
-                        )
-                          return null;
-                        return (
-                          <p key={key}>
-                            <strong>
-                              {key.charAt(0).toUpperCase() +
-                                key.slice(1).replace(/([A-Z])/g, " $1")}
-                              :
-                            </strong>{" "}
-                            {String(value)}
-                          </p>
-                        );
-                      }
+                    {showDocumentItemInputs ? (
+                      // Show document creation inputs for all selected items
+                      <>
+                        <h4 style={{ marginBottom: '16px', color: '#333' }}>Selected Items for Document:</h4>
+                        {documentItems.map((item) => (
+                          <div key={item.goodId} style={{ 
+                            marginBottom: '20px', 
+                            padding: '12px', 
+                            border: '1px solid #ddd', 
+                            borderRadius: '6px',
+                            backgroundColor: '#f9f9f9'
+                          }}>
+                            <h5 style={{ marginBottom: '8px', color: '#555' }}>{item.goodLabel}</h5>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                              <div>
+                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                  Quantity:
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => 
+                                    onUpdateDocumentItem?.(item.goodId, { 
+                                      quantity: parseInt(e.target.value) || 1 
+                                    })
+                                  }
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '4px',
+                                    fontSize: '14px'
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                  Unit Price:
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.unitPrice}
+                                  onChange={(e) => 
+                                    onUpdateDocumentItem?.(item.goodId, { 
+                                      unitPrice: parseFloat(e.target.value) || 0 
+                                    })
+                                  }
+                                  style={{
+                                    width: '100%',
+                                    padding: '6px 8px',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '4px',
+                                    fontSize: '14px'
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    ) : (
+                      // Show normal details
+                      Object.entries(currentItemForAccordion).map(
+                        ([key, value]) => {
+                          if (
+                            ["id", "label", "children"].includes(key) ||
+                            value === null ||
+                            typeof value === "object"
+                          )
+                            return null;
+                          return (
+                            <p key={key}>
+                              <strong>
+                                {key.charAt(0).toUpperCase() +
+                                  key.slice(1).replace(/([A-Z])/g, " $1")}
+                                :
+                              </strong>{" "}
+                              {String(value)}
+                            </p>
+                          );
+                        }
+                      )
                     )}
                   </div>
                 </motion.div>

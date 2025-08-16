@@ -84,6 +84,26 @@ export async function fetchJournalsForGoods(
   return journals.map(mapToJournalClient);
 }
 
+/**
+ * Finds all unique journals linked to a specific document through DocumentLine.
+ * @param documentId - The document ID (string format).
+ * @returns A promise resolving to an array of JournalClient objects.
+ */
+export async function fetchJournalsForDocument(
+  documentId: string
+): Promise<JournalClient[]> {
+  if (!documentId) return [];
+
+  const params = new URLSearchParams({ findByDocumentId: documentId });
+  const response = await fetch(`/api/journals?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch journals for document");
+  }
+  const journals: PrismaJournal[] = await response.json();
+  return journals.map(mapToJournalClient);
+}
+
 // --- CRUD Operations ---
 
 export async function createJournal(

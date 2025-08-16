@@ -5,16 +5,22 @@ import { parseBigInt } from "@/app/utils/jsonBigInt";
 // Schema for a single line in a document
 export const documentLineSchema = z.object({
   journalPartnerGoodLinkId: z.string(), // This is the unique link ID
+  goodId: z.string(), // Required goodId for denormalized access
   designation: z.string().min(1, "Designation is required"),
   quantity: z.number().min(0, "Quantity must be positive"),
   unitPrice: z.number().min(0, "Unit price must be positive"),
+  discountPercentage: z.number().min(0).max(1).optional().default(0), // Default to 0% discount
   taxRate: z.number().min(0).max(1), // Assuming tax rate is a decimal e.g., 0.20 for 20%
+  unitOfMeasure: z.string().optional().nullable(),
+  isTaxExempt: z.boolean().optional().default(false), // Default to not tax exempt
 });
 
 export const createDocumentSchema = z.object({
   refDoc: z.string().optional().nullable(),
   type: z.enum(["INVOICE", "QUOTE", "PURCHASE_ORDER", "CREDIT_NOTE"]),
-  date: z.date(),
+  date: z.union([z.date(), z.string().datetime()]).transform((val) => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
   partnerId: z.string(), // This will be the string version of the bigint on the client
   lines: z
     .array(documentLineSchema)

@@ -42,6 +42,9 @@ export const usePartnerManager = () => {
   );
 
   const { partner: selectedPartnerId } = selections;
+  
+  // Use the regular selection
+  const effectiveSelectedPartnerId = selectedPartnerId;
 
   // The useChainedQuery hook now correctly returns a query for { data: PartnerClient[], totalCount: number }
   const queryOptions = useChainedQuery(SLIDER_TYPES.PARTNER);
@@ -197,7 +200,7 @@ export const usePartnerManager = () => {
 
   return {
     // State
-    selectedPartnerId,
+    selectedPartnerId: effectiveSelectedPartnerId,
     partnersForSlider: (activeQuery.data?.data ?? []) as unknown as PartnerClient[],
     partnerQuery: activeQuery,
     isPartnerOptionsMenuOpen,

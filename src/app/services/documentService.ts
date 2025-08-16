@@ -93,18 +93,21 @@ const documentService = {
       totalHT += lineHT;
       totalTax += lineTaxAmount;
       return {
-        // Core link
-        journalPartnerGoodLinkId: line.journalPartnerGoodLinkId,
-        // ✨ NEW: Denormalized field for efficient filtering
-        goodId: line.goodId,
+        // Relations using connect syntax
+        journalPartnerGoodLink: {
+          connect: { id: line.journalPartnerGoodLinkId }
+        },
+        good: {
+          connect: { id: line.goodId }
+        },
         // Line details
         designation: line.designation,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
-        discountPercentage: line.discountPercentage,
+        discountPercentage: line.discountPercentage || 0,
         taxRate: line.taxRate,
         unitOfMeasure: line.unitOfMeasure,
-        isTaxExempt: line.isTaxExempt,
+        isTaxExempt: line.isTaxExempt || false,
         // Calculated values
         netTotal: lineHT,
         discountAmount: lineDiscountAmount,
@@ -208,7 +211,17 @@ const documentService = {
       take,
       skip,
       orderBy: { date: "desc" },
-      include: { partner: true }, // Include partner for display in tables
+      include: { 
+        partner: {
+          select: { id: true, name: true, registrationNumber: true, taxId: true }
+        },
+        journal: {
+          select: { id: true, name: true }
+        },
+        _count: {
+          select: { lines: true }
+        }
+      },
     });
 
     serviceLogger.debug(`documentService.getAllDocuments: Output - count: ${data.length}, totalCount: ${totalCount}, where: ${JSON.stringify(where, jsonBigIntReplacer)}`);
@@ -225,6 +238,9 @@ const documentService = {
       // ✨ NEW: The include clause is expanded for the "Gateway Lookup" use case.
       include: {
         partner: true,
+        journal: {
+          select: { id: true, name: true }
+        },
         lines: {
           include: {
             good: true, // Eagerly load the full Good details for each line.

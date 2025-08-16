@@ -40,14 +40,15 @@ export interface AccountNodeData {
 
 /**
  * Describes the state of the document creation UI flow.
+ * Supports multiple document creation workflows based on slider positions.
  */
 export type DocumentCreationMode =
   | "IDLE" // Not in creation mode
-  | "SINGLE_ITEM" // J->P->G->D or J->G->P->D
-  | "LOCK_PARTNER" // J->P->D->G
-  | "LOCK_GOOD" // J->G->D->P
-  | "INTERSECT_FROM_PARTNER" // J->D->P->G
-  | "INTERSECT_FROM_GOOD"; // J->D->G->P
+  | "SINGLE_ITEM" // J→P→G→D: Document creation when document slider is in last position
+  | "PARTNER_LOCKED" // J→P→D→G: Partner is locked, select multiple goods
+  | "GOODS_LOCKED" // J→G→D→P: Good is locked, select multiple partners
+  | "MULTIPLE_PARTNERS" // J→D→P→G: Select multiple partners, shows intersection of goods
+  | "MULTIPLE_GOODS"; // J→D→G→P: Select multiple goods, shows intersection of partners
 
 /**
  * Represents an item added to the document "cart" before creation.

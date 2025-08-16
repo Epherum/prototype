@@ -286,6 +286,143 @@ const goodsService = {
     return { data, totalCount: data.length };
   },
 
+  /**
+   * Finds goods that are available to a specific partner within specific journal contexts.
+   * Uses the three-way JournalPartnerGoodLink relationship for standard mode filtering.
+   */
+  async findGoodsForPartnerAndJournals(
+    partnerId: bigint,
+    journalIds: string[]
+  ): Promise<{ data: GoodsAndService[]; totalCount: number }> {
+    serviceLogger.debug(
+      "goodsService.findGoodsForPartnerAndJournals: Input",
+      { partnerId: partnerId.toString(), journalIds }
+    );
+
+    if (!partnerId || !journalIds || journalIds.length === 0) {
+      return { data: [], totalCount: 0 };
+    }
+
+    // Find the journal-partner links for this specific partner and journals
+    const journalPartnerLinks = await prisma.journalPartnerLink.findMany({
+      where: {
+        partnerId: partnerId,
+        journalId: { in: journalIds },
+      },
+      select: { id: true },
+    });
+
+    if (journalPartnerLinks.length === 0) {
+      return { data: [], totalCount: 0 };
+    }
+
+    const linkIds = journalPartnerLinks.map(link => link.id);
+
+    // Find goods that have three-way links with these journal-partner links
+    const journalPartnerGoodLinks = await prisma.journalPartnerGoodLink.findMany({
+      where: {
+        journalPartnerLinkId: { in: linkIds },
+      },
+      select: { goodId: true },
+      distinct: ['goodId'],
+    });
+
+    if (journalPartnerGoodLinks.length === 0) {
+      return { data: [], totalCount: 0 };
+    }
+
+    const goodIds = journalPartnerGoodLinks.map(link => link.goodId);
+
+    // Fetch the full good details with journal-partner-good links
+    const data = await prisma.goodsAndService.findMany({
+      where: {
+        id: { in: goodIds },
+        entityState: "ACTIVE",
+      },
+      orderBy: { label: "asc" },
+      include: { 
+        taxCode: true, 
+        unitOfMeasure: true,
+        journalGoodLinks: {
+          include: {
+            journal: {
+              select: {
+                id: true,
+                name: true,
+                parentId: true,
+              }
+            }
+          }
+        },
+        journalPartnerGoodLinks: {
+          where: {
+            journalPartnerLinkId: { in: linkIds }
+          },
+          include: {
+            journalPartnerLink: {
+              select: {
+                id: true,
+                partnerId: true,
+                journalId: true
+              }
+            }
+          }
+        }
+      },
+    });
+
+    // Add jpqLinkId to each good based on the current partner and journal context
+    const dataWithJpqLinkId = data.map(good => {
+      // Find the appropriate journalPartnerGoodLink for this context
+      const relevantLink = good.journalPartnerGoodLinks.find(jpgLink => 
+        jpgLink.journalPartnerLink.partnerId === partnerId &&
+        journalIds.includes(jpgLink.journalPartnerLink.journalId)
+      );
+      
+      return {
+        ...good,
+        jpqLinkId: relevantLink ? String(relevantLink.id) : undefined
+      };
+    });
+
+    serviceLogger.debug("goodsService.findGoodsForPartnerAndJournals: Output", {
+      count: dataWithJpqLinkId.length,
+    });
+    return { data: dataWithJpqLinkId, totalCount: dataWithJpqLinkId.length };
+  },
+
+  /**
+   * ✅ NEW: Get goods that are linked to a specific document through DocumentLine
+   */
+  async findGoodsForDocument(documentId: bigint): Promise<{ data: GoodsAndService[]; totalCount: number }> {
+    serviceLogger.debug(
+      `goodsService.findGoodsForDocument: Input - documentId: '${documentId}'`
+    );
+
+    if (!documentId) {
+      serviceLogger.debug(
+        "goodsService.findGoodsForDocument: Output - No documentId provided, returning empty array."
+      );
+      return { data: [], totalCount: 0 };
+    }
+
+    const data = await prisma.goodsAndService.findMany({
+      where: {
+        entityState: EntityState.ACTIVE,
+        documentLines: {
+          some: { documentId },
+        },
+      },
+      distinct: ['id'],
+      orderBy: { label: 'asc' },
+    });
+
+    serviceLogger.debug(
+      `goodsService.findGoodsForDocument: Output - Found ${data.length} goods.`
+    );
+    return { data, totalCount: data.length };
+  },
+
   async updateGood(
     id: bigint,
     data: UpdateGoodsData

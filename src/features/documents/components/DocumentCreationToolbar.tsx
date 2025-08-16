@@ -20,9 +20,9 @@ const DocumentCreationToolbar: React.FC<DocumentCreationToolbarProps> = ({
     // This motion.div is the container our CSS will style
     <motion.div
       className={styles.toolbarContainer}
-      initial={{ y: "150%", opacity: 0 }}
-      animate={{ y: "0%", opacity: 1 }}
-      exit={{ y: "150%", opacity: 0 }}
+      initial={{ y: "150%", x: "-50%", opacity: 0 }}
+      animate={{ y: "0%", x: "-50%", opacity: 1 }}
+      exit={{ y: "150%", x: "-50%", opacity: 0 }}
       transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       <button

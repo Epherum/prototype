@@ -57,8 +57,8 @@ export default function Home() {
   const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
   const visibility = useAppStore((state) => state.ui.visibility);
 
-  const docManager = useDocumentManager();
   const goodManager = useGoodManager();
+  const docManager = useDocumentManager(goodManager.goodsForSlider);
   const journalManager = useJournalManager();
   const jpqlLinking = useJournalPartnerGoodLinking();
 

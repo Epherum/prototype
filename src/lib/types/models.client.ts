@@ -32,9 +32,16 @@ export interface PaginatedResponse<T> {
 
 // --- Define Client-Side Models ---
 
-// Simple models with just 'id'
-export type PartnerClient = WithStringId<PartnerPrisma>;
-export type GoodClient = WithStringId<GoodPrisma>;
+// Simple models with just 'id'  
+export type PartnerClient = Omit<PartnerPrisma, "id" | "createdById" | "deletedById" | "previousVersionId" | "nextVersionId"> & {
+  id: string;
+  createdById: string | null;
+  deletedById: string | null; 
+  previousVersionId: string | null;
+  nextVersionId: string | null;
+  journalPartnerLinks?: JournalPartnerLinkWithDetailsClient[];
+};
+export type GoodClient = WithStringId<GoodPrisma> & { jpqLinkId?: string };
 export type JournalClient = JournalPrisma;
 
 // ✨ NEWLY ADDED & CORRECTED ✨
@@ -50,6 +57,19 @@ export type DocumentClient = WithStringKeys<
   "id" | "partnerId"
 > & {
   lines?: DocumentLineClient[];
+  partner?: {
+    id: string;
+    name: string;
+    registrationNumber?: string;
+    taxId?: string;
+  };
+  journal?: {
+    id: string;
+    name: string;
+  };
+  _count?: {
+    lines: number;
+  };
 };
 
 // ✨ NEWLY ADDED for Link Tables ✨
@@ -71,7 +91,7 @@ export type JournalPartnerGoodLinkClient = WithStringKeys<
 
 // Optional: Define "WithDetails" types if you fetch them with relations
 export type JournalPartnerLinkWithDetailsClient = JournalPartnerLinkClient & {
-  journal?: JournalPrisma; // or JournalClient
+  journal?: JournalClient & { parentId?: string | null };
   partner?: PartnerClient;
 };
 

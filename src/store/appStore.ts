@@ -47,10 +47,12 @@ interface SelectionsSlice {
 interface DocumentCreationSlice {
   isCreating: boolean;
   mode: DocumentCreationMode;
-  lockedPartnerIds: string[];
-  lockedGoodIds: string[];
-  lockedJournalId: string | null;
   items: DocumentItem[];
+  lockedPartnerId?: string; // For PARTNER_LOCKED mode (J→P→D→G)
+  lockedGoodId?: string; // For GOODS_LOCKED mode (J→G→D→P)
+  selectedPartnerIds: string[]; // Selected partners during multi-select
+  selectedGoodIds: string[]; // Selected goods during multi-select
+  isFinalizeModalOpen: boolean; // Modal state for document finalization
 }
 interface UiSlice {
   sliderOrder: SliderType[];
@@ -83,6 +85,7 @@ interface AppState {
   toggleEntityForDocument: (type: "partner" | "good", id: string) => void;
   updateDocumentItem: (goodId: string, updates: Partial<DocumentItem>) => void;
   setDocumentItems: (items: DocumentItem[]) => void;
+  setFinalizeModalOpen: (isOpen: boolean) => void;
   toggleAccordion: (sliderId: SliderType) => void;
   // ✅ CHANGED: Signature updated to use the new GoodClient type.
   prepareDocumentForFinalization: (allGoodsInSlider: GoodClient[]) => boolean;
@@ -111,10 +114,10 @@ const getInitialSelections = (
 const getInitialDocumentCreationState = (): DocumentCreationSlice => ({
   isCreating: false,
   mode: "IDLE",
-  lockedPartnerIds: [],
-  lockedGoodIds: [],
-  lockedJournalId: null,
   items: [],
+  selectedPartnerIds: [],
+  selectedGoodIds: [],
+  isFinalizeModalOpen: false,
 });
 
 export const useAppStore = create<AppState>()((set, get) => ({
@@ -261,46 +264,46 @@ export const useAppStore = create<AppState>()((set, get) => ({
     }),
 
   prepareDocumentForFinalization: (allGoodsInSlider) => {
-    const { mode, lockedGoodIds } = get().ui.documentCreationState;
+    const { mode, items, selectedGoodIds } = get().ui.documentCreationState;
     let itemsToFinalize: DocumentItem[] = [];
 
-    // The logic remains the same, but the input type is now correct.
-    if (
-      mode === "LOCK_PARTNER" ||
-      mode === "INTERSECT_FROM_PARTNER" ||
-      mode === "INTERSECT_FROM_GOOD"
-    ) {
-      itemsToFinalize = lockedGoodIds.map((goodId) => {
-        const goodData = allGoodsInSlider.find((g) => String(g.id) === goodId);
+    console.log("prepareDocumentForFinalization called:", {
+      mode,
+      items,
+      selectedGoodIds,
+      allGoodsInSlider: allGoodsInSlider?.length || 0,
+      itemsLength: items.length,
+      selectedGoodsLength: selectedGoodIds.length
+    });
+
+    // Handle different document creation modes
+    if (mode === "SINGLE_ITEM") {
+      // For single item mode (document in last position), use existing items
+      itemsToFinalize = items.map((item) => {
+        const goodData = allGoodsInSlider.find((g) => String(g.id) === item.goodId);
         return {
-          goodId: goodId,
-          goodLabel: goodData?.label ?? "Unknown Good",
-          quantity: 1,
-          // Note: Assuming `price` exists on GoodClient. If not, this needs adjustment.
-          unitPrice: 0,
-          // Note: `jpqLinkId` is not a standard Prisma field. Assuming it's added during fetching.
-          journalPartnerGoodLinkId: (goodData as any)?.jpqLinkId,
+          ...item,
+          goodLabel: goodData?.label ?? item.goodLabel,
+          journalPartnerGoodLinkId: (goodData as any)?.jpqLinkId || item.journalPartnerGoodLinkId,
         };
       });
-    } else if (mode === "LOCK_GOOD") {
-      const lockedGoodId = lockedGoodIds[0];
-      const goodData = allGoodsInSlider.find(
-        (g) => String(g.id) === lockedGoodId
-      );
-      if (lockedGoodId && goodData) {
-        itemsToFinalize = [
-          {
-            goodId: lockedGoodId,
-            goodLabel: goodData.label ?? "Unknown Good",
-            quantity: 1,
-            unitPrice: 0,
-            journalPartnerGoodLinkId: (goodData as any)?.jpqLinkId,
-          },
-        ];
-      }
+    } else if (mode === "PARTNER_LOCKED" || mode === "MULTIPLE_PARTNERS" || mode === "MULTIPLE_GOODS" || mode === "GOODS_LOCKED") {
+      // For other modes, use the items that were created when goods were selected
+      // These items should already exist in the items array from toggleEntityForDocument
+      itemsToFinalize = items.map((item) => {
+        const goodData = allGoodsInSlider.find((g) => String(g.id) === item.goodId);
+        return {
+          ...item,
+          goodLabel: goodData?.label ?? item.goodLabel,
+          journalPartnerGoodLinkId: (goodData as any)?.jpqLinkId || item.journalPartnerGoodLinkId,
+        };
+      });
     }
 
+    console.log("prepareDocumentForFinalization: Items to finalize:", itemsToFinalize);
+
     if (itemsToFinalize.length === 0) {
+      console.log("prepareDocumentForFinalization: No items to finalize, showing alert");
       alert("No items have been selected for the document.");
       return false;
     }
@@ -438,22 +441,68 @@ export const useAppStore = create<AppState>()((set, get) => ({
   toggleEntityForDocument: (type, id) => {
     set((state) => {
       const { documentCreationState } = state.ui;
-      const key = type === "partner" ? "lockedPartnerIds" : "lockedGoodIds";
-      const currentIds = new Set(documentCreationState[key]);
-      if (currentIds.has(id)) {
-        currentIds.delete(id);
-      } else {
-        currentIds.add(id);
+      let newItems = [...documentCreationState.items];
+      let newSelectedPartnerIds = [...documentCreationState.selectedPartnerIds];
+      let newSelectedGoodIds = [...documentCreationState.selectedGoodIds];
+      
+      console.log(`toggleEntityForDocument: ${type} ${id}`, {
+        currentItems: newItems,
+        currentPartners: newSelectedPartnerIds,
+        currentGoods: newSelectedGoodIds,
+      });
+      
+      if (type === "good") {
+        const existingItemIndex = newItems.findIndex(item => item.goodId === id);
+        const isAlreadySelected = newSelectedGoodIds.includes(id);
+        
+        if (isAlreadySelected) {
+          // Remove from selected goods and items
+          newSelectedGoodIds = newSelectedGoodIds.filter(goodId => goodId !== id);
+          if (existingItemIndex !== -1) {
+            newItems.splice(existingItemIndex, 1);
+          }
+        } else {
+          // Add to selected goods and create item
+          newSelectedGoodIds.push(id);
+          newItems.push({
+            goodId: id,
+            goodLabel: `Good ${id}`, // Will be updated with actual label later
+            quantity: 1,
+            unitPrice: 0,
+            journalPartnerGoodLinkId: null, // Will be resolved later during finalization
+          });
+        }
+      } else if (type === "partner") {
+        const isAlreadySelected = newSelectedPartnerIds.includes(id);
+        
+        if (isAlreadySelected) {
+          // Remove from selected partners
+          newSelectedPartnerIds = newSelectedPartnerIds.filter(partnerId => partnerId !== id);
+        } else {
+          // Add to selected partners
+          newSelectedPartnerIds.push(id);
+        }
       }
-      return {
+      
+      const newState = {
         ui: {
           ...state.ui,
           documentCreationState: {
             ...documentCreationState,
-            [key]: Array.from(currentIds),
+            items: newItems,
+            selectedPartnerIds: newSelectedPartnerIds,
+            selectedGoodIds: newSelectedGoodIds,
           },
         },
       };
+      
+      console.log(`toggleEntityForDocument result:`, {
+        items: newState.ui.documentCreationState.items,
+        selectedPartnerIds: newState.ui.documentCreationState.selectedPartnerIds,
+        selectedGoodIds: newState.ui.documentCreationState.selectedGoodIds,
+      });
+      
+      return newState;
     });
   },
 
@@ -479,6 +528,18 @@ export const useAppStore = create<AppState>()((set, get) => ({
         documentCreationState: {
           ...state.ui.documentCreationState,
           items,
+        },
+      },
+    }));
+  },
+
+  setFinalizeModalOpen: (isOpen) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        documentCreationState: {
+          ...state.ui.documentCreationState,
+          isFinalizeModalOpen: isOpen,
         },
       },
     }));

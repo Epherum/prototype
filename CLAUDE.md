@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 **Build and Start:**
-- `npm run dev` - Start development server
+- `npm run dev` - Start development server ⚠️ **DO NOT RUN** - causes port conflicts and bugs
 - `npm run build` - Build production (includes Prisma generation)
 - `npm run serve` - Build and start production server
 - `npm run start` - Start production server
@@ -14,6 +14,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Database:**
 - `npm run prisma:generate` - Generate Prisma client
 - `npm run prisma:migrate:deploy` - Deploy migrations
+
+## Claude Code Instructions
+
+**IMPORTANT**: Never run `npm run dev` as it causes port conflicts and application bugs. The development server should be managed by the user manually.
 
 ## Architecture Overview
 

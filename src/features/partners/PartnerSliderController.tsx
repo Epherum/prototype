@@ -53,7 +53,7 @@ export const PartnerSliderController: React.FC<
   const partnerManager = usePartnerManager();
   const partnerJournalLinking = usePartnerJournalLinking();
   const jpqlLinking = useJournalPartnerGoodLinking();
-  const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
+  const { isCreating, mode } = useAppStore((state) => state.ui.documentCreationState);
   const isDetailsAccordionOpen = useAppStore(
     (state) => !!state.ui.accordionState[SLIDER_TYPES.PARTNER]
   );
@@ -207,7 +207,7 @@ export const PartnerSliderController: React.FC<
         isMultiSelect={isMultiSelect}
         placeholderMessage={
           isCreating
-            ? "Select goods to see common partners."
+            ? "Document creation in progress."
             : "No partners match criteria."
         }
         isAccordionOpen={isDetailsAccordionOpen}

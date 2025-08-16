@@ -26,6 +26,8 @@ import { apiLogger } from "@/lib/logger";
  * @queryparam {string} [permissionRootId] - Root journal ID for permission-based filtering.
  * @queryparam {string} [selectedJournalIds] - Comma-separated list of journal IDs to filter by.
  * @queryparam {string} [intersectionOfPartnerIds] - Comma-separated list of partner IDs to find goods common to all.
+ * @queryparam {string} [partnerId] - Single partner ID for three-way lookup with journals.
+ * @queryparam {string} [journalIds] - Comma-separated list of journal IDs for three-way lookup with partner.
  * @returns {NextResponse} A JSON response containing a paginated list of goods.
  * @status 200 - OK: Goods successfully fetched.
  * @status 400 - Bad Request: Invalid query parameters.
@@ -48,18 +50,37 @@ export const GET = withAuthorization(
         );
       }
 
-      const { intersectionOfPartnerIds, selectedJournalIds, ...restOfOptions } =
-        validation.data;
+      const { 
+        intersectionOfPartnerIds, 
+        findByDocumentId,
+        selectedJournalIds, 
+        partnerId, 
+        journalIds, 
+        ...restOfOptions 
+      } = validation.data;
 
       let result;
 
-      // Logic from the spec: Check for intersection mode first.
-      if (intersectionOfPartnerIds && intersectionOfPartnerIds.length > 0) {
+      // Priority 1: Document filtering for standard mode document browsing
+      if (findByDocumentId) {
+        result = await goodsService.findGoodsForDocument(findByDocumentId);
+      }
+      // Priority 2: Three-way lookup (single partner + journals) for standard mode
+      else if (partnerId && journalIds && journalIds.length > 0) {
+        result = await goodsService.findGoodsForPartnerAndJournals(
+          partnerId,
+          journalIds
+        );
+      }
+      // Priority 3: Intersection mode (multiple partners) for document creation mode
+      else if (intersectionOfPartnerIds && intersectionOfPartnerIds.length > 0) {
         result = await goodsService.findGoodsForPartners({
           partnerIds: intersectionOfPartnerIds,
           journalIds: selectedJournalIds,
         });
-      } else {
+      } 
+      // Priority 4: Standard journal filtering
+      else {
         result = await goodsService.getAllGoods({
           ...restOfOptions,
           selectedJournalIds,

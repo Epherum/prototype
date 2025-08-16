@@ -41,6 +41,19 @@ export const getGoodsQuerySchema = z.object({
         .filter((id): id is bigint => id !== null)
     )
     .optional(),
+  // New parameters for three-way lookup (single partner + journals)
+  partnerId: z
+    .string()
+    .transform((val) => parseBigInt(val, "partner ID"))
+    .optional(),
+  journalIds: z
+    .string()
+    .transform((val) => val.split(","))
+    .optional(),
+  findByDocumentId: z
+    .string()
+    .transform((val) => parseBigInt(val, "document ID"))
+    .optional(),
 });
 
 export type CreateGoodPayload = z.infer<typeof createGoodSchema>;

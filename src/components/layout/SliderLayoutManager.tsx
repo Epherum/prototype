@@ -49,18 +49,21 @@ export const SliderLayoutManager = forwardRef<
 
     // Manager hooks to get state needed by controllers
     const journalManager = useJournalManager();
-    const docManager = useDocumentManager();
     const partnerManager = usePartnerManager();
     const goodManager = useGoodManager();
+    const docManager = useDocumentManager(goodManager.goodsForSlider);
     const jpqlLinking = useJournalPartnerGoodLinking();
 
     const {
       isCreating,
       mode,
-      lockedPartnerIds,
-      lockedGoodIds,
       toggleEntityForDocument,
     } = docManager;
+    
+    // Get selected entities for document creation
+    const { selectedPartnerIds, selectedGoodIds } = useAppStore(
+      (state) => state.ui.documentCreationState
+    );
 
     const visibleSliderOrder = useMemo(
       () => sliderOrder.filter((id) => visibility[id]),
@@ -118,58 +121,66 @@ export const SliderLayoutManager = forwardRef<
                     />
                   )}
 
-                  {sliderId === SLIDER_TYPES.PARTNER && (
-                    <PartnerSliderController
-                      {...layoutControlProps}
-                      isLocked={
-                        isCreating &&
-                        (mode === "LOCK_PARTNER" || mode === "SINGLE_ITEM")
-                      }
-                      isMultiSelect={
-                        isCreating &&
-                        (mode === "INTERSECT_FROM_GOOD" ||
-                          mode === "INTERSECT_FROM_PARTNER" ||
-                          mode === "LOCK_GOOD")
-                      }
-                      selectedPartnerIdsForDoc={lockedPartnerIds}
-                      onTogglePartnerForDoc={(id) =>
-                        toggleEntityForDocument("partner", id)
-                      }
-                      onOpenJournalSelector={onOpenJournalSelectorForLinking}
-                      fullJournalHierarchy={journalManager.hierarchyData}
-                    />
-                  )}
+                  {sliderId === SLIDER_TYPES.PARTNER && (() => {
+                    const documentIndex = visibleSliderOrder.indexOf(SLIDER_TYPES.DOCUMENT);
+                    const partnerIndex = currentVisibleIndex;
+                    
+                    // Partner is locked when it appears before Document in creation mode
+                    const isPartnerLocked = isCreating && documentIndex > partnerIndex;
+                    
+                    // Partner multi-select for modes where we select multiple partners
+                    const isPartnerMultiSelect = isCreating && 
+                      (mode === "MULTIPLE_PARTNERS" || mode === "GOODS_LOCKED");
+                    
+                    return (
+                      <PartnerSliderController
+                        {...layoutControlProps}
+                        isLocked={isPartnerLocked}
+                        isMultiSelect={isPartnerMultiSelect}
+                        selectedPartnerIdsForDoc={selectedPartnerIds}
+                        onTogglePartnerForDoc={(id) =>
+                          toggleEntityForDocument("partner", id)
+                        }
+                        onOpenJournalSelector={onOpenJournalSelectorForLinking}
+                        fullJournalHierarchy={journalManager.hierarchyData}
+                      />
+                    );
+                  })()}
 
-                  {sliderId === SLIDER_TYPES.GOODS && (
-                    <GoodsSliderController
-                      {...layoutControlProps}
-                      onOpenJournalSelectorForLinking={
-                        onOpenJournalSelectorForLinking
-                      }
-                      onOpenJournalSelectorForGPGContext={
-                        onOpenJournalSelectorForGPGContext
-                      }
-                      onOpenLinkGoodToPartnersModal={jpqlLinking.openLinkModal}
-                      onOpenUnlinkGoodFromPartnersModal={
-                        jpqlLinking.openUnlinkModal
-                      }
-                      isLocked={
-                        isCreating &&
-                        (mode === "LOCK_GOOD" || mode === "SINGLE_ITEM")
-                      }
-                      isMultiSelect={
-                        isCreating &&
-                        (mode === "LOCK_PARTNER" ||
-                          mode === "INTERSECT_FROM_PARTNER" ||
-                          mode === "INTERSECT_FROM_GOOD")
-                      }
-                      selectedGoodIdsForDoc={lockedGoodIds}
-                      onToggleGoodForDoc={(id) =>
-                        toggleEntityForDocument("good", id)
-                      }
-                      fullJournalHierarchy={journalManager.hierarchyData}
-                    />
-                  )}
+                  {sliderId === SLIDER_TYPES.GOODS && (() => {
+                    const documentIndex = visibleSliderOrder.indexOf(SLIDER_TYPES.DOCUMENT);
+                    const goodsIndex = currentVisibleIndex;
+                    
+                    // Goods is locked when it appears before Document in creation mode
+                    const isGoodsLocked = isCreating && documentIndex > goodsIndex;
+                    
+                    // Goods multi-select for modes where we select multiple goods
+                    const isGoodsMultiSelect = isCreating && 
+                      (mode === "SINGLE_ITEM" || mode === "MULTIPLE_GOODS" || mode === "PARTNER_LOCKED");
+                    
+                    return (
+                      <GoodsSliderController
+                        {...layoutControlProps}
+                        onOpenJournalSelectorForLinking={
+                          onOpenJournalSelectorForLinking
+                        }
+                        onOpenJournalSelectorForGPGContext={
+                          onOpenJournalSelectorForGPGContext
+                        }
+                        onOpenLinkGoodToPartnersModal={jpqlLinking.openLinkModal}
+                        onOpenUnlinkGoodFromPartnersModal={
+                          jpqlLinking.openUnlinkModal
+                        }
+                        isLocked={isGoodsLocked}
+                        isMultiSelect={isGoodsMultiSelect}
+                        selectedGoodIdsForDoc={selectedGoodIds}
+                        onToggleGoodForDoc={(id) =>
+                          toggleEntityForDocument("good", id)
+                        }
+                        fullJournalHierarchy={journalManager.hierarchyData}
+                      />
+                    );
+                  })()}
 
                   {sliderId === SLIDER_TYPES.PROJECT && (
                     <ProjectSliderController {...layoutControlProps} />

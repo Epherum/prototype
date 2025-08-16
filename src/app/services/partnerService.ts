@@ -207,10 +207,55 @@ const partnerService = {
         entityState: "ACTIVE",
       },
       orderBy: { name: "asc" },
+      include: {
+        journalPartnerLinks: {
+          include: {
+            journal: {
+              select: {
+                id: true,
+                name: true,
+                parentId: true,
+              }
+            }
+          }
+        }
+      }
     });
     serviceLogger.debug("partnerService.findPartnersForGoods: Output", {
       count: data.length,
     });
+    return { data, totalCount: data.length };
+  },
+
+  /**
+   * ✅ NEW: Get partners that are linked to a specific document through the Document relationship
+   */
+  async findPartnersForDocument(documentId: bigint): Promise<{ data: Partner[]; totalCount: number }> {
+    serviceLogger.debug(
+      `partnerService.findPartnersForDocument: Input - documentId: '${documentId}'`
+    );
+
+    if (!documentId) {
+      serviceLogger.debug(
+        "partnerService.findPartnersForDocument: Output - No documentId provided, returning empty array."
+      );
+      return { data: [], totalCount: 0 };
+    }
+
+    const data = await prisma.partner.findMany({
+      where: {
+        entityState: EntityState.ACTIVE,
+        documents: {
+          some: { id: documentId },
+        },
+      },
+      distinct: ['id'],
+      orderBy: { name: 'asc' },
+    });
+
+    serviceLogger.debug(
+      `partnerService.findPartnersForDocument: Output - Found ${data.length} partners.`
+    );
     return { data, totalCount: data.length };
   },
 

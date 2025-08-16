@@ -61,9 +61,10 @@ export const GoodsSliderController = forwardRef<
   ) => {
     const goodManager = useGoodManager();
     const goodJournalLinking = useGoodJournalLinking();
-    const { isCreating } = useAppStore(
+    const { isCreating, mode, items: documentItems } = useAppStore(
       (state) => state.ui.documentCreationState
     );
+    const updateDocumentItem = useAppStore((state) => state.updateDocumentItem);
     const isDetailsAccordionOpen = useAppStore(
       (state) => !!state.ui.accordionState[SLIDER_TYPES.GOODS]
     );
@@ -76,10 +77,28 @@ export const GoodsSliderController = forwardRef<
     const handleItemClick = (id: string) => {
       if (isMultiSelect) {
         onToggleGoodForDoc(id);
+        // Update the document item label when a good is selected
+        const selectedGood = goodManager.goodsForSlider.find(g => g.id === id);
+        if (selectedGood) {
+          setTimeout(() => {
+            updateDocumentItem(id, { goodLabel: selectedGood.label });
+          }, 0);
+        }
       } else {
         goodManager.setSelectedGoodsId(id);
       }
     };
+
+    // Prepare document items with updated labels for display
+    const documentItemsWithLabels = React.useMemo(() => {
+      return documentItems.map(item => {
+        const goodData = goodManager.goodsForSlider.find(g => g.id === item.goodId);
+        return {
+          ...item,
+          goodLabel: goodData?.label || item.goodLabel
+        };
+      });
+    }, [documentItems, goodManager.goodsForSlider]);
 
     const canLinkGoodToPartnersViaJournal = useMemo(() => {
       const journalIndex = sliderOrder.indexOf(SLIDER_TYPES.JOURNAL);
@@ -247,7 +266,7 @@ export const GoodsSliderController = forwardRef<
           isMultiSelect={isMultiSelect}
           placeholderMessage={
             isCreating
-              ? "Select partners to see common goods."
+              ? "Select goods for document creation."
               : "No goods match criteria."
           }
           isAccordionOpen={isDetailsAccordionOpen}
@@ -265,6 +284,9 @@ export const GoodsSliderController = forwardRef<
                 }
               : undefined
           }
+          showDocumentItemInputs={isCreating && isMultiSelect && mode === "SINGLE_ITEM"}
+          documentItems={documentItemsWithLabels}
+          onUpdateDocumentItem={updateDocumentItem}
         />
 
         <AddEditGoodModal

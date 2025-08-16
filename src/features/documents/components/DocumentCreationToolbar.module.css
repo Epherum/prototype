@@ -3,18 +3,19 @@
 */
 .toolbarContainer {
   /* --- Positioning (The Fix) --- */
-  position: fixed; /* <<< --- CHANGE FROM 'fixed' TO 'absolute' */
-  bottom: calc(var(--spacing-unit) * 3);
+  position: fixed;
+  bottom: 24px;
+  left: 50vw;
   z-index: 1000;
 
   /* --- Layout (Unchanged) --- */
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: var(--spacing-unit);
+  gap: 8px;
 
   /* --- Appearance (Unchanged) --- */
-  padding: var(--spacing-unit);
+  padding: 8px;
   background-color: var(--bg-card);
   border-radius: var(--border-radius-pill);
   box-shadow: 0 4px 16px var(--shadow-color);

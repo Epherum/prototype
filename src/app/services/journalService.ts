@@ -163,6 +163,45 @@ async function getJournalsForGoods(goodIds: bigint[]): Promise<Journal[]> {
   return journals;
 }
 
+/**
+ * ✅ NEW: Get journals that are linked to a specific document through DocumentLine
+ */
+async function getJournalsForDocument(documentId: bigint): Promise<Journal[]> {
+  serviceLogger.debug(
+    `journalService.getJournalsForDocument: Input - documentId: '${documentId}'`
+  );
+
+  if (!documentId) {
+    serviceLogger.debug(
+      "journalService.getJournalsForDocument: Output - No documentId provided, returning empty array."
+    );
+    return [];
+  }
+
+  const journals = await prisma.journal.findMany({
+    where: {
+      journalPartnerLinks: {
+        some: {
+          journalPartnerGoodLinks: {
+            some: {
+              documentLines: {
+                some: { documentId },
+              },
+            },
+          },
+        },
+      },
+    },
+    distinct: ['id'],
+    orderBy: { name: 'asc' },
+  });
+
+  serviceLogger.debug(
+    `journalService.getJournalsForDocument: Output - Found ${journals.length} journals.`
+  );
+  return journals;
+}
+
 // --- RESTORED: Original CRUD and Helper Functions ---
 // The following functions from your original file are preserved for use in other parts of the application.
 
@@ -317,6 +356,7 @@ export const journalService = {
   getJournalSubHierarchy,
   getJournalsForPartners,
   getJournalsForGoods,
+  getJournalsForDocument,
 
   // All original functions, preserved
   getRootJournals,

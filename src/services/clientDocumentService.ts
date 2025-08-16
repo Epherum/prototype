@@ -9,16 +9,35 @@ import { GetAllDocumentsOptions } from "@/lib/types/serviceOptions";
 import {
   CreateDocumentPayload,
   UpdateDocumentPayload,
+  ApiCreateDocumentPayload,
 } from "@/lib/schemas/document.schema";
 
 // --- Mapper Function ---
 function mapToDocumentClient(
-  raw: PrismaDocument & { lines?: (PrismaDocumentLine & { good?: any })[] }
+  raw: PrismaDocument & { 
+    lines?: (PrismaDocumentLine & { good?: any })[]; 
+    partner?: any;
+    journal?: any;
+    _count?: { lines: number };
+  }
 ): DocumentClient {
   return {
     ...raw,
     id: String(raw.id),
     partnerId: String(raw.partnerId),
+    partner: raw.partner ? {
+      id: String(raw.partner.id),
+      name: raw.partner.name,
+      registrationNumber: raw.partner.registrationNumber,
+      taxId: raw.partner.taxId,
+    } : undefined,
+    journal: raw.journal ? {
+      id: raw.journal.id,
+      name: raw.journal.name,
+    } : undefined,
+    _count: raw._count ? {
+      lines: raw._count.lines,
+    } : undefined,
     lines: raw.lines?.map((line) => ({
       ...line,
       id: String(line.id),
@@ -78,8 +97,11 @@ export async function getAllDocuments(
 // --- CRUD Operations ---
 
 export async function createDocument(
-  data: CreateDocumentPayload
+  data: ApiCreateDocumentPayload
 ): Promise<DocumentClient> {
+  // Log the payload being sent for debugging
+  console.log("Creating document with payload:", JSON.stringify(data, null, 2));
+  
   const response = await fetch("/api/documents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,6 +111,10 @@ export async function createDocument(
     const error = await response
       .json()
       .catch(() => ({ message: "Unknown error" }));
+    
+    // Log the full error response for debugging
+    console.error("Document creation failed:", error);
+    
     throw new Error(error.message || "Failed to create document");
   }
   const newDoc: PrismaDocument = await response.json();

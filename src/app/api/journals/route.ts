@@ -51,11 +51,11 @@ export const GET = withAuthorization(
         );
       }
 
-      const { rootJournalId, findByPartnerIds, findByGoodIds } =
+      const { rootJournalId, findByPartnerIds, findByGoodIds, findByDocumentId } =
         validation.data;
       let journals;
 
-      console.log("Parsed params:", { rootJournalId, findByPartnerIds, findByGoodIds });
+      console.log("Parsed params:", { rootJournalId, findByPartnerIds, findByGoodIds, findByDocumentId });
 
       // Logic from the spec: Use an if/else if/else block to call the correct service function.
       if (rootJournalId) {
@@ -69,6 +69,9 @@ export const GET = withAuthorization(
       } else if (findByGoodIds && findByGoodIds.length > 0) {
         console.log("Fetching journals for goods:", findByGoodIds);
         journals = await journalService.getJournalsForGoods(findByGoodIds);
+      } else if (findByDocumentId) {
+        console.log("Fetching journals for document:", findByDocumentId);
+        journals = await journalService.getJournalsForDocument(findByDocumentId);
       } else {
         console.log("Fetching root journals (no specific params)");
         apiLogger.info("No specific query params found, fetching root journals.");

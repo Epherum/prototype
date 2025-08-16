@@ -3,10 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { fetchGoodById } from "@/services/clientGoodService";
-import { goodKeys } from "@/lib/queryKeys";
 import styles from "./SingleItemQuantityModal.module.css";
 // ✅ CHANGED: Import the correct client-side model
 import type { GoodClient } from "@/lib/types/models.client";
@@ -16,23 +13,18 @@ interface SingleItemQuantityModalProps {
   onClose: () => void;
   // ✅ CHANGED: onSubmit now expects a GoodClient
   onSubmit: (item: { good: GoodClient; quantity: number }) => void;
-  goodId: string | null;
+  good: GoodClient | null;
 }
 
 const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  goodId,
+  good,
 }) => {
   const [quantity, setQuantity] = useState(1);
 
-  const goodQuery = useQuery({
-    queryKey: goodKeys.detail(goodId!),
-    queryFn: () => fetchGoodById(goodId!),
-    enabled: isOpen && !!goodId,
-    staleTime: Infinity,
-  });
+  // No need to fetch - we already have the good data from the slider
 
   // Reset quantity when modal opens for a new item
   useEffect(() => {
@@ -43,8 +35,8 @@ const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (goodQuery.data && quantity > 0) {
-      onSubmit({ good: goodQuery.data, quantity });
+    if (good && quantity > 0) {
+      onSubmit({ good, quantity });
     }
   };
 
@@ -75,13 +67,12 @@ const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
             </button>
             <h2 className={styles.modalTitle}>Enter Quantity</h2>
 
-            {goodQuery.isLoading && <p>Loading good details...</p>}
-            {goodQuery.isError && <p>Error loading good details.</p>}
-            {goodQuery.data && (
+            {!good && <p>Error: No good selected.</p>}
+            {good && (
               <form onSubmit={handleSubmit} className={styles.modalForm}>
                 <p className={styles.confirmationText}>
                   Enter the quantity for:{" "}
-                  <strong>{goodQuery.data.label}</strong>
+                  <strong>{good.label}</strong>
                 </p>
                 <div className={styles.formGroup}>
                   <label htmlFor="quantity">Quantity</label>
@@ -106,7 +97,7 @@ const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
                   <button
                     type="submit"
                     className={`${styles.modalActionButton} ${styles.confirmButton}`}
-                    disabled={quantity <= 0 || goodQuery.isLoading}
+                    disabled={quantity <= 0 || !good}
                   >
                     Confirm
                   </button>

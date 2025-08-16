@@ -34,6 +34,22 @@ const mapToPartnerClient = (partner: any): PartnerClient => {
     ...partner,
     id: String(partner.id),
     // Map other bigint fields if they exist, e.g., createdById
+    createdById: partner.createdById ? String(partner.createdById) : null,
+    deletedById: partner.deletedById ? String(partner.deletedById) : null,
+    previousVersionId: partner.previousVersionId ? String(partner.previousVersionId) : null,
+    nextVersionId: partner.nextVersionId ? String(partner.nextVersionId) : null,
+    // Preserve the journalPartnerLinks relationship data
+    journalPartnerLinks: partner.journalPartnerLinks?.map((link: any) => ({
+      ...link,
+      id: String(link.id),
+      journalId: String(link.journalId),
+      partnerId: String(link.partnerId),
+      journal: link.journal ? {
+        ...link.journal,
+        id: String(link.journal.id),
+        parentId: link.journal.parentId ? String(link.journal.parentId) : null,
+      } : null,
+    })) || [],
   };
 };
 
@@ -187,4 +203,40 @@ export async function fetchPartnerById(
   const partner = await response.json();
   // ✅ CRITICAL: Map the raw API response to the correct client type.
   return mapToPartnerClient(partner);
+}
+
+/**
+ * Fetches partners that are linked to a specific document through DocumentLine.
+ * @param documentId - The document ID (string format).
+ * @returns A promise resolving to a paginated response of PartnerClient objects.
+ */
+export async function fetchPartnersForDocument(
+  documentId: string
+): Promise<PaginatedPartnersResponse> {
+  if (!documentId) {
+    return { data: [], totalCount: 0 };
+  }
+
+  const params = new URLSearchParams({ findByDocumentId: documentId });
+  const response = await fetch(`/api/partners?${params.toString()}`);
+
+  if (!response.ok) {
+    const errorData = await response
+      .json()
+      .catch(() => ({ message: "Unknown error fetching partners for document" }));
+    throw new Error(
+      errorData.message ||
+        `Failed to fetch partners for document ${documentId}: ${response.statusText}`
+    );
+  }
+
+  const result = await response.json();
+  
+  // Map the raw API response to the correct client types
+  const mappedData = result.data.map(mapToPartnerClient);
+  
+  return {
+    data: mappedData,
+    totalCount: result.totalCount,
+  };
 }

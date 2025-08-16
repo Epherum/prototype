@@ -13,6 +13,8 @@ export const journalKeys = {
     ["flatJournalsFilteredByPartner", partnerId] as const,
   flatListByGood: (goodId: string | null) =>
     ["flatJournalsFilteredByGood", goodId] as const,
+  flatListByDocument: (documentId: string | null) =>
+    ["flatJournalsFilteredByDocument", documentId] as const,
 };
 
 export const partnerKeys = {
@@ -22,6 +24,8 @@ export const partnerKeys = {
   // The generic type can be an empty object as we only care about the shape of the options for the key.
   list: (params: GetAllItemsOptions<{}>) =>
     [...partnerKeys.lists(), params] as const,
+  listByDocument: (documentId: string | null) =>
+    ["partnersFilteredByDocument", documentId] as const,
   details: () => [...partnerKeys.all, "detail"] as const,
   detail: (id: string | null | undefined) =>
     [...partnerKeys.details(), id] as const,
@@ -33,6 +37,8 @@ export const goodKeys = {
   // ✅ REFACTORED: The list key now uses the powerful GetAllItemsOptions.
   list: (params: GetAllItemsOptions<{}>) =>
     [...goodKeys.lists(), params] as const,
+  listByDocument: (documentId: string | null) =>
+    ["goodsFilteredByDocument", documentId] as const,
   details: () => [...goodKeys.all, "detail"] as const,
   detail: (id: string | null | undefined) =>
     [...goodKeys.details(), id] as const,

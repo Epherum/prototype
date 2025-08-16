@@ -38,6 +38,10 @@ export const getPartnersQuerySchema = z.object({
         .filter((id): id is bigint => id !== null)
     )
     .optional(),
+  findByDocumentId: z
+    .string()
+    .transform((val) => parseBigInt(val, "document ID"))
+    .optional(),
 });
 
 // We export the inferred TypeScript types for use in our components and services

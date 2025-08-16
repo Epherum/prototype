@@ -71,11 +71,14 @@ export const useChainedQuery = <T extends SliderType>(
     journal: journalSelection,
     partner: selectedPartnerId,
     good: selectedGoodId,
+    document: selectedDocumentId,
   } = useAppStore((state) => state.selections);
   const { effectiveRestrictedJournalId } = useAppStore((state) => state.auth);
 
-  const { isCreating, mode, lockedPartnerIds, lockedGoodIds, lockedJournalId } =
-    documentCreationState;
+  const { isCreating } = documentCreationState;
+  
+  // In creation mode, ignore document selections to prevent filtering subsequent sliders
+  const effectiveDocumentId = isCreating ? null : selectedDocumentId;
 
   const queryOpts = useMemo(() => {
     const visibleOrder = sliderOrder.filter((id) => visibility[id]);
@@ -89,47 +92,8 @@ export const useChainedQuery = <T extends SliderType>(
       });
     }
 
-    if (isCreating) {
-      switch (sliderType) {
-        case SLIDER_TYPES.PARTNER:
-          if (
-            (mode === "INTERSECT_FROM_GOOD" || mode === "LOCK_GOOD") &&
-            lockedGoodIds.length > 0
-          ) {
-            const params: FetchPartnersParams = {
-              intersectionOfGoodIds: lockedGoodIds,
-              selectedJournalIds: lockedJournalId ? [lockedJournalId] : [],
-            };
-            return queryOptions({
-              queryKey: partnerKeys.list(params),
-              queryFn: () => partnerService.fetchPartners(params),
-              enabled: lockedGoodIds.length > 0,
-            });
-          }
-          break;
-
-        case SLIDER_TYPES.GOODS:
-          if (
-            (mode === "LOCK_PARTNER" || mode === "INTERSECT_FROM_PARTNER") &&
-            lockedPartnerIds.length > 0
-          ) {
-            const params = {
-              partnerIds: lockedPartnerIds,
-              journalIds: lockedJournalId ? [lockedJournalId] : undefined,
-            };
-            return queryOptions({
-              queryKey: goodKeys.list({
-                where: { forPartnersIntersection: lockedPartnerIds },
-              }),
-              // ✅ FIX: Cast the params to 'any' to bypass the incorrect service signature
-              // (which expects bigint[] instead of the client-side string[]). This acknowledges
-              // the type error is in the provided service file, not the hook logic.
-              queryFn: () => goodService.findGoodsForPartners(params as any),
-              enabled: lockedPartnerIds.length > 0,
-            });
-          }
-          break;
-      }
+    // Document creation mode: disable document slider during creation
+    if (isCreating && sliderType === SLIDER_TYPES.DOCUMENT) {
       return queryOptions({
         queryKey: [sliderType, "disabled_in_creation_mode"],
         queryFn: async () => ({ data: [], totalCount: 0 }),
@@ -140,9 +104,24 @@ export const useChainedQuery = <T extends SliderType>(
     const journalIndex = visibleOrder.indexOf(SLIDER_TYPES.JOURNAL);
     const partnerIndex = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
     const goodsIndex = visibleOrder.indexOf(SLIDER_TYPES.GOODS);
+    const documentIndex = visibleOrder.indexOf(SLIDER_TYPES.DOCUMENT);
 
     switch (sliderType) {
       case SLIDER_TYPES.JOURNAL:
+        // Handle document filtering first (for standard mode only)
+        if (documentIndex < myIndex && effectiveDocumentId) {
+          return queryOptions({
+            queryKey: journalKeys.flatListByDocument(effectiveDocumentId),
+            queryFn: async () => {
+              const flatJournals = await journalService.fetchJournalsForDocument(
+                effectiveDocumentId
+              );
+              const data = flatJournals.map(mapJournalToAccountNode);
+              return { data, totalCount: data.length };
+            },
+            enabled: !!effectiveDocumentId,
+          });
+        }
         if (goodsIndex < myIndex && selectedGoodId) {
           return queryOptions({
             queryKey: journalKeys.flatListByGood(selectedGoodId),
@@ -181,6 +160,15 @@ export const useChainedQuery = <T extends SliderType>(
         });
 
       case SLIDER_TYPES.PARTNER:
+        
+        // Handle document filtering first (for standard mode only)
+        if (documentIndex < myIndex && effectiveDocumentId) {
+          return queryOptions({
+            queryKey: partnerKeys.listByDocument(effectiveDocumentId),
+            queryFn: () => partnerService.fetchPartnersForDocument(effectiveDocumentId),
+            enabled: !!effectiveDocumentId,
+          });
+        }
         if (goodsIndex < myIndex && selectedGoodId) {
           const params: FetchPartnersParams = {
             intersectionOfGoodIds: [selectedGoodId],
@@ -249,17 +237,24 @@ export const useChainedQuery = <T extends SliderType>(
         });
 
       case SLIDER_TYPES.GOODS:
+        // Handle document filtering first (for standard mode only)
+        if (documentIndex < myIndex && effectiveDocumentId) {
+          return queryOptions({
+            queryKey: goodKeys.listByDocument(effectiveDocumentId),
+            queryFn: () => goodService.findGoodsForDocument(effectiveDocumentId),
+            enabled: !!effectiveDocumentId,
+          });
+        }
         if (partnerIndex < myIndex && selectedPartnerId) {
-          const params = {
-            partnerIds: [selectedPartnerId],
-            journalIds: effectiveJournalIds,
-          };
+          // Standard mode: Use three-way relationship lookup for single partner + journals
           return queryOptions({
             queryKey: goodKeys.list({
-              where: { forPartnersIntersection: params.partnerIds },
+              where: { forPartnerAndJournals: { partnerId: selectedPartnerId, journalIds: effectiveJournalIds } },
             }),
-            // ✅ FIX: Same cast to 'any' as in the creation-mode block.
-            queryFn: () => goodService.findGoodsForPartners(params as any),
+            queryFn: () => goodService.findGoodsForPartnerAndJournals(
+              selectedPartnerId,
+              effectiveJournalIds
+            ),
             enabled: !!selectedPartnerId,
           });
         }
@@ -320,16 +315,14 @@ export const useChainedQuery = <T extends SliderType>(
     sliderOrder,
     visibility,
     isCreating,
-    mode,
-    lockedPartnerIds,
-    lockedGoodIds,
-    lockedJournalId,
     effectiveJournalIds,
     journalSelection,
     selectedPartnerId,
     selectedGoodId,
+    selectedDocumentId,
     effectiveRestrictedJournalId,
   ]);
+
 
   // ✅ FIX: Cast to `unknown` first to resolve the complex type inference error.
   // This is a standard and safe pattern for this specific TanStack Query + useMemo scenario.
