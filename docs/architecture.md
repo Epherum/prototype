@@ -1,282 +1,211 @@
-ERP Application: The Authoritative Service Layer Guide
-This document specifies the complete server-side business logic layer. All backend development and modifications must adhere to these specifications to ensure consistency, performance, and alignment with the application's architectural goals.
-General Conventions
-Return Signatures: All functions that return a list of entities for a slider/table must return an object of the shape { data: YourModel[], totalCount: number } to support pagination.
-Parameter Naming: Array parameters for IDs must be plural (e.g., partnerIds: bigint[]).
-Error Handling: Services should throw errors for invalid input (e.g., non-existent IDs). The API route handlers (/src/app/api/...) are responsible for catching these errors and returning appropriate HTTP status codes (e.g., 400, 404).
-Security Context: Functions requiring user-level restrictions must accept a restrictedJournalId: string | null parameter. The service is responsible for applying the hierarchical filtering based on this ID.
-Service Layer Specifications
-src/app/services/journalService.ts
-Purpose: Manages all queries and mutations related to the Journal entity and its hierarchical structure.
-Functions:
-async getDescendantJournalIds(parentJournalId: string): Promise<string[]>
-async getJournalSubHierarchy(rootJournalId: string): Promise<Journal[]>
-async getJournalsForPartners(partnerIds: bigint[]): Promise<Journal[]>
-async getJournalsForGoods(goodIds: bigint[]): Promise<Journal[]>
-(...other CRUD functions like getJournalById, createJournal)
-Function Details:
-async getJournalsForPartners(partnerIds: bigint[]): Promise<Journal[]>
-Purpose: Finds all unique Journals that one or more specified Partners are linked to.
-Implementation: Queries prisma.journalPartnerLink for all records where partnerId is in the input partnerIds array. Uses select: { journalId: true } and distinct: ['journalId'] to get a unique list of journal IDs, then fetches the full Journal objects for those IDs.
-Usage Example: Used in slider order P -> J -> ... to populate the Journal slider based on Partner selections.
-async getJournalsForGoods(goodIds: bigint[]): Promise<Journal[]>
-Purpose: Finds all unique Journals that one or more specified Goods are linked to.
-Implementation: This is a two-step query:
-Query prisma.journalPartnerGoodLink where goodId is in goodIds to get distinct journalPartnerLinkIds.
-Query prisma.journalPartnerLink where id is in the IDs from step 1 to get distinct journalIds.
-Finally, query prisma.journal to fetch the full Journal objects.
-Usage Example: Used in slider order G -> J -> ... to populate the Journal slider based on Good selections.
-src/app/services/partnerService.ts & goodsService.ts
-Purpose: Manages queries and mutations for Partner and GoodsAndService entities, including complex filtering modes. The logic is symmetrical for both services.
-Functions:
-async getAllPartners(options: GetAllItemsOptions): Promise<{ data: Partner[], totalCount: number }>
-async getAllGoods(options: GetAllItemsOptions): Promise<{ data: GoodsAndService[], totalCount: number }>
-async findPartnersForGoods(options: IntersectionFindOptions): Promise<{ data: Partner[], totalCount: number }>
-async findGoodsForPartners(options: IntersectionFindOptions): Promise<{ data: GoodsAndService[], totalCount: number }>
-(...other CRUD functions like getPartnerById, createPartner)
-Shared Type Definitions (src/lib/types/serviceOptions.ts):
-Generated typescript
-type FilterMode = 'affected' | 'unaffected' | 'inProcess';
-// For getAllPartners / getAllGoods
-export interface GetAllItemsOptions {
-take?: number;
-skip?: number;
-restrictedJournalId?: string | null; // User's top-level permission
-// New Filtering Logic
-filterMode?: FilterMode;
-permissionRootId?: string; // The top-level journal of the current selection path
-selectedJournalIds?: string[]; // The full path of selected journals
-}
-// For findPartnersForGoods / findGoodsForPartners
-export interface IntersectionFindOptions {
-partnerIds?: bigint[];
-goodIds?: bigint[];
-journalIds?: string[]; // Optional array for journal context
-}
-Function Details:
-async getAllPartners(options: GetAllItemsOptions): Promise<{ data: Partner[], totalCount: number }>
-Purpose: A comprehensive fetch function that handles initial population and filtering by Journal selection with various modes.
-Implementation: The where clause is built dynamically based on options.filterMode:
-'affected': Filters the link table for links to the last journal in the selectedJournalIds array. This relies on the business rule that items must be linked to parent journals first.
-'unaffected': Performs a subquery to get all item IDs linked to the last journal in selectedJournalIds, then queries for items linked to any journal under permissionRootId whose IDs are notIn the subquery's result.
-'inProcess': Uses a where clause of { approvalStatus: 'PENDING', linkTable: { some: { journalId: { in: selectedJournalIds } } } }.
-No filterMode: Simply respects the restrictedJournalId for initial population.
-Usage Example: The primary function for the Partner/Good slider when it appears after the Journal slider (J -> P -> ... or J -> G -> ...).
-async findGoodsForPartners(options: IntersectionFindOptions): Promise<{ data: GoodsAndService[], totalCount: number }>
-Purpose: Finds items that are common to ALL specified counterparts, optionally filtered by a set of journals.
-Implementation: The core intersection logic (using groupBy and having count) is maintained. If journalIds is provided and is not empty, the initial query on the link table is modified to use where: { journalId: { in: journalIds } }.
-Usage Example: Used in J -> P -> G (find goods for selected partners within selected journals) or P -> G (find goods common to selected partners, ignoring journal context).
-src/app/services/documentService.ts
-Purpose: Manages all queries and mutations for the Document and DocumentLine entities, leveraging denormalized schema fields for performance.
-Functions:
-async createDocument(data: CreateDocumentData, createdById: string, journalId: string, ...): Promise<Document & { lines: DocumentLine[] }>
-async getAllDocuments(options: GetAllDocumentsOptions): Promise<{ data: Document[], totalCount: number }>
-async getDocumentById(id: bigint): Promise<Document | null>
-(...other CRUD functions like updateDocument, deleteDocument)
-Type Definitions (src/lib/types/serviceOptions.ts):
-Generated typescript
-export interface GetAllDocumentsOptions {
-take?: number;
-skip?: number;
-restrictedJournalId?: string | null; // User's permission
-// Filtering by selections in other sliders
-filterByJournalIds?: string[];
-filterByPartnerIds?: bigint[];
-filterByGoodIds?: bigint[];
-}
-IGNORE*WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-TypeScript
-IGNORE_WHEN_COPYING_END
-Function Details:
-async createDocument(...)
-Purpose: Creates a new Document and its lines, populating the denormalized fields.
-Implementation: The function accepts a journalId. When creating the Document record, it sets the journalId field. When creating DocumentLine records, it populates the denormalized goodId field on each line.
-async getAllDocuments(options: GetAllDocumentsOptions): Promise<...>
-Purpose: A powerful fetching function for the Document slider, capable of filtering by Journals, Partners, and Goods.
-Implementation: Builds a dynamic Prisma.DocumentWhereInput clause.
-filterByJournalIds adds journalId: { in: ... }.
-filterByPartnerIds adds partnerId: { in: ... }.
-filterByGoodIds adds a relational filter: lines: { some: { goodId: { in: ... } } }.
-Always respects the user's restrictedJournalId by filtering on the top-level journal and its descendants.
-Usage Example: The primary function for the Document slider in any permutation (J -> P -> D, G -> D, etc.).
-async getDocumentById(id: bigint): Promise<Document | null>
-Purpose: Fetches a single document, efficiently including its full good details.
-Implementation: Uses an optimized include clause: include: { partner: true, lines: { include: { good: true } } }. This avoids N+1 queries on the frontend to get good details for each line.
-Usage Example: Used in the "Gateway Lookup" mode (D -> P -> G) to display the contents of a selected document.
-Linking Services (journalGoodLinkService, etc.)
-Status: These services are low-level helpers.
-Business Logic Enforcement: A critical responsibility of these services is to enforce the hierarchical linking rule. In journalPartnerLinkService.createLink and journalGoodLinkService.createLink, before creating a link to a child journal (e.g., 4001), the service MUST query the database to verify that a link for the same item already exists for the parent journal (40). If it does not, the function must throw an error. This guarantees data integrity.
-API Layer Structure (src/app/api/...)
-This section outlines the structure of the API routes that consume the service functions. The API layer acts as a thin, secure translator between HTTP requests and our robust service layer.
-Core Principles
-RESTful Design: Use standard HTTP methods (GET, POST, PUT, DELETE) on resource-based URLs (e.g., /api/partners).
-Single Flexible Endpoint: Favor a single, powerful GET endpoint per resource that uses query parameters for filtering, rather than creating many specific endpoints.
-Validation: All incoming request bodies and query parameters are rigorously validated using Zod schemas.
-Authorization: Every route is wrapped with a Higher-Order Function (withAuthorization) to enforce permissions.
-API Endpoint Specifications
-Resource: Journals (GET /api/journals)
-Purpose: Fetches journals based on various contexts.
-Query Parameters:
-rootJournalId: string (optional): Fetches the sub-hierarchy for a restricted user. Calls journalService.getJournalSubHierarchy.
-findByPartnerIds: string (optional, comma-separated bigint): Finds journals linked to partners. Calls journalService.getJournalsForPartners.
-findByGoodIds: string (optional, comma-separated bigint): Finds journals linked to goods. Calls journalService.getJournalsForGoods.
-Logic: The route handler uses an if/else if/else block to determine which service function to call.
-Resource: Partners (GET /api/partners)
-Purpose: The single endpoint for fetching partners for all slider scenarios.
-Query Parameters:
-take, skip (for pagination).
-filterMode, permissionRootId, selectedJournalIds (for journal-based filtering).
-intersectionOfGoodIds: string (optional, comma-separated bigint): For finding partners common to a set of goods.
-Logic: The handler checks if intersectionOfGoodIds is present. If so, it calls partnerService.findPartnersForGoods. Otherwise, it calls partnerService.getAllPartners.
-Resource: Goods & Services (GET /api/goods)
-Purpose: The single endpoint for fetching goods for all slider scenarios.
-Logic: Symmetrical to the /api/partners endpoint. It checks for intersectionOfPartnerIds to call goodsService.findGoodsForPartners, otherwise calls goodsService.getAllGoods.
-Resource: Documents
-GET /api/documents: A powerful endpoint for fetching documents.
-Query Parameters: take, skip, filterByJournalIds, filterByPartnerIds, filterByGoodIds.
-Logic: Parses all filter parameters and calls documentService.getAllDocuments with all options.
-GET /api/documents/[id]: Fetches a single, detailed document for the "Gateway Lookup" view by calling the documentService.getDocumentById(id).
-CRUD Operations (Example: Partners)
-POST /api/partners: Validates body against createPartnerSchema and calls partnerService.createPartner.
-PUT /api/partners/[id]: Validates body against updatePartnerSchema and calls partnerService.updatePartner.
-DELETE /api/partners/[id]: Calls partnerService.deletePartner.
-Resources: Link Tables (journal-partner-links, journal-good-links, etc.)
-File Location: Each link table has its own consolidated route file (e.g., src/app/api/journal-partner-links/route.ts).
-Logic: Each file contains handlers for POST, GET, and DELETE.
-POST: Creates a new link.
-GET: Fetches links based on dynamic where clauses constructed from query parameters (e.g., linkId, journalId, partnerId).
-DELETE: Deletes a link based on its primary key or a composite key provided in query parameters. Zod schemas enforce that valid deletion criteria are provided.
-ERP Frontend Application: The Authoritative Developer Guide
-Part I: General Application Documentation
-Welcome to the team. This document is your complete guide to the application's architecture, conventions, and development patterns.
-This is a sophisticated, client-side rendered web application (Next.js with a "use client" architecture) that serves as the primary user interface for our ERP system.
-Core Concept: Chained Filtering
-The application's heart is a dynamic, multi-slider interface. Users configure which business entities (Journals, Partners, Goods, etc.) are displayed as "sliders." A selection made in one slider dynamically filters the content of all subsequent sliders to its right. This "chained filtering" provides a powerful and intuitive way to explore complex data relationships.
-Architectural Pillars
-All development must strictly adhere to these four foundational patterns.
-Pillar 1: Centralized Global State (Zustand)
-Location: src/store/appStore.ts
-Purpose: The single source of truth for minimal, truly global application state: user authentication, UI layout (slider order), and core entity selections that drive chained filtering.
-Convention: Avoid bloating the global store. Feature-specific state belongs in a Manager Hook.
-Pillar 2: Decentralized Logic (Headless "Manager" Hooks)
-Location: src/features/[featureName]/use[FeatureName]Manager.ts
-Purpose: Encapsulates all complex business logic, data fetching (via TanStack Query), and feature-specific state for a single feature.
-Convention: A manager hook takes zero arguments. It consumes global state from the Zustand store and exposes all data, derived state, and handlers its feature needs.
-Pillar 3: Controller Components (The Bridge)
-Location: src/features/[featureName]/[FeatureName]Controller.tsx
-Purpose: A non-visual or lightly-visual component that orchestrates a feature, connecting the headless logic from a Manager Hook to the presentational UI components (e.g., modals, sliders).
-Convention: A Controller calls its Manager Hook, manages conditional rendering, and passes data and handlers down as props.
-Pillar 4: Cross-Feature Communication (The "Switchboard" Model)
-Location: src/app/page.tsx
-Purpose: Manages direct interactions between features.
-Convention: The page.tsx file acts as the central "switchboard." We use React.forwardRef on Controller Components to expose imperative methods (e.g., open()), which the page calls directly.
-Architecture: Type Safety & Data Flow
-To ensure robustness and prevent bugs, the application follows a strict, type-safe architecture.
-Guiding Principles:
-schema.prisma is the single source of truth for database models.
-Zod schemas are the single source of truth for API payloads.
-The API layer is responsible for translating between client-side types (e.g., id: string) and server-side types (e.g., id: bigint).
-Key Directories:
-src/lib/schemas/: Contains all Zod schemas used for validating API payloads on the server and form data on the client. Each entity has its own schema file (e.g., partner.schema.ts).
-src/lib/types/models.client.ts: Contains definitions for our data models as they exist on the client. These types transform server-side models (e.g., converting bigint IDs to strings).
-src/lib/types/ui.ts: Contains pure UI-state types that have no server equivalent (e.g., SliderType, DocumentCreationMode).
-The Data Flow Pattern:
-Schema Definition (src/lib/schemas/): Define a Zod schema for creating/updating an entity. This becomes the contract between the client and server.
-Generated typescript
-// src/lib/schemas/partner.schema.ts
-import { z } from 'zod';
-export const createPartnerSchema = z.object({
-name: z.string().min(1, "Name is required"),
-partnerType: z.enum(["LEGAL_ENTITY", "NATURAL_PERSON"]),
-// ... other fields
-});
-export type CreatePartnerPayload = z.infer<typeof createPartnerSchema>;
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-TypeScript
-IGNORE_WHEN_COPYING_END
-API Route Validation: The API endpoint uses the schema to validate incoming data before passing it to the service layer.
-Generated typescript
-// src/app/api/partners/route.ts
-const validation = createPartnerSchema.safeParse(await request.json());
-if (!validation.success) { /* return 400 \_/ }
-await partnerService.createPartner(validation.data, ...);
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-TypeScript
-IGNORE_WHEN_COPYING_END
-Client-Side Model Definition (src/lib/types/models.client.ts): Define the shape of data as the UI will use it.
-Generated typescript
-// src/lib/types/models.client.ts
-import { Partner as PartnerPrisma } from "@prisma/client";
-type WithStringId<T extends { id: bigint }> = Omit<T, 'id'> & { id: string };
-export type PartnerClient = WithStringId<PartnerPrisma>;
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-TypeScript
-IGNORE_WHEN_COPYING_END
-Client-Side Form: UI forms use the Zod schema for type-safe state and validation, typically with a library like react-hook-form.
-Generated tsx
-// Example with react-hook-form
-import { createPartnerSchema, CreatePartnerPayload } from '@/lib/schemas/partner.schema';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-const { register, handleSubmit } = useForm<CreatePartnerPayload>({
-resolver: zodResolver(createPartnerSchema)
-});
-const onSubmit = async (data: CreatePartnerPayload) => {
-// 'data' is fully typed and validated
-await clientPartnerService.create(data);
-};
-IGNORE_WHEN_COPYING_START
-content_copy
-download
-Use code with caution.
-Tsx
-IGNORE_WHEN_COPYING_END
-Client Service (src/services/client...): The client service fetches data from the API and maps it to the appropriate ...Client type, handling any necessary transformations like bigint to string.
-This end-to-end type-safe approach minimizes runtime errors and ensures that changes in the database schema or API contract are caught by the type system during development.
-Part II: Feature Documentation
-Feature: Hierarchical Journal Filtering
-This document details the interaction logic for the hierarchical Journal selection interface.
-Core Interface Components:
-Split Button Control: A master control at the top of the Journal slider.
-Main Context Display: Shows the current hierarchy level (e.g., ROOT - All Accounts). Double-click to navigate up one level.
-Dropdown Trigger (▼): Opens a menu of explicit actions (Restore Last Selection, Select All Visible, etc.).
-L1 Items (1st Row): The top-level journal items in the current view, displayed in a horizontal scroller.
-L2 Items (2nd Row): Children of an expanded L1 parent, displayed in a wrapping grid.
-State Persistence and Memory:
-Persistent Top-Level Saved State: For each top-level view (e.g., ROOT), the system can store one snapshot of a custom selection, created by manually clicking an L1 or L2 item.
-L1-Item Saved State: A snapshot of selected L2 children for a specific L1 parent, used for the "Restore" action in the L1 item's click cycle.
-Interaction Logic:
-General Principles
-Manual Selection Priority: Any manual click on an L1 or L2 item creates a "custom saved state."
-Navigation: Double-clicking an item with children drills down. Double-clicking the main context display navigates up.
-Terminal Nodes: A single click on an item with no children toggles its selection state.
-Top-Level Control Button Interaction
-Dropdown Menu Actions:
-Restore Last Selection: Restores the saved custom selection for the current view.
-Select All Visible: Expands all L1 parents and selects every visible L1 and L2 item.
-Select Parents Only: Expands and selects all L1 parents, deselecting their L2 children.
-Clear All Selections: Deselects all items in the view (does not clear the persistent saved state).
-Using any top-level action resets the internal click-cycle state of all L1 items.
-L1 Item Interaction (for items with children)
-Double Click: Navigates into that item.
-Single-Click Cycle: A single click cycles through these states:
-Restore Saved Selection (if a custom L2 selection was saved for it).
-Children Visible, All Selected.
-Children Visible, Parent Selected.
-Children Hidden, Parent Selected.
-Unselected.
-L2 Item Interaction
-Single Click: Toggles the selection of the L2 item. This updates both the L1-item's saved state and the top-level saved state.
-Double Click: Navigates up to the parent of the L2 item and selects only the L2 item that was double-clicked.
+
+# ERP Application Architecture (Revised)
+
+This document outlines the high-level architecture of the ERP application, focusing on its core components, data flow, and key design principles.
+
+## 1. Overview
+
+The ERP application is a Next.js-based web application designed to manage various business entities such as Journals, Partners, Goods, and Documents. It leverages a modular, component-driven approach with a centralized state management system and a robust, context-aware data fetching strategy. The application's core feature is its dynamic "slider" interface, where the order of sliders can be reconfigured by the user, fundamentally changing the data filtering and entity creation workflows.
+
+## 2. Technology Stack
+
+*   **Frontend:** React (Next.js)
+*   **State Management:** Zustand
+*   **Data Fetching/Caching:** TanStack Query (React Query)
+*   **Styling:** CSS Modules
+*   **UI Animations:** Framer Motion
+*   **Database:** PostgreSQL (via Prisma ORM)
+*   **Authentication:** NextAuth.js
+
+## 3. Core Components and Data Flow
+
+The application's main interface (`src/app/page.tsx`) orchestrates the display and interaction of various "sliders" (Journal, Partner, Goods, Document, Project). These sliders represent different business entities, and their behavior is determined by two primary operating modes: **Standard Mode** (for browsing and filtering) and **Document Creation Mode** (for creating new documents).
+
+### 3.1. State Management (`src/store/appStore.ts`)
+
+The application uses Zustand for global state management. The `useAppStore` hook provides access to the application's state. Key slices include:
+
+*   **`auth`**: Manages user authentication and effective journal restrictions.
+*   **`ui`**: Controls UI-related aspects such as **`sliderOrder`**, visibility, and the crucial **`isCreating`** boolean that toggles between Standard and Document Creation modes.
+*   **`selections`**: Stores the currently selected single entities (e.g., `selectedJournalId`, `selectedPartnerId`).
+*   **`documentCreationState`**: A dedicated slice that becomes active when `isCreating` is `true`. It manages the state for new documents, including **locked entities** (like `lockedPartnerIds` or `lockedGoodIds` which can be arrays) and the items to be included in the final document(s).
+
+### 3.2. Data Fetching and Query Management (`src/hooks/useChainedQuery.ts`)
+
+Data fetching is centralized and managed by `TanStack Query` via the `useChainedQuery` hook. This hook is the brain of the data flow, constructing the correct query for each slider based on its type, its position in the `sliderOrder`, and the current application mode (`isCreating`).
+
+#### Core Principles of Data Fetching:
+
+*   **Chained Dependencies:** Data in a slider is filtered by selections made in *preceding* visible sliders.
+*   **Mode-Dependent Logic:** The query function, its parameters, and its `enabled` state change dramatically depending on whether `isCreating` is `true` or `false`.
+*   **Contextual UI:** The application isn't just a data browser; it transforms into a guided workflow tool when `isCreating` is `true`, with the `sliderOrder` defining the steps of that workflow.
+
+
+### 3.3. Journal Slider - Advanced Filtering and Selection
+
+The Journal slider is not a simple list but a powerful hierarchical selection tool with its own state management and interaction logic. The selections made here, combined with a chosen filter mode, fundamentally dictate the data available to all subsequent sliders in the chain.
+
+#### 3.3.1. Journal Filter Modes
+
+The Journal slider operates with a strict **3-level hierarchy structure** where level selection follows specific rules:
+
+**Hierarchy Structure:**
+- **Level 0 (Hidden/Root):** Not selectable in UI, but always included when present
+- **Level 1 (1st Row):** Selectable parent journals (e.g., 2, 3, 4)
+- **Level 2 (2nd Row):** Selectable child journals (e.g., 20, 21, 31, 32)
+
+**Selection Rules:**
+1. **Level 0** is never directly selectable but is automatically included if user has a restricted journal
+2. **Level 1** must be selected to enable Level 2 visibility - no skipping allowed
+3. **Level 2** is only visible when corresponding Level 1 items are selected
+4. **Empty Selection Rule:** If no Level 1 items are selected, return nothing
+
+**User Context:**
+- **Admin Users:** Level 0 can be empty (unrestricted access)
+- **Restricted Users:** Level 0 is always their `restrictedTopLevelJournalId`
+
+When the Journal slider is the first active slider in the `sliderOrder`, the user can select one of three filtering modes:
+
+*   **`affected` (Default Mode):** Returns entities linked to complete hierarchy paths. Level 0 + Level 1 + Level 2 (if selected) are combined with AND logic. Different Level 1 branches are combined with OR logic.
+    *   **Basic Example:** Level 1 items `[2, 3]` with Level 2 items `[20, 21, 31, 32]` returns: `(Level0 AND 2 AND (20 OR 21)) OR (Level0 AND 3 AND (31 OR 32))`
+    *   **Deep Path Example:** If hierarchy has 3 levels and Level 2 items `[201, 202, 211, 213]` are selected: `(Level0 AND 2 AND 20 AND (201 OR 202)) OR (Level0 AND 2 AND 21 AND (211 OR 213))`
+
+*   **`unaffected`:** Returns entities that belong to parent paths but are NOT linked to the deepest selected level in each branch.
+    *   **Example:** With Level 1 `[2, 3]` and Level 2 `[20, 21, 31, 32]` selected returns: `(Level0 AND 2 AND NOT (20 OR 21)) OR (Level0 AND 3 AND NOT (31 OR 32))`
+    *   **Deep Example:** With 3 levels returns: `(Level0 AND 2 AND 20 AND NOT (201 OR 202)) OR (Level0 AND 2 AND 21 AND NOT (211 OR 213))`
+
+*   **`inProcess`:** Functions identically to `affected` but adds `status = PENDING` condition for entities with approval workflows.
+    *   **Example:** Same logic as `affected` plus `AND status = PENDING`
+
+**Critical Rules:**
+- If no Level 1 items are selected → return empty results
+- Level 2 items are only visible when their parent Level 1 item is selected
+- Cannot skip levels in the hierarchy
+- Level 0 is implicit based on user permissions
+
+#### 3.3.2. Hierarchical Selection Interaction Logic
+
+The Journal slider's UI is designed for complex, multi-level selections. Its behavior is governed by the following principles:
+
+##### A. General Principles & State
+
+*   **Navigation:** Double-clicking an item with children drills down into that level. Double-clicking the main context display (e.g., `ROOT - All Accounts`) navigates up one level.
+*   **Manual Selection Priority:** Any manual click on a journal item (`L1` or `L2`) creates a "custom saved state" for the current view, which can be restored later.
+*   **State Persistence:** The system maintains two types of saved selections:
+    1.  **Top-Level Saved State:** A snapshot of a custom selection for an entire view (e.g., within `ROOT`).
+    2.  **L1-Item Saved State:** A snapshot of selected children (`L2` items) for a specific `L1` parent.
+
+##### B. Top-Level Control Button Interaction
+
+The split button at the top of the slider provides global actions via its dropdown menu. Using any of these actions resets the internal click-cycle state of all individual `L1` items.
+
+*   **Restore Last Selection:** Restores the saved custom selection for the current view.
+*   **Select All Visible:** Expands all `L1` parents and selects every visible `L1` and `L2` item.
+*   **Select Parents Only:** Expands and selects all `L1` parents while deselecting all their `L2` children.
+*   **Clear All Selections:** Deselects every item. This does not erase the persistent saved state, which can still be restored.
+
+##### C. L1 Item Interaction (Top-level items with children)
+
+*   **Double Click:** Navigates into that item, making it the new context view.
+*   **Single-Click Cycle:** A single click on an `L1` item with children cycles through the following states in order:
+    1.  **Restore Saved Selection:** Restores the specific `L2` children that were previously saved for this `L1` parent (if any exist).
+    2.  **Children Visible, All Selected:** Expands the `L2` grid and selects all children.
+    3.  **Children Visible, Parent Selected:** Keeps the `L2` grid visible but deselects all children, selecting only the `L1` parent itself.
+    4.  **Children Hidden, Parent Selected:** Collapses the `L2` grid, leaving only the `L1` parent selected.
+    5.  **Unselected:** Deselects the `L1` parent and collapses its children.
+
+##### D. L2 Item Interaction (Child items)
+
+*   **Single Click:** Toggles the selection state of the `L2` item. This action immediately updates both the **L1-item's saved state** and the **top-level saved state**.
+*   **Double Click:** A navigation shortcut. It navigates up to the parent `L1` view and applies a filter to show only the `L2` item that was just double-clicked.
+
+The final output of these interactions is a set of `selectedJournalIds` and a `filterMode`, which are then consumed by the `useChainedQuery` hook to build the precise queries for the subsequent Partner and Goods sliders.
+
+---
+
+## 4. Fetching Scenarios and Slider Order Logic
+
+The behavior of the sliders is best understood by analyzing the permutations of their order, especially the position of the **Document (D)** slider.
+
+### A. Standard Mode (`isCreating: false`)
+
+In this mode, the application functions as a powerful data exploration tool. The Document slider, like all others, acts as a filter sink, showing existing documents that match the criteria selected in any preceding sliders.
+
+*   **General Rule:** Each slider fetches data filtered by the selections (`selectedJournalId`, `selectedPartnerId`, etc.) in all sliders that appear *before* it in the `sliderOrder`.
+*   **Example (`P → G → J → D`):**
+    *   **Partner (P):** Fetches all available partners.
+    *   **Goods (G):** Fetches goods related to the `selectedPartnerId`.
+    *   **Journal (J):** Fetches journals related to both the `selectedPartnerId` and `selectedGoodId`.
+    *   **Document (D):** Fetches documents that match the selected Partner, Good, and Journal.
+
+### B. Document Creation Mode (`isCreating: true`)
+
+This mode transforms the UI into a guided wizard for creating documents. The position of the Document slider is **critical** as it dictates the workflow, what entities get "locked," and whether single or multiple documents are created.
+
+*   **Key Concept:** The Document (D) slider acts as a "commit" or "lock" point. Selections made in sliders *before* 'D' become the locked context for the document. Sliders *after* 'D' are then used to select the contents of the document(s), often with multi-select capabilities.
+
+---
+
+## 5. Slider Order Permutations and Detailed Behavior
+
+Here are the primary permutations and their distinct behaviors in both modes. We will focus on Journal (J), Partner (P), Goods (G), and Document (D).
+
+#### **1. Order: J → P → G → D**
+
+*   **Standard Mode (`isCreating: false`):**
+    *   Standard hierarchical filtering. Selecting a Journal filters Partners, selecting a Partner filters Goods, and all three selections filter the list of existing Documents.
+*   **Document Creation Mode (`isCreating: true`):**
+    *   **Workflow:** This is the simplest creation flow, designed for making a single document with one of each entity.
+    *   **Behavior:** The user selects a single Journal, a single Partner, and a single Good. The 'Create Document' action uses these three selections to generate one new document. Multi-selection is disabled.
+
+#### **2. Order: J → P → D → G**
+
+*   **Standard Mode (`isCreating: false`):**
+    *   Selecting a Journal filters Partners. Selections from both J and P filter the Document list. The Goods slider also shows goods related to the selections in J and P.
+*   **Document Creation Mode (`isCreating: true`):**
+    *   **Workflow:** **Lock-in a Partner to create one document with multiple goods.**
+    *   **Behavior:**
+        1.  User selects a Journal (e.g., "Sales Invoices").
+        2.  User selects a Partner (e.g., "Client A"). This partner is now considered **locked**.
+        3.  The Document slider (D) signifies the start of content selection.
+        4.  The **Goods (G) slider** appears, showing all goods available for the locked partner. It now functions as a **multi-select list**.
+        5.  The user can select multiple goods. The 'Create Document' action generates **one new document** for "Client A" containing all selected goods.
+
+#### **3. Order: J → G → D → P**
+
+*   **Standard Mode (`isCreating: false`):**
+    *   Similar to the above, but the dependency is on Goods first. Selecting J filters G. Selections from J and G filter the Document list and the Partner list.
+*   **Document Creation Mode (`isCreating: true`):**
+    *   **Workflow:** **Lock-in a Good to create multiple documents, one for each selected partner.**
+    *   **Behavior:**
+        1.  User selects a Journal.
+        2.  User selects a single Good (e.g., "Consulting Hour"). This good is now considered **locked**.
+        3.  The Document slider (D) signifies the start of content selection.
+        4.  The **Partner (P) slider** appears, showing all partners associated with the locked good. It now functions as a **multi-select list**.
+        5.  The user can select multiple partners (e.g., "Client A", "Client B"). The 'Create Documents' action generates **multiple new documents**: one for "Client A" with "Consulting Hour", and another for "Client B" with "Consulting Hour".
+
+#### **4. Order: J → D → P → G**
+
+*   **Standard Mode (`isCreating: false`):**
+    *   Selecting a Journal filters Documents, Partners, and Goods independently. There is no chained filtering between P and G in this mode.
+*   **Document Creation Mode (`isCreating: true`):**
+    *   **Workflow:** **Select multiple partners, then find their common goods (intersection).**
+    *   **Behavior:**
+        1.  User selects a Journal and immediately enters the document creation context.
+        2.  The **Partner (P) slider** appears as a **multi-select list**. The user selects one or more partners.
+        3.  The **Goods (G) slider** dynamically updates its query. It fetches and displays only the goods that are common to (**the intersection of**) *all* selected partners.
+        4.  The user can then select goods from this intersection list. This workflow is ideal for creating documents where the contents must be available to a group of partners. The system will create one document per selected partner, each containing the selected goods from the intersection.
+
+#### **5. Order: J → D → G → P**
+
+*   **Standard Mode (`isCreating: false`):**
+    *   Selecting a Journal filters Documents, Goods, and Partners independently.
+*   **Document Creation Mode (`isCreating: true`):**
+    *   **Workflow:** **Select multiple goods, then find the partners common to all of them (intersection).**
+    *   **Behavior:**
+        1.  User selects a Journal and enters the creation context.
+        2.  The **Goods (G) slider** appears as a **multi-select list**. The user selects one or more goods.
+        3.  The **Partner (P) slider** dynamically updates. It fetches and displays only the partners who are associated with *all* of the selected goods (**intersection**).
+        4.  The user can select partners from this filtered list. The system will then create one document for each selected partner, containing all the initially selected goods.
+
+This architecture demonstrates a highly flexible and powerful system where the user interface and underlying data logic adapt in real-time to the user's configured workflow, represented by the `sliderOrder` and the `isCreating` state.

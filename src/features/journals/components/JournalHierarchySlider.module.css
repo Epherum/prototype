@@ -53,6 +53,8 @@
   display: flex;
   justify-content: center;
   align-items: center;
+  background-color: #3d3d3d;
+  border-radius: var(--border-radius-md);
 }
 
 /* ✅ --- NEW STYLE FOR THE WRAPPING CONTAINER --- */
@@ -65,6 +67,8 @@
   padding: 4px 8px; /* Give it a little breathing room */
   width: 100%;
   box-sizing: border-box;
+  background-color: #3d3d3d;
+  border-radius: var(--border-radius-md);
 }
 
 /* Styles for the Swiper (used only for L1 now) */
@@ -110,7 +114,7 @@
   font-size: 0.8em;
   font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--border-subtle);
+  border: 2px solid white;
   border-radius: var(--border-radius-pill);
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
@@ -122,6 +126,7 @@
   position: relative;
   z-index: 5;
   box-sizing: border-box;
+  margin: 2px;
 }
 .level2Button:hover:not(.level2ButtonActive) {
   border-color: var(--accent-warm-light);
@@ -148,12 +153,14 @@
   font-family: monospace;
   padding-bottom: calc(var(--spacing-unit) * 0.5);
   margin-top: calc(var(--spacing-unit) * -0.5);
-  word-break: break-all;
+  word-break: keep-all;
+  word-wrap: break-word;
   min-height: 1rem;
 }
 .terminalNode {
-  border-style: dotted;
-  border-width: 2px;
+  border-style: dotted !important;
+  border-width: 2px !important;
+  border-color: white !important;
 }
 .terminalNode.level2ButtonActive {
   border-color: var(--accent-warm);

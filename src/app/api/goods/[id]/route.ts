@@ -1,34 +1,28 @@
 // src/app/api/goods/[id]/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import goodsService from "@/app/services/goodsService";
-import { UpdateGoodsData } from "@/app/services/service.types";
+import { UpdateGoodsData } from "@/lib/types/service.types";
 import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
-
-const updateGoodsSchema = z
-  .object({
-    label: z.string().min(1).max(255).optional(),
-    taxCodeId: z.number().int().positive().optional().nullable(),
-    typeCode: z.string().max(25).optional().nullable(),
-    description: z.string().optional().nullable(),
-    unitCodeId: z.number().int().positive().optional().nullable(),
-    stockTrackingMethod: z.string().max(50).optional().nullable(),
-    packagingTypeCode: z.string().max(25).optional().nullable(),
-    photoUrl: z.string().url().optional().nullable(),
-    additionalDetails: z.any().optional().nullable(),
-  })
-  .strict()
-  .refine(
-    (data) => Object.keys(data).length > 0,
-    "Update body cannot be empty."
-  );
+import { updateGoodSchema } from "@/lib/schemas/good.schema";
+import { apiLogger } from "@/lib/logger";
 
 type RouteContext = { params: { id: string } };
 
 /**
  * GET /api/goods/[id]
+ * Fetches a single Good or Service by its ID.
+ * @param {NextRequest} _request - The incoming Next.js request object.
+ * @param {object} context - The context object containing route parameters.
+ * @param {object} context.params - The parameters for the route.
+ * @param {string} context.params.id - The ID of the Good/Service to fetch (can be a string representation of BigInt).
+ * @returns {NextResponse} A JSON response containing the Good/Service data if found, or an error message.
+ * @status 200 - OK: Good/Service found and returned.
+ * @status 400 - Bad Request: Invalid Good/Service ID format.
+ * @status 404 - Not Found: Good/Service with the specified ID does not exist.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_GOODS - Requires 'READ' action on 'GOODS' resource.
  */
 export const GET = withAuthorization(
   async function GET(_request: NextRequest, { params }: RouteContext) {
@@ -56,7 +50,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error(`API GET /api/goods/${params.id} Error:`, e);
+      apiLogger.error(`API GET /api/goods/${params.id} Error:`, e);
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -68,6 +62,18 @@ export const GET = withAuthorization(
 
 /**
  * PUT /api/goods/[id]
+ * Updates an existing Good or Service by its ID.
+ * @param {NextRequest} request - The incoming Next.js request object containing the update payload.
+ * @param {object} context - The context object containing route parameters.
+ * @param {object} context.params - The parameters for the route.
+ * @param {string} context.params.id - The ID of the Good/Service to update (can be a string representation of BigInt).
+ * @body {UpdateGoodsData} - The Good/Service fields to update.
+ * @returns {NextResponse} A JSON response containing the updated Good/Service data or an error message.
+ * @status 200 - OK: Good/Service successfully updated.
+ * @status 400 - Bad Request: Invalid Good/Service ID format or invalid request body.
+ * @status 404 - Not Found: Good/Service with the specified ID does not exist for update.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission UPDATE_GOODS - Requires 'UPDATE' action on 'GOODS' resource.
  */
 export const PUT = withAuthorization(
   async function PUT(request: NextRequest, { params }: RouteContext) {
@@ -81,7 +87,7 @@ export const PUT = withAuthorization(
       }
 
       const rawBody = await request.json();
-      const validation = updateGoodsSchema.safeParse(rawBody);
+      const validation = updateGoodSchema.safeParse(rawBody);
 
       if (!validation.success) {
         return NextResponse.json(
@@ -105,9 +111,8 @@ export const PUT = withAuthorization(
       });
     } catch (error) {
       const e = error as Error & { code?: string };
-      console.error(`API PUT /api/goods/${params.id} Error:`, e);
+      apiLogger.error(`API PUT /api/goods/${params.id} Error:`, e);
 
-      // REFINED: Specifically catch Prisma's "record not found" error
       if (e.code === "P2025") {
         return NextResponse.json(
           { message: `Good with ID '${params.id}' not found for update.` },
@@ -125,6 +130,17 @@ export const PUT = withAuthorization(
 
 /**
  * DELETE /api/goods/[id]
+ * Deletes a Good or Service by its ID.
+ * @param {NextRequest} _request - The incoming Next.js request object.
+ * @param {object} context - The context object containing route parameters.
+ * @param {object} context.params - The parameters for the route.
+ * @param {string} context.params.id - The ID of the Good/Service to delete (can be a string representation of BigInt).
+ * @returns {NextResponse} A JSON response indicating success or an error message.
+ * @status 200 - OK: Good/Service successfully deleted.
+ * @status 400 - Bad Request: Invalid Good/Service ID format.
+ * @status 404 - Not Found: Good/Service with the specified ID does not exist for deletion.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission DELETE_GOODS - Requires 'DELETE' action on 'GOODS' resource.
  */
 export const DELETE = withAuthorization(
   async function DELETE(_request: NextRequest, { params }: RouteContext) {
@@ -147,9 +163,8 @@ export const DELETE = withAuthorization(
       );
     } catch (error) {
       const e = error as Error & { code?: string };
-      console.error(`API DELETE /api/goods/${params.id} Error:`, e);
+      apiLogger.error(`API DELETE /api/goods/${params.id} Error:`, e);
 
-      // REFINED: Specifically catch Prisma's "record not found" error
       if (e.code === "P2025") {
         return NextResponse.json(
           { message: `Good with ID '${params.id}' not found for deletion.` },

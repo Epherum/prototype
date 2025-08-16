@@ -1,66 +1,36 @@
 // src/app/api/journal-partner-good-links/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import jpgLinkService, {
   OrchestratedCreateJPGLSchema,
 } from "@/app/services/journalPartnerGoodLinkService";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import prisma from "@/app/utils/prisma";
-
-// Zod schema for validating GET query parameters as per the spec
-const getLinksQuerySchema = z
-  .object({
-    linkId: z.coerce.bigint().optional(),
-    journalPartnerLinkId: z.coerce.bigint().optional(),
-    // Contextual lookup
-    goodId: z.coerce.bigint().optional(),
-    journalId: z.string().optional(),
-  })
-  .superRefine((data, ctx) => {
-    // Enforce that for contextual lookup, both goodId and journalId are present
-    if (data.goodId && !data.journalId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["journalId"],
-        message: "journalId is required when goodId is provided.",
-      });
-    }
-    if (data.journalId && !data.goodId) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["goodId"],
-        message: "goodId is required when journalId is provided.",
-      });
-    }
-  });
-
-// Zod schema for validating DELETE query parameters
-const deleteLinksQuerySchema = z
-  .object({
-    linkId: z.coerce.bigint().optional(),
-    // Composite key
-    journalPartnerLinkId: z.coerce.bigint().optional(),
-    goodId: z.coerce.bigint().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const hasLinkId = data.linkId !== undefined;
-    const hasCompositeKey =
-      data.journalPartnerLinkId !== undefined && data.goodId !== undefined;
-
-    if (!hasLinkId && !hasCompositeKey) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Either linkId or both journalPartnerLinkId and goodId must be provided.",
-      });
-    }
-  });
+import {
+  getLinksQuerySchema,
+  deleteLinksQuerySchema,
+} from "@/lib/schemas/journalPartnerGoodLink.schema";
+import { apiLogger } from "@/lib/logger";
 
 /**
  * POST /api/journal-partner-good-links
- * Creates the full three-way link using the orchestration service.
+ * Creates a new three-way link (Journal-Partner-Good).
+ * This endpoint orchestrates the creation of the `JournalPartnerLink` if it doesn't exist,
+ * and then creates the `JournalPartnerGoodLink`.
+ * @param {NextRequest} request - The incoming Next.js request object containing the link creation payload.
+ * @body {object} body - The link creation data.
+ * @body {string} body.journalId - The ID of the journal.
+ * @body {bigint} body.partnerId - The ID of the partner.
+ * @body {bigint} body.goodId - The ID of the good.
+ * @body {string} [body.partnershipType] - The type of partnership (defaults to "STANDARD_TRANSACTION").
+ * @body {string} [body.descriptiveText] - Additional descriptive text for the link.
+ * @body {number} [body.contextualTaxCodeId] - ID of the contextual tax code.
+ * @returns {NextResponse} A JSON response containing the newly created three-way link.
+ * @status 201 - Created: Link successfully created.
+ * @status 400 - Bad Request: Invalid request body, or related entities not found.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission CREATE_JOURNAL - Requires 'CREATE' action on 'JOURNAL' resource.
  */
 export const POST = withAuthorization(
   async function POST(request: NextRequest) {
@@ -87,7 +57,7 @@ export const POST = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API POST /api/journal-partner-good-links Error:", e);
+      apiLogger.error("API POST /api/journal-partner-good-links Error", { error: e.message, stack: e.stack });
       if (e.message.includes("not found") || e.message.includes("Violation")) {
         return NextResponse.json({ message: e.message }, { status: 400 });
       }
@@ -102,7 +72,18 @@ export const POST = withAuthorization(
 
 /**
  * GET /api/journal-partner-good-links
- * Fetches JournalPartnerGoodLink records based on specific contexts.
+ * Fetches Journal-Partner-Good link records based on specific contexts.
+ * Requires either `linkId`, `journalPartnerLinkId`, or both `goodId` and `journalId`.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @queryparam {bigint} [linkId] - The ID of a specific three-way link to fetch.
+ * @queryparam {bigint} [journalPartnerLinkId] - The ID of the Journal-Partner link to filter by.
+ * @queryparam {bigint} [goodId] - The ID of the good for contextual lookup (requires `journalId`).
+ * @queryparam {string} [journalId] - The ID of the journal for contextual lookup (requires `goodId`).
+ * @returns {NextResponse} A JSON response containing an array of Journal-Partner-Good links.
+ * @status 200 - OK: Links successfully fetched.
+ * @status 400 - Bad Request: Invalid or insufficient query parameters.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_JOURNAL - Requires 'READ' action on 'JOURNAL' resource.
  */
 export const GET = withAuthorization(
   async function GET(request: NextRequest) {
@@ -149,7 +130,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API GET /api/journal-partner-good-links Error:", e);
+      apiLogger.error("API GET /api/journal-partner-good-links Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred." },
         { status: 500 }
@@ -161,7 +142,18 @@ export const GET = withAuthorization(
 
 /**
  * DELETE /api/journal-partner-good-links
- * Deletes a JournalPartnerGoodLink record.
+ * Deletes a Journal-Partner-Good link record.
+ * Requires either `linkId` or both `journalPartnerLinkId` and `goodId` for deletion.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @queryparam {bigint} [linkId] - The ID of the specific three-way link to delete.
+ * @queryparam {bigint} [journalPartnerLinkId] - The ID of the Journal-Partner link for composite key deletion.
+ * @queryparam {bigint} [goodId] - The ID of the good for composite key deletion.
+ * @returns {NextResponse} A JSON response indicating success or an error message.
+ * @status 200 - OK: Link successfully deleted.
+ * @status 400 - Bad Request: Invalid query parameters for deletion.
+ * @status 404 - Not Found: Link not found for deletion.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission DELETE_JOURNAL - Requires 'DELETE' action on 'JOURNAL' resource.
  */
 export const DELETE = withAuthorization(
   async function DELETE(request: NextRequest) {
@@ -217,7 +209,7 @@ export const DELETE = withAuthorization(
       return NextResponse.json({ message: resultMessage }, { status: 200 });
     } catch (error) {
       const e = error as Error;
-      console.error("API DELETE /api/journal-partner-good-links Error:", e);
+      apiLogger.error("API DELETE /api/journal-partner-good-links Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred." },
         { status: 500 }

@@ -8,6 +8,7 @@ import {
 import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
 
 import { z } from "zod";
+import { serviceLogger } from "@/lib/logger";
 
 export type CreateJPGLData = {
   journalPartnerLinkId: bigint;
@@ -53,7 +54,7 @@ const jpgLinkService = {
       contextualTaxCodeId,
     } = OrchestratedCreateJPGLSchema.parse(data);
 
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Orchestrating 3-way link for J:'${journalId}', P:'${partnerId}', G:'${goodId}', JPL Type:'${partnershipType}'.`
     );
 
@@ -70,7 +71,7 @@ const jpgLinkService = {
     });
 
     if (!journalPartnerLink) {
-      console.log(` -> JournalPartnerLink not found. Creating new one...`);
+      serviceLogger.debug(` -> JournalPartnerLink not found. Creating new one...`);
       try {
         journalPartnerLink = await prisma.journalPartnerLink.create({
           data: {
@@ -80,12 +81,12 @@ const jpgLinkService = {
             partnershipType: partnershipType,
           },
         });
-        console.log(
+        serviceLogger.debug(
           ` -> Created JournalPartnerLink with ID: ${journalPartnerLink.id}`
         );
       } catch (error: any) {
         if (error.code === "P2002") {
-          console.warn(
+          serviceLogger.warn(
             " -> P2002 during JPL creation, attempting to re-fetch."
           );
           journalPartnerLink = await prisma.journalPartnerLink.findUnique({
@@ -99,18 +100,18 @@ const jpgLinkService = {
             },
           });
           if (!journalPartnerLink) {
-            console.error(" -> Failed to create or find JPL even after P2002.");
+            serviceLogger.error(" -> Failed to create or find JPL even after P2002.");
             throw new Error(
               "Failed to establish intermediate Journal-Partner link after race condition."
             );
           }
         } else {
-          console.error(" -> Error creating JournalPartnerLink:", error);
+          serviceLogger.error(" -> Error creating JournalPartnerLink:", error);
           throw error;
         }
       }
     } else {
-      console.log(
+      serviceLogger.debug(
         ` -> Found existing JournalPartnerLink with ID: ${journalPartnerLink.id}`
       );
     }
@@ -151,7 +152,7 @@ const jpgLinkService = {
         contextualTaxCode: true,
       },
     });
-    console.log(` -> JournalPartnerGoodLink created with ID '${newLink.id}'.`);
+    serviceLogger.debug(` -> JournalPartnerGoodLink created with ID '${newLink.id}'.`);
     return newLink;
   },
 
@@ -162,7 +163,7 @@ const jpgLinkService = {
     // partnershipTypeParam?: string
   ): Promise<JournalPartnerGoodLink[]> {
     // Prisma type directly from service
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Getting JPGLs for GoodID:'${goodIdParam}', JournalID:'${journalIdParam}'.`
     );
     return prisma.journalPartnerGoodLink.findMany({
@@ -193,7 +194,7 @@ const jpgLinkService = {
   // Abbreviating for 'JournalPartnerGoodLinkService'
   // RECIPE 1: Create a new three-way link
   async createLink(data: CreateJPGLData): Promise<JournalPartnerGoodLink> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Linking JPL ID '${data.journalPartnerLinkId}' with Good ID '${data.goodId}'.`
     );
 
@@ -231,7 +232,7 @@ const jpgLinkService = {
     const newLink = await prisma.journalPartnerGoodLink.create({
       data: data,
     });
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): 3-way link created with ID '${newLink.id}'.`
     );
     return newLink;
@@ -251,13 +252,13 @@ const jpgLinkService = {
 
   // RECIPE 3: Delete a 3-way link by its ID
   async deleteLinkById(id: bigint): Promise<JournalPartnerGoodLink | null> {
-    console.log(`Chef (JPGLService): Deleting 3-way link with ID '${id}'.`);
+    serviceLogger.debug(`Chef (JPGLService): Deleting 3-way link with ID '${id}'.`);
     try {
       return await prisma.journalPartnerGoodLink.delete({
         where: { id },
       });
     } catch (error) {
-      console.warn(
+      serviceLogger.warn(
         `Chef (JPGLService): 3-way Link ID '${id}' not found for deletion.`,
         error
       );
@@ -323,7 +324,7 @@ const jpgLinkService = {
     partnerId: bigint,
     includeJournalChildren: boolean = true
   ): Promise<GoodsAndService[]> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Getting goods for Journals '${journalIds.join(
         ","
       )}' (children: ${includeJournalChildren}) AND Partner ID '${partnerId}'.`
@@ -360,7 +361,7 @@ const jpgLinkService = {
 
   // RECIPE 8: OPTIMIZED to a single query
   async getPartnerIdsForGood(goodId: bigint): Promise<bigint[]> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Getting partner IDs for Good ID '${goodId}'.`
     );
     const links = await prisma.journalPartnerLink.findMany({
@@ -378,7 +379,7 @@ const jpgLinkService = {
 
   // RECIPE 9: OPTIMIZED to a single query
   async getGoodIdsForPartner(partnerId: bigint): Promise<bigint[]> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Getting good IDs for Partner ID '${partnerId}'.`
     );
     const links = await prisma.journalPartnerGoodLink.findMany({
@@ -402,14 +403,14 @@ const jpgLinkService = {
     goodId: bigint,
     includeJournalChildren: boolean = true
   ): Promise<bigint[]> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Getting partners for Journals '${journalIds.join(
         ","
       )}' (children: ${includeJournalChildren}) AND Good ID '${goodId}'.`
     );
 
     if (!journalIds || journalIds.length === 0) {
-      console.log(
+      serviceLogger.debug(
         "Chef (JPGLService): No journal IDs provided for getPartnerIdsForJournalsAndGood."
       );
       return [];
@@ -435,7 +436,7 @@ const jpgLinkService = {
     }
 
     if (targetJournalIds.length === 0) {
-      console.log(
+      serviceLogger.debug(
         "Chef (JPGLService): No target journal IDs after processing children for getPartnerIdsForJournalsAndGood."
       );
       return [];
@@ -461,7 +462,7 @@ const jpgLinkService = {
     const partnerIds = [
       ...new Set(links.map((link) => link.journalPartnerLink.partnerId)),
     ];
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Found partner IDs [${partnerIds.join(
         ","
       )}] for Journals [${targetJournalIds.join(",")}] and Good ID ${goodId}`
@@ -487,7 +488,7 @@ const jpgLinkService = {
     partnerId: bigint,
     goodId: bigint
   ): Promise<string[]> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPGLService): Getting journals for Partner ID '${partnerId}' AND Good ID '${goodId}'.`
     );
 

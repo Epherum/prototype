@@ -192,16 +192,38 @@ export const useChainedQuery = <T extends SliderType>(
             enabled: !!selectedGoodId,
           });
         }
-        const params: FetchPartnersParams = {
-          selectedJournalIds: effectiveJournalIds,
-          filterMode: journalSelection.rootFilter[0] as any,
-          permissionRootId: journalSelection.topLevelId,
-        };
+        
+        // Handle journal filtering for partners
+        const hasJournalSelections = effectiveJournalIds.length > 0;
+        const isJournalBeforePartner = journalIndex < myIndex;
+        
+        const params: FetchPartnersParams = {};
+        
+        // Only include journal filtering if we have journal selections AND journal comes before partner
+        if (hasJournalSelections && isJournalBeforePartner) {
+          params.selectedJournalIds = effectiveJournalIds;
+          // Extract the first filter mode from the rootFilter array
+          const filterMode = journalSelection.rootFilter[0];
+          if (filterMode && ['affected', 'unaffected', 'inProcess'].includes(filterMode)) {
+            params.filterMode = filterMode as 'affected' | 'unaffected' | 'inProcess';
+          }
+          params.permissionRootId = journalSelection.topLevelId;
+          
+          // Debug logging
+          console.log('Partner query params:', {
+            hasJournalSelections,
+            isJournalBeforePartner,
+            effectiveJournalIds,
+            filterMode,
+            permissionRootId: params.permissionRootId
+          });
+        }
+        
         return queryOptions({
           queryKey: partnerKeys.list(params),
           queryFn: () => partnerService.fetchPartners(params),
-          enabled:
-            journalIndex < myIndex ? effectiveJournalIds.length > 0 : true,
+          // Only enabled if no journal selection is required OR if we have selections
+          enabled: !isJournalBeforePartner || hasJournalSelections,
         });
 
       case SLIDER_TYPES.GOODS:
@@ -219,16 +241,24 @@ export const useChainedQuery = <T extends SliderType>(
             enabled: !!selectedPartnerId,
           });
         }
-        const goodsParams: GetAllItemsOptions<{}> = {
-          selectedJournalIds: effectiveJournalIds,
-          filterMode: journalSelection.rootFilter[0] as any,
-          permissionRootId: journalSelection.topLevelId,
-        };
+        // Handle journal filtering for goods
+        const hasJournalSelectionsForGoods = effectiveJournalIds.length > 0;
+        const isJournalBeforeGoods = journalIndex < myIndex;
+        
+        const goodsParams: GetAllItemsOptions<{}> = {};
+        
+        // Only include journal filtering if we have journal selections AND journal comes before goods
+        if (hasJournalSelectionsForGoods && isJournalBeforeGoods) {
+          goodsParams.selectedJournalIds = effectiveJournalIds;
+          goodsParams.filterMode = journalSelection.rootFilter[0] as any;
+          goodsParams.permissionRootId = journalSelection.topLevelId;
+        }
+        
         return queryOptions({
           queryKey: goodKeys.list(goodsParams),
           queryFn: () => goodService.getAllGoods(goodsParams),
-          enabled:
-            journalIndex < myIndex ? effectiveJournalIds.length > 0 : true,
+          // Only enabled if no journal selection is required OR if we have selections
+          enabled: !isJournalBeforeGoods || hasJournalSelectionsForGoods,
         });
 
       case SLIDER_TYPES.DOCUMENT:

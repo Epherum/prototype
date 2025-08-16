@@ -79,6 +79,15 @@
   min-width: 75px;
   text-align: center;
   flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.visibilityButton.expanded {
+  white-space: normal;
+  word-wrap: break-word;
+  text-overflow: initial;
 }
 
 .visibilityButton.visibilityActive {

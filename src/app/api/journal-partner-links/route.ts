@@ -8,6 +8,11 @@ import journalPartnerLinkService, {
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { Prisma } from "@prisma/client";
+import {
+  getLinksQuerySchema,
+  deleteLinksQuerySchema,
+} from "@/lib/schemas/journalPartnerLink.schema";
+import { apiLogger } from "@/lib/logger";
 
 // Zod schema for the POST request body
 const createLinkSchema = z.object({
@@ -21,44 +26,26 @@ const createLinkSchema = z.object({
   documentReference: z.string().optional().nullable(),
 });
 
-// Zod schema for validating GET query parameters
-const getLinksQuerySchema = z.object({
-  linkId: z.coerce.bigint().optional(),
-  journalId: z.string().optional(),
-  partnerId: z.coerce.bigint().optional(),
-});
-
-// Zod schema for validating DELETE query parameters, as per the spec
-const deleteLinksQuerySchema = z
-  .object({
-    linkId: z.coerce.bigint().optional(),
-    journalId: z.string().optional(),
-    partnerId: z.coerce.bigint().optional(),
-    partnershipType: z.string().optional(), // Note: .nullable() not needed for optional query param
-  })
-  .superRefine((data, ctx) => {
-    const hasLinkId = data.linkId !== undefined;
-    const hasCompositeKey =
-      data.journalId !== undefined && data.partnerId !== undefined;
-
-    if (hasLinkId && (data.journalId || data.partnerId)) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Cannot provide journalId or partnerId when linkId is present.",
-      });
-    } else if (!hasLinkId && !hasCompositeKey) {
-      ctx.addIssue({
-        code: "custom",
-        message:
-          "Either linkId or both journalId and partnerId must be provided.",
-      });
-    }
-  });
 
 /**
  * POST /api/journal-partner-links
  * Creates a new link between a Journal and a Partner.
+ * Enforces business rule: a Partner cannot be linked to a child Journal unless it's also linked to its parent.
+ * @param {NextRequest} request - The incoming Next.js request object containing the link creation payload.
+ * @body {object} body - The link creation data.
+ * @body {string} body.journalId - The ID of the journal to link.
+ * @body {bigint} body.partnerId - The ID of the partner to link.
+ * @body {string} [body.partnershipType] - The type of partnership.
+ * @body {boolean} [body.exoneration] - Exoneration status.
+ * @body {string} [body.periodType] - Period type.
+ * @body {string} [body.dateDebut] - Start date (ISO string).
+ * @body {string} [body.dateFin] - End date (ISO string).
+ * @body {string} [body.documentReference] - Document reference.
+ * @returns {NextResponse} A JSON response containing the newly created link.
+ * @status 201 - Created: Link successfully created.
+ * @status 400 - Bad Request: Invalid request body, or business rule violation (e.g., parent link missing).
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission CREATE_JOURNAL - Requires 'CREATE' action on 'JOURNAL' resource.
  */
 export const POST = withAuthorization(
   async function POST(request: NextRequest) {
@@ -87,7 +74,7 @@ export const POST = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API POST /api/journal-partner-links Error:", e);
+      apiLogger.error("API POST /api/journal-partner-links Error", { error: e.message, stack: e.stack });
       if (e.message.includes("not found") || e.message.includes("Violation")) {
         return NextResponse.json({ message: e.message }, { status: 400 });
       }
@@ -102,7 +89,16 @@ export const POST = withAuthorization(
 
 /**
  * GET /api/journal-partner-links
- * Fetches JournalPartnerLink records based on query parameters.
+ * Fetches Journal-Partner link records based on query parameters.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @queryparam {bigint} [linkId] - The ID of a specific link to fetch.
+ * @queryparam {string} [journalId] - The ID of the journal to filter links by.
+ * @queryparam {bigint} [partnerId] - The ID of the partner to filter links by.
+ * @returns {NextResponse} A JSON response containing an array of Journal-Partner links.
+ * @status 200 - OK: Links successfully fetched.
+ * @status 400 - Bad Request: Invalid query parameters.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_JOURNAL - Requires 'READ' action on 'JOURNAL' resource.
  */
 export const GET = withAuthorization(
   async function GET(request: NextRequest) {
@@ -141,7 +137,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API GET /api/journal-partner-links Error:", e);
+      apiLogger.error("API GET /api/journal-partner-links Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred." },
         { status: 500 }
@@ -153,7 +149,20 @@ export const GET = withAuthorization(
 
 /**
  * DELETE /api/journal-partner-links
- * Deletes one or more JournalPartnerLink records.
+ * Deletes one or more Journal-Partner link records.
+ * Requires either `linkId` or both `journalId` and `partnerId` for deletion.
+ * Optionally, `partnershipType` can be provided for more specific deletion.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @queryparam {bigint} [linkId] - The ID of the specific link to delete.
+ * @queryparam {string} [journalId] - The ID of the journal for composite key deletion.
+ * @queryparam {bigint} [partnerId] - The ID of the partner for composite key deletion.
+ * @queryparam {string} [partnershipType] - The partnership type for composite key deletion.
+ * @returns {NextResponse} A JSON response indicating success or an error message.
+ * @status 200 - OK: Link(s) successfully deleted.
+ * @status 400 - Bad Request: Invalid query parameters for deletion.
+ * @status 404 - Not Found: Link(s) not found for deletion.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission DELETE_JOURNAL - Requires 'DELETE' action on 'JOURNAL' resource.
  */
 export const DELETE = withAuthorization(
   async function DELETE(request: NextRequest) {
@@ -186,12 +195,11 @@ export const DELETE = withAuthorization(
         }
         resultMessage = `Successfully deleted link with ID ${linkId}.`;
       } else if (journalId && partnerId) {
-        const { count } =
-          await journalPartnerLinkService.deleteLinkByJournalAndPartner(
-            journalId,
-            partnerId,
-            partnershipType
-          );
+        const { count } = await journalPartnerLinkService.deleteLinkByJournalAndPartner(
+          journalId,
+          partnerId,
+          partnershipType
+        );
         if (count === 0) {
           return NextResponse.json(
             {
@@ -206,7 +214,7 @@ export const DELETE = withAuthorization(
       return NextResponse.json({ message: resultMessage }, { status: 200 });
     } catch (error) {
       const e = error as Error;
-      console.error("API DELETE /api/journal-partner-links Error:", e);
+      apiLogger.error("API DELETE /api/journal-partner-links Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred." },
         { status: 500 }
@@ -215,3 +223,6 @@ export const DELETE = withAuthorization(
   },
   { action: "DELETE", resource: "JOURNAL" }
 );
+
+
+

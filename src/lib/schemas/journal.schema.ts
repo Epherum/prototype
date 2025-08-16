@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseBigInt } from "@/app/utils/jsonBigInt";
 
 export const createJournalSchema = z.object({
   id: z.string().min(1, "Code/ID is required"),
@@ -8,4 +9,27 @@ export const createJournalSchema = z.object({
   additionalDetails: z.any().optional(),
 });
 
+export const getJournalsQuerySchema = z.object({
+  rootJournalId: z.string().optional(),
+  findByPartnerIds: z
+    .string()
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => parseBigInt(id, "partner ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+  findByGoodIds: z
+    .string()
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => parseBigInt(id, "good ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+});
+
 export type CreateJournalPayload = z.infer<typeof createJournalSchema>;
+export type GetJournalsQuery = z.infer<typeof getJournalsQuerySchema>;

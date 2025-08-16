@@ -117,7 +117,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
       effectiveJournalIds.length === 0
         ? "none"
         : activeFilters
-            .map((filter) => `${filter}[${effectiveJournalIds.join(",")}]`)
+            .map((filter) => `${filter}[${effectiveJournalIds.join(", ")}]`)
             .join(" ");
     const isNone = effectiveJournalIds.length === 0;
     return (
@@ -213,7 +213,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               </motion.div>
             </div>
 
-            {/* --- L1 / Row 1 remains a Swiper --- */}
+            {/* --- L1 / Row 1 now same as L2 --- */}
             <h3 className={styles.level2ScrollerTitle}>1st Row</h3>
             <motion.div
               className={styles.level2ScrollerContainer}
@@ -221,57 +221,45 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               initial="hidden"
               animate="visible"
             >
-              <Swiper
-                modules={[Navigation]}
-                navigation={level2NodesForScroller.length > 5}
-                slidesPerView="auto"
-                spaceBetween={8}
-                className={styles.levelScrollerSwiper}
-                slidesPerGroupAuto
-              >
+              <div className={styles.wrappingItemContainer}>
                 {level2NodesForScroller.map((l1Node) => (
-                  <SwiperSlide
+                  <motion.button
                     key={l1Node.id}
-                    className={styles.level2ScrollerSlideNoOverflow}
+                    variants={itemVariants}
+                    onClick={() => onL1ItemInteract(l1Node.id)}
+                    onContextMenu={(e) => e.preventDefault()}
+                    className={`${styles.level2Button} ${
+                      selectedLevel2Ids.includes(l1Node.id)
+                        ? styles.level2ButtonActive
+                        : ""
+                    } ${
+                      selectedLevel2Ids.includes(l1Node.id) &&
+                      colorMap.get(l1Node.id)
+                        ? styles.colored
+                        : ""
+                    } ${
+                      !l1Node.children || l1Node.children.length === 0
+                        ? styles.terminalNode
+                        : ""
+                    }`}
+                    style={
+                      {
+                        "--item-color": colorMap.get(l1Node.id),
+                      } as React.CSSProperties
+                    }
+                    title={`${l1Node.code} - ${l1Node.name}. Click to cycle, Dbl-click to drill.`}
+                    disabled={isLocked}
+                    whileHover={{
+                      scale: 1.08,
+                      zIndex: 1,
+                      transition: { duration: 0.2, ease: "easeOut" },
+                    }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <motion.div variants={itemVariants}>
-                      <motion.button
-                        onClick={() => onL1ItemInteract(l1Node.id)}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className={`${styles.level2Button} ${
-                          selectedLevel2Ids.includes(l1Node.id)
-                            ? styles.level2ButtonActive
-                            : ""
-                        } ${
-                          selectedLevel2Ids.includes(l1Node.id) &&
-                          colorMap.get(l1Node.id)
-                            ? styles.colored
-                            : ""
-                        } ${
-                          !l1Node.children || l1Node.children.length === 0
-                            ? styles.terminalNode
-                            : ""
-                        }`}
-                        style={
-                          {
-                            "--item-color": colorMap.get(l1Node.id),
-                          } as React.CSSProperties
-                        }
-                        title={`${l1Node.code} - ${l1Node.name}. Click to cycle, Dbl-click to drill.`}
-                        disabled={isLocked}
-                        whileHover={{
-                          scale: 1.08,
-                          zIndex: 1,
-                          transition: { duration: 0.2, ease: "easeOut" },
-                        }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        {l1Node.code || "N/A"}
-                      </motion.button>
-                    </motion.div>
-                  </SwiperSlide>
+                    {l1Node.code || "N/A"}
+                  </motion.button>
                 ))}
-              </Swiper>
+              </div>
             </motion.div>
 
             {/* --- L2 / Row 2 header and filter info --- */}

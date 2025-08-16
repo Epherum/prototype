@@ -1,58 +1,36 @@
 // src/app/api/goods/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import goodsService from "@/app/services/goodsService";
-import { CreateGoodsData } from "@/app/services/service.types";
-import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { CreateGoodsData } from "@/lib/types/service.types";
+import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { ExtendedSession } from "@/lib/auth/authOptions";
-
-/**
- * Zod schema for validating query parameters for GET /api/goods.
- */
-const getGoodsQuerySchema = z.object({
-  take: z.coerce.number().int().positive().optional(),
-  skip: z.coerce.number().int().nonnegative().optional(),
-  filterMode: z.enum(["affected", "unaffected", "inProcess"]).optional(),
-  permissionRootId: z.string().optional(),
-  selectedJournalIds: z
-    .string()
-    .transform((val) => val.split(","))
-    .optional(),
-  intersectionOfPartnerIds: z
-    .string()
-    .transform((val) =>
-      val
-        .split(",")
-        .map((id) => parseBigInt(id, "partner ID"))
-        .filter((id): id is bigint => id !== null)
-    )
-    .optional(),
-});
-
-/**
- * Zod schema for validating the request body for POST /api/goods.
- */
-export const createGoodApiSchema = z
-  .object({
-    label: z.string().min(1, "Label is required").max(255),
-    referenceCode: z.string().max(50).optional().nullable(),
-    barcode: z.string().max(50).optional().nullable(),
-    taxCodeId: z.number().int().positive().optional().nullable(),
-    typeCode: z.string().max(25).optional().nullable(),
-    description: z.string().optional().nullable(),
-    unitCodeId: z.number().int().positive().optional().nullable(),
-    stockTrackingMethod: z.string().max(50).optional().nullable(),
-    packagingTypeCode: z.string().max(25).optional().nullable(),
-    photoUrl: z.string().url().optional().nullable(),
-    additionalDetails: z.any().optional().nullable(),
-  })
-  .strict();
+import {
+  getGoodsQuerySchema,
+  createGoodSchema,
+} from "@/lib/schemas/good.schema";
+import { apiLogger } from "@/lib/logger";
 
 /**
  * GET /api/goods
- * Fetches goods for all slider scenarios.
+ * Fetches goods based on various query parameters.
+ * Supports pagination, filtering by journal IDs, and intersection with partner IDs.
+ * Applies user's journal restriction if present.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated user's session.
+ * @queryparam {number} [take] - Number of records to take (for pagination).
+ * @queryparam {number} [skip] - Number of records to skip (for pagination).
+ * @queryparam {("affected"|"unaffected"|"inProcess")} [filterMode] - Filtering mode for goods based on journal linkage.
+ * @queryparam {string} [permissionRootId] - Root journal ID for permission-based filtering.
+ * @queryparam {string} [selectedJournalIds] - Comma-separated list of journal IDs to filter by.
+ * @queryparam {string} [intersectionOfPartnerIds] - Comma-separated list of partner IDs to find goods common to all.
+ * @returns {NextResponse} A JSON response containing a paginated list of goods.
+ * @status 200 - OK: Goods successfully fetched.
+ * @status 400 - Bad Request: Invalid query parameters.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_GOODS - Requires 'READ' action on 'GOODS' resource.
  */
 export const GET = withAuthorization(
   async function GET(request: NextRequest, _context, session: ExtendedSession) {
@@ -100,7 +78,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API GET /api/goods Error:", e);
+      apiLogger.error("API GET /api/goods Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -114,6 +92,26 @@ export const GET = withAuthorization(
 /**
  * POST /api/goods
  * Creates a new Good or Service.
+ * @param {NextRequest} request - The incoming Next.js request object containing the creation payload.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated user's session, used to record `createdById`.
+ * @body {object} body - The Good/Service creation data.
+ * @body {string} body.label - The label for the Good/Service (required).
+ * @body {string} [body.referenceCode] - Reference code.
+ * @body {string} [body.barcode] - Barcode.
+ * @body {number} [body.taxCodeId] - ID of the associated tax code.
+ * @body {string} [body.typeCode] - Type code.
+ * @body {string} [body.description] - Description.
+ * @body {number} [body.unitCodeId] - ID of the unit of measure.
+ * @body {string} [body.stockTrackingMethod] - Stock tracking method.
+ * @body {string} [body.packagingTypeCode] - Packaging type code.
+ * @body {string} [body.photoUrl] - URL to a photo of the Good/Service.
+ * @body {any} [body.additionalDetails] - Additional JSON details.
+ * @returns {NextResponse} A JSON response containing the newly created Good/Service.
+ * @status 201 - Created: Good/Service successfully created.
+ * @status 400 - Bad Request: Invalid request body or failed to create (e.g., related entity not found).
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission CREATE_GOODS - Requires 'CREATE' action on 'GOODS' resource.
  */
 export const POST = withAuthorization(
   async function POST(
@@ -123,7 +121,7 @@ export const POST = withAuthorization(
   ) {
     try {
       const rawBody = await request.json();
-      const validation = createGoodApiSchema.safeParse(rawBody);
+      const validation = createGoodSchema.safeParse(rawBody);
 
       if (!validation.success) {
         return NextResponse.json(
@@ -150,7 +148,7 @@ export const POST = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API POST /api/goods Error:", e);
+      apiLogger.error("API POST /api/goods Error", { error: e.message, stack: e.stack });
       if (e.message.includes("not found")) {
         return NextResponse.json(
           { message: "Failed to create good.", error: e.message },

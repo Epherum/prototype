@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  //remove strict mode
+  reactStrictMode: false,
   images: {
     remotePatterns: [
       // Keep Unsplash if you might use it elsewhere, or remove

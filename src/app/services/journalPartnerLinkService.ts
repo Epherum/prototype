@@ -2,6 +2,7 @@
 import prisma from "@/app/utils/prisma";
 import { JournalPartnerLink, Partner, Journal } from "@prisma/client";
 import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
+import { serviceLogger } from "@/lib/logger";
 export type CreateJournalPartnerLinkData = {
   journalId: string;
   partnerId: bigint;
@@ -18,7 +19,7 @@ const journalPartnerLinkService = {
   async createLink(
     data: CreateJournalPartnerLinkData
   ): Promise<JournalPartnerLink> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPLService): Linking Journal '${data.journalId}' with Partner ID '${data.partnerId}'.`
     );
 
@@ -58,7 +59,7 @@ const journalPartnerLinkService = {
 
     // Proceed with creation
     const newLink = await prisma.journalPartnerLink.create({ data });
-    console.log(`Chef (JPLService): Link created with ID '${newLink.id}'.`);
+    serviceLogger.debug(`Chef (JPLService): Link created with ID '${newLink.id}'.`);
     return newLink;
   },
 
@@ -72,7 +73,7 @@ const journalPartnerLinkService = {
 
   // RECIPE 3: Delete a link by its ID
   async deleteLinkById(linkId: bigint): Promise<JournalPartnerLink | null> {
-    console.log(`Chef (JPLService): Deleting link with ID '${linkId}'.`);
+    serviceLogger.debug(`Chef (JPLService): Deleting link with ID '${linkId}'.`);
     try {
       // Check schema: journalPartnerGoodLinks uses onDelete: Cascade.
       // Deleting this link will also delete associated 3-way links.
@@ -81,7 +82,7 @@ const journalPartnerLinkService = {
       });
     } catch (error) {
       // Prisma P2025: Record to delete not found
-      console.warn(
+      serviceLogger.warn(
         `Chef (JPLService): Link ID '${linkId}' not found for deletion.`,
         error
       );
@@ -95,7 +96,7 @@ const journalPartnerLinkService = {
     partnerId: bigint,
     partnershipType?: string | null // If null/undefined, deletes any link between them regardless of type
   ): Promise<{ count: number }> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPLService): Deleting link(s) between Journal '${journalId}' and Partner ID '${partnerId}'.`
     );
     const whereCondition: any = { journalId, partnerId };
@@ -107,7 +108,7 @@ const journalPartnerLinkService = {
     const result = await prisma.journalPartnerLink.deleteMany({
       where: whereCondition,
     });
-    console.log(`Chef (JPLService): Deleted ${result.count} link(s).`);
+    serviceLogger.debug(`Chef (JPLService): Deleted ${result.count} link(s).`);
     return result; // Returns { count: number_of_deleted_records }
   },
 
@@ -145,7 +146,7 @@ const journalPartnerLinkService = {
 
   // RECIPE 7: Get all Journals a specific Partner is linked to
   async getJournalsForPartner(partnerId: bigint): Promise<Journal[]> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JPLService): Getting journals for Partner ID '${partnerId}'.`
     );
     const links = await prisma.journalPartnerLink.findMany({
@@ -184,7 +185,7 @@ const journalPartnerLinkService = {
     journalId: string,
     partnerId: bigint
   ): Promise<JournalPartnerLink | null> {
-    console.log(
+    serviceLogger.debug(
       `JPL Service: Finding first link for Journal ${journalId} and Partner ${partnerId}`
     );
     // Use findFirst because the unique constraint also includes partnershipType,

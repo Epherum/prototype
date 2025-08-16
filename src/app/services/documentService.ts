@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 import { journalService } from "./journalService";
 import { jsonBigIntReplacer } from "../utils/jsonBigInt";
+import { serviceLogger } from "@/lib/logger";
 
 // ===================================
 // Type Definitions
@@ -76,7 +77,7 @@ const documentService = {
     createdById: string,
     journalId: string // NEW: Journal context is now required.
   ): Promise<Document & { lines: DocumentLine[] }> {
-    console.log(
+    serviceLogger.debug(
       "documentService.createDocument: Input",
       JSON.stringify({ ...data, createdById, journalId }, jsonBigIntReplacer)
     );
@@ -136,7 +137,7 @@ const documentService = {
       },
     });
 
-    console.log("documentService.createDocument: Output", newDocument);
+    serviceLogger.debug("documentService.createDocument: Output", newDocument);
     return newDocument;
   },
 
@@ -147,7 +148,7 @@ const documentService = {
   async getAllDocuments(
     options: GetAllDocumentsOptions
   ): Promise<{ data: Document[]; totalCount: number }> {
-    console.log(
+    serviceLogger.debug(
       "documentService.getAllDocuments: Input",
       JSON.stringify(options, jsonBigIntReplacer)
     );
@@ -211,7 +212,7 @@ const documentService = {
       include: { partner: true }, // Include partner for display in tables
     });
 
-    console.log("documentService.getAllDocuments: Output", {
+    serviceLogger.debug("documentService.getAllDocuments: Output", {
       count: data.length,
       totalCount,
     });
@@ -222,7 +223,7 @@ const documentService = {
    * ✏️ MODIFIED: Fetches a single document, now including full good details per line.
    */
   async getDocumentById(id: bigint): Promise<Document | null> {
-    console.log("documentService.getDocumentById: Input", { id });
+    serviceLogger.debug("documentService.getDocumentById: Input", { id });
     return await prisma.document.findUnique({
       where: { id, entityState: "ACTIVE" },
       // ✨ NEW: The include clause is expanded for the "Gateway Lookup" use case.
@@ -241,7 +242,7 @@ const documentService = {
   // --- Other CRUD functions remain as-is ---
 
   async updateDocument(id: bigint, data: UpdateDocumentData) {
-    console.log(
+    serviceLogger.debug(
       "documentService.updateDocument: Input",
       JSON.stringify({ id, ...data }, jsonBigIntReplacer)
     );
@@ -252,7 +253,7 @@ const documentService = {
   },
 
   async deleteDocument(id: bigint, deletedById: string) {
-    console.log(
+    serviceLogger.debug(
       "documentService.deleteDocument: Input",
       JSON.stringify({ id, deletedById }, jsonBigIntReplacer)
     );

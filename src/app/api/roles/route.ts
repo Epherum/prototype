@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 // CORRECT: Import the service object and the schema from the service file
 import roleService, { rolePayloadSchema } from "@/app/services/roleService";
+import { apiLogger } from "@/lib/logger";
 
 // GET all roles
 const getHandler = async () => {
@@ -12,7 +13,7 @@ const getHandler = async () => {
     const roles = await roleService.getAll();
     return NextResponse.json(roles);
   } catch (error) {
-    console.error("API GET /api/roles Error:", error);
+    apiLogger.error("API GET /api/roles Error", { error: error.message, stack: error.stack });
     return NextResponse.json(
       { message: "Failed to fetch roles" },
       { status: 500 }
@@ -38,7 +39,7 @@ const postHandler = async (req: NextRequest) => {
     const newRole = await roleService.create(validation.data);
     return NextResponse.json(newRole, { status: 201 });
   } catch (error) {
-    console.error("API POST /api/roles Error:", error);
+    apiLogger.error("API POST /api/roles Error", { error: error.message, stack: error.stack });
     // You could add more specific error handling here for things like
     // duplicate role names (P2002) if needed.
     return NextResponse.json(
@@ -48,11 +49,32 @@ const postHandler = async (req: NextRequest) => {
   }
 };
 
+/**
+ * GET /api/roles
+ * Fetches a list of all roles in the system, including their associated permissions.
+ * @param {NextRequest} _request - The incoming Next.js request object (unused).
+ * @returns {NextResponse} A JSON response containing an array of role objects.
+ * @status 200 - OK: Roles successfully fetched.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_ROLE - Requires 'READ' action on 'ROLE' resource.
+ */
 export const GET = withAuthorization(getHandler, {
-  action: "READ",
+  action: "MANAGE",
   resource: "ROLE",
 });
+
+/**
+ * POST /api/roles
+ * Creates a new role.
+ * @param {NextRequest} request - The incoming Next.js request object containing the role creation payload.
+ * @body {RolePayload} - The role data to create (name, description, permissionIds).
+ * @returns {NextResponse} A JSON response containing the newly created role.
+ * @status 201 - Created: Role successfully created.
+ * @status 400 - Bad Request: Invalid role data.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission MANAGE_ROLE - Requires 'MANAGE' action on 'ROLE' resource.
+ */
 export const POST = withAuthorization(postHandler, {
-  action: "READ",
+  action: "MANAGE",
   resource: "ROLE",
 });

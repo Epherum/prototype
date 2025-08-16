@@ -7,6 +7,7 @@ import {
   UpdateJournalData,
 } from "@/app/services/journalService";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
+import { apiLogger } from "@/lib/logger";
 
 // Zod schema for validating the request body for PUT /api/journals/[id].
 const updateJournalSchema = z
@@ -25,6 +26,16 @@ type RouteContext = { params: { id: string } };
 
 /**
  * GET /api/journals/[id]
+ * Fetches a single Journal by its ID.
+ * @param {NextRequest} _request - The incoming Next.js request object.
+ * @param {object} context - The context object containing route parameters.
+ * @param {object} context.params - The parameters for the route.
+ * @param {string} context.params.id - The ID of the Journal to fetch.
+ * @returns {NextResponse} A JSON response containing the Journal data if found, or an error message.
+ * @status 200 - OK: Journal found and returned.
+ * @status 404 - Not Found: Journal with the specified ID does not exist.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_JOURNAL - Requires 'READ' action on 'JOURNAL' resource.
  */
 export const GET = withAuthorization(
   async function GET(_request: NextRequest, { params }: RouteContext) {
@@ -39,7 +50,7 @@ export const GET = withAuthorization(
       return NextResponse.json(journal);
     } catch (error) {
       const e = error as Error;
-      console.error(`API GET /api/journals/${params.id} Error:`, e);
+      apiLogger.error(`API GET /api/journals/${params.id} Error:`, e);
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -51,6 +62,18 @@ export const GET = withAuthorization(
 
 /**
  * PUT /api/journals/[id]
+ * Updates an existing Journal by its ID.
+ * @param {NextRequest} request - The incoming Next.js request object containing the update payload.
+ * @param {object} context - The context object containing route parameters.
+ * @param {object} context.params - The parameters for the route.
+ * @param {string} context.params.id - The ID of the Journal to update.
+ * @body {UpdateJournalData} - The Journal fields to update.
+ * @returns {NextResponse} A JSON response containing the updated Journal data or an error message.
+ * @status 200 - OK: Journal successfully updated.
+ * @status 400 - Bad Request: Invalid request body.
+ * @status 404 - Not Found: Journal with the specified ID does not exist for update.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission UPDATE_JOURNAL - Requires 'UPDATE' action on 'JOURNAL' resource.
  */
 export const PUT = withAuthorization(
   async function PUT(request: NextRequest, { params }: RouteContext) {
@@ -75,7 +98,7 @@ export const PUT = withAuthorization(
       return NextResponse.json(updatedJournal);
     } catch (error) {
       const e = error as Error & { code?: string };
-      console.error(`API PUT /api/journals/${params.id} Error:`, e);
+      apiLogger.error(`API PUT /api/journals/${params.id} Error:`, e);
 
       if (e.code === "P2025") {
         return NextResponse.json(
@@ -94,6 +117,17 @@ export const PUT = withAuthorization(
 
 /**
  * DELETE /api/journals/[id]
+ * Deletes a Journal by its ID.
+ * @param {NextRequest} _request - The incoming Next.js request object.
+ * @param {object} context - The context object containing route parameters.
+ * @param {object} context.params - The parameters for the route.
+ * @param {string} context.params.id - The ID of the Journal to delete.
+ * @returns {NextResponse} A JSON response indicating success or an error message.
+ * @status 200 - OK: Journal successfully deleted.
+ * @status 404 - Not Found: Journal with the specified ID does not exist for deletion.
+ * @status 409 - Conflict: Cannot delete journal due to existing children or user role restrictions.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission DELETE_JOURNAL - Requires 'DELETE' action on 'JOURNAL' resource.
  */
 export const DELETE = withAuthorization(
   async function DELETE(_request: NextRequest, { params }: RouteContext) {
@@ -105,16 +139,8 @@ export const DELETE = withAuthorization(
       );
     } catch (error) {
       const e = error as Error & { code?: string };
-      console.error(`API DELETE /api/journals/${params.id} Error:`, e);
+      apiLogger.error(`API DELETE /api/journals/${params.id} Error:`, e);
 
-      // Catch specific "cannot delete" errors from the service layer
-      if (e.message.includes("Cannot delete Journal")) {
-        return NextResponse.json(
-          { message: e.message },
-          { status: 409 } // 409 Conflict is appropriate here
-        );
-      }
-      // Catch Prisma's "record not found" error
       if (e.code === "P2025") {
         return NextResponse.json(
           { message: `Journal with ID '${params.id}' not found for deletion.` },

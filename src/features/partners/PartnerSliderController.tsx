@@ -38,6 +38,11 @@ export interface PartnerSliderControllerProps {
 export const PartnerSliderController: React.FC<
   PartnerSliderControllerProps
 > = ({
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  isMoveDisabled,
   onOpenJournalSelector,
   fullJournalHierarchy,
   isLocked,
@@ -111,7 +116,7 @@ export const PartnerSliderController: React.FC<
   // so no mapping is needed if the types are compatible. We ensure the `id` is a string.
   const sliderData = useMemo(
     () =>
-      partnerManager.partnersForSlider.map((p: PartnerClient) => ({
+      partnerManager.partnersForSlider.map((p: any) => ({
         id: p.id, // ID is already a string
         label: p.name,
         code: p.registrationNumber,
@@ -148,7 +153,26 @@ export const PartnerSliderController: React.FC<
             />
           </div>
         </div>
-        <div className={styles.moveButtonGroup}>{/* Move buttons */}</div>
+        <div className={styles.moveButtonGroup}>
+          {canMoveUp && (
+            <button
+              onClick={onMoveUp}
+              className={styles.controlButton}
+              disabled={isMoveDisabled}
+            >
+              ▲ Up
+            </button>
+          )}
+          {canMoveDown && (
+            <button
+              onClick={onMoveDown}
+              className={styles.controlButton}
+              disabled={isMoveDisabled}
+            >
+              ▼ Down
+            </button>
+          )}
+        </div>
       </div>
       <DynamicSlider
         sliderId={SLIDER_TYPES.PARTNER}
@@ -209,9 +233,9 @@ export const PartnerSliderController: React.FC<
             partner={partnerJournalLinking.partnerForUnlinking}
             onUnlink={partnerJournalLinking.submitUnlink}
             fetchLinksFn={() =>
-              getJournalPartnerLinks(
-                partnerJournalLinking.partnerForUnlinking!.id
-              )
+              getJournalPartnerLinks({
+                partnerId: partnerJournalLinking.partnerForUnlinking!.id
+              })
             }
             isUnlinking={partnerJournalLinking.isSubmittingUnlink}
           />

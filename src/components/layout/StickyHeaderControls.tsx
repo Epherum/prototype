@@ -4,6 +4,7 @@
 import { motion, LayoutGroup } from "framer-motion";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation } from "swiper/modules";
+import { useState } from "react";
 import "swiper/css";
 import styles from "./StickyHeaderControls.module.css";
 import type { SliderType, SliderVisibility } from "@/store/appStore"; // Import types from store
@@ -33,6 +34,25 @@ export default function StickyHeaderControls({
   visibleSliderOrder,
   sliderConfigs,
 }: StickyHeaderControlsProps) {
+  const [expandedButton, setExpandedButton] = useState<SliderType | null>(null);
+
+  const handleButtonClick = (sliderId: SliderType) => {
+    // If clicking the same button that's expanded, collapse it and toggle visibility
+    if (expandedButton === sliderId) {
+      setExpandedButton(null);
+      onToggleVisibility(sliderId);
+    } else {
+      // If the title is too long and would be truncated, expand it
+      const title = sliderConfigs[sliderId]?.title || sliderId;
+      if (title.length > 10) { // Threshold for when text might be truncated
+        setExpandedButton(sliderId);
+      } else {
+        // If title is short enough, just toggle visibility
+        onToggleVisibility(sliderId);
+      }
+    }
+  };
+
   return (
     <div className={styles.stickyHeaderContainer}>
       <LayoutGroup id="visibility-toggles-layout">
@@ -52,6 +72,7 @@ export default function StickyHeaderControls({
 
               const title = config.title || sliderId;
               const isCurrentlyVisible = visibility[sliderId];
+              const isExpanded = expandedButton === sliderId;
 
               // Find the index in the *visible* order array to get the number
               const visibleIndex = visibleSliderOrder.indexOf(sliderId);
@@ -72,21 +93,25 @@ export default function StickyHeaderControls({
                     }}
                     transition={{ duration: 0.2, ease: "easeInOut" }}
                   >
-                    <button
-                      onClick={() => onToggleVisibility(sliderId)}
+                    <motion.button
+                      onClick={() => handleButtonClick(sliderId)}
                       className={`${styles.visibilityButton} ${
                         isCurrentlyVisible
                           ? styles.visibilityActive
                           : styles.visibilityInactive
-                      }`}
+                      } ${isExpanded ? styles.expanded : ""}`}
                       aria-pressed={isCurrentlyVisible}
+                      animate={{
+                        maxWidth: isExpanded ? "300px" : "120px",
+                      }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
                       {/* Display number only if it's visible */}
                       {isCurrentlyVisible && visibleIndex !== -1
                         ? `${visibleIndex + 1}: `
                         : ""}
                       {title}
-                    </button>
+                    </motion.button>
                   </motion.div>
                 </SwiperSlide>
               );

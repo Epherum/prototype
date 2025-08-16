@@ -35,6 +35,13 @@ interface ExtendedJWT extends JWT {
   picture?: string | null;
 }
 
+/**
+ * Handles all NextAuth.js authentication requests (e.g., sign-in, sign-out, session).
+ * This is a catch-all route for NextAuth.js.
+ * @route GET /api/auth/[...nextauth]
+ * @route POST /api/auth/[...nextauth]
+ * @returns NextAuth.js authentication responses.
+ */
 const handler = NextAuth(authOptions);
 
 export { handler as GET, handler as POST };

@@ -8,11 +8,12 @@ import {
 } from "@/lib/types/serviceOptions";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 // ✅ CORRECTED IMPORT: Import from the new shared types file
-import { CreateGoodsData, UpdateGoodsData } from "./service.types";
+import { CreateGoodsData, UpdateGoodsData } from "@/lib/types/service.types";
+import { serviceLogger } from "@/lib/logger";
 
 const goodsService = {
   async createGood(data: CreateGoodsData): Promise<GoodsAndService> {
-    console.log("goodsService.createGood: Input", data);
+    serviceLogger.debug("goodsService.createGood: Input", data);
     // ... existing implementation ...
     if (data.taxCodeId) {
       const taxCodeExists = await prisma.taxCode.findUnique({
@@ -39,17 +40,17 @@ const goodsService = {
         createdBy: { connect: { id: createdById } },
       },
     });
-    console.log("goodsService.createGood: Output", newGood);
+    serviceLogger.debug("goodsService.createGood: Output", newGood);
     return newGood;
   },
 
   async getGoodById(id: bigint): Promise<GoodsAndService | null> {
-    console.log("goodsService.getGoodById: Input", { id });
+    serviceLogger.debug("goodsService.getGoodById: Input", { id });
     const good = await prisma.goodsAndService.findUnique({
       where: { id },
       include: { taxCode: true, unitOfMeasure: true },
     });
-    console.log("goodsService.getGoodById: Output", good);
+    serviceLogger.debug("goodsService.getGoodById: Output", good);
     return good;
   },
 
@@ -60,7 +61,7 @@ const goodsService = {
   async getAllGoods(
     options: GetAllItemsOptions<Prisma.GoodsAndServiceWhereInput>
   ): Promise<{ data: GoodsAndService[]; totalCount: number }> {
-    console.log(
+    serviceLogger.debug(
       "goodsService.getAllGoods: Input",
       JSON.stringify(options, jsonBigIntReplacer)
     );
@@ -81,36 +82,42 @@ const goodsService = {
     };
 
     if (filterMode) {
-      const lastJournalId =
-        selectedJournalIds.length > 0
-          ? selectedJournalIds[selectedJournalIds.length - 1]
-          : null;
-
-      if (!lastJournalId) {
-        console.warn(
+      if (selectedJournalIds.length === 0) {
+        serviceLogger.warn(
           "goodsService.getAllGoods: 'filterMode' was provided without 'selectedJournalIds'. Returning empty."
         );
         return { data: [], totalCount: 0 };
       }
 
+      // Get all descendant IDs for all selected journals
+      const allJournalIds = new Set<string>();
+      
+      for (const journalId of selectedJournalIds) {
+        allJournalIds.add(journalId);
+        const descendants = await journalService.getDescendantJournalIds(journalId);
+        descendants.forEach(id => allJournalIds.add(id));
+      }
+      
+      const allRelevantJournalIds = Array.from(allJournalIds);
+
       switch (filterMode) {
         case "affected":
-          // Find goods linked to the very last selected journal.
+          // Find goods linked to any of the selected journals or their descendants
           prismaWhere.journalGoodLinks = {
-            some: { journalId: lastJournalId },
+            some: { journalId: { in: allRelevantJournalIds } },
           };
           break;
 
         case "unaffected":
           if (!permissionRootId) {
-            console.warn(
+            serviceLogger.warn(
               "goodsService.getAllGoods: 'unaffected' filter requires 'permissionRootId'. Returning empty."
             );
             return { data: [], totalCount: 0 };
           }
-          // 1. Get all good IDs linked to the last selected journal.
+          // 1. Get all good IDs linked to any of the selected journals and their descendants
           const affectedGoodLinks = await prisma.journalGoodLink.findMany({
-            where: { journalId: lastJournalId },
+            where: { journalId: { in: allRelevantJournalIds } },
             select: { goodId: true },
           });
           const affectedGoodIds = affectedGoodLinks.map((p) => p.goodId);
@@ -139,7 +146,7 @@ const goodsService = {
         case "inProcess":
           // The spec `{ approvalStatus: 'PENDING' }` doesn't apply to the Goods model.
           // This mode is not applicable to Goods as they lack a status field.
-          console.warn(
+          serviceLogger.warn(
             "goodsService.getAllGoods: 'inProcess' filter is not applicable to Goods. Returning empty."
           );
           return { data: [], totalCount: 0 };
@@ -165,7 +172,7 @@ const goodsService = {
       include: { taxCode: true, unitOfMeasure: true },
     });
 
-    console.log("goodsService.getAllGoods: Output", {
+    serviceLogger.debug("goodsService.getAllGoods: Output", {
       count: data.length,
       totalCount,
     });
@@ -179,7 +186,7 @@ const goodsService = {
   async findGoodsForPartners(
     options: IntersectionFindOptions
   ): Promise<{ data: GoodsAndService[]; totalCount: number }> {
-    console.log(
+    serviceLogger.debug(
       "goodsService.findGoodsForPartners: Input",
       JSON.stringify(options, jsonBigIntReplacer)
     );
@@ -245,7 +252,7 @@ const goodsService = {
       include: { taxCode: true, unitOfMeasure: true },
     });
 
-    console.log("goodsService.findGoodsForPartners: Output", {
+    serviceLogger.debug("goodsService.findGoodsForPartners: Output", {
       count: data.length,
     });
     return { data, totalCount: data.length };
@@ -255,21 +262,21 @@ const goodsService = {
     id: bigint,
     data: UpdateGoodsData
   ): Promise<GoodsAndService | null> {
-    console.log("goodsService.updateGood: Input", { id, data });
+    serviceLogger.debug("goodsService.updateGood: Input", { id, data });
     // ... existing implementation ...
     const updatedGood = await prisma.goodsAndService.update({
       where: { id },
       data: data,
     });
-    console.log("goodsService.updateGood: Output", updatedGood);
+    serviceLogger.debug("goodsService.updateGood: Output", updatedGood);
     return updatedGood;
   },
 
   async deleteGood(id: bigint): Promise<GoodsAndService | null> {
-    console.log("goodsService.deleteGood: Input", { id });
+    serviceLogger.debug("goodsService.deleteGood: Input", { id });
     // ... existing implementation ...
     const deletedGood = await prisma.goodsAndService.delete({ where: { id } });
-    console.log("goodsService.deleteGood: Output", deletedGood);
+    serviceLogger.debug("goodsService.deleteGood: Output", deletedGood);
     return deletedGood;
   },
 };

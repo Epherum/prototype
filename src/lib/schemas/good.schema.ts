@@ -1,5 +1,6 @@
 //src/lib/schemas/good.schema.ts
 import { z } from "zod";
+import { parseBigInt } from "@/app/utils/jsonBigInt";
 
 export const createGoodSchema = z.object({
   label: z.string().min(1, "Label is required"),
@@ -22,5 +23,26 @@ export const updateGoodSchema = createGoodSchema.partial().omit({
   barcode: true,
 });
 
+export const getGoodsQuerySchema = z.object({
+  take: z.coerce.number().int().positive().optional(),
+  skip: z.coerce.number().int().nonnegative().optional(),
+  filterMode: z.enum(["affected", "unaffected", "inProcess"]).optional(),
+  permissionRootId: z.string().optional(),
+  selectedJournalIds: z
+    .string()
+    .transform((val) => val.split(","))
+    .optional(),
+  intersectionOfPartnerIds: z
+    .string()
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => parseBigInt(id, "partner ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+});
+
 export type CreateGoodPayload = z.infer<typeof createGoodSchema>;
 export type UpdateGoodPayload = z.infer<typeof updateGoodSchema>;
+export type GetGoodsQuery = z.infer<typeof getGoodsQuerySchema>;

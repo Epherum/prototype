@@ -1,50 +1,36 @@
 // src/app/api/documents/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import documentService, {
   CreateDocumentData,
-  createDocumentSchema,
 } from "@/app/services/documentService";
-import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { ExtendedSession } from "@/lib/auth/authOptions";
-
-// ... (your zod schemas remain unchanged)
-const getDocumentsQuerySchema = z.object({
-  take: z.coerce.number().int().positive().optional(),
-  skip: z.coerce.number().int().nonnegative().optional(),
-  filterByJournalIds: z
-    .string()
-    .transform((val) => val.split(","))
-    .optional(),
-  filterByPartnerIds: z
-    .string()
-    .transform((val) =>
-      val
-        .split(",")
-        .map((id) => parseBigInt(id, "partner ID"))
-        .filter((id): id is bigint => id !== null)
-    )
-    .optional(),
-  filterByGoodIds: z
-    .string()
-    .transform((val) =>
-      val
-        .split(",")
-        .map((id) => parseBigInt(id, "good ID"))
-        .filter((id): id is bigint => id !== null)
-    )
-    .optional(),
-});
-
-const apiCreateDocumentSchema = createDocumentSchema.extend({
-  journalId: z.string().min(1, "Journal ID is required for creation."),
-});
+import {
+  getDocumentsQuerySchema,
+  apiCreateDocumentSchema,
+} from "@/lib/schemas/document.schema";
+import { apiLogger } from "@/lib/logger";
 
 /**
  * GET /api/documents
- * Fetches documents. Requires full management permission for the DOCUMENT resource.
+ * Fetches documents based on various query parameters.
+ * Supports pagination, filtering by journal IDs, partner IDs, and good IDs.
+ * Applies user's journal restriction if present.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated user's session.
+ * @queryparam {number} [take] - Number of records to take (for pagination).
+ * @queryparam {number} [skip] - Number of records to skip (for pagination).
+ * @queryparam {string} [filterByJournalIds] - Comma-separated list of journal IDs to filter by.
+ * @queryparam {string} [filterByPartnerIds] - Comma-separated list of partner IDs to filter by.
+ * @queryparam {string} [filterByGoodIds] - Comma-separated list of good IDs to filter by.
+ * @returns {NextResponse} A JSON response containing a paginated list of documents.
+ * @status 200 - OK: Documents successfully fetched.
+ * @status 400 - Bad Request: Invalid query parameters.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission MANAGE_DOCUMENT - Requires 'MANAGE' action on 'DOCUMENT' resource.
  */
 export const GET = withAuthorization(
   async function GET(request: NextRequest, _context, session: ExtendedSession) {
@@ -74,7 +60,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API GET /api/documents Error:", e);
+      apiLogger.error("API GET /api/documents Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -87,7 +73,18 @@ export const GET = withAuthorization(
 
 /**
  * POST /api/documents
- * Creates a new Document. This is part of 'managing' documents.
+ * Creates a new Document.
+ * @param {NextRequest} request - The incoming Next.js request object containing the document creation payload.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated user's session, used to record `createdById`.
+ * @body {object} - The document creation data.
+ * @body {string} body.journalId - The ID of the journal the document belongs to.
+ * @body {CreateDocumentData} body - Other document fields as defined by `CreateDocumentData`.
+ * @returns {NextResponse} A JSON response containing the newly created document.
+ * @status 201 - Created: Document successfully created.
+ * @status 400 - Bad Request: Invalid request body.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission MANAGE_DOCUMENT - Requires 'MANAGE' action on 'DOCUMENT' resource.
  */
 export const POST = withAuthorization(
   async function POST(
@@ -109,9 +106,20 @@ export const POST = withAuthorization(
         );
       }
 
-      const { journalId, ...documentData } = validation.data;
+      const { journalId, partnerId, lines, ...documentData } = validation.data;
+      
+      // Convert string IDs to bigint for the service
+      const createData: CreateDocumentData = {
+        ...documentData,
+        partnerId: BigInt(partnerId),
+        lines: lines?.map(line => ({
+          ...line,
+          journalPartnerGoodLinkId: BigInt(line.journalPartnerGoodLinkId),
+        })) || [],
+      };
+
       const newDocument = await documentService.createDocument(
-        documentData as CreateDocumentData,
+        createData,
         session.user!.id,
         journalId
       );
@@ -123,7 +131,7 @@ export const POST = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API POST /api/documents Error:", e);
+      apiLogger.error("API POST /api/documents Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }

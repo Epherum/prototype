@@ -12,6 +12,7 @@ import {
   CreatePartnerPayload,
   UpdatePartnerPayload,
 } from "@/lib/schemas/partner.schema";
+import { serviceLogger } from "@/lib/logger";
 
 const partnerService = {
   // ✅ CHANGED: The function signature now uses the Zod-inferred type.
@@ -19,7 +20,7 @@ const partnerService = {
     data: CreatePartnerPayload,
     createdById: string
   ): Promise<Partner> {
-    console.log("partnerService.createPartner: Input", { data, createdById });
+    serviceLogger.debug("partnerService.createPartner: Input", { data, createdById });
     const newPartner = await prisma.partner.create({
       data: {
         ...data,
@@ -28,21 +29,21 @@ const partnerService = {
         approvalStatus: ApprovalStatus.PENDING,
       },
     });
-    console.log("partnerService.createPartner: Output", newPartner);
+    serviceLogger.debug("partnerService.createPartner: Output", newPartner);
     return newPartner;
   },
 
   async getPartnerById(id: bigint): Promise<Partner | null> {
-    console.log("partnerService.getPartnerById: Input", { id });
+    serviceLogger.debug("partnerService.getPartnerById: Input", { id });
     const partner = await prisma.partner.findUnique({ where: { id } });
-    console.log("partnerService.getPartnerById: Output", partner);
+    serviceLogger.debug("partnerService.getPartnerById: Output", partner);
     return partner;
   },
 
   async getAllPartners(
     options: GetAllItemsOptions<Prisma.PartnerWhereInput>
   ): Promise<{ data: Partner[]; totalCount: number }> {
-    console.log(
+    serviceLogger.debug(
       "partnerService.getAllPartners: Input",
       JSON.stringify(options, jsonBigIntReplacer)
     );
@@ -61,30 +62,49 @@ const partnerService = {
     };
     if (filterMode) {
       if (selectedJournalIds.length === 0) {
-        console.warn(
+        serviceLogger.warn(
           "partnerService.getAllPartners: 'filterMode' was provided without 'selectedJournalIds'. Returning empty."
         );
         return { data: [], totalCount: 0 };
       }
-      const lastJournalId = selectedJournalIds[selectedJournalIds.length - 1];
+      
+      serviceLogger.debug("partnerService.getAllPartners: Filter mode processing", {
+        filterMode,
+        selectedJournalIds,
+        permissionRootId
+      });
+      
+      // The selectedJournalIds represent the effective path IDs from the frontend
+      // According to the documentation, these are already the complete paths we need to filter by
+      const journalIdsString = selectedJournalIds;
+      
+      serviceLogger.debug("partnerService.getAllPartners: Selected journal IDs for filtering", {
+        selectedJournalIds,
+        journalIdsString
+      });
+      
       switch (filterMode) {
         case "affected":
+          // Partners linked to any of the journals in the effective path
           prismaWhere.journalPartnerLinks = {
-            some: { journalId: lastJournalId },
+            some: { journalId: { in: journalIdsString } },
           };
           break;
         case "unaffected":
           if (!permissionRootId) {
-            console.warn(
+            serviceLogger.warn(
               "partnerService.getAllPartners: 'unaffected' filter requires 'permissionRootId'. Returning empty."
             );
             return { data: [], totalCount: 0 };
           }
+          // Find partners affected by any of the selected journals
           const affectedLinks = await prisma.journalPartnerLink.findMany({
-            where: { journalId: lastJournalId },
+            where: { journalId: { in: journalIdsString } },
             select: { partnerId: true },
           });
           const affectedPartnerIds = affectedLinks.map((p) => p.partnerId);
+          
+          // Get descendant IDs for permission root
           const descendantIds = await journalService.getDescendantJournalIds(
             permissionRootId
           );
@@ -106,7 +126,7 @@ const partnerService = {
             { approvalStatus: "PENDING" },
             {
               journalPartnerLinks: {
-                some: { journalId: { in: selectedJournalIds } },
+                some: { journalId: { in: journalIdsString } },
               },
             },
           ];
@@ -127,7 +147,7 @@ const partnerService = {
       skip,
       orderBy: { name: "asc" },
     });
-    console.log("partnerService.getAllPartners: Output", {
+    serviceLogger.debug("partnerService.getAllPartners: Output", {
       count: data.length,
       totalCount,
     });
@@ -137,7 +157,7 @@ const partnerService = {
   async findPartnersForGoods(
     options: IntersectionFindOptions
   ): Promise<{ data: Partner[]; totalCount: number }> {
-    console.log(
+    serviceLogger.debug(
       "partnerService.findPartnersForGoods: Input",
       JSON.stringify(options, jsonBigIntReplacer)
     );
@@ -178,7 +198,7 @@ const partnerService = {
       },
       orderBy: { name: "asc" },
     });
-    console.log("partnerService.findPartnersForGoods: Output", {
+    serviceLogger.debug("partnerService.findPartnersForGoods: Output", {
       count: data.length,
     });
     return { data, totalCount: data.length };
@@ -189,18 +209,18 @@ const partnerService = {
     id: bigint,
     data: UpdatePartnerPayload
   ): Promise<Partner | null> {
-    console.log("partnerService.updatePartner: Input", { id, data });
+    serviceLogger.debug("partnerService.updatePartner: Input", { id, data });
     // Note: The `updatePartnerSchema` on the client side now correctly matches the fields
     // from `createPartnerSchema`, so a simple spread is safe.
     const updatedPartner = await prisma.partner.update({ where: { id }, data });
-    console.log("partnerService.updatePartner: Output", updatedPartner);
+    serviceLogger.debug("partnerService.updatePartner: Output", updatedPartner);
     return updatedPartner;
   },
 
   async deletePartner(id: bigint): Promise<Partner | null> {
-    console.log("partnerService.deletePartner: Input", { id });
+    serviceLogger.debug("partnerService.deletePartner: Input", { id });
     const deletedPartner = await prisma.partner.delete({ where: { id } });
-    console.log("partnerService.deletePartner: Output", deletedPartner);
+    serviceLogger.debug("partnerService.deletePartner: Output", deletedPartner);
     return deletedPartner;
   },
 };

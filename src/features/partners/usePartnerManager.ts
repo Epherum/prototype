@@ -154,7 +154,7 @@ export const usePartnerManager = () => {
         (p) => p.id === selectedPartnerId
       );
       if (partnerToEdit) {
-        setEditingPartnerData(partnerToEdit);
+        setEditingPartnerData(partnerToEdit as unknown as PartnerClient);
         setIsAddEditPartnerModalOpen(true);
         handleClosePartnerOptionsMenu();
       }
@@ -198,7 +198,7 @@ export const usePartnerManager = () => {
   return {
     // State
     selectedPartnerId,
-    partnersForSlider: activeQuery.data?.data ?? [],
+    partnersForSlider: (activeQuery.data?.data ?? []) as unknown as PartnerClient[],
     partnerQuery: activeQuery,
     isPartnerOptionsMenuOpen,
     partnerOptionsMenuAnchorEl,

@@ -88,16 +88,10 @@ export const useGoodManager = () => {
   });
 
   // --- DERIVED STATE ---
-  const goodsForSlider = useMemo(() => {
-    // The data from activeQuery is already `GoodClient[]`.
-    // The `id` is already a string, and `label` exists.
-    // The map is now simpler and mainly for ensuring a consistent return shape.
+  const goodsForSlider: GoodClient[] = useMemo(() => {
+    // Cast the data to GoodClient[] since useChainedQuery may return AccountNodeData[]
     if (!activeQuery.data?.data) return [];
-    return activeQuery.data.data.map((good) => ({
-      ...good, // Spread the full GoodClient object
-      id: good.id,
-      label: good.label,
-    }));
+    return activeQuery.data.data as unknown as GoodClient[];
   }, [activeQuery.data]);
 
   // --- SIDE EFFECTS (useEffect) ---
@@ -143,7 +137,7 @@ export const useGoodManager = () => {
       (g) => g.id === selectedGoodsId
     );
     if (goodToEdit) {
-      setEditingGoodData(goodToEdit);
+      setEditingGoodData(goodToEdit as unknown as GoodClient);
       setAddEditGoodModalOpen(true);
       setGoodsOptionsMenuOpen(false);
     }

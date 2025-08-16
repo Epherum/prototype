@@ -1,69 +1,31 @@
 // src/app/api/journals/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import {
   journalService,
   CreateJournalData,
 } from "@/app/services/journalService";
-import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
+import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { ExtendedSession } from "@/lib/auth/authOptions";
-
-/**
- * Zod schema for validating query parameters for the versatile GET /api/journals endpoint.
- */
-const getJournalsQuerySchema = z
-  .object({
-    // Use Case 1: Fetch sub-hierarchy for a restricted user
-    rootJournalId: z.string().optional(),
-
-    // Use Case 2: Find journals linked to partners (P -> J)
-    findByPartnerIds: z
-      .string()
-      .optional()
-      .transform((val) =>
-        val
-          ? val
-              .split(",")
-              .map((id) => parseBigInt(id, "partner ID"))
-              .filter((id): id is bigint => id !== null)
-          : undefined
-      ),
-
-    // Use Case 3: Find journals linked to goods (G -> J)
-    findByGoodIds: z
-      .string()
-      .optional()
-      .transform((val) =>
-        val
-          ? val
-              .split(",")
-              .map((id) => parseBigInt(id, "good ID"))
-              .filter((id): id is bigint => id !== null)
-          : undefined
-      ),
-  })
-  // ✅ FIX: The .refine() check has been removed.
-  // This schema now correctly handles the case where NO query parameters are provided,
-  // which is necessary for the initial, unfiltered data load for the Journal slider.
-  // .partial() is sufficient to make all fields optional.
-  .partial();
-
-/**
- * Zod schema for creating a new journal.
- */
-const createJournalSchema = z.object({
-  id: z.string().min(1, "ID is required"),
-  name: z.string().min(1, "Name is required"),
-  parentId: z.string().optional().nullable(),
-  isTerminal: z.boolean().optional(),
-  additionalDetails: z.any().optional(),
-});
+import {
+  getJournalsQuerySchema,
+  createJournalSchema,
+} from "@/lib/schemas/journal.schema";
+import { apiLogger } from "@/lib/logger";
 
 /**
  * GET /api/journals
  * Fetches journals based on various contexts, acting as a router to the service layer.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @queryparam {string} [rootJournalId] - The ID of the root journal to fetch its sub-hierarchy.
+ * @queryparam {string} [findByPartnerIds] - Comma-separated list of partner IDs to find associated journals.
+ * @queryparam {string} [findByGoodIds] - Comma-separated list of good IDs to find associated journals.
+ * @returns {NextResponse} A JSON response containing an array of journals.
+ * @status 200 - OK: Journals successfully fetched.
+ * @status 400 - Bad Request: Invalid query parameters.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_JOURNAL - Requires 'READ' action on 'JOURNAL' resource.
  */
 export const GET = withAuthorization(
   async function GET(request: NextRequest) {
@@ -100,20 +62,17 @@ export const GET = withAuthorization(
         // typically for an admin user loading the application for the first time.
         // We assume a `getRootJournals` or similar function exists in the service.
         // If it was called `getJournalSubHierarchy` with no args, that would go here too.
-        console.log("No specific query params found, fetching root journals.");
-        console.log(
-          "--> Calling journalService.getJournalSubHierarchy with null for Admin user."
-        ); // <-- ADD THIS
+        apiLogger.info("No specific query params found, fetching root journals.");
+        apiLogger.debug("Calling journalService.getJournalSubHierarchy with null for Admin user.");
         journals = await journalService.getJournalSubHierarchy(null);
-        console.log("<-- Service returned:", journals); // <-- ADD THIS
-        journals = await journalService.getJournalSubHierarchy(null); // Assuming `null` fetches the root
+        apiLogger.debug("Service returned journals", { count: journals?.length });
       }
 
       // The service functions return a simple array, not the { data, totalCount } object.
       return NextResponse.json(journals);
     } catch (error) {
       const e = error as Error;
-      console.error("API GET /api/journals Error:", e);
+      apiLogger.error("API GET /api/journals Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -125,7 +84,19 @@ export const GET = withAuthorization(
 
 /**
  * POST /api/journals
- * Creates a new journal.
+ * Creates a new Journal.
+ * @param {NextRequest} request - The incoming Next.js request object containing the journal creation payload.
+ * @body {object} body - The journal creation data.
+ * @body {string} body.id - The unique ID for the journal.
+ * @body {string} body.name - The name of the journal.
+ * @body {string} [body.parentId] - The ID of the parent journal.
+ * @body {boolean} [body.isTerminal] - Whether the journal is a terminal node.
+ * @body {any} [body.additionalDetails] - Additional JSON details.
+ * @returns {NextResponse} A JSON response containing the newly created journal.
+ * @status 201 - Created: Journal successfully created.
+ * @status 400 - Bad Request: Invalid request body or parent journal not found.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission CREATE_JOURNAL - Requires 'CREATE' action on 'JOURNAL' resource.
  */
 export const POST = withAuthorization(
   async function POST(request: NextRequest) {
@@ -150,7 +121,7 @@ export const POST = withAuthorization(
       return NextResponse.json(newJournal, { status: 201 });
     } catch (error) {
       const e = error as Error;
-      console.error("API POST /api/journals Error:", e);
+      apiLogger.error("API POST /api/journals Error", { error: e.message, stack: e.stack });
       // Handle specific errors like a non-existent parent
       if (e.message.includes("not found")) {
         return NextResponse.json(

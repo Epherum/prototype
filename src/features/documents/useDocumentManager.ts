@@ -13,6 +13,7 @@ import type { DocumentClient, GoodClient } from "@/lib/types/models.client";
 import type {
   CreateDocumentPayload,
   DocumentLinePayload,
+  ApiCreateDocumentPayload,
 } from "@/lib/schemas/document.schema";
 import type { DocumentCreationMode, DocumentItem } from "@/lib/types/ui";
 
@@ -199,7 +200,7 @@ export const useDocumentManager = () => {
 
   // ✅ REFACTORED: Logic now iterates and calls the single-item mutation.
   const handleSubmit = useCallback(
-    async (headerData: { refDoc: string; date: Date; type: any }) => {
+    async (headerData: { refDoc: string; date: Date; type: any; [key: string]: any }) => {
       if (!lockedJournalId) {
         alert("Critical Error: Journal ID is missing for document creation.");
         return;
@@ -224,7 +225,7 @@ export const useDocumentManager = () => {
         };
       });
 
-      let payloadsToCreate: CreateDocumentPayload[] = [];
+      let payloadsToCreate: ApiCreateDocumentPayload[] = [];
 
       if (
         mode === "LOCK_GOOD" ||
@@ -298,7 +299,7 @@ export const useDocumentManager = () => {
     setDocumentItems,
     handleSubmit,
     handleSingleItemSubmit,
-    documentsForSlider: (documentsQuery.data?.data || []) as DocumentClient[], // ✅ TYPE CAST
+    documentsForSlider: (documentsQuery.data?.data || []) as unknown as DocumentClient[], // ✅ TYPE CAST
     documentsQuery,
     handlePrepareFinalization,
     isFinalizeModalOpen,

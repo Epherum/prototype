@@ -2,6 +2,7 @@
 import prisma from "@/app/utils/prisma";
 import { JournalGoodLink, GoodsAndService, Journal } from "@prisma/client";
 import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
+import { serviceLogger } from "@/lib/logger";
 
 export type CreateJournalGoodLinkData = {
   journalId: string;
@@ -12,7 +13,7 @@ export type CreateJournalGoodLinkData = {
 const journalGoodLinkService = {
   // RECIPE 1: Create a new link (MODIFIED with hierarchical check)
   async createLink(data: CreateJournalGoodLinkData): Promise<JournalGoodLink> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JGLService): Linking Journal '${data.journalId}' with Good ID '${data.goodId}'.`
     );
 
@@ -50,7 +51,7 @@ const journalGoodLinkService = {
     }
 
     const newLink = await prisma.journalGoodLink.create({ data });
-    console.log(`Chef (JGLService): Link created with ID '${newLink.id}'.`);
+    serviceLogger.debug(`Chef (JGLService): Link created with ID '${newLink.id}'.`);
     return newLink;
   },
 
@@ -64,14 +65,14 @@ const journalGoodLinkService = {
 
   // RECIPE 3: Delete a link by its ID
   async deleteLinkById(linkId: bigint): Promise<JournalGoodLink | null> {
-    console.log(`Chef (JGLService): Deleting link with ID '${linkId}'.`);
+    serviceLogger.debug(`Chef (JGLService): Deleting link with ID '${linkId}'.`);
     try {
       // No further cascading deletes from JournalGoodLink in your current schema.
       return await prisma.journalGoodLink.delete({
         where: { id: linkId },
       });
     } catch (error) {
-      console.warn(
+      serviceLogger.warn(
         `Chef (JGLService): Link ID '${linkId}' not found for deletion.`,
         error
       );
@@ -84,13 +85,13 @@ const journalGoodLinkService = {
     journalId: string,
     goodId: bigint
   ): Promise<{ count: number }> {
-    console.log(
+    serviceLogger.debug(
       `Chef (JGLService): Deleting link(s) between Journal '${journalId}' and Good ID '${goodId}'.`
     );
     const result = await prisma.journalGoodLink.deleteMany({
       where: { journalId, goodId },
     });
-    console.log(`Chef (JGLService): Deleted ${result.count} link(s).`);
+    serviceLogger.debug(`Chef (JGLService): Deleted ${result.count} link(s).`);
     return result;
   },
 
@@ -128,7 +129,7 @@ const journalGoodLinkService = {
 
   // RECIPE 6: Get all Journals a specific Good/Service is linked to
   async getJournalsForGood(goodId: bigint): Promise<Journal[]> {
-    console.log(`Chef (JGLService): Getting journals for Good ID '${goodId}'.`);
+    serviceLogger.debug(`Chef (JGLService): Getting journals for Good ID '${goodId}'.`);
     const links = await prisma.journalGoodLink.findMany({
       where: { goodId: goodId },
       include: {

@@ -6,6 +6,7 @@ import { ExtendedSession } from "@/lib/auth/authOptions";
 import userService from "@/app/services/userService"; // Now expects types from schemas
 import { createUserSchema, CreateUserPayload } from "@/lib/schemas/user.schema";
 import { isDescendantOf } from "@/app/services/journalService";
+import { apiLogger } from "@/lib/logger";
 
 const postHandler = async (
   req: NextRequest,
@@ -66,7 +67,7 @@ const postHandler = async (
 
     return NextResponse.json(newUser, { status: 201 });
   } catch (error: any) {
-    console.error(
+    apiLogger.error(
       `API /users POST (Admin: ${adminUser.id}) Error:`,
       error.message
     );
@@ -90,6 +91,23 @@ const postHandler = async (
   }
 };
 
+/**
+ * POST /api/users
+ * Creates a new user.
+ * Enforces business rules for journal restriction assignment: a restricted admin can only assign
+ * a restricted journal within their own hierarchy.
+ * @param {NextRequest} request - The incoming Next.js request object containing the user creation payload.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated admin user's session.
+ * @body {CreateUserPayload} body - The user data to create (name, email, password, roles, restrictedTopLevelJournalId).
+ * @returns {NextResponse} A JSON response containing the newly created user.
+ * @status 201 - Created: User successfully created.
+ * @status 400 - Bad Request: Invalid creation data or non-existent journal ID.
+ * @status 403 - Forbidden: Attempt to create an unrestricted user by a restricted admin, or assign restriction outside hierarchy.
+ * @status 409 - Conflict: A user with the provided email already exists.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission MANAGE_USER - Requires 'MANAGE' action on 'USER' resource.
+ */
 export const POST = withAuthorization(postHandler, {
   action: "MANAGE",
   resource: "USER", // Assuming this is the correct resource for user management

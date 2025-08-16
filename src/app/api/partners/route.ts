@@ -6,31 +6,31 @@ import partnerService from "@/app/services/partnerService";
 import { jsonBigIntReplacer, parseBigInt } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { ExtendedSession } from "@/lib/auth/authOptions";
-import { createPartnerSchema } from "@/lib/schemas/partner.schema";
+import { createPartnerSchema, getPartnersQuerySchema } from "@/lib/schemas/partner.schema";
+import { apiLogger } from "@/lib/logger";
 
-const getPartnersQuerySchema = z.object({
-  take: z.coerce.number().int().positive().optional(),
-  skip: z.coerce.number().int().nonnegative().optional(),
-  filterMode: z.enum(["affected", "unaffected", "inProcess"]).optional(),
-  permissionRootId: z.string().optional(),
-  selectedJournalIds: z
-    .string()
-    .transform((val) => val.split(","))
-    .optional(),
-  intersectionOfGoodIds: z
-    .string()
-    .transform((val) =>
-      val
-        .split(",")
-        .map((id) => parseBigInt(id, "good ID"))
-        .filter((id): id is bigint => id !== null)
-    )
-    .optional(),
-});
-
+/**
+ * GET /api/partners
+ * Fetches partners based on various query parameters.
+ * Supports pagination, filtering by journal IDs, and intersection with good IDs.
+ * Applies user's journal restriction if present.
+ * @param {NextRequest} request - The incoming Next.js request object.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated user's session.
+ * @queryparam {number} [take] - Number of records to take (for pagination).
+ * @queryparam {number} [skip] - Number of records to skip (for pagination).
+ * @queryparam {("affected"|"unaffected"|"inProcess")} [filterMode] - Filtering mode for partners based on journal linkage.
+ * @queryparam {string} [permissionRootId] - Root journal ID for permission-based filtering.
+ * @queryparam {string} [selectedJournalIds] - Comma-separated list of journal IDs to filter by.
+ * @queryparam {string} [intersectionOfGoodIds] - Comma-separated list of good IDs to find partners common to all.
+ * @returns {NextResponse} A JSON response containing a paginated list of partners.
+ * @status 200 - OK: Partners successfully fetched.
+ * @status 400 - Bad Request: Invalid query parameters.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission READ_PARTNER - Requires 'READ' action on 'PARTNER' resource.
+ */
 export const GET = withAuthorization(
   async function GET(request: NextRequest, _context, session: ExtendedSession) {
-    // ... (no changes in this function)
     try {
       const queryParams = Object.fromEntries(request.nextUrl.searchParams);
       const validation = getPartnersQuerySchema.safeParse(queryParams);
@@ -66,7 +66,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API GET /api/partners Error:", e);
+      apiLogger.error("API GET /api/partners Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -76,6 +76,30 @@ export const GET = withAuthorization(
   { action: "READ", resource: "PARTNER" }
 );
 
+/**
+ * POST /api/partners
+ * Creates a new Partner.
+ * @param {NextRequest} request - The incoming Next.js request object containing the creation payload.
+ * @param {object} _context - The context object (unused).
+ * @param {ExtendedSession} session - The authenticated user's session, used to record `createdById`.
+ * @body {object} body - The Partner creation data.
+ * @body {string} body.name - The name of the partner (required).
+ * @body {PartnerType} body.partnerType - The type of partner (e.g., LEGAL_ENTITY, NATURAL_PERSON).
+ * @body {string} [body.notes] - Additional notes.
+ * @body {string} [body.logoUrl] - URL to the partner's logo.
+ * @body {string} [body.photoUrl] - URL to the partner's photo.
+ * @body {boolean} [body.isUs] - Indicates if the partner is "us".
+ * @body {string} [body.registrationNumber] - Registration number.
+ * @body {string} [body.taxId] - Tax ID.
+ * @body {string} [body.bioFatherName] - Father's name (for natural persons).
+ * @body {string} [body.bioMotherName] - Mother's name (for natural persons).
+ * @body {any} [body.additionalDetails] - Additional JSON details.
+ * @returns {NextResponse} A JSON response containing the newly created Partner.
+ * @status 201 - Created: Partner successfully created.
+ * @status 400 - Bad Request: Invalid request body.
+ * @status 500 - Internal Server Error: An unexpected error occurred.
+ * @permission CREATE_PARTNER - Requires 'CREATE' action on 'PARTNER' resource.
+ */
 export const POST = withAuthorization(
   async function POST(
     request: NextRequest,
@@ -111,7 +135,7 @@ export const POST = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      console.error("API POST /api/partners Error:", e);
+      apiLogger.error("API POST /api/partners Error", { error: e.message, stack: e.stack });
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -120,3 +144,4 @@ export const POST = withAuthorization(
   },
   { action: "CREATE", resource: "PARTNER" }
 );
+

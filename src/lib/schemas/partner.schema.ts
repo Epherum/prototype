@@ -1,5 +1,6 @@
 // src/lib/schemas/partner.schema.ts
 import { z } from "zod";
+import { parseBigInt } from "@/app/utils/jsonBigInt";
 
 export const createPartnerSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -19,6 +20,27 @@ export const createPartnerSchema = z.object({
 // The update schema allows partial updates
 export const updatePartnerSchema = createPartnerSchema.partial();
 
+export const getPartnersQuerySchema = z.object({
+  take: z.coerce.number().int().positive().optional(),
+  skip: z.coerce.number().int().nonnegative().optional(),
+  filterMode: z.enum(["affected", "unaffected", "inProcess"]).optional(),
+  permissionRootId: z.string().optional(),
+  selectedJournalIds: z
+    .string()
+    .transform((val) => val.split(","))
+    .optional(),
+  intersectionOfGoodIds: z
+    .string()
+    .transform((val) =>
+      val
+        .split(",")
+        .map((id) => parseBigInt(id, "good ID"))
+        .filter((id): id is bigint => id !== null)
+    )
+    .optional(),
+});
+
 // We export the inferred TypeScript types for use in our components and services
 export type CreatePartnerPayload = z.infer<typeof createPartnerSchema>;
 export type UpdatePartnerPayload = z.infer<typeof updatePartnerSchema>;
+export type GetPartnersQuery = z.infer<typeof getPartnersQuerySchema>;
