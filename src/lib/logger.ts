@@ -53,16 +53,22 @@ if (isDevelopment) {
     })
   );
 } else {
+  // Production console logging (for serverless environments like Vercel)
   transports.push(
     new winston.transports.Console({
-      level: 'warn',
-      format: winston.format.simple(),
+      level: 'info', // Changed from 'warn' to 'info' to capture more logs
+      format: winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        winston.format.errors({ stack: true }),
+        winston.format.json()
+      ),
     })
   );
 }
 
-// File transports for production
-if (isProduction) {
+// File transports for production (only in non-serverless environments)
+// Vercel and other serverless platforms don't support persistent file system writes
+if (isProduction && !process.env.VERCEL) {
   transports.push(
     // Error log file
     new winston.transports.File({
