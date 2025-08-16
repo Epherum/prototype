@@ -60,32 +60,48 @@ export function withAuthorization(
   requiredPermission: Permission // Step 3: And use the strong type here.
 ) {
   return async function (req: NextRequest, context: { params: any }) {
+    console.log("=== AUTHORIZATION CHECK START ===");
+    console.log("Required permission:", requiredPermission);
+    
     const session = (await getServerSession(
       authOptions
     )) as ExtendedSession | null;
 
+    console.log("Session exists:", !!session);
+    console.log("User ID:", session?.user?.id);
+
     if (!session?.user?.id) {
+      console.log("UNAUTHORIZED: No session or user ID");
       return new Response(JSON.stringify({ message: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
 
+    console.log("User roles:", session.user.roles?.map(r => r.name));
+    console.log("User permissions:", session.user.roles?.flatMap(r => 
+      r.permissions.map(p => `${p.action}_${p.resource}`)
+    ));
+
     const userHasPermission = checkUserPermission(
       session.user as ExtendedUser,
       requiredPermission
     );
 
+    console.log("Permission check result:", userHasPermission);
+
     if (!userHasPermission) {
       console.warn(
         `FORBIDDEN: User ${session.user.id} attempted action [${requiredPermission.action}] on resource [${requiredPermission.resource}] without permission.`
       );
+      console.log("=== AUTHORIZATION CHECK END (FORBIDDEN) ===");
       return new Response(JSON.stringify({ message: "Forbidden" }), {
         status: 403,
         headers: { "Content-Type": "application/json" },
       });
     }
 
+    console.log("=== AUTHORIZATION CHECK END (AUTHORIZED) ===");
     return handler(req, context, session);
   };
 }

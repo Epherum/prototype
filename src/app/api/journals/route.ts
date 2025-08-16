@@ -30,10 +30,18 @@ import { apiLogger } from "@/lib/logger";
 export const GET = withAuthorization(
   async function GET(request: NextRequest) {
     try {
+      console.log("=== JOURNALS API DEBUG START ===");
+      console.log("Request URL:", request.url);
+      console.log("Environment:", process.env.NODE_ENV);
+      console.log("Database URL exists:", !!process.env.DATABASE_URL);
+      
       const queryParams = Object.fromEntries(request.nextUrl.searchParams);
+      console.log("Query params:", queryParams);
+      
       const validation = getJournalsQuerySchema.safeParse(queryParams);
 
       if (!validation.success) {
+        console.log("Validation failed:", validation.error.format());
         return NextResponse.json(
           {
             message: "Invalid query parameters.",
@@ -47,27 +55,31 @@ export const GET = withAuthorization(
         validation.data;
       let journals;
 
+      console.log("Parsed params:", { rootJournalId, findByPartnerIds, findByGoodIds });
+
       // Logic from the spec: Use an if/else if/else block to call the correct service function.
       if (rootJournalId) {
+        console.log("Fetching journals for rootJournalId:", rootJournalId);
         journals = await journalService.getJournalSubHierarchy(rootJournalId);
       } else if (findByPartnerIds && findByPartnerIds.length > 0) {
+        console.log("Fetching journals for partners:", findByPartnerIds);
         journals = await journalService.getJournalsForPartners(
           findByPartnerIds
         );
       } else if (findByGoodIds && findByGoodIds.length > 0) {
+        console.log("Fetching journals for goods:", findByGoodIds);
         journals = await journalService.getJournalsForGoods(findByGoodIds);
       } else {
-        // ✅ FIX: This block is now reachable and serves as the default case.
-        // It handles the initial request from the client when no filters are applied,
-        // typically for an admin user loading the application for the first time.
-        // We assume a `getRootJournals` or similar function exists in the service.
-        // If it was called `getJournalSubHierarchy` with no args, that would go here too.
+        console.log("Fetching root journals (no specific params)");
         apiLogger.info("No specific query params found, fetching root journals.");
         apiLogger.debug("Calling journalService.getJournalSubHierarchy with null for Admin user.");
         journals = await journalService.getJournalSubHierarchy(null);
         apiLogger.debug("Service returned journals", { count: journals?.length });
       }
 
+      console.log("Journals fetched successfully, count:", journals?.length);
+      console.log("=== JOURNALS API DEBUG END ===");
+      
       // The service functions return a simple array, not the { data, totalCount } object.
       return NextResponse.json(journals);
     } catch (error) {
