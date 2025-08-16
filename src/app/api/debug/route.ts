@@ -77,6 +77,31 @@ export async function GET(request: NextRequest) {
       permissionTest = { error: "No session found" };
     }
 
+    // 5. Test the actual journal service call that's failing
+    let journalServiceTest;
+    try {
+      console.log("Testing journalService.getJournalSubHierarchy(null)...");
+      const { journalService } = await import("@/app/services/journalService");
+      const journals = await journalService.getJournalSubHierarchy(null);
+      console.log("Journal service test successful, count:", journals?.length);
+      journalServiceTest = {
+        success: true,
+        journalCount: journals?.length,
+        sampleJournal: journals?.[0] ? {
+          id: journals[0].id,
+          name: journals[0].name,
+          parentId: journals[0].parentId
+        } : null
+      };
+    } catch (serviceError) {
+      console.error("Journal service error:", serviceError);
+      journalServiceTest = {
+        success: false,
+        error: serviceError.message,
+        stack: serviceError.stack
+      };
+    }
+
     console.log("=== DEBUG ENDPOINT END ===");
 
     return NextResponse.json({
@@ -90,7 +115,8 @@ export async function GET(request: NextRequest) {
         restrictedJournal: session?.user?.restrictedTopLevelJournalId
       },
       database: dbTest,
-      permissions: permissionTest
+      permissions: permissionTest,
+      journalService: journalServiceTest
     });
 
   } catch (error) {
