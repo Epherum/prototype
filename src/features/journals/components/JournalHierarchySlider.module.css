@@ -46,59 +46,29 @@
   margin-bottom: calc(var(--spacing-unit) * 0.75);
 }
 
-.level2ScrollerContainer {
-  width: 100%;
-  padding: calc(var(--spacing-unit) * 0.5) 0;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: #3d3d3d;
-  border-radius: var(--border-radius-md);
-}
-
-/* ✅ --- NEW STYLE FOR THE WRAPPING CONTAINER --- */
 .wrappingItemContainer {
   display: flex;
-  flex-direction: row; /* Explicitly set direction to row */
-  flex-wrap: wrap; /* The key property to allow wrapping */
-  justify-content: center; /* Center the items horizontally */
-  gap: 8px; /* Use a fixed gap for consistency */
-  padding: 4px 8px; /* Give it a little breathing room */
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: var(--spacing-unit);
   width: 100%;
   box-sizing: border-box;
-  background-color: #3d3d3d;
   border-radius: var(--border-radius-md);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  transition: background-color 0.3s ease;
 }
 
-/* Styles for the Swiper (used only for L1 now) */
-.level2ScrollerSwiper {
-  padding: 0 calc(var(--spacing-unit) * 0.5);
-  --swiper-navigation-size: 16px;
-  --swiper-navigation-color: var(--text-secondary);
+.level2WrappingContainer {
+  background-color: #3d3d3d;
+  padding: calc(var(--spacing-unit) * 1.5);
+
 }
 
-.level2ScrollerSwiper .swiper-button-next,
-.level2ScrollerSwiper .swiper-button-prev {
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 28px;
-  background-color: var(--accent-slider);
-  border-radius: 50%;
-}
-
-.level2ScrollerSwiper .swiper-button-next:hover,
-.level2ScrollerSwiper .swiper-button-prev:hover {
-  background-color: var(--accent-warm-light);
-}
-
-.level2ScrollerSlideNoOverflow {
-  width: auto !important;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  padding: calc(var(--spacing-unit) * 0.5);
+.level3WrappingContainer {
+  background-color: #3d3d3d;
+  padding: calc(var(--spacing-unit) * 1.5);
 }
 
 /* ... (all remaining styles from .l2ButtonInteractiveWrapper to .noDataSmall are unchanged) ... */
@@ -114,7 +84,7 @@
   font-size: 0.8em;
   font-weight: 500;
   cursor: pointer;
-  border: 2px solid white;
+  border: 2px solid var(--text-secondary);
   border-radius: var(--border-radius-pill);
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
@@ -126,11 +96,14 @@
   position: relative;
   z-index: 5;
   box-sizing: border-box;
-  margin: 2px;
+  outline: none;
+  -webkit-tap-highlight-color: transparent; /* For mobile tap highlight */
 }
-.level2Button:hover:not(.level2ButtonActive) {
-  border-color: var(--accent-warm-light);
-  background-color: var(--accent-slider);
+@media (hover: hover) {
+  .level2Button:hover:not(.level2ButtonActive) {
+    border-color: var(--accent-warm-light);
+    background-color: var(--accent-slider);
+  }
 }
 .level2ButtonActive,
 .level2ButtonActive:hover {
@@ -146,6 +119,12 @@
   color: #333;
   font-weight: 600;
 }
+
+.level2Button.level2ButtonActive:not(.terminalNode),
+.level2Button.colored.level2ButtonActive:not(.terminalNode) {
+  border-color: var(--text-secondary);
+  box-shadow: inset 0 0 0 2px var(--bg-card);
+}
 .filterInfoRow {
   text-align: center;
   font-size: 0.75rem;
@@ -153,20 +132,21 @@
   font-family: monospace;
   padding-bottom: calc(var(--spacing-unit) * 0.5);
   margin-top: calc(var(--spacing-unit) * -0.5);
-  word-break: keep-all;
-  word-wrap: break-word;
   min-height: 1rem;
+  overflow-wrap: break-word;
 }
 .terminalNode {
-  border-style: dotted !important;
-  border-width: 2px !important;
-  border-color: white !important;
+  border-style: dotted;
+  border-width: 2px;
+  border-color: var(--text-secondary);
 }
 .terminalNode.level2ButtonActive {
   border-color: var(--accent-warm);
+  box-shadow: inset 0 0 0 2px var(--bg-card);
 }
 .terminalNode.colored.level2ButtonActive {
   border-color: #333;
+  box-shadow: inset 0 0 0 2px var(--bg-card);
 }
 .filterInfoNone {
   font-style: italic;
