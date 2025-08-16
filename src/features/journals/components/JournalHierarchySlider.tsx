@@ -221,7 +221,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               initial="hidden"
               animate="visible"
             >
-              <div className={styles.wrappingItemContainer}>
+              <div className={`${styles.wrappingItemContainer} ${styles.level2WrappingContainer}`}>
                 {level2NodesForScroller.map((l1Node) => (
                   <motion.button
                     key={l1Node.id}
@@ -273,7 +273,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               {level3Nodes.length > 0 ? (
                 <motion.div
                   key="l3-grid-present"
-                  className={styles.wrappingItemContainer}
+                  className={`${styles.wrappingItemContainer} ${styles.level3WrappingContainer}`}
                   variants={containerVariants}
                   initial="hidden"
                   animate="visible"

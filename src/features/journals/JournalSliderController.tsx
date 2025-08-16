@@ -65,6 +65,7 @@ export const JournalSliderController = forwardRef<
     ((node: AccountNodeData) => void) | null
   >(null);
   const [isGpgContextModalOpen, setIsGpgContextModalOpen] = useState(false);
+  const [isTitleExpanded, setIsTitleExpanded] = useState(false);
 
   const topLevelContextNode = useMemo(() => {
     if (
@@ -223,6 +224,11 @@ export const JournalSliderController = forwardRef<
                       animate="animate"
                       exit="exit"
                       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                      className={isTitleExpanded ? styles.expanded : ""}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsTitleExpanded(!isTitleExpanded);
+                      }}
                     >
                       {topLevelContextNode.code} - {topLevelContextNode.name}
                     </motion.span>
