@@ -1,10 +1,6 @@
 import React, { useMemo } from "react";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation } from "swiper/modules";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
-import "swiper/css";
-import "swiper/css/navigation";
 import styles from "./JournalHierarchySlider.module.css";
 import { findParentOfNode } from "@/lib/helpers";
 import type {
