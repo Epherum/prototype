@@ -169,7 +169,21 @@ const goodsService = {
       take,
       skip,
       orderBy: { label: "asc" },
-      include: { taxCode: true, unitOfMeasure: true },
+      include: { 
+        taxCode: true, 
+        unitOfMeasure: true,
+        journalGoodLinks: {
+          include: {
+            journal: {
+              select: {
+                id: true,
+                name: true,
+                parentId: true,
+              }
+            }
+          }
+        }
+      },
     });
 
     serviceLogger.debug("goodsService.getAllGoods: Output", {
@@ -249,7 +263,21 @@ const goodsService = {
         entityState: "ACTIVE",
       },
       orderBy: { label: "asc" },
-      include: { taxCode: true, unitOfMeasure: true },
+      include: { 
+        taxCode: true, 
+        unitOfMeasure: true,
+        journalGoodLinks: {
+          include: {
+            journal: {
+              select: {
+                id: true,
+                name: true,
+                parentId: true,
+              }
+            }
+          }
+        }
+      },
     });
 
     serviceLogger.debug("goodsService.findGoodsForPartners: Output", {

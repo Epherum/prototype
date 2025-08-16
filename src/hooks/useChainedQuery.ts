@@ -201,21 +201,43 @@ export const useChainedQuery = <T extends SliderType>(
         
         // Only include journal filtering if we have journal selections AND journal comes before partner
         if (hasJournalSelections && isJournalBeforePartner) {
-          params.selectedJournalIds = effectiveJournalIds;
-          // Extract the first filter mode from the rootFilter array
-          const filterMode = journalSelection.rootFilter[0];
-          if (filterMode && ['affected', 'unaffected', 'inProcess'].includes(filterMode)) {
-            params.filterMode = filterMode as 'affected' | 'unaffected' | 'inProcess';
+          // Handle multiple filter modes - for now, use the first one but ensure all are included in query key
+          const activeFilters = journalSelection.rootFilter;
+          const primaryFilterMode = activeFilters[0];
+          
+          if (primaryFilterMode === 'affected') {
+            // For affected mode, we need only the terminal (deepest) journals
+            // If level3Ids exist, use those; otherwise use level2Ids; otherwise use topLevelId
+            const terminalIds = journalSelection.level3Ids.length > 0 
+              ? journalSelection.level3Ids
+              : journalSelection.level2Ids.length > 0 
+                ? journalSelection.level2Ids
+                : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
+            params.selectedJournalIds = terminalIds;
+          } else {
+            // For unaffected and inProcess modes, use the full effective path
+            params.selectedJournalIds = effectiveJournalIds;
+          }
+          
+          if (primaryFilterMode && ['affected', 'unaffected', 'inProcess'].includes(primaryFilterMode)) {
+            params.filterMode = primaryFilterMode as 'affected' | 'unaffected' | 'inProcess';
           }
           params.permissionRootId = journalSelection.topLevelId;
+          
+          // Include all filters in params to ensure query key changes when filters change
+          params.allFilters = activeFilters;
           
           // Debug logging
           console.log('Partner query params:', {
             hasJournalSelections,
             isJournalBeforePartner,
-            effectiveJournalIds,
-            filterMode,
-            permissionRootId: params.permissionRootId
+            allEffectiveIds: effectiveJournalIds,
+            selectedJournalIds: params.selectedJournalIds,
+            filterMode: params.filterMode,
+            allFilters: params.allFilters,
+            permissionRootId: params.permissionRootId,
+            level2Ids: journalSelection.level2Ids,
+            level3Ids: journalSelection.level3Ids
           });
         }
         

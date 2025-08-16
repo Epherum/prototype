@@ -208,6 +208,7 @@ export const JournalSliderController = forwardRef<
                 className={`${styles.splitButtonMain} ${
                   isCreating ? styles.disabled : ""
                 }`}
+                onClick={() => setIsTitleExpanded(!isTitleExpanded)}
                 onDoubleClick={
                   !isCreating
                     ? journalManager.handleNavigateUpOneLevel
@@ -224,11 +225,7 @@ export const JournalSliderController = forwardRef<
                       animate="animate"
                       exit="exit"
                       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                      className={isTitleExpanded ? styles.expanded : ""}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setIsTitleExpanded(!isTitleExpanded);
-                      }}
+                      style={{ whiteSpace: isTitleExpanded ? "normal" : "nowrap" }}
                     >
                       {topLevelContextNode.code} - {topLevelContextNode.name}
                     </motion.span>

@@ -149,8 +149,7 @@ const documentService = {
     options: GetAllDocumentsOptions
   ): Promise<{ data: Document[]; totalCount: number }> {
     serviceLogger.debug(
-      "documentService.getAllDocuments: Input",
-      JSON.stringify(options, jsonBigIntReplacer)
+      `documentService.getAllDocuments: Input ${JSON.stringify(options, jsonBigIntReplacer)}`
     );
     const {
       take,
@@ -212,10 +211,7 @@ const documentService = {
       include: { partner: true }, // Include partner for display in tables
     });
 
-    serviceLogger.debug("documentService.getAllDocuments: Output", {
-      count: data.length,
-      totalCount,
-    });
+    serviceLogger.debug(`documentService.getAllDocuments: Output - count: ${data.length}, totalCount: ${totalCount}, where: ${JSON.stringify(where, jsonBigIntReplacer)}`);
     return { data, totalCount };
   },
 

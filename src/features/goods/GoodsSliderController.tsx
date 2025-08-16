@@ -192,6 +192,15 @@ export const GoodsSliderController = forwardRef<
                 }
               />
             </div>
+            <div className={styles.countDisplay}>
+              {goodManager.goodsQueryState.isLoading ? (
+                "Loading..."
+              ) : goodManager.goodsQueryState.isError ? (
+                "Error"
+              ) : (
+                `${goodManager.goodsQueryState.data?.totalCount || 0} goods`
+              )}
+            </div>
           </div>
           <div className={styles.moveButtonGroup}>
             {canMoveUp && (
@@ -217,7 +226,13 @@ export const GoodsSliderController = forwardRef<
         <DynamicSlider
           sliderId={SLIDER_TYPES.GOODS}
           title="Goods"
-          data={goodManager.goodsForSlider}
+          data={goodManager.goodsForSlider.map((g: any) => ({
+            ...g,
+            // Add formatted journal information for display with ID and name
+            journalNames: g.journalGoodLinks?.map((link: any) => 
+              link.journal ? `${link.journal.id} - ${link.journal.name}` : null
+            ).filter(Boolean).join(", ") || "No journals",
+          }))}
           isLoading={
             goodManager.goodsQueryState.isLoading ||
             goodManager.goodsQueryState.isFetching
@@ -225,9 +240,7 @@ export const GoodsSliderController = forwardRef<
           isError={goodManager.goodsQueryState.isError}
           error={goodManager.goodsQueryState.error}
           activeItemId={goodManager.selectedGoodsId}
-          onSlideChange={
-            isMultiSelect ? () => {} : goodManager.setSelectedGoodsId
-          }
+          onSlideChange={goodManager.setSelectedGoodsId}
           onItemClick={handleItemClick}
           isItemSelected={(item) => selectedGoodIdsForDoc.includes(item.id)}
           isLocked={isLocked}

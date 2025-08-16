@@ -52,12 +52,20 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-unit);
+  min-width: 0;
 }
 
 .moveButtonGroup {
   display: flex;
   gap: var(--spacing-unit);
   flex-shrink: 0;
+}
+
+.countDisplay {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-left: calc(var(--spacing-unit) * 1);
 }
 
 /* --- Generic Buttons --- */
@@ -189,6 +197,7 @@
   border: 1px solid var(--border-subtle);
   background-color: var(--bg-secondary);
   box-shadow: 0 1px 2px var(--shadow-color);
+  min-width: 0;
 }
 
 .splitButtonMain {
@@ -208,6 +217,11 @@
   align-items: center;
   user-select: none;
   touch-action: manipulation;
+  min-width: 0; /* Allow the container to shrink */
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+}
+.splitButtonMain:focus {
+  outline: none;
 }
 .splitButtonMain:not(.disabled):hover {
   background-color: var(--bg-hover);
@@ -221,28 +235,18 @@
   position: relative;
   display: flex;
   align-items: center;
+  justify-content: center;
   min-height: 20px;
-  flex: 1;
+  /* Ensure the wrapper can shrink */
   min-width: 0;
+  flex-grow: 1;
 }
 .animatedTextWrapper span {
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
-  min-width: 0;
   display: block;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: inherit;
-  font-weight: inherit;
-}
-
-.animatedTextWrapper span.expanded {
-  white-space: normal;
-  word-break: break-word;
-  overflow: visible;
-  text-overflow: unset;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .splitButtonTrigger {

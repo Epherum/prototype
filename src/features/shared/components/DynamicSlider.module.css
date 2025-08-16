@@ -130,6 +130,17 @@
   color: var(--text-secondary);
 }
 
+.slideJournalInfo {
+  font-size: 0.75em;
+  color: var(--text-tertiary);
+  font-style: italic;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Document Creation Mode Specifics */
 .slideSelectedForDocument {
   border: 3px solid var(--accent-warm) !important;

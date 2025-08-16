@@ -44,8 +44,7 @@ const partnerService = {
     options: GetAllItemsOptions<Prisma.PartnerWhereInput>
   ): Promise<{ data: Partner[]; totalCount: number }> {
     serviceLogger.debug(
-      "partnerService.getAllPartners: Input",
-      JSON.stringify(options, jsonBigIntReplacer)
+      `partnerService.getAllPartners: Input ${JSON.stringify(options, jsonBigIntReplacer)}`
     );
     const {
       take,
@@ -85,7 +84,8 @@ const partnerService = {
       
       switch (filterMode) {
         case "affected":
-          // Partners linked to any of the journals in the effective path
+          // Partners linked to the selected journal hierarchy
+          // The selectedJournalIds should contain only the terminal/deepest selected journals
           prismaWhere.journalPartnerLinks = {
             some: { journalId: { in: journalIdsString } },
           };
@@ -146,11 +146,21 @@ const partnerService = {
       take,
       skip,
       orderBy: { name: "asc" },
+      include: {
+        journalPartnerLinks: {
+          include: {
+            journal: {
+              select: {
+                id: true,
+                name: true,
+                parentId: true,
+              }
+            }
+          }
+        }
+      }
     });
-    serviceLogger.debug("partnerService.getAllPartners: Output", {
-      count: data.length,
-      totalCount,
-    });
+    serviceLogger.debug(`partnerService.getAllPartners: Output - count: ${data.length}, totalCount: ${totalCount}, where: ${JSON.stringify(prismaWhere, jsonBigIntReplacer)}`);
     return { data, totalCount };
   },
 

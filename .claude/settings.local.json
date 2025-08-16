@@ -11,6 +11,9 @@
       "Bash(grep:*)",
       "Bash(npx tsx:*)"
     ],
-    "defaultMode": "acceptEdits"
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "C:\\c\\work"
+    ]
   }
 }

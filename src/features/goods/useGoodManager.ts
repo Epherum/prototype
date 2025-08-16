@@ -184,6 +184,7 @@ export const useGoodManager = () => {
       isFetching: activeQuery.isFetching,
       isError: activeQuery.isError,
       error: activeQuery.error,
+      data: activeQuery.data,
     },
     goodsForSlider,
     selectedGoodsId,

@@ -81,7 +81,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   );
 
   const handleSwiperChange = (swiper: any) => {
-    if (isLocked || isMultiSelect) return;
+    if (isLocked) return;
     const currentRealIndex = swiper.activeIndex;
     if (data?.[currentRealIndex]) {
       onSlideChange(data[currentRealIndex].id);
@@ -220,6 +220,11 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                         {(item.code || item.unit_code) && (
                           <span className={styles.slideSubText}>
                             {item.code || item.unit_code}
+                          </span>
+                        )}
+                        {item.journalNames && (
+                          <span className={styles.slideJournalInfo}>
+                            Journals: {item.journalNames}
                           </span>
                         )}
                       </div>

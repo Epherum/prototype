@@ -22,6 +22,7 @@ export interface FetchPartnersParams {
   permissionRootId?: string;
   selectedJournalIds?: string[];
   intersectionOfGoodIds?: string[]; // Note: API expects bigint, we send string
+  allFilters?: string[]; // Include all active filters to ensure query key changes
 }
 
 /**

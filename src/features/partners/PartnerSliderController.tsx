@@ -120,6 +120,12 @@ export const PartnerSliderController: React.FC<
         id: p.id, // ID is already a string
         label: p.name,
         code: p.registrationNumber,
+        // Include all partner fields for the details accordion
+        ...p,
+        // Add formatted journal information for display with ID and name
+        journalNames: p.journalPartnerLinks?.map((link: any) => 
+          link.journal ? `${link.journal.id} - ${link.journal.name}` : null
+        ).filter(Boolean).join(", ") || "No journals",
       })),
     [partnerManager.partnersForSlider]
   );
@@ -151,6 +157,15 @@ export const PartnerSliderController: React.FC<
                 canCreateGPGLink ? handleCreateGPGLink : undefined
               }
             />
+          </div>
+          <div className={styles.countDisplay}>
+            {partnerManager.partnerQuery.isLoading ? (
+              "Loading..."
+            ) : partnerManager.partnerQuery.isError ? (
+              "Error"
+            ) : (
+              `${partnerManager.partnerQuery.data?.totalCount || 0} partners`
+            )}
           </div>
         </div>
         <div className={styles.moveButtonGroup}>
@@ -185,9 +200,7 @@ export const PartnerSliderController: React.FC<
         isError={partnerManager.partnerQuery.isError}
         error={partnerManager.partnerQuery.error}
         activeItemId={partnerManager.selectedPartnerId}
-        onSlideChange={
-          isMultiSelect ? () => {} : partnerManager.setSelectedPartnerId
-        }
+        onSlideChange={partnerManager.setSelectedPartnerId}
         onItemClick={handleItemClick}
         isItemSelected={(item) => selectedPartnerIdsForDoc.includes(item.id)}
         isLocked={isLocked}

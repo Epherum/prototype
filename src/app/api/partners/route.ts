@@ -43,7 +43,7 @@ export const GET = withAuthorization(
           { status: 400 }
         );
       }
-      const { intersectionOfGoodIds, selectedJournalIds, ...restOfOptions } =
+      const { intersectionOfGoodIds, selectedJournalIds, filterMode, permissionRootId, ...restOfOptions } =
         validation.data;
       let result;
       if (intersectionOfGoodIds && intersectionOfGoodIds.length > 0) {
@@ -55,6 +55,8 @@ export const GET = withAuthorization(
         result = await partnerService.getAllPartners({
           ...restOfOptions,
           selectedJournalIds,
+          filterMode,
+          permissionRootId,
           restrictedJournalId: session.user?.restrictedTopLevelJournalId,
           where: {},
         });
