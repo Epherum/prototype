@@ -9,7 +9,8 @@
       "Bash(node:*)",
       "Bash(rm:*)",
       "Bash(grep:*)",
-      "Bash(npx tsx:*)"
+      "Bash(npx tsx:*)",
+      "Bash(find:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

@@ -4,3 +4,9 @@
   level: 'info',
   timestamp: '2025-08-16 03:39:01'
 }
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 01:32:08'
+}

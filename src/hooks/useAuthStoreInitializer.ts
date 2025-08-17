@@ -13,12 +13,12 @@ import { useAppStore } from "@/store/appStore";
 export const useAuthStoreInitializer = () => {
   const { data: session, status } = useSession();
   const setAuth = useAppStore((state) => state.setAuth);
-  const wasSet = useAppStore((state) => state.auth.sessionStatus !== "loading");
+  const wasSet = useAppStore((state) => state.sessionStatus !== "loading");
 
   useEffect(() => {
     // We only want to set the auth state if it has changed, or if it's the initial load.
     // This prevents unnecessary re-renders if the session object reference changes but the status is the same.
-    if (status !== useAppStore.getState().auth.sessionStatus) {
+    if (status !== useAppStore.getState().sessionStatus) {
       setAuth(session, status);
     }
   }, [session, status, setAuth]);

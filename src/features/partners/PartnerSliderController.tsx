@@ -55,10 +55,11 @@ export const PartnerSliderController: React.FC<
   const jpqlLinking = useJournalPartnerGoodLinking();
   const { isCreating, mode } = useAppStore((state) => state.ui.documentCreationState);
   const isDetailsAccordionOpen = useAppStore(
-    (state) => !!state.ui.accordionState[SLIDER_TYPES.PARTNER]
+    (state) => !!state.accordionState[SLIDER_TYPES.PARTNER]
   );
   const toggleAccordion = useAppStore((state) => state.toggleAccordion);
-  const { sliderOrder, visibility } = useAppStore((state) => state.ui);
+  const sliderOrder = useAppStore((state) => state.sliderOrder);
+  const visibility = useAppStore((state) => state.visibility);
   const { gpgContextJournalId, good: selectedGoodId } = useAppStore(
     // Corrected selection name
     (state) => state.selections

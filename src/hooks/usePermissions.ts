@@ -15,7 +15,7 @@ type PermissionQuery = {
  * @returns {{ can: boolean }} An object with a boolean `can` property indicating if the permission is granted.
  */
 export const usePermissions = (query: PermissionQuery) => {
-  const user = useAppStore((state) => state.auth.user);
+  const user = useAppStore((state) => state.user);
 
   const can = useMemo(() => {
     if (!user?.roles || user.roles.length === 0) {

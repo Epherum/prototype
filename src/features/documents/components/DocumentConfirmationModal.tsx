@@ -32,6 +32,11 @@ interface ConfirmationModalProps {
   title?: string;
   confirmButtonText?: string;
   message?: string;
+  // Multiple document workflow props
+  currentPartner?: { id: string; name: string; email?: string };
+  totalDocuments?: number;
+  currentDocumentIndex?: number;
+  allPartners?: Array<{ id: string; name: string; email?: string }>;
 }
 
 export const DocumentConfirmationModal = ({
@@ -43,6 +48,11 @@ export const DocumentConfirmationModal = ({
   isDestructive = false,
   title = "Finalize Document",
   confirmButtonText = "Validate Document",
+  message,
+  currentPartner,
+  totalDocuments,
+  currentDocumentIndex,
+  allPartners,
 }: ConfirmationModalProps) => {
   const [refDoc, setRefDoc] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -103,6 +113,67 @@ export const DocumentConfirmationModal = ({
           ×
         </button>
         <h2 className={baseStyles.modalTitle}>{title}</h2>
+
+        {/* Multiple Document Workflow Information */}
+        {currentPartner && totalDocuments && currentDocumentIndex !== undefined && (
+          <div className={styles.multiDocumentInfo}>
+            <div className={styles.progressSection}>
+              <div className={styles.progressHeader}>
+                <h3>Multiple Document Creation</h3>
+                <span className={styles.progressBadge}>
+                  {currentDocumentIndex + 1} of {totalDocuments}
+                </span>
+              </div>
+              <div className={styles.progressBar}>
+                <div 
+                  className={styles.progressFill}
+                  style={{ width: `${((currentDocumentIndex + 1) / totalDocuments) * 100}%` }}
+                />
+              </div>
+            </div>
+            
+            <div className={styles.currentPartnerSection}>
+              <h4>Creating document for:</h4>
+              <div className={styles.partnerCard}>
+                <div className={styles.partnerName}>{currentPartner.name}</div>
+                {currentPartner.email && (
+                  <div className={styles.partnerEmail}>{currentPartner.email}</div>
+                )}
+                <div className={styles.partnerId}>ID: {currentPartner.id}</div>
+              </div>
+              <div className={styles.referenceNote}>
+                <strong>Note:</strong> Please enter a unique reference for this partner's document below.
+              </div>
+            </div>
+
+            {allPartners && allPartners.length > 1 && (
+              <div className={styles.allPartnersSection}>
+                <h4>All Selected Partners:</h4>
+                <div className={styles.partnersList}>
+                  {allPartners.map((partner, index) => (
+                    <div 
+                      key={partner.id} 
+                      className={`${styles.partnerChip} ${
+                        index === currentDocumentIndex ? styles.currentPartnerChip : ''
+                      } ${
+                        index < currentDocumentIndex ? styles.completedPartnerChip : ''
+                      }`}
+                    >
+                      {index < currentDocumentIndex && '✓ '}
+                      {partner.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {message && (
+          <div className={styles.messageSection}>
+            <p>{message}</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className={styles.formContainer}>
           <div className={styles.formSection}>

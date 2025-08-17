@@ -145,7 +145,7 @@ export const useJournalSelection = (
     (state) => state.selections.effectiveJournalIds
   );
   const setSelection = useAppStore((state) => state.setSelection);
-  const auth = useAppStore((state) => state.auth);
+  const effectiveRestrictedJournalId = useAppStore((state) => state.effectiveRestrictedJournalId);
 
   const {
     topLevelId,
@@ -192,24 +192,24 @@ export const useJournalSelection = (
 
   const resetJournalSelections = useCallback(() => {
     const initialSelections = getInitialSelections(
-      auth.effectiveRestrictedJournalId
+      effectiveRestrictedJournalId
     );
     setSelection("journal", initialSelections.journal);
     setSelection("effectiveJournalIds", initialSelections.effectiveJournalIds);
-  }, [setSelection, auth.effectiveRestrictedJournalId]);
+  }, [setSelection, effectiveRestrictedJournalId]);
 
   const setSelectedFlatJournalId = useCallback(
     (id: string | null) => {
       setSelection("journal", {
         flatId: id,
-        topLevelId: auth.effectiveRestrictedJournalId || ROOT_JOURNAL_ID,
+        topLevelId: effectiveRestrictedJournalId || ROOT_JOURNAL_ID,
         level2Ids: [],
         level3Ids: [],
         selectedJournalId: null, // Flat mode does not have a hierarchical selection
         effectiveJournalIds: id ? [id] : [],
       });
     },
-    [setSelection, auth.effectiveRestrictedJournalId]
+    [setSelection, effectiveRestrictedJournalId]
   );
 
   // ✅ FIX: The final `selectedJournalId` is now correctly derived from the stored

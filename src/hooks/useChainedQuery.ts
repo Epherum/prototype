@@ -73,9 +73,9 @@ export const useChainedQuery = <T extends SliderType>(
     good: selectedGoodId,
     document: selectedDocumentId,
   } = useAppStore((state) => state.selections);
-  const { effectiveRestrictedJournalId } = useAppStore((state) => state.auth);
+  const effectiveRestrictedJournalId = useAppStore((state) => state.effectiveRestrictedJournalId);
 
-  const { isCreating } = documentCreationState;
+  const { isCreating, selectedPartnerIds, selectedGoodIds } = documentCreationState;
   
   // In creation mode, ignore document selections to prevent filtering subsequent sliders
   const effectiveDocumentId = isCreating ? null : selectedDocumentId;
@@ -169,6 +169,20 @@ export const useChainedQuery = <T extends SliderType>(
             enabled: !!effectiveDocumentId,
           });
         }
+        
+        // Handle multiple goods intersection (for J->D->G->P case in creation mode)
+        if (goodsIndex < myIndex && isCreating && selectedGoodIds.length > 0) {
+          const params: FetchPartnersParams = {
+            intersectionOfGoodIds: selectedGoodIds,
+            selectedJournalIds: effectiveJournalIds,
+          };
+          return queryOptions({
+            queryKey: partnerKeys.list(params),
+            queryFn: () => partnerService.fetchPartners(params),
+            enabled: selectedGoodIds.length > 0,
+          });
+        }
+        
         if (goodsIndex < myIndex && selectedGoodId) {
           const params: FetchPartnersParams = {
             intersectionOfGoodIds: [selectedGoodId],
@@ -245,6 +259,22 @@ export const useChainedQuery = <T extends SliderType>(
             enabled: !!effectiveDocumentId,
           });
         }
+        
+        // Handle multiple partners intersection (for J->D->P->G case in creation mode)
+        if (partnerIndex < myIndex && isCreating && selectedPartnerIds.length > 0) {
+          const params: IntersectionFindOptions = {
+            partnerIds: selectedPartnerIds.map(id => BigInt(id)),
+            journalIds: effectiveJournalIds,
+          };
+          return queryOptions({
+            queryKey: goodKeys.list({
+              where: { intersectionOfPartnerIds: selectedPartnerIds, journalIds: effectiveJournalIds },
+            }),
+            queryFn: () => goodService.findGoodsForPartners(params),
+            enabled: selectedPartnerIds.length > 0,
+          });
+        }
+        
         if (partnerIndex < myIndex && selectedPartnerId) {
           // Standard mode: Use three-way relationship lookup for single partner + journals
           return queryOptions({
@@ -318,7 +348,9 @@ export const useChainedQuery = <T extends SliderType>(
     effectiveJournalIds,
     journalSelection,
     selectedPartnerId,
+    selectedPartnerIds,
     selectedGoodId,
+    selectedGoodIds,
     selectedDocumentId,
     effectiveRestrictedJournalId,
   ]);

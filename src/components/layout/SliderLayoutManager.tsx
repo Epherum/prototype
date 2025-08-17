@@ -44,7 +44,8 @@ export const SliderLayoutManager = forwardRef<
     ref
   ) => {
     // State from Zustand store
-    const { sliderOrder, visibility } = useAppStore((state) => state.ui);
+    const sliderOrder = useAppStore((state) => state.sliderOrder);
+    const visibility = useAppStore((state) => state.visibility);
     const moveSlider = useAppStore((state) => state.moveSlider);
 
     // Manager hooks to get state needed by controllers
@@ -130,7 +131,7 @@ export const SliderLayoutManager = forwardRef<
                     
                     // Partner multi-select for modes where we select multiple partners
                     const isPartnerMultiSelect = isCreating && 
-                      (mode === "MULTIPLE_PARTNERS" || mode === "GOODS_LOCKED");
+                      (mode === "MULTIPLE_PARTNERS" || mode === "GOODS_LOCKED" || mode === "MULTIPLE_GOODS");
                     
                     return (
                       <PartnerSliderController
@@ -156,7 +157,7 @@ export const SliderLayoutManager = forwardRef<
                     
                     // Goods multi-select for modes where we select multiple goods
                     const isGoodsMultiSelect = isCreating && 
-                      (mode === "SINGLE_ITEM" || mode === "MULTIPLE_GOODS" || mode === "PARTNER_LOCKED");
+                      (mode === "SINGLE_ITEM" || mode === "MULTIPLE_GOODS" || mode === "PARTNER_LOCKED" || mode === "MULTIPLE_PARTNERS");
                     
                     return (
                       <GoodsSliderController

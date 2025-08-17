@@ -167,7 +167,11 @@ export const DocumentSliderController = forwardRef<
                     className={styles.primaryActionButton}
                     title="Create a new document based on current slider order"
                   >
-                    <IoAddCircleOutline /> Create Document
+                    <IoAddCircleOutline /> 
+                    <span className={styles.buttonText}>
+                      <span className={styles.fullText}>Create Document</span>
+                      <span className={styles.shortText}>Create</span>
+                    </span>
                   </button>
                 ) : (
                   <div className={styles.disabledControlText}>
@@ -220,9 +224,11 @@ export const DocumentSliderController = forwardRef<
           good={manager.quantityModalState.good}
         />
 
-        {/* ✅ REFACTORED: `manager.items` is now typed as DocumentItem[] */}
+
+        {/* ✅ REFACTORED: Handle both single and multiple document creation modals */}
         <AnimatePresence>
-          {manager.isFinalizeModalOpen && (
+          {/* Single document creation modal - only show if NOT in multi-partner/multi-goods modes */}
+          {manager.isFinalizeModalOpen && manager.mode !== "GOODS_LOCKED" && manager.mode !== "MULTIPLE_PARTNERS" && manager.mode !== "MULTIPLE_GOODS" && (
             <DocumentConfirmationModal
                 isOpen={manager.isFinalizeModalOpen}
                 onClose={() => {
@@ -231,6 +237,34 @@ export const DocumentSliderController = forwardRef<
                 }}
                 onValidate={manager.handleSubmit}
                 title="Finalize Document Creation"
+                currentPartner={manager.singleDocumentPartner}
+                goods={manager.items.map((item: DocumentItem) => ({
+                  id: item.goodId,
+                  name: item.goodLabel,
+                  quantity: item.quantity,
+                  price: item.unitPrice,
+                  amount: item.quantity * item.unitPrice,
+                }))}
+                isLoading={manager.createDocumentMutation.isPending}
+              />
+          )}
+          
+          {/* Multiple document creation workflow modal - for GOODS_LOCKED, MULTIPLE_PARTNERS, and MULTIPLE_GOODS modes */}
+          {manager.multiDocumentState.isProcessing && (
+            <DocumentConfirmationModal
+                isOpen={manager.multiDocumentState.isProcessing}
+                onClose={manager.cancelMultipleDocumentCreation}
+                onValidate={manager.processNextDocument}
+                title={`Multiple Document Creation`}
+                confirmButtonText={
+                  manager.multiDocumentState.currentPartnerIndex === manager.multiDocumentState.totalPartners - 1
+                    ? "Create Final Document"
+                    : "Create Document & Continue"
+                }
+                currentPartner={manager.multiDocumentState.partnerData[manager.multiDocumentState.currentPartnerIndex]}
+                totalDocuments={manager.multiDocumentState.totalPartners}
+                currentDocumentIndex={manager.multiDocumentState.currentPartnerIndex}
+                allPartners={manager.multiDocumentState.partnerData}
                 goods={manager.items.map((item: DocumentItem) => ({
                   id: item.goodId,
                   name: item.goodLabel,

@@ -13,10 +13,10 @@ import { useJournalInteraction } from "./hooks/useJournalInteraction";
 import { useJournalMutations } from "./hooks/useJournalMutations";
 
 export const useJournalManager = () => {
-  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
-  const visibility = useAppStore((state) => state.ui.visibility);
+  const sliderOrder = useAppStore((state) => state.sliderOrder);
+  const visibility = useAppStore((state) => state.visibility);
   const restrictedJournalId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalId
+    (state) => state.effectiveRestrictedJournalId
   );
 
   const isJournalSliderPrimary = useMemo(

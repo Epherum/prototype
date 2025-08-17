@@ -54,8 +54,8 @@ export default function Home() {
   const usersControllerRef = useRef<UsersControllerRef>(null);
   const journalControllerRef = useRef<JournalSliderControllerRef>(null);
 
-  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
-  const visibility = useAppStore((state) => state.ui.visibility);
+  const sliderOrder = useAppStore((state) => state.sliderOrder);
+  const visibility = useAppStore((state) => state.visibility);
 
   const goodManager = useGoodManager();
   const docManager = useDocumentManager(goodManager.goodsForSlider);

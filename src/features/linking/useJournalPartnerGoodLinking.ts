@@ -37,10 +37,10 @@ export const useJournalPartnerGoodLinking = () => {
   const queryClient = useQueryClient();
 
   // Consume state from the global store
-  const sliderOrder = useAppStore((state) => state.ui.sliderOrder);
+  const sliderOrder = useAppStore((state) => state.sliderOrder);
   const selections = useAppStore((state) => state.selections);
   const restrictedJournalId = useAppStore(
-    (state) => state.auth.effectiveRestrictedJournalId
+    (state) => state.effectiveRestrictedJournalId
   );
 
   const { good: selectedGoodId, journal: journalSelections } = selections;

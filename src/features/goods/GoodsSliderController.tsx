@@ -66,10 +66,11 @@ export const GoodsSliderController = forwardRef<
     );
     const updateDocumentItem = useAppStore((state) => state.updateDocumentItem);
     const isDetailsAccordionOpen = useAppStore(
-      (state) => !!state.ui.accordionState[SLIDER_TYPES.GOODS]
+      (state) => !!state.accordionState[SLIDER_TYPES.GOODS]
     );
     const toggleAccordion = useAppStore((state) => state.toggleAccordion);
-    const { sliderOrder, visibility } = useAppStore((state) => state.ui);
+    const sliderOrder = useAppStore((state) => state.sliderOrder);
+    const visibility = useAppStore((state) => state.visibility);
     const { journal: journalSelections, gpgContextJournalId } = useAppStore(
       (state) => state.selections
     );

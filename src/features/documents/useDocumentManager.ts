@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
 import { documentKeys } from "@/lib/queryKeys";
 import { createDocument } from "@/services/clientDocumentService";
+import { fetchPartnerById } from "@/services/clientPartnerService";
 import { SLIDER_TYPES } from "@/lib/constants";
 
 // ✅ NEW: Correct, structured imports
@@ -26,6 +27,44 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
   const { sliderOrder, visibility } = useAppStore((state) => state.ui);
   const documentCreationState = useAppStore((state) => state.ui.documentCreationState);
   const selections = useAppStore((state) => state.selections);
+  
+  // Use store state for multiple document creation
+  const multiDocumentState = useAppStore((state) => state.ui.documentCreationState.multiDocumentState);
+  const setMultiDocumentState = useAppStore((state) => state.setMultiDocumentState);
+  const updateMultiDocumentState = useAppStore((state) => state.updateMultiDocumentState);
+  
+  // State for single document partner information
+  const [singleDocumentPartner, setSingleDocumentPartner] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  
+  // Fetch partner data immediately when partner selection changes
+  useEffect(() => {
+    const fetchPartnerData = async () => {
+      if (selections.partner) {
+        try {
+          const partner = await fetchPartnerById(selections.partner);
+          setSingleDocumentPartner({
+            id: selections.partner,
+            name: partner?.name || `Partner ${selections.partner}`,
+          });
+        } catch (error) {
+          console.warn(`Failed to fetch partner ${selections.partner}:`, error);
+          setSingleDocumentPartner({
+            id: selections.partner,
+            name: `Partner ${selections.partner}`,
+          });
+        }
+      } else {
+        setSingleDocumentPartner(null);
+      }
+    };
+
+    fetchPartnerData();
+  }, [selections.partner]);
+  
+  const resetMultiDocumentState = useAppStore((state) => state.resetMultiDocumentState);
   const startDocumentCreation = useAppStore(
     (state) => state.startDocumentCreation
   );
@@ -46,10 +85,12 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
     good: GoodClient | null;
   }>({ isOpen: false, good: null });
 
+
   const {
     isCreating,
     mode,
     items,
+    selectedPartnerIds,
   } = documentCreationState;
 
   const isJournalFirst = useMemo(() => {
@@ -191,35 +232,73 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
   });
 
   const handlePrepareFinalization = useCallback(
-    (allGoodsInSlider: GoodClient[]) => {
+    async (allGoodsInSlider: GoodClient[]) => {
       const success = prepareDocumentForFinalization(allGoodsInSlider);
       
       if (success) {
-        setFinalizeModalOpen(true);
+        // For GOODS_LOCKED, MULTIPLE_PARTNERS, and MULTIPLE_GOODS modes, start multiple document creation immediately
+        if ((mode === "GOODS_LOCKED" || mode === "MULTIPLE_PARTNERS" || mode === "MULTIPLE_GOODS") && selectedPartnerIds.length > 0) {
+          
+          // Fetch partner data first, then show modal
+          try {
+            const partnerDataPromises = selectedPartnerIds.map(async (id) => {
+              try {
+                const partner = await fetchPartnerById(id);
+                return {
+                  id,
+                  name: partner?.name || `Partner ${id}`,
+                };
+              } catch (error) {
+                console.warn(`Failed to fetch partner ${id}:`, error);
+                return {
+                  id,
+                  name: `Partner ${id}`,
+                };
+              }
+            });
+            
+            const partnerData = await Promise.all(partnerDataPromises);
+            
+            const newState = {
+              isProcessing: true,
+              currentPartnerIndex: 0,
+              totalPartners: selectedPartnerIds.length,
+              partnerIds: selectedPartnerIds,
+              partnerData: partnerData,
+              headerData: null,
+            };
+            // Use store action to set state
+            setMultiDocumentState(newState);
+          } catch (error) {
+            console.warn("Failed to fetch partner information:", error);
+            // Fallback with partner IDs
+            const fallbackPartnerData = selectedPartnerIds.map((id, index) => ({
+              id,
+              name: `Partner ${id}`,
+            }));
+            
+            const newState = {
+              isProcessing: true,
+              currentPartnerIndex: 0,
+              totalPartners: selectedPartnerIds.length,
+              partnerIds: selectedPartnerIds,
+              partnerData: fallbackPartnerData,
+              headerData: null,
+            };
+            setMultiDocumentState(newState);
+          }
+        } else {
+          // For single document modes (SINGLE_ITEM, PARTNER_LOCKED), partner data is already available
+          setFinalizeModalOpen(true);
+        }
       }
     },
-    [prepareDocumentForFinalization, setFinalizeModalOpen]
+    [prepareDocumentForFinalization, setFinalizeModalOpen, mode, selectedPartnerIds]
   );
 
-  // Simple document creation for single-item mode
-  const handleSubmit = useCallback(
-    async (headerData: { refDoc: string; date: Date; type: any; [key: string]: any }) => {
-      const journalId = selections.journal.selectedJournalId;
-      const partnerId = selections.partner;
-      
-      if (!journalId) {
-        alert("Critical Error: Journal ID is missing for document creation.");
-        return;
-      }
-      if (!partnerId) {
-        alert("Critical Error: Partner ID is missing for document creation.");
-        return;
-      }
-      if (items.length === 0) {
-        alert("Cannot create a document with no lines.");
-        return;
-      }
-
+  // Helper function to create a single document
+  const createSingleDocument = useCallback(
+    async (journalId: string, partnerId: string, headerData: any) => {
       // Ensure all items have journalPartnerGoodLinkId, fetch if missing
       const linesPromises = items.map(async (item) => {
         let linkId = item.journalPartnerGoodLinkId;
@@ -283,23 +362,91 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
 
       try {
         await createDocMutation.mutateAsync(payload);
+        return true;
+      } catch (e) {
+        throw e;
+      }
+    },
+    [items, createDocMutation]
+  );
+
+  // Document creation for single-item mode and single documents
+  const handleSubmit = useCallback(
+    async (headerData: { refDoc: string; date: Date; type: any; [key: string]: any }) => {
+      const journalId = selections.journal.selectedJournalId;
+      
+      if (!journalId) {
+        alert("Critical Error: Journal ID is missing for document creation.");
+        return;
+      }
+      
+      // For other modes (not GOODS_LOCKED), use single partner from selections
+      const partnerId = selections.partner;
+      if (!partnerId) {
+        alert("Critical Error: Partner ID is missing for document creation.");
+        return;
+      }
+      
+      if (items.length === 0) {
+        alert("Cannot create a document with no lines.");
+        return;
+      }
+      
+      try {
+        await createSingleDocument(journalId, partnerId, headerData);
         alert("Document created successfully!");
         handleCancelCreation();
+        setFinalizeModalOpen(false);
       } catch (e) {
         // Error is already handled by the mutation's onError
       }
-
-      setFinalizeModalOpen(false);
     },
     [
       selections.journal.selectedJournalId,
       selections.partner,
       items,
-      createDocMutation,
+      createSingleDocument,
       handleCancelCreation,
       setFinalizeModalOpen,
     ]
   );
+  
+  // Process the next document in the multiple document creation workflow
+  const processNextDocument = useCallback(
+    async (confirmedHeaderData: any) => {
+      const { currentPartnerIndex, partnerIds, totalPartners } = multiDocumentState;
+      const journalId = selections.journal.selectedJournalId!;
+      const partnerId = partnerIds[currentPartnerIndex];
+      
+      try {
+        await createSingleDocument(journalId, partnerId, confirmedHeaderData);
+        
+        const nextIndex = currentPartnerIndex + 1;
+        if (nextIndex < totalPartners) {
+          // More documents to create
+          updateMultiDocumentState({
+            currentPartnerIndex: nextIndex,
+          });
+        } else {
+          // All documents created successfully
+          alert(`Successfully created ${totalPartners} documents!`);
+          resetMultiDocumentState();
+          handleCancelCreation();
+          setFinalizeModalOpen(false);
+        }
+      } catch (error) {
+        alert(`Error creating document for partner ${currentPartnerIndex + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Continue with next document or allow user to retry
+      }
+    },
+    [multiDocumentState, selections.journal.selectedJournalId, createSingleDocument, handleCancelCreation, setFinalizeModalOpen, updateMultiDocumentState, resetMultiDocumentState]
+  );
+  
+  // Cancel multiple document creation
+  const cancelMultipleDocumentCreation = useCallback(() => {
+    resetMultiDocumentState();
+    setFinalizeModalOpen(false);
+  }, [resetMultiDocumentState, setFinalizeModalOpen]);
 
   const documentsQuery = useQuery(useChainedQuery(SLIDER_TYPES.DOCUMENT));
 
@@ -335,6 +482,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
     mode,
     isJournalFirst,
     items,
+    selectedPartnerIds,
     quantityModalState,
     handleStartCreation,
     handleCancelCreation,
@@ -348,5 +496,11 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
     isFinalizeModalOpen,
     setFinalizeModalOpen,
     createDocumentMutation: createDocMutation,
+    // Multiple document creation state and handlers
+    multiDocumentState,
+    processNextDocument,
+    cancelMultipleDocumentCreation,
+    // Single document partner information
+    singleDocumentPartner,
   };
 };

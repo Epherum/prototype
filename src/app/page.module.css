@@ -141,6 +141,26 @@
   transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease;
 }
 
+/* Mobile-responsive text for primary action button */
+.primaryActionButton .fullText {
+  display: inline;
+}
+
+.primaryActionButton .shortText {
+  display: none;
+}
+
+/* Show short text on mobile instead of full text */
+@media (max-width: 480px) {
+  .primaryActionButton .fullText {
+    display: none;
+  }
+  
+  .primaryActionButton .shortText {
+    display: inline;
+  }
+}
+
 .primaryActionButton:not(:disabled):hover {
   background-color: var(--bg-hover);
 }
