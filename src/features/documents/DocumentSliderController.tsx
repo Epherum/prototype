@@ -13,7 +13,9 @@ import styles from "@/app/page.module.css";
 import { IoAddCircleOutline, IoOptionsOutline, IoOpenOutline } from "react-icons/io5";
 import type { useDocumentManager } from "./useDocumentManager";
 import DocumentsOptionsMenu from "./components/DocumentsOptionsMenu";
-import { getDocumentById } from "@/services/clientDocumentService";
+import { getDocumentById, deleteDocument } from "@/services/clientDocumentService";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { documentKeys } from "@/lib/queryKeys";
 
 // ✅ NEW: Import client model
 import type { DocumentClient } from "@/lib/types/models.client";
@@ -47,6 +49,7 @@ export const DocumentSliderController = forwardRef<
   ) => {
     const setSelection = useAppStore((state) => state.setSelection);
     const activeDocumentId = useAppStore((state) => state.selections.document);
+    const queryClient = useQueryClient();
 
     const [isDocMenuOpen, setDocMenuOpen] = useState(false);
     const [docMenuAnchorEl, setDocMenuAnchorEl] = useState<HTMLElement | null>(
@@ -55,6 +58,23 @@ export const DocumentSliderController = forwardRef<
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [selectedDocumentDetails, setSelectedDocumentDetails] = useState<DocumentClient | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+    // Delete mutation
+    const deleteMutation = useMutation({
+      mutationFn: deleteDocument,
+      onSuccess: () => {
+        // Invalidate and refetch document queries
+        queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+        // Clear selection if the deleted document was selected
+        if (activeDocumentId) {
+          setSelection("document", null);
+        }
+        alert("Document deleted successfully!");
+      },
+      onError: (error: Error) => {
+        alert(`Failed to delete document: ${error.message}`);
+      },
+    });
 
     const handleOpenDocMenu = (event: React.MouseEvent<HTMLElement>) => {
       setDocMenuAnchorEl(event.currentTarget);
@@ -94,9 +114,16 @@ export const DocumentSliderController = forwardRef<
     };
 
     const handleDeleteDocument = () => {
-      // TODO: Implement delete functionality with confirmation
-      if (confirm(`Are you sure you want to delete document ${activeDocumentId}?`)) {
-        alert(`Delete functionality for document ${activeDocumentId} will be implemented`);
+      if (!activeDocumentId) return;
+      
+      // Show confirmation dialog
+      const documentName = selectedDocumentDetails?.refDoc || `Document ${activeDocumentId}`;
+      const confirmed = confirm(
+        `Are you sure you want to delete "${documentName}"?\n\nThis action cannot be undone. The document will be marked as deleted and will no longer appear in the system.`
+      );
+      
+      if (confirmed) {
+        deleteMutation.mutate(activeDocumentId);
       }
     };
 
@@ -149,6 +176,7 @@ export const DocumentSliderController = forwardRef<
                     onView={handleViewDocument}
                     onEdit={handleEditDocument}
                     onDelete={handleDeleteDocument}
+                    isDeleting={deleteMutation.isPending}
                   />
                 </div>
                 {activeDocumentId && (
@@ -213,9 +241,11 @@ export const DocumentSliderController = forwardRef<
           onSlideChange={(id) => setSelection("document", id)}
           placeholderMessage={
             manager.isCreating
-              ? `Building document in '${manager.mode}' mode... Use the toolbar at the bottom to proceed.`
+              ? null
               : "No documents matching the current filters."
           }
+          isCreating={manager.isCreating}
+          creationMode={manager.mode}
         />
         <SingleItemQuantityModal
           isOpen={manager.quantityModalState.isOpen}

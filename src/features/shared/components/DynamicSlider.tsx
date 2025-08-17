@@ -53,11 +53,14 @@ interface DynamicSliderProps {
   showContextJournalFilterButton?: boolean;
   onOpenContextJournalFilterModal?: () => void;
   gpgContextJournalInfo?: GPGContextJournalInfo | null;
-  placeholderMessage?: string;
+  placeholderMessage?: string | null;
   // New props for document creation
   showDocumentItemInputs?: boolean;
   documentItems?: Array<{ goodId: string; quantity: number; unitPrice: number; goodLabel: string }>;
   onUpdateDocumentItem?: (goodId: string, updates: { quantity?: number; unitPrice?: number }) => void;
+  // Document creation mode props
+  isCreating?: boolean;
+  creationMode?: string;
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -81,6 +84,8 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   showDocumentItemInputs = false,
   documentItems = [],
   onUpdateDocumentItem,
+  isCreating = false,
+  creationMode,
 }) => {
   const initialSlideIndex = Math.max(
     0,
@@ -160,14 +165,31 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
           ) : data.length === 0 ? (
             <motion.div
               key="no-data"
-              className={styles.stateOverlay}
+              className={`${styles.stateOverlay} ${isCreating ? styles.creationState : ''}`}
               variants={sliderContentVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
             >
-              {placeholderMessage ||
-                `No ${title.toLowerCase()} match criteria.`}
+              {isCreating ? (
+                <div className={styles.creationContent}>
+                  <div className={styles.creationIcon}>+</div>
+                  <div className={styles.creationText}>
+                    <div className={styles.creationTitle}>Document Creation Mode</div>
+                    <div className={styles.creationSubtitle}>
+                      {creationMode === 'SINGLE_ITEM' && 'Building single document'}
+                      {creationMode === 'PARTNER_LOCKED' && 'Partner locked - multi-item document'}
+                      {creationMode === 'GOODS_LOCKED' && 'Good locked - multi-partner documents'}
+                      {creationMode === 'MULTIPLE_PARTNERS' && 'Creating documents for multiple partners'}
+                      {creationMode === 'MULTIPLE_GOODS' && 'Creating documents for multiple goods'}
+                      {!creationMode && 'Preparing document creation'}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                placeholderMessage ||
+                `No ${title.toLowerCase()} match criteria.`
+              )}
             </motion.div>
           ) : (
             <motion.div

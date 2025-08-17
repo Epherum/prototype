@@ -8,28 +8,31 @@
   ); /* Make sure --overlay-bg is defined in globals.css */
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start; /* Align to top for better scrolling */
   z-index: 1000; /* High z-index to be on top */
-  padding: var(--spacing-unit); /* Ensure --spacing-unit is global */
+  padding: calc(var(--spacing-unit) * 2); /* Increased padding */
   box-sizing: border-box;
   overflow-y: auto; /* Allow scrolling if modal content is too tall */
+  padding-top: calc(var(--spacing-unit) * 4); /* Top padding for better centering */
+  padding-bottom: calc(var(--spacing-unit) * 4); /* Bottom padding for scroll area */
 }
 
 .modalContent {
   background-color: var(--bg-card); /* Ensure --bg-card is global */
-  padding: calc(var(--spacing-unit) * 2);
+  padding: calc(var(--spacing-unit) * 3);
   border-radius: var(
     --border-radius-lg
   ); /* Ensure --border-radius-lg is global */
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-  max-width: 90%;
-  width: 450px; /* Default width, can be overridden by specific modal styles if needed */
+  max-width: 95%;
+  width: 600px; /* Increased width for better spacing */
   position: relative; /* Crucial for close button positioning */
   color: var(--text-primary); /* Ensure --text-primary is global */
-  max-height: 85vh; /* Limit height, works with overflow-y on overlay */
+  max-height: 90vh; /* Increased max height */
   display: flex;
   flex-direction: column;
   margin: auto; /* Helps with centering if overlay uses overflow */
+  overflow: hidden; /* Prevent content overflow */
 }
 
 .modalTitle {

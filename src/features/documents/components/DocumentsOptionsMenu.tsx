@@ -14,6 +14,7 @@ interface DocumentsOptionsMenuProps {
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  isDeleting?: boolean;
 }
 
 const menuVariants = {
@@ -46,6 +47,7 @@ const DocumentsOptionsMenu: React.FC<DocumentsOptionsMenuProps> = ({
   onView,
   onEdit,
   onDelete,
+  isDeleting = false,
 }) => {
   const { can: canManageDocuments } = usePermissions({
     action: "MANAGE",
@@ -102,10 +104,10 @@ const DocumentsOptionsMenu: React.FC<DocumentsOptionsMenuProps> = ({
                     if (selectedDocumentId) onDelete();
                     onClose();
                   }}
-                  disabled={!selectedDocumentId}
+                  disabled={!selectedDocumentId || isDeleting}
                   className={`${styles.optionButton} ${styles.deleteButton}`}
                 >
-                  <IoTrashOutline /> Delete Selected
+                  <IoTrashOutline /> {isDeleting ? "Deleting..." : "Delete Selected"}
                 </button>
               </>
             )}

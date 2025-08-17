@@ -114,24 +114,28 @@ export const DocumentConfirmationModal = ({
         </button>
         <h2 className={baseStyles.modalTitle}>{title}</h2>
 
-        {/* Multiple Document Workflow Information */}
-        {currentPartner && totalDocuments && currentDocumentIndex !== undefined && (
+        {/* Document Creation Information */}
+        {currentPartner && (
           <div className={styles.multiDocumentInfo}>
-            <div className={styles.progressSection}>
-              <div className={styles.progressHeader}>
-                <h3>Multiple Document Creation</h3>
-                <span className={styles.progressBadge}>
-                  {currentDocumentIndex + 1} of {totalDocuments}
-                </span>
+            {/* Multiple Document Workflow Progress - only show for multi-document mode */}
+            {totalDocuments && currentDocumentIndex !== undefined && (
+              <div className={styles.progressSection}>
+                <div className={styles.progressHeader}>
+                  <h3>Multiple Document Creation</h3>
+                  <span className={styles.progressBadge}>
+                    {currentDocumentIndex + 1} of {totalDocuments}
+                  </span>
+                </div>
+                <div className={styles.progressBar}>
+                  <div 
+                    className={styles.progressFill}
+                    style={{ width: `${((currentDocumentIndex + 1) / totalDocuments) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className={styles.progressBar}>
-                <div 
-                  className={styles.progressFill}
-                  style={{ width: `${((currentDocumentIndex + 1) / totalDocuments) * 100}%` }}
-                />
-              </div>
-            </div>
+            )}
             
+            {/* Partner Information - always show when partner is available */}
             <div className={styles.currentPartnerSection}>
               <h4>Creating document for:</h4>
               <div className={styles.partnerCard}>
@@ -141,12 +145,19 @@ export const DocumentConfirmationModal = ({
                 )}
                 <div className={styles.partnerId}>ID: {currentPartner.id}</div>
               </div>
-              <div className={styles.referenceNote}>
-                <strong>Note:</strong> Please enter a unique reference for this partner's document below.
-              </div>
+              {totalDocuments && totalDocuments > 1 ? (
+                <div className={styles.referenceNote}>
+                  <strong>Note:</strong> Please enter a unique reference for this partner's document below.
+                </div>
+              ) : (
+                <div className={styles.referenceNote}>
+                  <strong>Note:</strong> Please enter a reference for this document below.
+                </div>
+              )}
             </div>
 
-            {allPartners && allPartners.length > 1 && (
+            {/* All Partners List - only show for multi-document mode */}
+            {allPartners && allPartners.length > 1 && totalDocuments && currentDocumentIndex !== undefined && (
               <div className={styles.allPartnersSection}>
                 <h4>All Selected Partners:</h4>
                 <div className={styles.partnersList}>

@@ -5,15 +5,21 @@
 .formContainer {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing-unit) * 3);
+  gap: calc(var(--spacing-unit) * 4);
   width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: calc(var(--spacing-unit) * 0.5); /* Space for scrollbar */
 }
 
 .formSection,
 .confirmationSection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-unit);
+  gap: calc(var(--spacing-unit) * 1.5);
+  flex-shrink: 0; /* Prevent shrinking */
+  max-height: 350px; /* Control max height */
+  overflow: hidden;
 }
 
 .formGroup {
@@ -66,15 +72,20 @@
 
 .confirmationGoodsList {
   list-style: none;
-  max-height: 220px; /* Control height on mobile */
+  max-height: 280px; /* Increased height */
   overflow-y: auto;
   padding-right: calc(var(--spacing-unit) * 0.5); /* For scrollbar */
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: calc(var(--spacing-unit) * 1.5);
+  margin: 0;
 }
 
 .confirmationGoodsList li {
   display: flex;
   flex-direction: column;
-  padding: var(--spacing-unit) 0;
+  padding: calc(var(--spacing-unit) * 1.5) 0;
   border-bottom: 1px dashed var(--border-subtle);
 }
 
@@ -104,12 +115,13 @@
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-md);
-  padding: calc(var(--spacing-unit) * 2);
-  margin-bottom: calc(var(--spacing-unit) * 2);
+  padding: calc(var(--spacing-unit) * 3);
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .progressSection {
-  margin-bottom: calc(var(--spacing-unit) * 2);
+  margin-bottom: calc(var(--spacing-unit) * 3);
 }
 
 .progressHeader {
@@ -150,7 +162,7 @@
 }
 
 .currentPartnerSection {
-  margin-bottom: calc(var(--spacing-unit) * 2);
+  margin-bottom: calc(var(--spacing-unit) * 3);
 }
 
 .currentPartnerSection h4 {
