@@ -293,7 +293,7 @@ export const GoodsSliderController = forwardRef<
                 }
               : undefined
           }
-          showDocumentItemInputs={isCreating && isMultiSelect && mode === "SINGLE_ITEM"}
+          showDocumentItemInputs={isCreating && isMultiSelect && !isLocked}
           documentItems={documentItemsWithLabels}
           onUpdateDocumentItem={updateDocumentItem}
           currentFilter={shouldShowFilterColors ? journalSelections.rootFilter[0] : undefined}

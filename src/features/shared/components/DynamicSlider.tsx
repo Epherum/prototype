@@ -291,7 +291,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
 
       {!isLoading &&
         !isError &&
-        currentItemForAccordion &&
+        (currentItemForAccordion || showDocumentItemInputs) &&
         onToggleAccordion && (
           <div className={styles.accordionContainer}>
             <button
@@ -299,7 +299,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
               className={styles.detailsButton}
               aria-expanded={isAccordionOpen}
             >
-              Details{" "}
+{showDocumentItemInputs ? "Selected Items" : "Details"}{" "}
               <span
                 className={`${styles.accordionIcon} ${
                   isAccordionOpen ? styles.accordionIconOpen : ""
@@ -326,62 +326,90 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                   className={styles.detailsContentWrapper}
                 >
                   <div className={styles.detailsContent}>
-                    {showDocumentItemInputs ? (
+                    {showDocumentItemInputs && documentItems.length > 0 ? (
                       // Show document creation inputs for all selected items
                       <>
-                        <h4 style={{ marginBottom: '16px', color: '#333' }}>Selected Items for Document:</h4>
+                        <h4 style={{ marginBottom: '16px', color: '#fff' }}>Selected Items for Document:</h4>
                         {documentItems.map((item) => (
                           <div key={item.goodId} style={{ 
                             marginBottom: '20px', 
                             padding: '12px', 
-                            border: '1px solid #ddd', 
+                            border: '1px solid #444', 
                             borderRadius: '6px',
-                            backgroundColor: '#f9f9f9'
+                            backgroundColor: '#2a2a2a'
                           }}>
-                            <h5 style={{ marginBottom: '8px', color: '#555' }}>{item.goodLabel}</h5>
+                            <h5 style={{ marginBottom: '8px', color: '#fff' }}>{item.goodLabel}</h5>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold', color: '#fff' }}>
                                   Quantity:
                                 </label>
                                 <input
                                   type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) => 
-                                    onUpdateDocumentItem?.(item.goodId, { 
-                                      quantity: parseInt(e.target.value) || 1 
-                                    })
-                                  }
+                                  value={item.quantity === 0 ? '' : item.quantity}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === '' || value === '0') {
+                                      onUpdateDocumentItem?.(item.goodId, { quantity: 0 });
+                                    } else {
+                                      const numValue = parseInt(value);
+                                      if (!isNaN(numValue) && numValue > 0) {
+                                        onUpdateDocumentItem?.(item.goodId, { quantity: numValue });
+                                      }
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const value = parseInt(e.target.value);
+                                    if (isNaN(value) || value <= 0) {
+                                      onUpdateDocumentItem?.(item.goodId, { quantity: 1 });
+                                    }
+                                  }}
+                                  placeholder="1"
                                   style={{
                                     width: '100%',
                                     padding: '6px 8px',
-                                    border: '1px solid #ccc',
+                                    border: '1px solid #555',
                                     borderRadius: '4px',
-                                    fontSize: '14px'
+                                    fontSize: '14px',
+                                    backgroundColor: '#1a1a1a',
+                                    color: '#fff'
                                   }}
                                 />
                               </div>
                               <div>
-                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+                                <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold', color: '#fff' }}>
                                   Unit Price:
                                 </label>
                                 <input
                                   type="number"
-                                  min="0"
                                   step="0.01"
-                                  value={item.unitPrice}
-                                  onChange={(e) => 
-                                    onUpdateDocumentItem?.(item.goodId, { 
-                                      unitPrice: parseFloat(e.target.value) || 0 
-                                    })
-                                  }
+                                  value={item.unitPrice === 0 ? '' : item.unitPrice}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value === '') {
+                                      onUpdateDocumentItem?.(item.goodId, { unitPrice: 0 });
+                                    } else {
+                                      const numValue = parseFloat(value);
+                                      if (!isNaN(numValue) && numValue >= 0) {
+                                        onUpdateDocumentItem?.(item.goodId, { unitPrice: numValue });
+                                      }
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    if (isNaN(value) || value < 0) {
+                                      onUpdateDocumentItem?.(item.goodId, { unitPrice: 0 });
+                                    }
+                                  }}
+                                  placeholder="0.00"
                                   style={{
                                     width: '100%',
                                     padding: '6px 8px',
-                                    border: '1px solid #ccc',
+                                    border: '1px solid #555',
                                     borderRadius: '4px',
-                                    fontSize: '14px'
+                                    fontSize: '14px',
+                                    backgroundColor: '#1a1a1a',
+                                    color: '#fff'
                                   }}
                                 />
                               </div>
@@ -389,8 +417,8 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                           </div>
                         ))}
                       </>
-                    ) : (
-                      // Show normal details
+                    ) : currentItemForAccordion ? (
+                      // Show normal details for the current item
                       Object.entries(currentItemForAccordion).map(
                         ([key, value]) => {
                           if (
@@ -411,6 +439,11 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                           );
                         }
                       )
+                    ) : (
+                      // Fallback when showing document inputs but no items selected yet
+                      <p style={{ color: '#ccc', fontStyle: 'italic' }}>
+                        Select items to configure pricing and quantities for the document.
+                      </p>
                     )}
                   </div>
                 </motion.div>
