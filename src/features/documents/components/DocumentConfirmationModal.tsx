@@ -114,160 +114,184 @@ export const DocumentConfirmationModal = ({
         </button>
         <h2 className={baseStyles.modalTitle}>{title}</h2>
 
-        {/* Document Creation Information */}
-        {currentPartner && (
-          <div className={styles.multiDocumentInfo}>
-            {/* Multiple Document Workflow Progress - only show for multi-document mode */}
-            {totalDocuments && currentDocumentIndex !== undefined && (
-              <div className={styles.progressSection}>
-                <div className={styles.progressHeader}>
-                  <h3>Multiple Document Creation</h3>
-                  <span className={styles.progressBadge}>
-                    {currentDocumentIndex + 1} of {totalDocuments}
-                  </span>
+        <form onSubmit={handleSubmit}>
+          <div className={styles.modalLayout}>
+            <div className={styles.formContainer}>
+              {/* Document Creation Information */}
+              {currentPartner && (
+                <div className={styles.multiDocumentInfo}>
+                  {/* Multiple Document Workflow Progress - only show for multi-document mode */}
+                  {totalDocuments && currentDocumentIndex !== undefined && (
+                    <div className={styles.progressSection}>
+                      <div className={styles.progressHeader}>
+                        <h3>Multiple Document Creation</h3>
+                        <span className={styles.progressBadge}>
+                          {currentDocumentIndex + 1} of {totalDocuments}
+                        </span>
+                      </div>
+                      <div className={styles.progressBar}>
+                        <div
+                          className={styles.progressFill}
+                          style={{
+                            width: `${
+                              ((currentDocumentIndex + 1) / totalDocuments) *
+                              100
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Partner Information - always show when partner is available */}
+                  <div className={styles.currentPartnerSection}>
+                    <h4>Creating document for:</h4>
+                    <div className={styles.partnerCard}>
+                      <div className={styles.partnerName}>
+                        {currentPartner.name}
+                      </div>
+                      {currentPartner.email && (
+                        <div className={styles.partnerEmail}>
+                          {currentPartner.email}
+                        </div>
+                      )}
+                      <div className={styles.partnerId}>
+                        ID: {currentPartner.id}
+                      </div>
+                    </div>
+                    {totalDocuments && totalDocuments > 1 ? (
+                      <div className={styles.referenceNote}>
+                        <strong>Note:</strong> Please enter a unique reference
+                        for this partner's document below.
+                      </div>
+                    ) : (
+                      <div className={styles.referenceNote}>
+                        <strong>Note:</strong> Please enter a reference for this
+                        document below.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* All Partners List - only show for multi-document mode */}
+                  {allPartners &&
+                    allPartners.length > 1 &&
+                    totalDocuments &&
+                    currentDocumentIndex !== undefined && (
+                      <div className={styles.allPartnersSection}>
+                        <h4>All Selected Partners:</h4>
+                        <div className={styles.partnersList}>
+                          {allPartners.map((partner, index) => (
+                            <div
+                              key={partner.id}
+                              className={`${styles.partnerChip} ${
+                                index === currentDocumentIndex
+                                  ? styles.currentPartnerChip
+                                  : ""
+                              } ${
+                                index < currentDocumentIndex
+                                  ? styles.completedPartnerChip
+                                  : ""
+                              }`}
+                            >
+                              {index < currentDocumentIndex && "✓ "}
+                              {partner.name}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                 </div>
-                <div className={styles.progressBar}>
-                  <div 
-                    className={styles.progressFill}
-                    style={{ width: `${((currentDocumentIndex + 1) / totalDocuments) * 100}%` }}
+              )}
+
+              {message && (
+                <div className={styles.messageSection}>
+                  <p>{message}</p>
+                </div>
+              )}
+
+              <div className={styles.formSection}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="refDoc">Reference (Optional)</label>
+                  <input
+                    id="refDoc"
+                    type="text"
+                    value={refDoc || ""}
+                    onChange={(e) => setRefDoc(e.target.value)}
+                    placeholder="e.g., INV-2025-001"
+                    className={styles.formInput}
+                    autoFocus
                   />
                 </div>
-              </div>
-            )}
-            
-            {/* Partner Information - always show when partner is available */}
-            <div className={styles.currentPartnerSection}>
-              <h4>Creating document for:</h4>
-              <div className={styles.partnerCard}>
-                <div className={styles.partnerName}>{currentPartner.name}</div>
-                {currentPartner.email && (
-                  <div className={styles.partnerEmail}>{currentPartner.email}</div>
-                )}
-                <div className={styles.partnerId}>ID: {currentPartner.id}</div>
-              </div>
-              {totalDocuments && totalDocuments > 1 ? (
-                <div className={styles.referenceNote}>
-                  <strong>Note:</strong> Please enter a unique reference for this partner's document below.
+                <div className={styles.formGroupGrid}>
+                  <div className={styles.formGroup}>
+                    <label htmlFor="date">Date</label>
+                    <input
+                      id="date"
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      className={styles.formInput}
+                      required
+                    />
+                  </div>
+                  <div className={styles.formGroup}>
+                    <label htmlFor="type">Type</label>
+                    <select
+                      id="type"
+                      value={type}
+                      // ✅ CHANGED: Type cast is now strongly typed
+                      onChange={(e) =>
+                        setType(e.target.value as CreateDocumentPayload["type"])
+                      }
+                      className={styles.formInput}
+                    >
+                      <option value="INVOICE">Invoice</option>
+                      <option value="QUOTE">Quote</option>
+                      <option value="PURCHASE_ORDER">Purchase Order</option>
+                      <option value="CREDIT_NOTE">Credit Note</option>
+                    </select>
+                  </div>
                 </div>
-              ) : (
-                <div className={styles.referenceNote}>
-                  <strong>Note:</strong> Please enter a reference for this document below.
+              </div>
+
+              {goods && goods.length > 0 && (
+                <div className={styles.confirmationSection}>
+                  <h3 className={styles.sectionHeader}>
+                    <span>Summary</span>
+                    <span>Total: ${totalAmount}</span>
+                  </h3>
+                  <ul className={styles.confirmationGoodsList}>
+                    {goods.map((good) => (
+                      <li key={good.id}>
+                        <span className={styles.itemName}>{good.name}</span>
+                        <span className={styles.lineItemDetails}>
+                          {good.quantity} x ${good.price?.toFixed(2)} ={" "}
+                          <strong>${good.amount.toFixed(2)}</strong>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
 
-            {/* All Partners List - only show for multi-document mode */}
-            {allPartners && allPartners.length > 1 && totalDocuments && currentDocumentIndex !== undefined && (
-              <div className={styles.allPartnersSection}>
-                <h4>All Selected Partners:</h4>
-                <div className={styles.partnersList}>
-                  {allPartners.map((partner, index) => (
-                    <div 
-                      key={partner.id} 
-                      className={`${styles.partnerChip} ${
-                        index === currentDocumentIndex ? styles.currentPartnerChip : ''
-                      } ${
-                        index < currentDocumentIndex ? styles.completedPartnerChip : ''
-                      }`}
-                    >
-                      {index < currentDocumentIndex && '✓ '}
-                      {partner.name}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {message && (
-          <div className={styles.messageSection}>
-            <p>{message}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className={styles.formContainer}>
-          <div className={styles.formSection}>
-            <div className={styles.formGroup}>
-              <label htmlFor="refDoc">Reference (Optional)</label>
-              <input
-                id="refDoc"
-                type="text"
-                value={refDoc || ""}
-                onChange={(e) => setRefDoc(e.target.value)}
-                placeholder="e.g., INV-2025-001"
-                className={styles.formInput}
-                autoFocus
-              />
+            <div className={styles.footerActions}>
+              <button
+                type="button"
+                className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
+                onClick={onClose}
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
+                disabled={isLoading}
+              >
+                {isLoading ? "Saving..." : confirmButtonText}
+              </button>
             </div>
-            <div className={styles.formGroupGrid}>
-              <div className={styles.formGroup}>
-                <label htmlFor="date">Date</label>
-                <input
-                  id="date"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className={styles.formInput}
-                  required
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor="type">Type</label>
-                <select
-                  id="type"
-                  value={type}
-                  // ✅ CHANGED: Type cast is now strongly typed
-                  onChange={(e) =>
-                    setType(e.target.value as CreateDocumentPayload["type"])
-                  }
-                  className={styles.formInput}
-                >
-                  <option value="INVOICE">Invoice</option>
-                  <option value="QUOTE">Quote</option>
-                  <option value="PURCHASE_ORDER">Purchase Order</option>
-                  <option value="CREDIT_NOTE">Credit Note</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {goods && goods.length > 0 && (
-            <div className={styles.confirmationSection}>
-              <h3 className={styles.sectionHeader}>
-                <span>Summary</span>
-                <span>Total: ${totalAmount}</span>
-              </h3>
-              <ul className={styles.confirmationGoodsList}>
-                {goods.map((good) => (
-                  <li key={good.id}>
-                    <span className={styles.itemName}>{good.name}</span>
-                    <span className={styles.lineItemDetails}>
-                      {good.quantity} x ${good.price?.toFixed(2)} ={" "}
-                      <strong>${good.amount.toFixed(2)}</strong>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className={baseStyles.modalActions}>
-            <button
-              type="button"
-              className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
-              onClick={onClose}
-              disabled={isLoading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
-              disabled={isLoading}
-            >
-              {isLoading ? "Saving..." : confirmButtonText}
-            </button>
           </div>
         </form>
       </motion.div>

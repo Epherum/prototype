@@ -19,7 +19,7 @@
 
 .modalContent {
   background-color: var(--bg-card); /* Ensure --bg-card is global */
-  padding: calc(var(--spacing-unit) * 3);
+  padding: calc(var(--spacing-unit) * 1.5);
   border-radius: var(
     --border-radius-lg
   ); /* Ensure --border-radius-lg is global */

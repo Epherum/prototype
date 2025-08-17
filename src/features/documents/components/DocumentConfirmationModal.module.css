@@ -1,31 +1,55 @@
-/*
-  MODIFIED: Mobile-first styles that use global variables 
-  for a clean, integrated, and responsive layout.
-*/
+
+
+/* New: A flex container to structure the modal body */
+.modalLayout {
+  display: flex;
+  flex-direction: column;
+  height: 70vh; /* Set a fixed height to enable scrolling */
+  max-height: 80vh; /* Prevent modal from taking full screen on desktop */
+  min-height: 400px; /* Ensure minimum height */
+  overflow-y: auto; /* Make entire modal scrollable */
+  /* Ensure smooth scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mobile-specific improvements */
+@media (max-width: 640px) {
+  .modalLayout {
+    height: 80vh; /* Larger height on mobile */
+    max-height: 90vh; /* Allow more height on mobile */
+    min-height: 300px; /* Smaller minimum height on mobile */
+  }
+}
+
 .formContainer {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing-unit) * 4);
   width: 100%;
-  flex: 1;
-  overflow-y: auto;
-  padding-right: calc(var(--spacing-unit) * 0.5); /* Space for scrollbar */
+  flex-grow: 1; /* Allows this section to fill available space */
+  padding: calc(var(--spacing-unit) * 2.5); /* Generous padding */
 }
 
+/* Mobile-specific padding adjustments */
+@media (max-width: 640px) {
+  .formContainer {
+    gap: calc(var(--spacing-unit) * 2); /* Reduce gap on mobile */
+    padding: calc(var(--spacing-unit) * 1.5); /* Reduce padding on mobile */
+  }
+}
+
+/* Removed max-height and overflow to allow .formContainer to control scrolling */
 .formSection,
 .confirmationSection {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing-unit) * 1.5);
-  flex-shrink: 0; /* Prevent shrinking */
-  max-height: 350px; /* Control max height */
-  overflow: hidden;
+  gap: calc(var(--spacing-unit) * 2);
+  flex-shrink: 0; /* Prevents section from shrinking */
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--spacing-unit) * 0.5);
+  gap: calc(var(--spacing-unit) * 0.75);
 }
 
 .formGroup label {
@@ -51,14 +75,19 @@
   box-shadow: 0 0 0 2px var(--accent-warm-light);
 }
 
-/* For side-by-side Date and Type fields */
+/* Responsive grid: stacks on mobile, side-by-side on larger screens */
 .formGroupGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-unit);
+  grid-template-columns: 1fr; /* Mobile-first: single column */
+  gap: calc(var(--spacing-unit) * 2);
 }
 
-/* Goods List Styling */
+@media (min-width: 640px) {
+  .formGroupGrid {
+    grid-template-columns: 1fr 1fr; /* Two columns for wider screens */
+  }
+}
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;
@@ -70,16 +99,15 @@
   color: var(--text-primary);
 }
 
+/* Scrolling is now handled by .formContainer */
 .confirmationGoodsList {
   list-style: none;
-  max-height: 280px; /* Increased height */
-  overflow-y: auto;
-  padding-right: calc(var(--spacing-unit) * 0.5); /* For scrollbar */
+  margin: 0;
+  padding: calc(var(--spacing-unit) * 1.5);
   background-color: var(--bg-primary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-sm);
-  padding: calc(var(--spacing-unit) * 1.5);
-  margin: 0;
+  /* max-height and overflow are removed */
 }
 
 .confirmationGoodsList li {
@@ -102,7 +130,7 @@
 .lineItemDetails {
   font-size: 0.9em;
   color: var(--text-secondary);
-  align-self: flex-end; /* Push details to the right */
+  align-self: flex-end;
 }
 
 .lineItemDetails strong {
@@ -110,14 +138,42 @@
   font-weight: 600;
 }
 
-/* Multiple Document Workflow Styles */
+/* New: Footer for action buttons */
+.footerActions {
+  flex-shrink: 0; /* Prevents the footer from shrinking */
+  padding: calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 2.5);
+  border-top: 1px solid var(--border-subtle);
+  background-color: var(--bg-primary);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-unit);
+}
+
+/* Mobile footer adjustments - keep buttons side by side */
+@media (max-width: 640px) {
+  .footerActions {
+    padding: calc(var(--spacing-unit) * 1.5);
+    gap: calc(var(--spacing-unit) * 2);
+    /* Keep horizontal layout but make buttons flexible */
+    justify-content: space-between;
+  }
+  
+  .footerActions button {
+    flex: 1;
+    min-width: 0; /* Allow buttons to shrink if needed */
+  }
+}
+
+/* --- Existing styles for multi-document workflow below --- */
+/* (These are kept as they were, but will benefit from the new scroll container) */
+
 .multiDocumentInfo {
   background-color: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-md);
-  padding: calc(var(--spacing-unit) * 3);
+padding: calc(var(--spacing-unit) * 1.5);
   margin-bottom: calc(var(--spacing-unit) * 3);
-  flex-shrink: 0; /* Prevent shrinking */
+  flex-shrink: 0;
 }
 
 .progressSection {
