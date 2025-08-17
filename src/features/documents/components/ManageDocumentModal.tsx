@@ -45,16 +45,19 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
   useEffect(() => {
     if (document) {
       setFormData({
-        refDoc: document.refDoc || undefined, // Use undefined for optional fields
+        refDoc: document.refDoc || undefined,
         date: document.date
           ? new Date(document.date).toISOString().split("T")[0]
           : undefined,
+        description: document.description || undefined,
+        paymentMode: document.paymentMode || undefined,
+        state: document.state || undefined,
       });
     }
   }, [document]);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -110,7 +113,69 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
                 value={formData.refDoc || ""}
                 onChange={handleChange}
                 readOnly={isViewOnly}
+                placeholder="Document reference number"
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="date">Date</label>
+              <input
+                id="date"
+                name="date"
+                type="date"
+                value={
+                  typeof formData.date === 'string' 
+                    ? formData.date 
+                    : formData.date instanceof Date 
+                      ? formData.date.toISOString().split("T")[0]
+                      : ""
+                }
+                onChange={handleChange}
+                readOnly={isViewOnly}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="description">Description</label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description || ""}
+                onChange={handleChange}
+                readOnly={isViewOnly}
+                placeholder="Optional description"
+                rows={3}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="paymentMode">Payment Mode</label>
+              <input
+                id="paymentMode"
+                name="paymentMode"
+                type="text"
+                value={formData.paymentMode || ""}
+                onChange={handleChange}
+                readOnly={isViewOnly}
+                placeholder="e.g., Cash, Credit Card, Bank Transfer"
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="state">Document Status</label>
+              <select
+                id="state"
+                name="state"
+                value={formData.state || ""}
+                onChange={handleChange}
+                disabled={isViewOnly}
+              >
+                <option value="">Select Status</option>
+                <option value="DRAFT">Draft</option>
+                <option value="FINALIZED">Finalized</option>
+                <option value="PAID">Paid</option>
+                <option value="VOID">Void</option>
+              </select>
             </div>
 
             <div className={baseStyles.modalActions}>

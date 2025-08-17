@@ -1,6 +1,6 @@
 // src/features/goods/components/AddEditGoodModal.tsx
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
@@ -9,6 +9,7 @@ import { IoClose } from "react-icons/io5";
 // ✅ 1. Import new, robust types and schemas
 import { createGoodSchema, CreateGoodPayload } from "@/lib/schemas/good.schema";
 import { GoodClient } from "@/lib/types/models.client";
+import { AccountNodeData } from "@/lib/types/ui";
 
 // ✅ 2. Use a consistent styling approach
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
@@ -21,6 +22,10 @@ interface AddEditGoodModalProps {
   onSubmit: (data: CreateGoodPayload) => void;
   initialData: GoodClient | null;
   isSubmitting: boolean;
+  // ✨ NEW: Journal modal integration
+  onOpenJournalSelector: (
+    onSelectCallback: (journalNode: AccountNodeData) => void
+  ) => void;
 }
 
 const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
@@ -29,14 +34,19 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
   onSubmit,
   initialData,
   isSubmitting,
+  onOpenJournalSelector,
 }) => {
   const isEditing = !!initialData;
+  
+  // ✨ NEW: State for selected journal
+  const [selectedJournal, setSelectedJournal] = useState<AccountNodeData | null>(null);
 
   // ✅ 4. Setup react-hook-form with Zod resolver
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
   } = useForm<CreateGoodPayload>({
     resolver: zodResolver(createGoodSchema),
@@ -49,8 +59,27 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
       taxCodeId: undefined,
       unitCodeId: undefined,
       typeCode: "",
+      journalId: "",
     },
   });
+
+  // Handle journal selection from modal
+  const handleJournalSelected = (journalNode: AccountNodeData) => {
+    setSelectedJournal(journalNode);
+    setValue("journalId", journalNode.id);
+  };
+
+  // Open journal selector
+  const handleOpenJournalSelector = () => {
+    onOpenJournalSelector(handleJournalSelected);
+  };
+
+  // Reset selected journal when modal opens/closes
+  useEffect(() => {
+    if (!isOpen || isEditing) {
+      setSelectedJournal(null);
+    }
+  }, [isOpen, isEditing]);
 
   // Effect for escape key & body scroll (Good practice, retained from your original)
   useEffect(() => {
@@ -200,6 +229,44 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
                   <p className={formStyles.error}>{errors.price.message}</p>
                 )}
               </div>
+
+              {/* ✨ NEW: Journal selection for new goods */}
+              {!isEditing && (
+                <div className={formStyles.formGroup}>
+                  <label>Journal Assignment *</label>
+                  <div className={formStyles.journalSelectionContainer}>
+                    {selectedJournal ? (
+                      <div className={formStyles.selectedJournalDisplay}>
+                        <span className={formStyles.selectedJournalName}>
+                          {selectedJournal.name} ({selectedJournal.id})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleOpenJournalSelector}
+                          className={formStyles.changeJournalButton}
+                          disabled={isSubmitting}
+                        >
+                          Change Journal
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleOpenJournalSelector}
+                        className={formStyles.selectJournalButton}
+                        disabled={isSubmitting}
+                      >
+                        Select Journal
+                      </button>
+                    )}
+                  </div>
+                  {errors.journalId && (
+                    <p className={formStyles.error}>
+                      {errors.journalId.message}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Other fields follow the same pattern */}
 

@@ -24,34 +24,44 @@
   margin-bottom: 0.5rem;
   font-weight: 600;
   font-size: 0.9rem;
-  color: #333;
+  color: var(--text-primary);
 }
 
 .formGroup input,
-.formGroup textarea {
+.formGroup textarea,
+.formGroup select {
   padding: 0.75rem;
-  border: 1px solid #ccc;
+  border: 1px solid var(--border-subtle);
   border-radius: 6px;
   font-size: 1rem;
-  background-color: #f9f9f9;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .formGroup input:focus,
-.formGroup textarea:focus {
+.formGroup textarea:focus,
+.formGroup select:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .formGroup input[readOnly],
-.formGroup textarea[readOnly] {
-  background-color: #e9ecef;
+.formGroup textarea[readOnly],
+.formGroup select[disabled] {
+  background-color: var(--bg-disabled);
   cursor: not-allowed;
-  color: #495057;
+  color: var(--text-disabled);
+  border-color: var(--border-disabled);
 }
 
 .formGroup textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+.formGroup select option {
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }

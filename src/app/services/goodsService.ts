@@ -14,7 +14,8 @@ import { serviceLogger } from "@/lib/logger";
 const goodsService = {
   async createGood(data: CreateGoodsData): Promise<GoodsAndService> {
     serviceLogger.debug("goodsService.createGood: Input", data);
-    // ... existing implementation ...
+    
+    // Validate related entities
     if (data.taxCodeId) {
       const taxCodeExists = await prisma.taxCode.findUnique({
         where: { id: data.taxCodeId },
@@ -32,13 +33,34 @@ const goodsService = {
         );
     }
 
-    const { createdById, ...restOfData } = data;
+    const { createdById, journalId, ...restOfData } = data;
+    
+    // Get the complete ancestor path for the selected journal
+    const ancestorPath = await journalService.getJournalAncestorPath(journalId);
+    serviceLogger.debug("goodsService.createGood: Ancestor path", { ancestorPath });
 
+    // Create the good first
     const newGood = await prisma.goodsAndService.create({
       data: {
         ...restOfData,
         createdBy: { connect: { id: createdById } },
       },
+    });
+    
+    // Create journal-good links for the entire hierarchy path
+    const journalGoodLinks = ancestorPath.map(journalId => ({
+      journalId,
+      goodId: newGood.id,
+      createdById: createdById,
+    }));
+    
+    await prisma.journalGoodLink.createMany({
+      data: journalGoodLinks,
+    });
+    
+    serviceLogger.debug("goodsService.createGood: Created journal links", { 
+      goodId: newGood.id, 
+      linkedJournals: ancestorPath 
     });
     serviceLogger.debug("goodsService.createGood: Output", newGood);
     return newGood;
@@ -103,9 +125,15 @@ const goodsService = {
       switch (filterMode) {
         case "affected":
           // Find goods linked to any of the selected journals or their descendants
-          prismaWhere.journalGoodLinks = {
-            some: { journalId: { in: allRelevantJournalIds } },
-          };
+          // Only show APPROVED goods in affected mode
+          prismaWhere.AND = [
+            { approvalStatus: "APPROVED" },
+            {
+              journalGoodLinks: {
+                some: { journalId: { in: allRelevantJournalIds } },
+              },
+            },
+          ];
           break;
 
         case "unaffected":
@@ -115,25 +143,40 @@ const goodsService = {
             );
             return { data: [], totalCount: 0 };
           }
-          // 1. Get all good IDs linked to any of the selected journals and their descendants
+          
+          // Get the parent paths for each selected journal
+          const goodsParentPaths: string[] = [];
+          for (const journalId of selectedJournalIds) {
+            const ancestorPath = await journalService.getJournalAncestorPath(journalId);
+            // Remove the deepest journal (the one selected) from the path to get parent path
+            const parentPath = ancestorPath.slice(1); // Remove the first element (deepest)
+            goodsParentPaths.push(...parentPath);
+          }
+          
+          // Remove duplicates from parent paths
+          const uniqueGoodsParentPaths = [...new Set(goodsParentPaths)];
+          
+          if (uniqueGoodsParentPaths.length === 0) {
+            serviceLogger.warn(
+              "goodsService.getAllGoods: No parent paths found for selected journals in 'unaffected' mode. Returning empty."
+            );
+            return { data: [], totalCount: 0 };
+          }
+          
+          // Find goods linked directly to the selected (deepest) journals
           const affectedGoodLinks = await prisma.journalGoodLink.findMany({
-            where: { journalId: { in: allRelevantJournalIds } },
+            where: { journalId: { in: selectedJournalIds } },
             select: { goodId: true },
           });
           const affectedGoodIds = affectedGoodLinks.map((p) => p.goodId);
-
-          // 2. Get all descendant journals for the overall permission scope.
-          const descendantIds = await journalService.getDescendantJournalIds(
-            permissionRootId
-          );
-
-          // 3. Find goods linked anywhere in the permission scope...
-          // 4. ...but exclude those found in the 'affected' list.
+          
+          // Find goods linked to parent paths but NOT to the deepest selected journals
           prismaWhere.AND = [
+            { approvalStatus: "APPROVED" }, // Only show approved goods
             {
               journalGoodLinks: {
                 some: {
-                  journalId: { in: [...descendantIds, permissionRootId] },
+                  journalId: { in: uniqueGoodsParentPaths },
                 },
               },
             },
@@ -144,12 +187,17 @@ const goodsService = {
           break;
 
         case "inProcess":
-          // The spec `{ approvalStatus: 'PENDING' }` doesn't apply to the Goods model.
-          // This mode is not applicable to Goods as they lack a status field.
-          serviceLogger.warn(
-            "goodsService.getAllGoods: 'inProcess' filter is not applicable to Goods. Returning empty."
-          );
-          return { data: [], totalCount: 0 };
+          // Find goods linked to any of the selected journals or their descendants
+          // Only show PENDING goods in inProcess mode
+          prismaWhere.AND = [
+            { approvalStatus: "PENDING" },
+            {
+              journalGoodLinks: {
+                some: { journalId: { in: allRelevantJournalIds } },
+              },
+            },
+          ];
+          break;
       }
     } else if (restrictedJournalId) {
       // Default behavior: Fetch all goods within the user's permitted journal hierarchy.

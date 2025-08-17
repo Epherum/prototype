@@ -203,6 +203,13 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                     whileTap={{ scale: 0.97 }}
                     transition={{ duration: 0.2, ease: "easeOut" }}
                   >
+                    <span 
+                      className={`${styles.filterDot} ${
+                        filter === 'affected' ? styles.filterDotAffected :
+                        filter === 'unaffected' ? styles.filterDotUnaffected :
+                        styles.filterDotInProcess
+                      }`}
+                    />
                     {filter.charAt(0).toUpperCase() + filter.slice(1)}
                   </motion.button>
                 ))}

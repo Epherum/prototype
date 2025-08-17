@@ -32,6 +32,7 @@ export const updateDocumentSchema = z.object({
   date: z.string().or(z.date()).optional(),
   description: z.string().optional().nullable(),
   paymentMode: z.string().optional().nullable(),
+  state: z.enum(["DRAFT", "FINALIZED", "PAID", "VOID"]).optional(),
 });
 
 export const getDocumentsQuerySchema = z.object({

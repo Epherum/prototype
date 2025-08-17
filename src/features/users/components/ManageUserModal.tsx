@@ -65,7 +65,7 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
     handleSubmit,
     showPassword,
     setShowPassword,
-  } = useUserManagement(userIdToEdit, onClose); // Pass onClose as the onSuccess callback
+  } = useUserManagement(userIdToEdit, onClose, true); // Pass onClose as the onSuccess callback and enable queries
 
   const handleDeleteRole = async (roleId: string, roleName: string) => {
     if (
@@ -319,12 +319,6 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                     >
                       <div
                         className={styles.journalSelect}
-                        style={{
-                          flexGrow: 1,
-                          padding: "8px 12px",
-                          backgroundColor: "#f0f0f0",
-                          cursor: "pointer",
-                        }}
                         onClick={() => setIsJournalModalOpen(true)}
                       >
                         {selectedJournalName}

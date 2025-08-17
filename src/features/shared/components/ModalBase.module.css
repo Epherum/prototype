@@ -65,7 +65,7 @@
 }
 .modalCloseButton:hover {
   color: var(--text-primary);
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--bg-secondary-hover);
 }
 
 .modalActions {
@@ -105,7 +105,7 @@
   color: var(--bg-card);
 }
 .modalButtonPrimary:hover:not(:disabled) {
-  background-color: #d68f63; /* Consider making this a variable too */
+  background-color: var(--accent-warm-hover);
 }
 .modalButtonPrimary:disabled {
   opacity: 0.5;
@@ -118,8 +118,8 @@
   border: 1px solid var(--border-subtle);
 }
 .modalButtonSecondary:hover {
-  background-color: #f0f0f0; /* Consider making this a variable */
-  border-color: #ccc; /* Consider making this a variable */
+  background-color: var(--bg-secondary-hover);
+  border-color: var(--border-hover);
 }
 
 /* In ModalBase.module.css */

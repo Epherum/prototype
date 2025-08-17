@@ -15,12 +15,15 @@ export const createGoodSchema = z.object({
   photoUrl: z.string().url("Must be a valid URL").optional().nullable(),
   additionalDetails: z.any().optional(),
   price: z.number().optional().nullable(),
+  // ✨ NEW: Required journal selection for good creation
+  journalId: z.string().min(1, "Journal selection is required"),
 });
 
 export const updateGoodSchema = createGoodSchema.partial().omit({
   // Per old types, these are not updatable
   referenceCode: true,
   barcode: true,
+  journalId: true, // Journal assignment cannot be changed after creation
 });
 
 export const getGoodsQuerySchema = z.object({

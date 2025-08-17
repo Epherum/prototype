@@ -8,17 +8,22 @@ export const createPartnerSchema = z.object({
   notes: z.string().optional().nullable(),
   logoUrl: z.string().url("Must be a valid URL").optional().nullable(),
   photoUrl: z.string().url("Must be a valid URL").optional().nullable(),
-  isUs: z.boolean().optional().nullable(),
   registrationNumber: z.string().optional().nullable(),
   taxId: z.string().optional().nullable(),
   bioFatherName: z.string().optional().nullable(),
   bioMotherName: z.string().optional().nullable(),
   // Assuming additionalDetails can be any JSON structure
   additionalDetails: z.any().optional(),
+  // ✨ NEW: Required journal selection for partner creation
+  journalId: z.string().min(1, "Journal selection is required"),
+  // Add approvalStatus to create schema as well for consistent typing
+  approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
 });
 
-// The update schema allows partial updates
-export const updatePartnerSchema = createPartnerSchema.partial();
+// The update schema allows partial updates and includes approval status
+export const updatePartnerSchema = createPartnerSchema.partial().extend({
+  approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+});
 
 export const getPartnersQuerySchema = z.object({
   take: z.coerce.number().int().positive().optional(),

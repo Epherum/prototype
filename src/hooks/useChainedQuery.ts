@@ -207,19 +207,14 @@ export const useChainedQuery = <T extends SliderType>(
           const activeFilters = journalSelection.rootFilter;
           const primaryFilterMode = activeFilters[0];
           
-          if (primaryFilterMode === 'affected') {
-            // For affected mode, we need only the terminal (deepest) journals
-            // If level3Ids exist, use those; otherwise use level2Ids; otherwise use topLevelId
-            const terminalIds = journalSelection.level3Ids.length > 0 
-              ? journalSelection.level3Ids
-              : journalSelection.level2Ids.length > 0 
-                ? journalSelection.level2Ids
-                : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
-            params.selectedJournalIds = terminalIds;
-          } else {
-            // For unaffected and inProcess modes, use the full effective path
-            params.selectedJournalIds = effectiveJournalIds;
-          }
+          // For all filter modes, we need the terminal (deepest) selected journals
+          // If level3Ids exist, use those; otherwise use level2Ids; otherwise use topLevelId
+          const terminalIds = journalSelection.level3Ids.length > 0 
+            ? journalSelection.level3Ids
+            : journalSelection.level2Ids.length > 0 
+              ? journalSelection.level2Ids
+              : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
+          params.selectedJournalIds = terminalIds;
           
           if (primaryFilterMode && ['affected', 'unaffected', 'inProcess'].includes(primaryFilterMode)) {
             params.filterMode = primaryFilterMode as 'affected' | 'unaffected' | 'inProcess';
@@ -229,18 +224,7 @@ export const useChainedQuery = <T extends SliderType>(
           // Include all filters in params to ensure query key changes when filters change
           params.allFilters = activeFilters;
           
-          // Debug logging
-          console.log('Partner query params:', {
-            hasJournalSelections,
-            isJournalBeforePartner,
-            allEffectiveIds: effectiveJournalIds,
-            selectedJournalIds: params.selectedJournalIds,
-            filterMode: params.filterMode,
-            allFilters: params.allFilters,
-            permissionRootId: params.permissionRootId,
-            level2Ids: journalSelection.level2Ids,
-            level3Ids: journalSelection.level3Ids
-          });
+         
         }
         
         return queryOptions({
@@ -296,7 +280,13 @@ export const useChainedQuery = <T extends SliderType>(
         
         // Only include journal filtering if we have journal selections AND journal comes before goods
         if (hasJournalSelectionsForGoods && isJournalBeforeGoods) {
-          goodsParams.selectedJournalIds = effectiveJournalIds;
+          // Use terminal IDs like in the partner section for consistency
+          const terminalIds = journalSelection.level3Ids.length > 0 
+            ? journalSelection.level3Ids
+            : journalSelection.level2Ids.length > 0 
+              ? journalSelection.level2Ids
+              : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
+          goodsParams.selectedJournalIds = terminalIds;
           goodsParams.filterMode = journalSelection.rootFilter[0] as any;
           goodsParams.permissionRootId = journalSelection.topLevelId;
         }
@@ -327,10 +317,14 @@ export const useChainedQuery = <T extends SliderType>(
           !!docParams.filterByJournalIds ||
           !!docParams.filterByPartnerIds ||
           !!docParams.filterByGoodIds;
+        
+        // When Document is in first position, enable query to show all user-accessible documents
+        const isDocumentFirst = myIndex === 0;
+        
         return queryOptions({
           queryKey: documentKeys.list(docParams),
           queryFn: () => documentService.getAllDocuments(docParams),
-          enabled: hasFilters,
+          enabled: hasFilters || isDocumentFirst,
         });
 
       default:
@@ -347,6 +341,10 @@ export const useChainedQuery = <T extends SliderType>(
     isCreating,
     effectiveJournalIds,
     journalSelection,
+    JSON.stringify(journalSelection.rootFilter), // Ensure array content changes trigger re-render
+    journalSelection.topLevelId,
+    journalSelection.level2Ids.length, // Track array length changes
+    journalSelection.level3Ids.length,
     selectedPartnerId,
     selectedPartnerIds,
     selectedGoodId,

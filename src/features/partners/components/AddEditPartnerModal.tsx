@@ -1,29 +1,36 @@
 // src/features/partners/components/AddEditPartnerModal.tsx
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IoClose } from "react-icons/io5";
-import { PartnerType } from "@prisma/client";
+import { PartnerType, ApprovalStatus } from "@prisma/client";
 
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import formStyles from "./AddEditPartnerModal.module.css";
 
-// ✅ Use only the most complete schema and payload type
+// ✅ Use both create and update schemas
 import {
   createPartnerSchema,
+  updatePartnerSchema,
   CreatePartnerPayload,
+  UpdatePartnerPayload,
 } from "@/lib/schemas/partner.schema";
 import { PartnerClient } from "@/lib/types/models.client";
+import { AccountNodeData } from "@/lib/types/ui";
 
 interface AddEditPartnerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // ✅ REFINED: onSubmit now expects the single, complete payload type.
-  onSubmit: (data: CreatePartnerPayload) => void;
+  // ✅ REFINED: onSubmit now expects either create or update payload type.
+  onSubmit: (data: CreatePartnerPayload | UpdatePartnerPayload) => void;
   initialData?: PartnerClient | null;
   isSubmitting?: boolean;
+  // ✨ NEW: Journal modal integration
+  onOpenJournalSelector: (
+    onSelectCallback: (journalNode: AccountNodeData) => void
+  ) => void;
 }
 
 const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
@@ -32,19 +39,42 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
   onSubmit,
   initialData,
   isSubmitting,
+  onOpenJournalSelector,
 }) => {
   const isEditMode = Boolean(initialData);
+  
+  // ✨ NEW: State for selected journal
+  const [selectedJournal, setSelectedJournal] = useState<AccountNodeData | null>(null);
 
-  // ✅ CORE CHANGE: The form is now typed ONLY with the complete payload type.
+  // ✅ CORE CHANGE: The form uses appropriate schema based on edit mode.
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors },
-  } = useForm<CreatePartnerPayload>({
-    // Always use the full schema for validation. Zod handles partials correctly.
-    resolver: zodResolver(createPartnerSchema),
+  } = useForm<CreatePartnerPayload | UpdatePartnerPayload>({
+    // Use appropriate schema for validation based on edit mode.
+    resolver: zodResolver(isEditMode ? updatePartnerSchema : createPartnerSchema),
   });
+
+  // Handle journal selection from modal
+  const handleJournalSelected = (journalNode: AccountNodeData) => {
+    setSelectedJournal(journalNode);
+    setValue("journalId", journalNode.id);
+  };
+
+  // Open journal selector
+  const handleOpenJournalSelector = () => {
+    onOpenJournalSelector(handleJournalSelected);
+  };
+
+  // Reset selected journal when modal opens/closes
+  useEffect(() => {
+    if (!isOpen || isEditMode) {
+      setSelectedJournal(null);
+    }
+  }, [isOpen, isEditMode]);
 
   // Effect to reset the form when the modal opens or initialData changes.
   useEffect(() => {
@@ -60,7 +90,7 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
           notes: "",
           taxId: "",
           registrationNumber: "",
-          isUs: false,
+          journalId: "",
         });
       }
     }
@@ -209,17 +239,65 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
                 )}
               </div>
 
-              <div
-                className={`${formStyles.formGroup} ${formStyles.formGroupCheckbox}`}
-              >
-                <input
-                  type="checkbox"
-                  id="isUs"
-                  {...register("isUs")}
-                  disabled={isSubmitting}
-                />
-                <label htmlFor="isUs">This is 'Us' (Our Company)</label>
-              </div>
+              {/* Approval Status field - only show in edit mode */}
+              {isEditMode && (
+                <div className={formStyles.formGroup}>
+                  <label htmlFor="approvalStatus">Approval Status</label>
+                  <select
+                    id="approvalStatus"
+                    {...register("approvalStatus")}
+                    disabled={isSubmitting}
+                    defaultValue={initialData?.approvalStatus}
+                  >
+                    <option value="PENDING">Pending</option>
+                    <option value="APPROVED">Approved</option>
+                    <option value="REJECTED">Rejected</option>
+                  </select>
+                  {errors.approvalStatus && (
+                    <p className={formStyles.errorText}>
+                      {errors.approvalStatus.message}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* ✨ NEW: Journal selection for new partners */}
+              {!isEditMode && (
+                <div className={formStyles.formGroup}>
+                  <label>Journal Assignment *</label>
+                  <div className={formStyles.journalSelectionContainer}>
+                    {selectedJournal ? (
+                      <div className={formStyles.selectedJournalDisplay}>
+                        <span className={formStyles.selectedJournalName}>
+                          {selectedJournal.name} ({selectedJournal.id})
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleOpenJournalSelector}
+                          className={formStyles.changeJournalButton}
+                          disabled={isSubmitting}
+                        >
+                          Change Journal
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleOpenJournalSelector}
+                        className={formStyles.selectJournalButton}
+                        disabled={isSubmitting}
+                      >
+                        Select Journal
+                      </button>
+                    )}
+                  </div>
+                  {errors.journalId && (
+                    <p className={formStyles.errorText}>
+                      {errors.journalId.message}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className={baseStyles.modalActions}>
                 <button

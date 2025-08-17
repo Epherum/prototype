@@ -51,6 +51,34 @@ async function getDescendantJournalIds(
 }
 
 /**
+ * ✨ NEW
+ * Gets the complete ancestor path (including the journal itself) for a given journal ID.
+ * Returns an array of journal IDs from root to the target journal.
+ */
+async function getJournalAncestorPath(journalId: string): Promise<string[]> {
+  serviceLogger.debug(
+    `journalService.getJournalAncestorPath: Input - journalId: '${journalId}'`
+  );
+
+  const result = await prisma.$queryRaw<Array<{ id: string; level: number }>>`
+    WITH RECURSIVE "JournalAncestors" AS (
+      SELECT "id", "parent_id", 0 AS level FROM "journals" WHERE "id" = ${journalId}
+      UNION ALL
+      SELECT j."id", j."parent_id", ja.level + 1 FROM "journals" j
+      INNER JOIN "JournalAncestors" ja ON j."id" = ja."parent_id"
+    )
+    SELECT "id", level FROM "JournalAncestors" ORDER BY level DESC;
+  `;
+
+  const path = result.map((row) => row.id);
+  serviceLogger.debug(
+    `journalService.getJournalAncestorPath: Output - path: [${path.join(', ')}]`
+  );
+
+  return path;
+}
+
+/**
  * ✅ EXISTING & SPECIFIED
  * Fetches the complete hierarchy of journals starting from a given root.
  */
@@ -353,6 +381,7 @@ export async function isDescendantOf(
 export const journalService = {
   // Functions specified in the new documentation
   getDescendantJournalIds,
+  getJournalAncestorPath,
   getJournalSubHierarchy,
   getJournalsForPartners,
   getJournalsForGoods,

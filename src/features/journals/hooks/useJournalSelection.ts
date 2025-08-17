@@ -191,12 +191,10 @@ export const useJournalSelection = (
   );
 
   const resetJournalSelections = useCallback(() => {
-    const initialSelections = getInitialSelections(
-      effectiveRestrictedJournalId
-    );
-    setSelection("journal", initialSelections.journal);
-    setSelection("effectiveJournalIds", initialSelections.effectiveJournalIds);
-  }, [setSelection, effectiveRestrictedJournalId]);
+    // Use the store's resetSelections which handles localStorage properly
+    const resetSelections = useAppStore.getState().resetSelections;
+    resetSelections();
+  }, []);
 
   const setSelectedFlatJournalId = useCallback(
     (id: string | null) => {
@@ -233,14 +231,3 @@ export const useJournalSelection = (
   };
 };
 
-const getInitialSelections = (restrictedJournalId = ROOT_JOURNAL_ID) => ({
-  journal: {
-    topLevelId: restrictedJournalId,
-    level2Ids: [],
-    level3Ids: [],
-    flatId: null,
-    rootFilter: ["affected"],
-    selectedJournalId: null,
-  },
-  effectiveJournalIds: [],
-});

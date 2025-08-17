@@ -61,6 +61,8 @@ interface DynamicSliderProps {
   // Document creation mode props
   isCreating?: boolean;
   creationMode?: string;
+  // Filter color coding
+  currentFilter?: string;
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -86,11 +88,28 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   onUpdateDocumentItem,
   isCreating = false,
   creationMode,
+  currentFilter,
 }) => {
   const initialSlideIndex = Math.max(
     0,
     data.findIndex((item) => item?.id === activeItemId)
   );
+
+  // Helper function to get filter dot CSS class and visibility
+  const getFilterDot = () => {
+    if (!currentFilter) return null;
+    
+    switch (currentFilter) {
+      case 'affected':
+        return <span className={`${styles.filterIndicatorDot} ${styles.filterDotAffected}`} />;
+      case 'unaffected':
+        return <span className={`${styles.filterIndicatorDot} ${styles.filterDotUnaffected}`} />;
+      case 'inProcess':
+        return <span className={`${styles.filterIndicatorDot} ${styles.filterDotInProcess}`} />;
+      default:
+        return null;
+    }
+  };
 
   const handleSwiperChange = (swiper: any) => {
     if (isLocked) return;
@@ -243,7 +262,8 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                       onClick={() => onItemClick && onItemClick(item.id)}
                     >
                       <div className={styles.slideTextContent}>
-                        <span className={styles.slideName}>
+                        <span className={styles.slideName} style={{ display: 'flex', alignItems: 'center' }}>
+                          {getFilterDot()}
                           {item.label || "Unnamed Item"}
                         </span>
                         {(item.code || item.unit_code) && (

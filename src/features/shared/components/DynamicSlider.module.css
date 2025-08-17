@@ -141,6 +141,28 @@
   white-space: nowrap;
 }
 
+/* Journal Filter Color Dots */
+.filterIndicatorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.filterDotAffected {
+  background-color: #4ade80; /* Green for affected */
+}
+
+.filterDotUnaffected {
+  background-color: #f97316; /* Orange for unaffected */
+}
+
+.filterDotInProcess {
+  background-color: #3b82f6; /* Blue for in-process */
+}
+
 /* Document Creation Mode Specifics */
 .slideSelectedForDocument {
   border: 3px solid var(--accent-warm) !important;

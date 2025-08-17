@@ -43,6 +43,31 @@ export async function fetchJournalHierarchy(
 }
 
 /**
+ * ✨ NEW: Fetches all available journals for selection in dropdowns.
+ * Respects user's journal restrictions.
+ * @param restrictedJournalId - The user's top-level journal permission.
+ * @returns A promise resolving to a flat array of journals.
+ */
+export async function fetchJournalsForSelection(
+  restrictedJournalId?: string | null
+): Promise<JournalClient[]> {
+  const params = new URLSearchParams();
+  if (restrictedJournalId && restrictedJournalId !== ROOT_JOURNAL_ID) {
+    params.append("rootJournalId", restrictedJournalId);
+  }
+
+  const apiUrl = `/api/journals?${params.toString()}`;
+  const response = await fetch(apiUrl);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch journals for selection");
+  }
+
+  const flatJournals: PrismaJournal[] = await response.json();
+  return flatJournals.map(mapToJournalClient);
+}
+
+/**
  * Finds all unique journals linked to one or more partners.
  * @param partnerIds - An array of partner IDs (string format).
  * @returns A promise resolving to an array of JournalClient objects.

@@ -40,8 +40,14 @@ export type PartnerClient = Omit<PartnerPrisma, "id" | "createdById" | "deletedB
   previousVersionId: string | null;
   nextVersionId: string | null;
   journalPartnerLinks?: JournalPartnerLinkWithDetailsClient[];
+  // Filter metadata for color coding
+  matchedFilters?: string[];
 };
-export type GoodClient = WithStringId<GoodPrisma> & { jpqLinkId?: string };
+export type GoodClient = WithStringId<GoodPrisma> & { 
+  jpqLinkId?: string;
+  // Filter metadata for color coding
+  matchedFilters?: string[];
+};
 export type JournalClient = JournalPrisma;
 
 // ✨ NEWLY ADDED & CORRECTED ✨

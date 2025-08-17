@@ -49,7 +49,7 @@ export default function UserAuthDisplay({
   const { data: session, status } = useSession();
   const { can: canManageUsers } = usePermissions({
     action: "MANAGE",
-    resource: "USERS",
+    resource: "USER",
   });
 
   return (

@@ -15,19 +15,43 @@ import {
 import { serviceLogger } from "@/lib/logger";
 
 const partnerService = {
-  // ✅ CHANGED: The function signature now uses the Zod-inferred type.
+  // ✅ ENHANCED: Now includes automatic hierarchical journal linking
   async createPartner(
     data: CreatePartnerPayload,
     createdById: string
   ): Promise<Partner> {
     serviceLogger.debug("partnerService.createPartner: Input", { data, createdById });
+    
+    const { journalId, ...partnerData } = data;
+    
+    // Get the complete ancestor path for the selected journal
+    const ancestorPath = await journalService.getJournalAncestorPath(journalId);
+    serviceLogger.debug("partnerService.createPartner: Ancestor path", { ancestorPath });
+    
+    // Create the partner first
     const newPartner = await prisma.partner.create({
       data: {
-        ...data,
+        ...partnerData,
         createdById: createdById,
         entityState: EntityState.ACTIVE,
         approvalStatus: ApprovalStatus.PENDING,
       },
+    });
+    
+    // Create journal-partner links for the entire hierarchy path
+    const journalPartnerLinks = ancestorPath.map(journalId => ({
+      journalId,
+      partnerId: newPartner.id,
+      partnershipType: "STANDARD_TRANSACTION", // Default partnership type
+    }));
+    
+    await prisma.journalPartnerLink.createMany({
+      data: journalPartnerLinks,
+    });
+    
+    serviceLogger.debug("partnerService.createPartner: Created journal links", { 
+      partnerId: newPartner.id, 
+      linkedJournals: ancestorPath 
     });
     serviceLogger.debug("partnerService.createPartner: Output", newPartner);
     return newPartner;
@@ -86,9 +110,15 @@ const partnerService = {
         case "affected":
           // Partners linked to the selected journal hierarchy
           // The selectedJournalIds should contain only the terminal/deepest selected journals
-          prismaWhere.journalPartnerLinks = {
-            some: { journalId: { in: journalIdsString } },
-          };
+          // Only show APPROVED partners in affected mode
+          prismaWhere.AND = [
+            { approvalStatus: "APPROVED" },
+            {
+              journalPartnerLinks: {
+                some: { journalId: { in: journalIdsString } },
+              },
+            },
+          ];
           break;
         case "unaffected":
           if (!permissionRootId) {
@@ -97,22 +127,40 @@ const partnerService = {
             );
             return { data: [], totalCount: 0 };
           }
-          // Find partners affected by any of the selected journals
+          
+          // Get the parent paths for each selected journal
+          const parentPaths: string[] = [];
+          for (const journalId of journalIdsString) {
+            const ancestorPath = await journalService.getJournalAncestorPath(journalId);
+            // Remove the deepest journal (the one selected) from the path to get parent path
+            const parentPath = ancestorPath.slice(1); // Remove the first element (deepest)
+            parentPaths.push(...parentPath);
+          }
+          
+          // Remove duplicates from parent paths
+          const uniqueParentPaths = [...new Set(parentPaths)];
+          
+          if (uniqueParentPaths.length === 0) {
+            serviceLogger.warn(
+              "partnerService.getAllPartners: No parent paths found for selected journals in 'unaffected' mode. Returning empty."
+            );
+            return { data: [], totalCount: 0 };
+          }
+          
+          // Find partners linked directly to the selected (deepest) journals
           const affectedLinks = await prisma.journalPartnerLink.findMany({
             where: { journalId: { in: journalIdsString } },
             select: { partnerId: true },
           });
           const affectedPartnerIds = affectedLinks.map((p) => p.partnerId);
           
-          // Get descendant IDs for permission root
-          const descendantIds = await journalService.getDescendantJournalIds(
-            permissionRootId
-          );
+          // Find partners linked to parent paths but NOT to the deepest selected journals
           prismaWhere.AND = [
+            { approvalStatus: "APPROVED" }, // Only show approved partners
             {
               journalPartnerLinks: {
                 some: {
-                  journalId: { in: [...descendantIds, permissionRootId] },
+                  journalId: { in: uniqueParentPaths },
                 },
               },
             },

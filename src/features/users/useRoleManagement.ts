@@ -35,12 +35,14 @@ interface UseRoleManagementProps {
   roleIdToEdit?: string | null;
   allRoles?: RoleWithPermissionsClient[];
   onSuccess: () => void;
+  enabled?: boolean; // Add flag to control when queries should run
 }
 
 export function useRoleManagement({
   roleIdToEdit,
   allRoles,
   onSuccess,
+  enabled = true,
 }: UseRoleManagementProps) {
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState<RoleFormState>(initialFormState);
@@ -67,6 +69,7 @@ export function useRoleManagement({
     queryKey: permissionKeys.all,
     queryFn: fetchAllPermissions,
     staleTime: Infinity,
+    enabled: enabled, // Only fetch when enabled and role modal is actually open
   });
 
   const mutationOptions = {

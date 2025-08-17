@@ -60,7 +60,8 @@ function findNodeById(
 
 export function useUserManagement(
   userIdToEdit?: string,
-  onSuccess?: () => void
+  onSuccess?: () => void,
+  enabled: boolean = true
 ) {
   const queryClient = useQueryClient();
   const currentUser = useCurrentUser();
@@ -103,6 +104,7 @@ export function useUserManagement(
   const { data: assignableRoles, isLoading: isLoadingRoles } = useQuery({
     queryKey: roleKeys.all,
     queryFn: (): Promise<RoleWithPermissionsClient[]> => fetchAllRoles(),
+    enabled: enabled, // Only fetch when enabled to avoid 403 errors
   });
 
   // ✨ MODIFIED: Use the correct Zod-inferred payload types.

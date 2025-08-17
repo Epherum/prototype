@@ -60,7 +60,7 @@ export const PartnerSliderController: React.FC<
   const toggleAccordion = useAppStore((state) => state.toggleAccordion);
   const sliderOrder = useAppStore((state) => state.sliderOrder);
   const visibility = useAppStore((state) => state.visibility);
-  const { gpgContextJournalId, good: selectedGoodId } = useAppStore(
+  const { gpgContextJournalId, good: selectedGoodId, journal: journalSelection } = useAppStore(
     // Corrected selection name
     (state) => state.selections
   );
@@ -79,6 +79,14 @@ export const PartnerSliderController: React.FC<
       visibleSliders[0] === SLIDER_TYPES.GOODS &&
       visibleSliders[1] === SLIDER_TYPES.PARTNER
     );
+  }, [sliderOrder, visibility]);
+
+  // Check if journal slider comes before partner slider for filter color coding
+  const shouldShowFilterColors = useMemo(() => {
+    const visibleSliders = sliderOrder.filter((id) => visibility[id]);
+    const journalIndex = visibleSliders.indexOf(SLIDER_TYPES.JOURNAL);
+    const partnerIndex = visibleSliders.indexOf(SLIDER_TYPES.PARTNER);
+    return journalIndex !== -1 && partnerIndex !== -1 && journalIndex < partnerIndex;
   }, [sliderOrder, visibility]);
 
   const canCreateGPGLink = useMemo(
@@ -213,6 +221,7 @@ export const PartnerSliderController: React.FC<
         }
         isAccordionOpen={isDetailsAccordionOpen}
         onToggleAccordion={() => toggleAccordion(SLIDER_TYPES.PARTNER)}
+        currentFilter={shouldShowFilterColors ? journalSelection.rootFilter[0] : undefined}
       />
 
       <AddEditPartnerModal
@@ -224,6 +233,7 @@ export const PartnerSliderController: React.FC<
           partnerManager.createPartnerMutation.isPending ||
           partnerManager.updatePartnerMutation.isPending
         }
+        onOpenJournalSelector={onOpenJournalSelector}
       />
 
       {/* Linking Modals */}

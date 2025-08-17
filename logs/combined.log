@@ -10,3 +10,57 @@
   level: 'info',
   timestamp: '2025-08-17 01:32:08'
 }
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:11:27'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:11:44'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:11:49'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:16:31'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:18:17'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:18:22'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:18:32'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:18:39'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 16:19:00'
+}

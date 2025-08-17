@@ -30,9 +30,11 @@ export const UsersController = forwardRef<UsersControllerRef>((_props, ref) => {
 
   // Fetch all roles once here, so both modals can use the data.
   // The User modal needs it for the list, the Role modal needs it for editing.
+  // Only fetch when a modal is actually open to avoid 403 errors for users without permissions
   const { data: allRoles } = useQuery({
     queryKey: roleKeys.all,
     queryFn: fetchAllRoles,
+    enabled: modalState.view !== "none", // Only fetch when a modal is open
   });
 
   // This hook manages the FORM STATE and LOGIC for the Role Modal
@@ -40,6 +42,7 @@ export const UsersController = forwardRef<UsersControllerRef>((_props, ref) => {
     roleIdToEdit: modalState.roleIdToEdit,
     allRoles: allRoles,
     onSuccess: closeModal, // On success, call the manager to close the role modal
+    enabled: modalState.view === "role", // Only enable queries when role modal is open
   });
 
   // Expose the `openUserModal` function to the parent component

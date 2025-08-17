@@ -9,7 +9,7 @@ import type {
   AccordionState 
 } from "../types";
 import { getInitialDocumentCreationState } from "./documentCreationSlice";
-import { getInitialSelections } from "./selectionsSlice";
+import { getDefaultSelections } from "./selectionsSlice";
 
 // Initial UI state
 export const getInitialUiState = (): Omit<UiSlice, 'documentCreationState'> => ({
@@ -84,7 +84,7 @@ export const createUiActions = (set: any, get: any): UiActions => ({
 
       const slidersToReset = newVisibleOrder.slice(breakPointIndex);
       const newSelections = { ...state.selections };
-      const initialSelectionsForReset = getInitialSelections(
+      const initialSelectionsForReset = getDefaultSelections(
         state.effectiveRestrictedJournalId
       );
 

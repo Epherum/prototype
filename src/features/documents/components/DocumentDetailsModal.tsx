@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./DocumentDetailsModal.module.css";
 import { DocumentClient } from "@/lib/types/models.client";
-import { IoDocumentTextOutline } from "react-icons/io5";
+import { IoDocumentTextOutline, IoCalendarOutline, IoPersonOutline, IoReceiptOutline } from "react-icons/io5";
 
 interface DocumentDetailsModalProps {
   isOpen: boolean;
@@ -134,29 +134,38 @@ const DocumentDetailsModal: React.FC<DocumentDetailsModalProps> = ({
                 <>
                   <div className={styles.headerInfo}>
                     <div className={styles.documentInfo}>
-                      <h3 className={styles.sectionTitle}>Document Information</h3>
+                      <h3 className={styles.sectionTitle}>
+                        <IoDocumentTextOutline style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                        Document Information
+                      </h3>
                       <div className={styles.infoGrid}>
                         <div className={styles.infoItem}>
-                          <span className={styles.label}>Reference:</span>
+                          <span className={styles.label}>
+                            <IoReceiptOutline style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                            Reference
+                          </span>
                           <span className={styles.value}>{document.refDoc}</span>
                         </div>
                         <div className={styles.infoItem}>
-                          <span className={styles.label}>Type:</span>
+                          <span className={styles.label}>Type</span>
                           <span className={styles.value}>{document.type}</span>
                         </div>
                         <div className={styles.infoItem}>
-                          <span className={styles.label}>Date:</span>
+                          <span className={styles.label}>
+                            <IoCalendarOutline style={{ marginRight: '4px', verticalAlign: 'middle' }} />
+                            Date
+                          </span>
                           <span className={styles.value}>{formatDate(document.date)}</span>
                         </div>
                         <div className={styles.infoItem}>
-                          <span className={styles.label}>State:</span>
+                          <span className={styles.label}>Status</span>
                           <span className={`${styles.value} ${styles.status} ${styles[document.state.toLowerCase()]}`}>
                             {document.state}
                           </span>
                         </div>
                         {document.description && (
                           <div className={styles.infoItem}>
-                            <span className={styles.label}>Description:</span>
+                            <span className={styles.label}>Description</span>
                             <span className={styles.value}>{document.description}</span>
                           </div>
                         )}
@@ -165,21 +174,24 @@ const DocumentDetailsModal: React.FC<DocumentDetailsModalProps> = ({
                     
                     {document.partner && (
                       <div className={styles.partnerInfo}>
-                        <h3 className={styles.sectionTitle}>Partner Information</h3>
+                        <h3 className={styles.sectionTitle}>
+                          <IoPersonOutline style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+                          Partner Information
+                        </h3>
                         <div className={styles.infoGrid}>
                           <div className={styles.infoItem}>
-                            <span className={styles.label}>Name:</span>
+                            <span className={styles.label}>Name</span>
                             <span className={styles.value}>{document.partner.name}</span>
                           </div>
                           {document.partner.registrationNumber && (
                             <div className={styles.infoItem}>
-                              <span className={styles.label}>Registration #:</span>
+                              <span className={styles.label}>Registration #</span>
                               <span className={styles.value}>{document.partner.registrationNumber}</span>
                             </div>
                           )}
                           {document.partner.taxId && (
                             <div className={styles.infoItem}>
-                              <span className={styles.label}>Tax ID:</span>
+                              <span className={styles.label}>Tax ID</span>
                               <span className={styles.value}>{document.partner.taxId}</span>
                             </div>
                           )}
@@ -210,11 +222,15 @@ const DocumentDetailsModal: React.FC<DocumentDetailsModalProps> = ({
                               </span>
                             </div>
                             <div className={styles.lineItemDetails}>
-                              {parseFloat(line.quantity.toString()).toLocaleString()}
-                              {line.unitOfMeasure && ` ${line.unitOfMeasure}`} × {formatCurrency(line.unitPrice.toString())}
+                              <span>
+                                <strong>{parseFloat(line.quantity.toString()).toLocaleString()}</strong>
+                                {line.unitOfMeasure && ` ${line.unitOfMeasure}`}
+                              </span>
+                              <span>×</span>
+                              <span>{formatCurrency(line.unitPrice.toString())}</span>
                               {line.discountPercentage && parseFloat(line.discountPercentage.toString()) > 0 && (
                                 <span className={styles.discount}>
-                                  {" "}- {parseFloat(line.discountPercentage.toString())}% discount
+                                  -{parseFloat(line.discountPercentage.toString())}% off
                                 </span>
                               )}
                             </div>

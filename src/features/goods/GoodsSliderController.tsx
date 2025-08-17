@@ -75,6 +75,14 @@ export const GoodsSliderController = forwardRef<
       (state) => state.selections
     );
 
+    // Check if journal slider comes before goods slider for filter color coding
+    const shouldShowFilterColors = useMemo(() => {
+      const visibleSliders = sliderOrder.filter((id) => visibility[id]);
+      const journalIndex = visibleSliders.indexOf(SLIDER_TYPES.JOURNAL);
+      const goodsIndex = visibleSliders.indexOf(SLIDER_TYPES.GOODS);
+      return journalIndex !== -1 && goodsIndex !== -1 && journalIndex < goodsIndex;
+    }, [sliderOrder, visibility]);
+
     const handleItemClick = (id: string) => {
       if (isMultiSelect) {
         onToggleGoodForDoc(id);
@@ -288,6 +296,7 @@ export const GoodsSliderController = forwardRef<
           showDocumentItemInputs={isCreating && isMultiSelect && mode === "SINGLE_ITEM"}
           documentItems={documentItemsWithLabels}
           onUpdateDocumentItem={updateDocumentItem}
+          currentFilter={shouldShowFilterColors ? journalSelections.rootFilter[0] : undefined}
         />
 
         <AddEditGoodModal
@@ -299,6 +308,7 @@ export const GoodsSliderController = forwardRef<
             goodManager.createGoodMutation.isPending ||
             goodManager.updateGoodMutation.isPending
           }
+          onOpenJournalSelector={onOpenJournalSelectorForLinking}
         />
         {goodJournalLinking.isLinkModalOpen && (
           <LinkGoodToJournalsModal

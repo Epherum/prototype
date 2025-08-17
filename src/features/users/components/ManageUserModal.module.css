@@ -66,9 +66,9 @@
 .formGroup textarea {
   width: 100%;
   padding: calc(var(--spacing-unit) * 1.5);
-  border: 1px solid #dcdcdc; /* A slightly more visible border */
+  border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-sm);
-  background-color: var(--bg-card);
+  background-color: var(--bg-input);
   font-size: 1rem;
   color: var(--text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -145,6 +145,7 @@
   gap: 4px; /* Tighter gap between roles */
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-md);
+  background-color: var(--bg-input);
   padding: var(--spacing-unit);
   max-height: 220px;
   overflow-y: auto;
@@ -214,7 +215,7 @@
 
 .roleActions button:hover {
   color: var(--text-primary);
-  background-color: #e0e0e0;
+  background-color: var(--bg-secondary-hover);
   transform: scale(1.1);
 }
 
@@ -244,4 +245,22 @@
   font-size: 0.9rem;
   font-weight: 500;
   border: 1px solid var(--danger-color);
+}
+
+/* --- Journal Selection Styling --- */
+.journalSelect {
+  flex-grow: 1;
+  padding: calc(var(--spacing-unit) * 1.5);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.journalSelect:hover {
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 3px var(--accent-warm-light);
 }

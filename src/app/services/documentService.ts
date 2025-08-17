@@ -61,6 +61,7 @@ export const updateDocumentSchema = z.object({
   date: z.coerce.date().optional(),
   description: z.string().optional().nullable(),
   paymentMode: z.string().optional().nullable(),
+  state: z.enum(["DRAFT", "FINALIZED", "PAID", "VOID"]).optional(),
 });
 export type UpdateDocumentData = z.infer<typeof updateDocumentSchema>;
 

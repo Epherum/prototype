@@ -1,6 +1,6 @@
 // src/components/modals/ManageRoleModal.tsx
 
-import React from "react";
+import React, { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { IoClose } from "react-icons/io5";
 import type { RoleFormState } from "@/features/users/useRoleManagement"; // Import the type for our form state
@@ -44,9 +44,56 @@ export const ManageRoleModal: React.FC<ManageRoleModalProps> = ({
 }) => {
   const modalTitle = isEditMode ? `Edit Role` : "Create New Role";
 
+  // Group permissions by resource for better organization
+  const groupedPermissions = useMemo(() => {
+    if (!allPermissions) return {};
+    
+    return allPermissions.reduce((groups, permission) => {
+      const resource = permission.resource;
+      if (!groups[resource]) {
+        groups[resource] = [];
+      }
+      groups[resource].push(permission);
+      return groups;
+    }, {} as Record<string, PermissionClient[]>);
+  }, [allPermissions]);
+
+  // Sort resources to show in a logical order
+  const sortedResources = useMemo(() => {
+    const resourceOrder = ['USER', 'ROLE', 'JOURNAL', 'PARTNER', 'GOODS', 'DOCUMENT'];
+    const resources = Object.keys(groupedPermissions);
+    
+    return resourceOrder.filter(resource => resources.includes(resource))
+      .concat(resources.filter(resource => !resourceOrder.includes(resource)));
+  }, [groupedPermissions]);
+
   const handleActualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     handleSubmit();
+  };
+
+  const handleSelectAllForResource = (resource: string, select: boolean) => {
+    const resourcePermissions = groupedPermissions[resource] || [];
+    resourcePermissions.forEach(permission => {
+      const isCurrentlySelected = formState.permissionIds.includes(permission.id);
+      if (select && !isCurrentlySelected) {
+        handlePermissionToggle(permission.id);
+      } else if (!select && isCurrentlySelected) {
+        handlePermissionToggle(permission.id);
+      }
+    });
+  };
+
+  const getResourceDisplayName = (resource: string) => {
+    switch (resource) {
+      case 'USER': return 'User Management';
+      case 'ROLE': return 'Role Management';
+      case 'JOURNAL': return 'Journal/Accounts';
+      case 'PARTNER': return 'Partners';
+      case 'GOODS': return 'Goods & Services';
+      case 'DOCUMENT': return 'Documents';
+      default: return resource.charAt(0) + resource.slice(1).toLowerCase();
+    }
   };
 
   return (
@@ -106,29 +153,65 @@ export const ManageRoleModal: React.FC<ManageRoleModalProps> = ({
                 </div>
                 <div className={styles.formGroup}>
                   <label>Permissions *</label>
-                  <div className={roleStyles.permissionsGrid}>
-                    {allPermissions?.map((p) => (
-                      <div key={p.id} className={styles.roleCheckboxWrapper}>
-                        <input
-                          type="checkbox"
-                          id={`perm-${p.id}`}
-                          checked={formState.permissionIds.includes(p.id)}
-                          onChange={() => handlePermissionToggle(p.id)}
-                          disabled={isSubmitting}
-                        />
-                        <label
-                          htmlFor={`perm-${p.id}`}
-                          className={roleStyles.permissionLabel}
-                        >
-                          <span className={roleStyles.actionText}>
-                            {p.action}
-                          </span>
-                          <span className={roleStyles.resourceText}>
-                            {p.resource}
-                          </span>
-                        </label>
-                      </div>
-                    ))}
+                  <div className={roleStyles.permissionsContainer}>
+                    {sortedResources.map((resource) => {
+                      const resourcePermissions = groupedPermissions[resource] || [];
+                      const selectedCount = resourcePermissions.filter(p => 
+                        formState.permissionIds.includes(p.id)
+                      ).length;
+                      const totalCount = resourcePermissions.length;
+                      const allSelected = selectedCount === totalCount;
+                      const someSelected = selectedCount > 0 && selectedCount < totalCount;
+
+                      return (
+                        <div key={resource} className={roleStyles.permissionGroup}>
+                          <div className={roleStyles.groupHeader}>
+                            <h4 className={roleStyles.groupTitle}>
+                              {getResourceDisplayName(resource)}
+                            </h4>
+                            <div className={roleStyles.groupControls}>
+                              <span className={roleStyles.selectionCount}>
+                                {selectedCount}/{totalCount} selected
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleSelectAllForResource(resource, !allSelected)}
+                                className={roleStyles.selectAllButton}
+                                disabled={isSubmitting}
+                              >
+                                {allSelected ? 'Deselect All' : 'Select All'}
+                              </button>
+                            </div>
+                          </div>
+                          <div className={roleStyles.permissionsGrid}>
+                            {resourcePermissions.map((permission) => (
+                              <div key={permission.id} className={styles.roleCheckboxWrapper}>
+                                <input
+                                  type="checkbox"
+                                  id={`perm-${permission.id}`}
+                                  checked={formState.permissionIds.includes(permission.id)}
+                                  onChange={() => handlePermissionToggle(permission.id)}
+                                  disabled={isSubmitting}
+                                />
+                                <label
+                                  htmlFor={`perm-${permission.id}`}
+                                  className={roleStyles.permissionLabel}
+                                >
+                                  <span className={roleStyles.actionText}>
+                                    {permission.action}
+                                  </span>
+                                  {permission.description && (
+                                    <span className={roleStyles.descriptionText}>
+                                      {permission.description}
+                                    </span>
+                                  )}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

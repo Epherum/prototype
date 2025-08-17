@@ -24,46 +24,40 @@
 .formGroup label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: var(--text-secondary); /* Use your global variable */
+  color: var(--text-secondary, #374151);
 }
 
-.formGroup input[type="text"],
-.formGroup input[type="url"],
+.formGroup input,
 .formGroup select,
 .formGroup textarea {
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--border-subtle); /* Use your global variable */
-  border-radius: var(--border-radius-md); /* Use your global variable */
+  border: 1px solid var(--border-subtle, #d1d5db);
+  border-radius: var(--border-radius-md, 6px);
   font-size: 0.95rem;
-  background-color: var(
-    --bg-input,
-    white
-  ); /* Assuming a global variable for input background */
-  color: var(--text-primary);
+  background-color: var(--bg-input, #ffffff);
+  color: var(--text-primary, #1f2937);
   width: 100%;
   box-sizing: border-box;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.formGroup input[type="text"]:focus,
-.formGroup input[type="url"]:focus,
+.formGroup input:focus,
 .formGroup select:focus,
 .formGroup textarea:focus {
   outline: none;
-  border-color: var(--accent-warm); /* Use your global variable */
-  box-shadow: 0 0 0 2px var(--accent-warm-light); /* Use your global variable */
+  border-color: var(--accent-warm, #f59e0b);
+  box-shadow: 0 0 0 2px var(--accent-warm-light, rgba(245, 158, 11, 0.1));
 }
 
-.formGroup input[type="text"]:disabled,
-.formGroup input[type="url"]:disabled,
+.formGroup input:disabled,
 .formGroup select:disabled,
 .formGroup textarea:disabled,
 .readOnlyInput {
   /* Class for explicitly read-only styled inputs */
-  background-color: var(--bg-disabled, #e9ecef); /* Use your global variable */
-  color: var(--text-disabled, #6c757d); /* Use your global variable */
+  background-color: var(--bg-disabled, #f3f4f6);
+  color: var(--text-disabled, #6b7280);
   cursor: not-allowed;
-  border-color: var(--border-disabled, #ced4da);
+  border-color: var(--border-disabled, #d1d5db);
 }
 
 .formGroupCheckbox {
@@ -83,6 +77,71 @@
   font-weight: normal; /* Labels for checkboxes are often normal weight */
   font-size: 0.95rem;
   color: var(--text-primary);
+}
+
+/* Journal selection styles */
+.journalSelectionContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.selectedJournalDisplay {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-input, white);
+}
+
+.selectedJournalName {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.selectJournalButton,
+.changeJournalButton {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--accent-warm);
+  border-radius: var(--border-radius-md);
+  background-color: transparent;
+  color: var(--accent-warm);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selectJournalButton:hover,
+.changeJournalButton:hover {
+  background-color: var(--accent-warm);
+  color: white;
+}
+
+.selectJournalButton:disabled,
+.changeJournalButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.changeJournalButton {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+/* Error and info text styles */
+.errorText {
+  color: var(--color-error, #dc3545);
+  font-size: 0.825rem;
+  margin-top: 0.25rem;
+}
+
+.infoText {
+  color: var(--text-secondary, #6c757d);
+  font-size: 0.825rem;
+  margin-top: 0.25rem;
+  font-style: italic;
 }
 
 /* Styles for .modalActions and its buttons are in ModalBase.module.css */

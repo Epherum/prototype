@@ -20,5 +20,5 @@ export type CreateGoodsData = z.infer<typeof createGoodSchema> & {
 };
 
 export type UpdateGoodsData = Partial<
-  Omit<CreateGoodsData, "referenceCode" | "barcode" | "createdById">
+  Omit<CreateGoodsData, "referenceCode" | "barcode" | "createdById" | "journalId">
 >;

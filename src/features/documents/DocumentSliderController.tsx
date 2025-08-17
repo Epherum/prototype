@@ -8,14 +8,16 @@ import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import DocumentConfirmationModal from "./components/DocumentConfirmationModal";
 import SingleItemQuantityModal from "./components/SingleItemQuantityModal";
 import DocumentDetailsModal from "./components/DocumentDetailsModal";
+import { ManageDocumentModal } from "./components/ManageDocumentModal";
 import { SLIDER_TYPES } from "@/lib/constants";
 import styles from "@/app/page.module.css";
 import { IoAddCircleOutline, IoOptionsOutline, IoOpenOutline } from "react-icons/io5";
 import type { useDocumentManager } from "./useDocumentManager";
 import DocumentsOptionsMenu from "./components/DocumentsOptionsMenu";
-import { getDocumentById, deleteDocument } from "@/services/clientDocumentService";
+import { getDocumentById, deleteDocument, updateDocument } from "@/services/clientDocumentService";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentKeys } from "@/lib/queryKeys";
+import type { UpdateDocumentPayload } from "@/lib/schemas/document.schema";
 
 // ✅ NEW: Import client model
 import type { DocumentClient } from "@/lib/types/models.client";
@@ -58,6 +60,7 @@ export const DocumentSliderController = forwardRef<
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [selectedDocumentDetails, setSelectedDocumentDetails] = useState<DocumentClient | null>(null);
     const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
     // Delete mutation
     const deleteMutation = useMutation({
@@ -73,6 +76,26 @@ export const DocumentSliderController = forwardRef<
       },
       onError: (error: Error) => {
         alert(`Failed to delete document: ${error.message}`);
+      },
+    });
+
+    // Update mutation
+    const updateMutation = useMutation({
+      mutationFn: ({ id, data }: { id: string; data: UpdateDocumentPayload }) =>
+        updateDocument(id, data),
+      onSuccess: (updatedDocument) => {
+        // Invalidate and refetch document queries
+        queryClient.invalidateQueries({ queryKey: documentKeys.lists() });
+        queryClient.invalidateQueries({ queryKey: documentKeys.detail(updatedDocument.id) });
+        // Update the selectedDocumentDetails if it matches the updated document
+        if (selectedDocumentDetails?.id === updatedDocument.id) {
+          setSelectedDocumentDetails(updatedDocument);
+        }
+        setIsEditModalOpen(false);
+        alert("Document updated successfully!");
+      },
+      onError: (error: Error) => {
+        alert(`Failed to update document: ${error.message}`);
       },
     });
 
@@ -108,9 +131,31 @@ export const DocumentSliderController = forwardRef<
       setIsLoadingDetails(false);
     };
 
-    const handleEditDocument = () => {
-      // TODO: Implement edit functionality
-      alert(`Edit functionality for document ${activeDocumentId} will be implemented`);
+    const handleEditDocument = async () => {
+      if (!activeDocumentId) return;
+      
+      // If we don't have document details loaded, fetch them first
+      if (!selectedDocumentDetails || selectedDocumentDetails.id !== activeDocumentId) {
+        setIsLoadingDetails(true);
+        try {
+          const documentDetails = await getDocumentById(activeDocumentId);
+          setSelectedDocumentDetails(documentDetails);
+        } catch (error) {
+          console.error('Failed to fetch document details for editing:', error);
+          alert('Failed to load document details for editing');
+          setIsLoadingDetails(false);
+          return;
+        } finally {
+          setIsLoadingDetails(false);
+        }
+      }
+      
+      setIsEditModalOpen(true);
+    };
+
+    const handleSaveDocument = (data: UpdateDocumentPayload) => {
+      if (!activeDocumentId) return;
+      updateMutation.mutate({ id: activeDocumentId, data });
     };
 
     const handleDeleteDocument = () => {
@@ -312,6 +357,16 @@ export const DocumentSliderController = forwardRef<
           onClose={handleCloseDetailsModal}
           document={selectedDocumentDetails}
           isLoading={isLoadingDetails}
+        />
+        
+        <ManageDocumentModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          onSave={handleSaveDocument}
+          document={selectedDocumentDetails}
+          isLoading={isLoadingDetails}
+          isSaving={updateMutation.isPending}
+          isViewOnly={false}
         />
       </div>
     );
