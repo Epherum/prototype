@@ -9,6 +9,12 @@ import type {
   PartnerGoodFilterStatus,
 } from "@/lib/types/ui";
 
+// Helper function to capitalize only the first letter
+const capitalizeFirstLetter = (text: string): string => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+};
+
 const pastelColors = [
   "#BFFCC6",
   "#FFFFBA",
@@ -250,7 +256,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                         "--item-color": colorMap.get(l1Node.id),
                       } as React.CSSProperties
                     }
-                    title={`${l1Node.code} - ${l1Node.name}. Click to cycle, Dbl-click to drill.`}
+                    title={`${l1Node.code} - ${capitalizeFirstLetter(l1Node.name)}. Click to cycle, Dbl-click to drill.`}
                     disabled={isLocked}
                     whileHover={{
                       scale: 1.08,
@@ -307,7 +313,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                             : ""
                         }`}
                         style={{ "--item-color": color } as React.CSSProperties}
-                        title={`${l2Node.code} - ${l2Node.name}`}
+                        title={`${l2Node.code} - ${capitalizeFirstLetter(l2Node.name)}`}
                         disabled={isLocked}
                         whileHover={{
                           scale: 1.08,

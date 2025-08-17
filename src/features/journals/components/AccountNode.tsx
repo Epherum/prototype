@@ -8,6 +8,12 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./JournalModal.module.css";
 
+// Helper function to capitalize only the first letter
+const capitalizeFirstLetter = (text: string): string => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+};
+
 function AccountNode({
   node,
   level = 0,
@@ -61,7 +67,7 @@ function AccountNode({
     if (onDeleteNode) {
       if (
         window.confirm(
-          `Are you sure you want to delete "${node.code} - ${node.name}"? This will also delete all its sub-accounts.`
+          `Are you sure you want to delete "${node.code} - ${capitalizeFirstLetter(node.name)}"? This will also delete all its sub-accounts.`
         )
       ) {
         onDeleteNode(node.id);
@@ -102,14 +108,14 @@ function AccountNode({
           )}
         </span>
         <span className={styles.accountNodeCode}>{node.code}</span>
-        <span className={styles.accountNodeName}>{node.name}</span>
+        <span className={styles.accountNodeName}>{capitalizeFirstLetter(node.name)}</span>
 
         <div className={styles.accountNodeActions}>
           {isSelected && onTriggerAddChildToNode && (
             <button
               onClick={handleAddChildClick}
               className={`${styles.accountNodeActionButton} ${styles.accountNodeAddChildButton}`}
-              title={`Add sub-account to ${node.name}${
+              title={`Add sub-account to ${capitalizeFirstLetter(node.name)}${
                 isConceptualRootNode ? " (New Top-Level)" : ""
               }`}
             >
@@ -120,7 +126,7 @@ function AccountNode({
             <button
               onClick={handleDeleteClick}
               className={`${styles.accountNodeActionButton} ${styles.accountNodeDeleteButton}`}
-              title={`Delete account ${node.name}`}
+              title={`Delete account ${capitalizeFirstLetter(node.name)}`}
             >
               <IoTrashBinOutline />
             </button>

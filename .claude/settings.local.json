@@ -10,7 +10,9 @@
       "Bash(rm:*)",
       "Bash(grep:*)",
       "Bash(npx tsx:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

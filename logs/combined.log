@@ -64,3 +64,15 @@
   level: 'info',
   timestamp: '2025-08-17 16:19:00'
 }
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 20:10:40'
+}
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-08-17 20:10:40'
+}

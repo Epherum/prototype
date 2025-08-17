@@ -239,6 +239,7 @@
   touch-action: manipulation;
   min-width: 0; /* Allow the container to shrink */
   -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+  text-transform: capitalize;
 }
 .splitButtonMain:focus {
   outline: none;
@@ -266,6 +267,7 @@
   text-overflow: ellipsis;
   display: block;
   max-width: 100%;
+  text-transform: capitalize;
   white-space: nowrap;
 }
 

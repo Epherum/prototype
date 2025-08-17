@@ -32,6 +32,12 @@ import {
 // Types
 import type { AccountNodeData, PartnerGoodFilterStatus } from "@/lib/types/ui";
 
+// Helper function to capitalize only the first letter
+const capitalizeFirstLetter = (text: string): string => {
+  if (!text) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+};
+
 // --- ANIMATION VARIANTS ---
 const textVariants = {
   initial: { opacity: 0, y: -10 },
@@ -214,7 +220,7 @@ export const JournalSliderController = forwardRef<
                     ? journalManager.handleNavigateUpOneLevel
                     : undefined
                 }
-                title={`${topLevelContextNode.code} - ${topLevelContextNode.name}. Double-click to navigate up.`}
+                title={`${topLevelContextNode.code} - ${capitalizeFirstLetter(topLevelContextNode.name)}. Double-click to navigate up.`}
               >
                 <div className={styles.animatedTextWrapper}>
                   <AnimatePresence mode="wait">
@@ -227,7 +233,7 @@ export const JournalSliderController = forwardRef<
                       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
                       style={{ whiteSpace: isTitleExpanded ? "normal" : "nowrap" }}
                     >
-                      {topLevelContextNode.code} - {topLevelContextNode.name}
+                      {topLevelContextNode.code} - {capitalizeFirstLetter(topLevelContextNode.name)}
                     </motion.span>
                   </AnimatePresence>
                 </div>
