@@ -43,7 +43,7 @@ export const GET = withAuthorization(
           { status: 400 }
         );
       }
-      const { intersectionOfGoodIds, findByDocumentId, selectedJournalIds, filterMode, permissionRootId, ...restOfOptions } =
+      const { intersectionOfGoodIds, findByDocumentId, selectedJournalIds, filterMode, activeFilterModes, permissionRootId, ...restOfOptions } =
         validation.data;
       let result;
       if (findByDocumentId) {
@@ -58,6 +58,7 @@ export const GET = withAuthorization(
           ...restOfOptions,
           selectedJournalIds,
           filterMode,
+          activeFilterModes,
           permissionRootId,
           restrictedJournalId: session.user?.restrictedTopLevelJournalId,
           where: {},

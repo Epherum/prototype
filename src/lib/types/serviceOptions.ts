@@ -20,6 +20,7 @@ export interface GetAllItemsOptions<T> {
 
   // New Filtering Logic
   filterMode?: FilterMode;
+  activeFilterModes?: FilterMode[]; // Multi-select filter modes
   permissionRootId?: string;
   selectedJournalIds?: string[];
 }

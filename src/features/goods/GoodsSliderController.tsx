@@ -297,6 +297,7 @@ export const GoodsSliderController = forwardRef<
           documentItems={documentItemsWithLabels}
           onUpdateDocumentItem={updateDocumentItem}
           currentFilter={shouldShowFilterColors ? journalSelections.rootFilter[0] : undefined}
+          activeFilters={shouldShowFilterColors ? journalSelections.rootFilter : []}
         />
 
         <AddEditGoodModal

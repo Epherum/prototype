@@ -54,6 +54,9 @@ export const GET = withAuthorization(
         intersectionOfPartnerIds, 
         findByDocumentId,
         selectedJournalIds, 
+        filterMode,
+        activeFilterModes,
+        permissionRootId,
         partnerId, 
         journalIds, 
         ...restOfOptions 
@@ -84,6 +87,9 @@ export const GET = withAuthorization(
         result = await goodsService.getAllGoods({
           ...restOfOptions,
           selectedJournalIds,
+          filterMode,
+          activeFilterModes,
+          permissionRootId,
           // CORRECTED FIX: Use optional chaining.
           // This safely passes the ID if it exists, or `undefined` if not,
           // which the service is already designed to handle.

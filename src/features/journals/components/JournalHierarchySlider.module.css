@@ -1,10 +1,96 @@
 /* src/features/journals/components/JournalHierarchySlider.module.css */
 
+/* Slider header with help button */
+.sliderHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: calc(var(--spacing-unit) * 0.75);
+  padding: 0 calc(var(--spacing-unit) * 0.5);
+}
+
+.sliderTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.helpButtonContainer {
+  position: absolute;
+  right: 0;
+}
+
+.helpButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  font-size: 18px;
+}
+
+.helpButton:hover:not(:disabled) {
+  color: var(--accent-warm);
+  background-color: var(--bg-secondary);
+}
+
+.helpButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tooltip {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  z-index: 1000;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+/* Mobile responsiveness for tooltip */
+@media (max-width: 768px) {
+  .tooltip {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 8px;
+    min-width: 300px;
+    max-width: 400px;
+  }
+}
+
+.tooltipContent {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  padding: 12px 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.tooltipContent strong {
+  color: var(--accent-warm);
+}
+
 /* ... (all existing styles from .headerFilterRow down to .rootFilterControls button.activeFilter) ... */
 .headerFilterRow {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   width: 100%;
-  margin-bottom: calc(var(--spacing-unit) * 1);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  position: relative;
 }
 .rootFilterControls {
   display: inline-flex;
@@ -40,6 +126,19 @@
   color: var(--bg-card);
   font-weight: 600;
   box-shadow: 0 1px 3px var(--shadow-color);
+  position: relative;
+}
+
+
+/* Subtle animation for better feedback */
+.rootFilterControls button.activeFilter {
+  transform: scale(1.02);
+}
+
+/* Container glow when multiple filters are active */
+.rootFilterControls:has(button.activeFilter + button.activeFilter) {
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+  border-color: var(--accent-warm);
 }
 
 /* Filter color dots */
@@ -50,16 +149,30 @@
   display: inline-block;
 }
 
-.filterDotAffected {
-  background-color: #4ade80; /* Green */
+/* Make dot colors more specific to override button color inheritance */
+.rootFilterControls button .filterDotAffected {
+  background-color: #4ade80 !important; /* Green */
 }
 
-.filterDotUnaffected {
-  background-color: #f97316; /* Orange */
+.rootFilterControls button .filterDotUnaffected {
+  background-color: #f97316 !important; /* Orange */
 }
 
-.filterDotInProcess {
-  background-color: #3b82f6; /* Blue */
+.rootFilterControls button .filterDotInProcess {
+  background-color: #3b82f6 !important; /* Blue */
+}
+
+/* Ensure dots maintain their colors even when button is active */
+.rootFilterControls button.activeFilter .filterDotAffected {
+  background-color: #4ade80 !important; /* Green */
+}
+
+.rootFilterControls button.activeFilter .filterDotUnaffected {
+  background-color: #f97316 !important; /* Orange */
+}
+
+.rootFilterControls button.activeFilter .filterDotInProcess {
+  background-color: #3b82f6 !important; /* Blue */
 }
 
 /* --- L2 and L3 Scroller / Container Styles --- */

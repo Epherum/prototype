@@ -20,8 +20,8 @@ export const createPartnerSchema = z.object({
   approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
 });
 
-// The update schema allows partial updates and includes approval status
-export const updatePartnerSchema = createPartnerSchema.partial().extend({
+// The update schema allows partial updates but excludes journalId (journal assignment cannot be changed after creation)
+export const updatePartnerSchema = createPartnerSchema.omit({ journalId: true }).partial().extend({
   approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
 });
 
@@ -29,6 +29,11 @@ export const getPartnersQuerySchema = z.object({
   take: z.coerce.number().int().positive().optional(),
   skip: z.coerce.number().int().nonnegative().optional(),
   filterMode: z.enum(["affected", "unaffected", "inProcess"]).optional(),
+  activeFilterModes: z
+    .string()
+    .transform((val) => val.split(","))
+    .pipe(z.array(z.enum(["affected", "unaffected", "inProcess"])))
+    .optional(),
   permissionRootId: z.string().optional(),
   selectedJournalIds: z
     .string()

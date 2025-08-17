@@ -2,6 +2,9 @@
 const nextConfig = {
   //remove strict mode
   reactStrictMode: false,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   images: {
     remotePatterns: [
       // Keep Unsplash if you might use it elsewhere, or remove

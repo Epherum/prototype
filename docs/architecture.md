@@ -129,20 +129,23 @@ The behavior of the sliders is best understood by analyzing the permutations of 
 
 ### A. Standard Mode (`isCreating: false`)
 
-In this mode, the application functions as a powerful data exploration tool. The Document slider, like all others, acts as a filter sink, showing existing documents that match the criteria selected in any preceding sliders.
+In this mode, the application functions as a powerful data exploration tool. The Document slider, like all others, acts as a filter sink, showing existing documents that match the criteria selected in any preceding sliders. Additionally, when a document is selected, it filters subsequent sliders to show only entities contained within that document.
 
 *   **General Rule:** Each slider fetches data filtered by the selections (`selectedJournalId`, `selectedPartnerId`, etc.) in all sliders that appear *before* it in the `sliderOrder`.
-*   **Example (`P → G → J → D`):**
+*   **Document Filtering:** When a document is selected, subsequent sliders show only the entities that are linked to that document through the DocumentLine table.
+*   **Example (`P → G → D → J`):**
     *   **Partner (P):** Fetches all available partners.
     *   **Goods (G):** Fetches goods related to the `selectedPartnerId`.
-    *   **Journal (J):** Fetches journals related to both the `selectedPartnerId` and `selectedGoodId`.
-    *   **Document (D):** Fetches documents that match the selected Partner, Good, and Journal.
+    *   **Document (D):** Fetches documents that match the selected Partner and Good.
+    *   **Journal (J):** If a document is selected, shows only journals that appear in that specific document; otherwise shows journals related to the Partner and Good selections.
 
 ### B. Document Creation Mode (`isCreating: true`)
 
-This mode transforms the UI into a guided wizard for creating documents. The position of the Document slider is **critical** as it dictates the workflow, what entities get "locked," and whether single or multiple documents are created.
+This mode transforms the UI into a guided wizard for creating documents. The position of the Document slider is **critical** as it dictates the workflow, what entities get "locked," and whether single or multiple documents are created. In this mode, the Document slider is disabled and subsequent sliders ignore any previous document selections to allow creation of new entity combinations.
 
 *   **Key Concept:** The Document (D) slider acts as a "commit" or "lock" point. Selections made in sliders *before* 'D' become the locked context for the document. Sliders *after* 'D' are then used to select the contents of the document(s), often with multi-select capabilities.
+*   **Document Slider Behavior:** In creation mode, the Document slider is always disabled and shows no data. This prevents circular dependency issues where users would be limited to entities already in existing documents.
+*   **Mode-Aware Filtering:** The filtering system completely ignores document selections when `isCreating: true`, allowing subsequent sliders to show all available entities rather than being constrained by existing document contents.
 
 ---
 
@@ -158,54 +161,96 @@ Here are the primary permutations and their distinct behaviors in both modes. We
     *   **Workflow:** This is the simplest creation flow, designed for making a single document with one of each entity.
     *   **Behavior:** The user selects a single Journal, a single Partner, and a single Good. The 'Create Document' action uses these three selections to generate one new document. Multi-selection is disabled.
 
-#### **2. Order: J → P → D → G**
+#### **2. Order: J → P → D → G (Partner Locked Mode)**
 
 *   **Standard Mode (`isCreating: false`):**
-    *   Selecting a Journal filters Partners. Selections from both J and P filter the Document list. The Goods slider also shows goods related to the selections in J and P.
+    *   Selecting a Journal filters Partners. Selections from both J and P filter the Document list. If a document is selected, the Goods slider shows only goods contained in that document; otherwise shows goods related to J and P selections.
 *   **Document Creation Mode (`isCreating: true`):**
     *   **Workflow:** **Lock-in a Partner to create one document with multiple goods.**
     *   **Behavior:**
         1.  User selects a Journal (e.g., "Sales Invoices").
         2.  User selects a Partner (e.g., "Client A"). This partner is now considered **locked**.
-        3.  The Document slider (D) signifies the start of content selection.
-        4.  The **Goods (G) slider** appears, showing all goods available for the locked partner. It now functions as a **multi-select list**.
-        5.  The user can select multiple goods. The 'Create Document' action generates **one new document** for "Client A" containing all selected goods.
+        3.  The Document slider (D) is disabled and shows no data.
+        4.  The **Partner slider becomes locked** (shows selected partner but cannot be swiped).
+        5.  The **Goods (G) slider** appears, showing all goods available for the locked partner. It functions as a **multi-select list**.
+        6.  The user can select multiple goods with price and quantity. The 'Create Document' action generates **one new document** for "Client A" containing all selected goods.
+        7.  **Validation:** Standard validation modal before document creation.
 
-#### **3. Order: J → G → D → P**
+#### **3. Order: J → G → D → P (Goods Locked Mode)**
 
 *   **Standard Mode (`isCreating: false`):**
-    *   Similar to the above, but the dependency is on Goods first. Selecting J filters G. Selections from J and G filter the Document list and the Partner list.
+    *   Similar to the above, but the dependency is on Goods first. Selecting J filters G. Selections from J and G filter the Document list. If a document is selected, the Partner slider shows only partners in that document; otherwise shows partners related to J and G selections.
 *   **Document Creation Mode (`isCreating: true`):**
     *   **Workflow:** **Lock-in a Good to create multiple documents, one for each selected partner.**
     *   **Behavior:**
         1.  User selects a Journal.
         2.  User selects a single Good (e.g., "Consulting Hour"). This good is now considered **locked**.
-        3.  The Document slider (D) signifies the start of content selection.
-        4.  The **Partner (P) slider** appears, showing all partners associated with the locked good. It now functions as a **multi-select list**.
-        5.  The user can select multiple partners (e.g., "Client A", "Client B"). The 'Create Documents' action generates **multiple new documents**: one for "Client A" with "Consulting Hour", and another for "Client B" with "Consulting Hour".
+        3.  The Document slider (D) is disabled and shows no data.
+        4.  The **Goods slider becomes locked** (shows selected good but cannot be swiped).
+        5.  The **Partner (P) slider** appears, showing all partners associated with the locked good. It functions as a **multi-select list**.
+        6.  The user can select multiple partners (e.g., "Client A", "Client B"). The 'Create Documents' action generates **multiple new documents**: one for "Client A" with "Consulting Hour", and another for "Client B" with "Consulting Hour".
+        7.  **Validation:** Multiple document creation workflow.
 
-#### **4. Order: J → D → P → G**
+#### **4. Order: J → D → P → G (Multiple Partners, Intersection Goods)**
 
 *   **Standard Mode (`isCreating: false`):**
-    *   Selecting a Journal filters Documents, Partners, and Goods independently. There is no chained filtering between P and G in this mode.
+    *   Selecting a Journal filters Documents, Partners, and Goods independently. If a document is selected, both Partner and Goods sliders show only entities contained in that document.
 *   **Document Creation Mode (`isCreating: true`):**
     *   **Workflow:** **Select multiple partners, then find their common goods (intersection).**
     *   **Behavior:**
         1.  User selects a Journal and immediately enters the document creation context.
-        2.  The **Partner (P) slider** appears as a **multi-select list**. The user selects one or more partners.
-        3.  The **Goods (G) slider** dynamically updates its query. It fetches and displays only the goods that are common to (**the intersection of**) *all* selected partners.
-        4.  The user can then select goods from this intersection list. This workflow is ideal for creating documents where the contents must be available to a group of partners. The system will create one document per selected partner, each containing the selected goods from the intersection.
+        2.  The Document slider (D) is disabled and shows no data.
+        3.  The **Partner (P) slider** appears as a **multi-select list**. The user selects one or more partners.
+        4.  The **Goods (G) slider** dynamically updates its query. It fetches and displays only the goods that are common to (**the intersection of**) *all* selected partners.
+        5.  The user can then select goods from this intersection list. The system will create **N documents** (one per selected partner), each containing the selected intersected goods.
+        6.  **Logic:** Only goods that are linked to every selected partner are shown.
 
-#### **5. Order: J → D → G → P**
+#### **5. Order: J → D → G → P (Multiple Goods, Intersection Partners)**
 
 *   **Standard Mode (`isCreating: false`):**
-    *   Selecting a Journal filters Documents, Goods, and Partners independently.
+    *   Selecting a Journal filters Documents, Goods, and Partners independently. If a document is selected, both Goods and Partners sliders show only entities contained in that document.
 *   **Document Creation Mode (`isCreating: true`):**
     *   **Workflow:** **Select multiple goods, then find the partners common to all of them (intersection).**
     *   **Behavior:**
         1.  User selects a Journal and enters the creation context.
-        2.  The **Goods (G) slider** appears as a **multi-select list**. The user selects one or more goods.
-        3.  The **Partner (P) slider** dynamically updates. It fetches and displays only the partners who are associated with *all* of the selected goods (**intersection**).
-        4.  The user can select partners from this filtered list. The system will then create one document for each selected partner, containing all the initially selected goods.
+        2.  The Document slider (D) is disabled and shows no data.
+        3.  The **Goods (G) slider** appears as a **multi-select list**. The user selects one or more goods.
+        4.  The **Partner (P) slider** dynamically updates. It fetches and displays only the partners who are associated with *all* of the selected goods (**intersection**).
+        5.  The user can select partners from this filtered list. The system will create **N documents** (one per intersected partner), each containing the selected goods.
+        6.  **Logic:** Only partners that are linked to every selected good are shown.
+
+---
+
+## 6. Document Slider Implementation Details
+
+### 6.1. Slider Locking System
+- When an entity type appears before Document in the slider order, that slider becomes "locked" during document creation
+- Locked sliders display the selected entity but prevent navigation/swiping
+- User can still see the selection but cannot change it during document creation
+
+### 6.2. Intersection Logic
+- When Document appears first (J→D→P→G or J→D→G→P), subsequent sliders show intersections
+- **Partner Intersection:** Partners who have access to ALL selected goods
+- **Goods Intersection:** Goods that are available to ALL selected partners
+- This ensures document creation only includes valid entity combinations
+
+### 6.3. Multiple Document Creation
+- When multiple entities are selected before Document position, multiple documents are created
+- Each document contains one instance of the "variable" entity (partner or good)
+- All documents share the same "fixed" entities from earlier slider selections
+
+### 6.4. Mode-Aware Filtering Implementation
+The filtering system in `useChainedQuery.ts` implements mode-aware behavior:
+
+**In Standard Mode (`isCreating: false`):**
+- Document slider affects subsequent sliders normally
+- Subsequent sliders filter by document content when document comes before them
+- Enables exploration of existing document contents
+
+**In Document Creation Mode (`isCreating: true`):**
+- Document slider is disabled/invisible and shows no data
+- Subsequent sliders ignore any document selections completely
+- Filtering works as if Document slider doesn't exist
+- Prevents circular dependency issues in document creation workflows
 
 This architecture demonstrates a highly flexible and powerful system where the user interface and underlying data logic adapt in real-time to the user's configured workflow, represented by the `sliderOrder` and the `isCreating` state.

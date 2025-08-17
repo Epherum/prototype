@@ -36,6 +36,8 @@
     "@types/node": "22.15.21",
     "@types/react": "19.1.4",
     "and": "^0.0.3",
+    "eslint": "^9.33.0",
+    "eslint-config-next": "^15.4.6",
     "i": "^0.3.7",
     "install": "^0.13.0",
     "npm": "^11.4.2",

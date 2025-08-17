@@ -75,6 +75,7 @@ const partnerService = {
       skip,
       restrictedJournalId,
       filterMode,
+      activeFilterModes,
       permissionRootId,
       selectedJournalIds = [],
       where: externalWhere,
@@ -83,16 +84,21 @@ const partnerService = {
       entityState: EntityState.ACTIVE,
       ...externalWhere,
     };
-    if (filterMode) {
+    // Use activeFilterModes if provided, otherwise fall back to single filterMode
+    const filtersToApply = activeFilterModes?.length > 0 
+      ? activeFilterModes 
+      : filterMode ? [filterMode] : [];
+
+    if (filtersToApply.length > 0) {
       if (selectedJournalIds.length === 0) {
         serviceLogger.warn(
-          "partnerService.getAllPartners: 'filterMode' was provided without 'selectedJournalIds'. Returning empty."
+          "partnerService.getAllPartners: Filter modes were provided without 'selectedJournalIds'. Returning empty."
         );
         return { data: [], totalCount: 0 };
       }
       
-      serviceLogger.debug("partnerService.getAllPartners: Filter mode processing", {
-        filterMode,
+      serviceLogger.debug("partnerService.getAllPartners: Multi-filter mode processing", {
+        filtersToApply,
         selectedJournalIds,
         permissionRootId
       });
@@ -106,79 +112,88 @@ const partnerService = {
         journalIdsString
       });
       
-      switch (filterMode) {
-        case "affected":
-          // Partners linked to the selected journal hierarchy
-          // The selectedJournalIds should contain only the terminal/deepest selected journals
-          // Only show APPROVED partners in affected mode
-          prismaWhere.AND = [
-            { approvalStatus: "APPROVED" },
-            {
-              journalPartnerLinks: {
-                some: { journalId: { in: journalIdsString } },
-              },
-            },
-          ];
-          break;
-        case "unaffected":
-          if (!permissionRootId) {
-            serviceLogger.warn(
-              "partnerService.getAllPartners: 'unaffected' filter requires 'permissionRootId'. Returning empty."
+      // For multi-filter mode, we need to track which filter each entity matches
+      if (filtersToApply.length > 1) {
+        // Execute queries for each filter separately to track matches
+        const allPartners = new Map<bigint, { partner: any, matchedFilters: string[] }>();
+        
+        for (const filterMode of filtersToApply) {
+          const filterClauses = await this.buildMultiFilterClauses(
+            [filterMode], // Single filter at a time
+            journalIdsString,
+            permissionRootId
+          );
+          
+          if (filterClauses.length === 0) continue;
+          
+          const filterWhere: Prisma.PartnerWhereInput = {
+            entityState: EntityState.ACTIVE,
+            ...externalWhere,
+            AND: [filterClauses[0]],
+          };
+          
+          // Apply journal restrictions if needed
+          if (restrictedJournalId) {
+            const descendantIds = await journalService.getDescendantJournalIds(
+              restrictedJournalId
             );
-            return { data: [], totalCount: 0 };
+            filterWhere.journalPartnerLinks = {
+              some: { journalId: { in: [...descendantIds, restrictedJournalId] } },
+            };
           }
           
-          // Get the parent paths for each selected journal
-          const parentPaths: string[] = [];
-          for (const journalId of journalIdsString) {
-            const ancestorPath = await journalService.getJournalAncestorPath(journalId);
-            // Remove the deepest journal (the one selected) from the path to get parent path
-            const parentPath = ancestorPath.slice(1); // Remove the first element (deepest)
-            parentPaths.push(...parentPath);
-          }
-          
-          // Remove duplicates from parent paths
-          const uniqueParentPaths = [...new Set(parentPaths)];
-          
-          if (uniqueParentPaths.length === 0) {
-            serviceLogger.warn(
-              "partnerService.getAllPartners: No parent paths found for selected journals in 'unaffected' mode. Returning empty."
-            );
-            return { data: [], totalCount: 0 };
-          }
-          
-          // Find partners linked directly to the selected (deepest) journals
-          const affectedLinks = await prisma.journalPartnerLink.findMany({
-            where: { journalId: { in: journalIdsString } },
-            select: { partnerId: true },
-          });
-          const affectedPartnerIds = affectedLinks.map((p) => p.partnerId);
-          
-          // Find partners linked to parent paths but NOT to the deepest selected journals
-          prismaWhere.AND = [
-            { approvalStatus: "APPROVED" }, // Only show approved partners
-            {
+          const partnersForFilter = await prisma.partner.findMany({
+            where: filterWhere,
+            include: {
               journalPartnerLinks: {
-                some: {
-                  journalId: { in: uniqueParentPaths },
+                include: {
+                  journal: true,
                 },
               },
             },
-            {
-              id: { notIn: affectedPartnerIds },
-            },
-          ];
-          break;
-        case "inProcess":
-          prismaWhere.AND = [
-            { approvalStatus: "PENDING" },
-            {
-              journalPartnerLinks: {
-                some: { journalId: { in: journalIdsString } },
-              },
-            },
-          ];
-          break;
+          });
+          
+          // Track which filter each partner matches
+          partnersForFilter.forEach(partner => {
+            if (allPartners.has(partner.id)) {
+              allPartners.get(partner.id)!.matchedFilters.push(filterMode);
+            } else {
+              allPartners.set(partner.id, { 
+                partner, 
+                matchedFilters: [filterMode] 
+              });
+            }
+          });
+        }
+        
+        // Convert map to array and add filter match information
+        const data = Array.from(allPartners.values()).map(({ partner, matchedFilters }) => ({
+          ...partner,
+          matchedFilters
+        }));
+        
+        serviceLogger.debug(
+          `partnerService.getAllPartners: Multi-filter output: ${data.length} partners with filter matches`,
+          { totalPartners: data.length }
+        );
+        
+        return { data, totalCount: data.length };
+      } else {
+        // Single filter mode - use existing logic
+        const filterClauses = await this.buildMultiFilterClauses(
+          filtersToApply,
+          journalIdsString,
+          permissionRootId
+        );
+        
+        if (filterClauses.length === 0) {
+          serviceLogger.warn(
+            "partnerService.getAllPartners: No valid filter clauses generated. Returning empty."
+          );
+          return { data: [], totalCount: 0 };
+        }
+        
+        prismaWhere.AND = [filterClauses[0]];
       }
     } else if (restrictedJournalId) {
       const descendantIds = await journalService.getDescendantJournalIds(
@@ -208,8 +223,15 @@ const partnerService = {
         }
       }
     });
+    
+    // Add matchedFilters information for single filter mode
+    const dataWithFilters = data.map(partner => ({
+      ...partner,
+      matchedFilters: filtersToApply.length > 0 ? filtersToApply : undefined
+    }));
+    
     serviceLogger.debug(`partnerService.getAllPartners: Output - count: ${data.length}, totalCount: ${totalCount}, where: ${JSON.stringify(prismaWhere, jsonBigIntReplacer)}`);
-    return { data, totalCount };
+    return { data: dataWithFilters, totalCount };
   },
 
   async findPartnersForGoods(
@@ -325,6 +347,96 @@ const partnerService = {
     const deletedPartner = await prisma.partner.delete({ where: { id } });
     serviceLogger.debug("partnerService.deletePartner: Output", deletedPartner);
     return deletedPartner;
+  },
+
+  /**
+   * Builds filter clauses for multiple filter modes
+   */
+  async buildMultiFilterClauses(
+    filterModes: string[],
+    selectedJournalIds: string[],
+    permissionRootId?: string
+  ): Promise<Prisma.PartnerWhereInput[]> {
+    const clauses: Prisma.PartnerWhereInput[] = [];
+    
+    for (const mode of filterModes) {
+      switch (mode) {
+        case "affected":
+          clauses.push({
+            AND: [
+              { approvalStatus: "APPROVED" },
+              {
+                journalPartnerLinks: {
+                  some: { journalId: { in: selectedJournalIds } },
+                },
+              },
+            ],
+          });
+          break;
+          
+        case "unaffected":
+          if (!permissionRootId) {
+            serviceLogger.warn(
+              "partnerService.buildMultiFilterClauses: 'unaffected' filter requires 'permissionRootId'. Skipping."
+            );
+            continue;
+          }
+          
+          // Get the parent paths for each selected journal
+          const parentPaths: string[] = [];
+          for (const journalId of selectedJournalIds) {
+            const ancestorPath = await journalService.getJournalAncestorPath(journalId);
+            // Remove the deepest journal (the one selected) from the path to get parent path
+            const parentPath = ancestorPath.slice(1); // Remove the first element (deepest)
+            parentPaths.push(...parentPath);
+          }
+          
+          // Remove duplicates from parent paths
+          const uniqueParentPaths = [...new Set(parentPaths)];
+          
+          if (uniqueParentPaths.length === 0) {
+            serviceLogger.warn(
+              "partnerService.buildMultiFilterClauses: No parent paths found for 'unaffected' mode. Skipping."
+            );
+            continue;
+          }
+          
+          // Find partners linked directly to the selected (deepest) journals
+          const affectedLinks = await prisma.journalPartnerLink.findMany({
+            where: { journalId: { in: selectedJournalIds } },
+            select: { partnerId: true },
+          });
+          const affectedPartnerIds = affectedLinks.map((p) => p.partnerId);
+          
+          clauses.push({
+            AND: [
+              { approvalStatus: "APPROVED" },
+              {
+                journalPartnerLinks: {
+                  some: { journalId: { in: uniqueParentPaths } },
+                },
+              },
+              { id: { notIn: affectedPartnerIds } },
+            ],
+          });
+          break;
+          
+        case "inProcess":
+          clauses.push({
+            AND: [
+              { approvalStatus: "PENDING" },
+              {
+                journalPartnerLinks: {
+                  some: { journalId: { in: selectedJournalIds } },
+                },
+              },
+            ],
+          });
+          break;
+      }
+    }
+    
+    return clauses;
   },
 };
 

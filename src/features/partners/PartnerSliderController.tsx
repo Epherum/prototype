@@ -222,6 +222,7 @@ export const PartnerSliderController: React.FC<
         isAccordionOpen={isDetailsAccordionOpen}
         onToggleAccordion={() => toggleAccordion(SLIDER_TYPES.PARTNER)}
         currentFilter={shouldShowFilterColors ? journalSelection.rootFilter[0] : undefined}
+        activeFilters={shouldShowFilterColors ? journalSelection.rootFilter : []}
       />
 
       <AddEditPartnerModal

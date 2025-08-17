@@ -88,13 +88,14 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
       let clearSubsequent = true;
 
       if (sliderType === "journal.rootFilter") {
-        // Single-select only: if clicking the same filter, deselect it; otherwise select the new one
-        const currentFilter = newSelections.journal.rootFilter[0];
-        if (currentFilter === value) {
-          newSelections.journal.rootFilter = [];
+        // Multi-select: toggle the filter on/off
+        const currentFilters = new Set(newSelections.journal.rootFilter);
+        if (currentFilters.has(value)) {
+          currentFilters.delete(value);
         } else {
-          newSelections.journal.rootFilter = [value];
+          currentFilters.add(value);
         }
+        newSelections.journal.rootFilter = Array.from(currentFilters);
         clearSubsequent = false;
         
         // Save journal selection to localStorage

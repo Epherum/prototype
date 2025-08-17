@@ -19,6 +19,7 @@ export interface FetchPartnersParams {
   take?: number;
   skip?: number;
   filterMode?: "affected" | "unaffected" | "inProcess";
+  activeFilterModes?: ("affected" | "unaffected" | "inProcess")[]; // Array of filter modes for multi-select
   permissionRootId?: string;
   selectedJournalIds?: string[];
   intersectionOfGoodIds?: string[]; // Note: API expects bigint, we send string
@@ -82,11 +83,16 @@ export async function fetchPartners(
   }
   // Journal filter modes (J -> P)
   else if (
-    params.filterMode &&
+    (params.filterMode || params.activeFilterModes) &&
     params.selectedJournalIds &&
     params.selectedJournalIds.length > 0
   ) {
-    queryParams.append("filterMode", params.filterMode);
+    // Use activeFilterModes if provided, otherwise fall back to filterMode
+    if (params.activeFilterModes && params.activeFilterModes.length > 0) {
+      queryParams.append("activeFilterModes", params.activeFilterModes.join(","));
+    } else if (params.filterMode) {
+      queryParams.append("filterMode", params.filterMode);
+    }
     queryParams.append(
       "selectedJournalIds",
       params.selectedJournalIds.join(",")

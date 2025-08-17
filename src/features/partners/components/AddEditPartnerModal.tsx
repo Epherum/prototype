@@ -53,7 +53,7 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
     reset,
     setValue,
     formState: { errors },
-  } = useForm<CreatePartnerPayload | UpdatePartnerPayload>({
+  } = useForm<CreatePartnerPayload>({
     // Use appropriate schema for validation based on edit mode.
     resolver: zodResolver(isEditMode ? updatePartnerSchema : createPartnerSchema),
   });

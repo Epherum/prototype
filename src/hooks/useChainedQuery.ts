@@ -203,9 +203,8 @@ export const useChainedQuery = <T extends SliderType>(
         
         // Only include journal filtering if we have journal selections AND journal comes before partner
         if (hasJournalSelections && isJournalBeforePartner) {
-          // Handle multiple filter modes - for now, use the first one but ensure all are included in query key
+          // Handle multiple active filter modes
           const activeFilters = journalSelection.rootFilter;
-          const primaryFilterMode = activeFilters[0];
           
           // For all filter modes, we need the terminal (deepest) selected journals
           // If level3Ids exist, use those; otherwise use level2Ids; otherwise use topLevelId
@@ -216,13 +215,17 @@ export const useChainedQuery = <T extends SliderType>(
               : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
           params.selectedJournalIds = terminalIds;
           
-          if (primaryFilterMode && ['affected', 'unaffected', 'inProcess'].includes(primaryFilterMode)) {
-            params.filterMode = primaryFilterMode as 'affected' | 'unaffected' | 'inProcess';
+          // Pass all active filter modes for multi-select support
+          if (activeFilters.length > 0) {
+            // Use activeFilterModes for new multi-select API, keep filterMode for backward compatibility
+            params.activeFilterModes = activeFilters as ('affected' | 'unaffected' | 'inProcess')[];
+            // Keep the first filter as filterMode for backward compatibility
+            const primaryFilterMode = activeFilters[0];
+            if (primaryFilterMode && ['affected', 'unaffected', 'inProcess'].includes(primaryFilterMode)) {
+              params.filterMode = primaryFilterMode as 'affected' | 'unaffected' | 'inProcess';
+            }
           }
           params.permissionRootId = journalSelection.topLevelId;
-          
-          // Include all filters in params to ensure query key changes when filters change
-          params.allFilters = activeFilters;
           
          
         }
@@ -230,8 +233,8 @@ export const useChainedQuery = <T extends SliderType>(
         return queryOptions({
           queryKey: partnerKeys.list(params),
           queryFn: () => partnerService.fetchPartners(params),
-          // Only enabled if no journal selection is required OR if we have selections
-          enabled: !isJournalBeforePartner || hasJournalSelections,
+          // Only enabled if no journal selection is required OR if we have selections AND at least one filter
+          enabled: !isJournalBeforePartner || (hasJournalSelections && journalSelection.rootFilter.length > 0),
         });
 
       case SLIDER_TYPES.GOODS:
@@ -280,6 +283,9 @@ export const useChainedQuery = <T extends SliderType>(
         
         // Only include journal filtering if we have journal selections AND journal comes before goods
         if (hasJournalSelectionsForGoods && isJournalBeforeGoods) {
+          // Handle multiple active filter modes
+          const activeFilters = journalSelection.rootFilter;
+          
           // Use terminal IDs like in the partner section for consistency
           const terminalIds = journalSelection.level3Ids.length > 0 
             ? journalSelection.level3Ids
@@ -287,15 +293,22 @@ export const useChainedQuery = <T extends SliderType>(
               ? journalSelection.level2Ids
               : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
           goodsParams.selectedJournalIds = terminalIds;
-          goodsParams.filterMode = journalSelection.rootFilter[0] as any;
+          
+          // Pass all active filter modes for multi-select support
+          if (activeFilters.length > 0) {
+            // Use activeFilterModes for new multi-select API, keep filterMode for backward compatibility
+            goodsParams.activeFilterModes = activeFilters as ('affected' | 'unaffected' | 'inProcess')[];
+            // Keep the first filter as filterMode for backward compatibility
+            goodsParams.filterMode = activeFilters[0] as any;
+          }
           goodsParams.permissionRootId = journalSelection.topLevelId;
         }
         
         return queryOptions({
           queryKey: goodKeys.list(goodsParams),
           queryFn: () => goodService.getAllGoods(goodsParams),
-          // Only enabled if no journal selection is required OR if we have selections
-          enabled: !isJournalBeforeGoods || hasJournalSelectionsForGoods,
+          // Only enabled if no journal selection is required OR if we have selections AND at least one filter
+          enabled: !isJournalBeforeGoods || (hasJournalSelectionsForGoods && journalSelection.rootFilter.length > 0),
         });
 
       case SLIDER_TYPES.DOCUMENT:

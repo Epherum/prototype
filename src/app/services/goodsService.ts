@@ -93,6 +93,7 @@ const goodsService = {
       skip,
       restrictedJournalId,
       filterMode,
+      activeFilterModes,
       permissionRootId,
       selectedJournalIds = [],
       where: externalWhere,
@@ -103,101 +104,101 @@ const goodsService = {
       ...externalWhere,
     };
 
-    if (filterMode) {
+    // Use activeFilterModes if provided, otherwise fall back to single filterMode
+    const filtersToApply = activeFilterModes?.length > 0 
+      ? activeFilterModes 
+      : filterMode ? [filterMode] : [];
+
+    if (filtersToApply.length > 0) {
       if (selectedJournalIds.length === 0) {
         serviceLogger.warn(
-          "goodsService.getAllGoods: 'filterMode' was provided without 'selectedJournalIds'. Returning empty."
+          "goodsService.getAllGoods: Filter modes were provided without 'selectedJournalIds'. Returning empty."
         );
         return { data: [], totalCount: 0 };
       }
 
-      // Get all descendant IDs for all selected journals
-      const allJournalIds = new Set<string>();
-      
-      for (const journalId of selectedJournalIds) {
-        allJournalIds.add(journalId);
-        const descendants = await journalService.getDescendantJournalIds(journalId);
-        descendants.forEach(id => allJournalIds.add(id));
-      }
-      
-      const allRelevantJournalIds = Array.from(allJournalIds);
-
-      switch (filterMode) {
-        case "affected":
-          // Find goods linked to any of the selected journals or their descendants
-          // Only show APPROVED goods in affected mode
-          prismaWhere.AND = [
-            { approvalStatus: "APPROVED" },
-            {
-              journalGoodLinks: {
-                some: { journalId: { in: allRelevantJournalIds } },
-              },
-            },
-          ];
-          break;
-
-        case "unaffected":
-          if (!permissionRootId) {
-            serviceLogger.warn(
-              "goodsService.getAllGoods: 'unaffected' filter requires 'permissionRootId'. Returning empty."
+      // For multi-filter mode, we need to track which filter each entity matches
+      if (filtersToApply.length > 1) {
+        // Execute queries for each filter separately to track matches
+        const allGoods = new Map<bigint, { good: any, matchedFilters: string[] }>();
+        
+        for (const filterMode of filtersToApply) {
+          const filterClauses = await this.buildMultiFilterClauses(
+            [filterMode], // Single filter at a time
+            selectedJournalIds,
+            permissionRootId
+          );
+          
+          if (filterClauses.length === 0) continue;
+          
+          const filterWhere: Prisma.GoodsAndServiceWhereInput = {
+            entityState: EntityState.ACTIVE,
+            ...externalWhere,
+            AND: [filterClauses[0]],
+          };
+          
+          // Apply journal restrictions if needed
+          if (restrictedJournalId) {
+            const descendantIds = await journalService.getDescendantJournalIds(
+              restrictedJournalId
             );
-            return { data: [], totalCount: 0 };
+            filterWhere.journalGoodLinks = {
+              some: { journalId: { in: [...descendantIds, restrictedJournalId] } },
+            };
           }
           
-          // Get the parent paths for each selected journal
-          const goodsParentPaths: string[] = [];
-          for (const journalId of selectedJournalIds) {
-            const ancestorPath = await journalService.getJournalAncestorPath(journalId);
-            // Remove the deepest journal (the one selected) from the path to get parent path
-            const parentPath = ancestorPath.slice(1); // Remove the first element (deepest)
-            goodsParentPaths.push(...parentPath);
-          }
-          
-          // Remove duplicates from parent paths
-          const uniqueGoodsParentPaths = [...new Set(goodsParentPaths)];
-          
-          if (uniqueGoodsParentPaths.length === 0) {
-            serviceLogger.warn(
-              "goodsService.getAllGoods: No parent paths found for selected journals in 'unaffected' mode. Returning empty."
-            );
-            return { data: [], totalCount: 0 };
-          }
-          
-          // Find goods linked directly to the selected (deepest) journals
-          const affectedGoodLinks = await prisma.journalGoodLink.findMany({
-            where: { journalId: { in: selectedJournalIds } },
-            select: { goodId: true },
-          });
-          const affectedGoodIds = affectedGoodLinks.map((p) => p.goodId);
-          
-          // Find goods linked to parent paths but NOT to the deepest selected journals
-          prismaWhere.AND = [
-            { approvalStatus: "APPROVED" }, // Only show approved goods
-            {
+          const goodsForFilter = await prisma.goodsAndService.findMany({
+            where: filterWhere,
+            include: {
               journalGoodLinks: {
-                some: {
-                  journalId: { in: uniqueGoodsParentPaths },
+                include: {
+                  journal: true,
                 },
               },
             },
-            {
-              id: { notIn: affectedGoodIds },
-            },
-          ];
-          break;
-
-        case "inProcess":
-          // Find goods linked to any of the selected journals or their descendants
-          // Only show PENDING goods in inProcess mode
-          prismaWhere.AND = [
-            { approvalStatus: "PENDING" },
-            {
-              journalGoodLinks: {
-                some: { journalId: { in: allRelevantJournalIds } },
-              },
-            },
-          ];
-          break;
+          });
+          
+          // Track which filter each good matches
+          goodsForFilter.forEach(good => {
+            if (allGoods.has(good.id)) {
+              allGoods.get(good.id)!.matchedFilters.push(filterMode);
+            } else {
+              allGoods.set(good.id, { 
+                good, 
+                matchedFilters: [filterMode] 
+              });
+            }
+          });
+        }
+        
+        // Convert map to array and add filter match information
+        const data = Array.from(allGoods.values()).map(({ good, matchedFilters }) => ({
+          ...good,
+          matchedFilters
+        }));
+        
+        serviceLogger.debug(
+          `goodsService.getAllGoods: Multi-filter output: ${data.length} goods with filter matches`,
+          { totalGoods: data.length }
+        );
+        
+        return { data, totalCount: data.length };
+      } else {
+        // Single filter mode - use existing logic
+        const filterClauses = await this.buildMultiFilterClauses(
+          filtersToApply,
+          selectedJournalIds,
+          permissionRootId
+        );
+        
+        if (filterClauses.length === 0) {
+          serviceLogger.warn(
+            "goodsService.getAllGoods: No valid filter clauses generated. Returning empty."
+          );
+          return { data: [], totalCount: 0 };
+        }
+        
+        prismaWhere.AND = [filterClauses[0]];
       }
     } else if (restrictedJournalId) {
       // Default behavior: Fetch all goods within the user's permitted journal hierarchy.
@@ -234,11 +235,17 @@ const goodsService = {
       },
     });
 
+    // Add matchedFilters information for single filter mode
+    const dataWithFilters = data.map(good => ({
+      ...good,
+      matchedFilters: filtersToApply.length > 0 ? filtersToApply : undefined
+    }));
+
     serviceLogger.debug("goodsService.getAllGoods: Output", {
       count: data.length,
       totalCount,
     });
-    return { data, totalCount };
+    return { data: dataWithFilters, totalCount };
   },
 
   /**
@@ -491,6 +498,105 @@ const goodsService = {
     const deletedGood = await prisma.goodsAndService.delete({ where: { id } });
     serviceLogger.debug("goodsService.deleteGood: Output", deletedGood);
     return deletedGood;
+  },
+
+  /**
+   * Builds filter clauses for multiple filter modes
+   */
+  async buildMultiFilterClauses(
+    filterModes: string[],
+    selectedJournalIds: string[],
+    permissionRootId?: string
+  ): Promise<Prisma.GoodsAndServiceWhereInput[]> {
+    const clauses: Prisma.GoodsAndServiceWhereInput[] = [];
+    
+    // Get all descendant IDs for all selected journals (shared across filters)
+    const allJournalIds = new Set<string>();
+    for (const journalId of selectedJournalIds) {
+      allJournalIds.add(journalId);
+      const descendants = await journalService.getDescendantJournalIds(journalId);
+      descendants.forEach(id => allJournalIds.add(id));
+    }
+    const allRelevantJournalIds = Array.from(allJournalIds);
+    
+    for (const mode of filterModes) {
+      switch (mode) {
+        case "affected":
+          clauses.push({
+            AND: [
+              { approvalStatus: "APPROVED" },
+              {
+                journalGoodLinks: {
+                  some: { journalId: { in: allRelevantJournalIds } },
+                },
+              },
+            ],
+          });
+          break;
+          
+        case "unaffected":
+          if (!permissionRootId) {
+            serviceLogger.warn(
+              "goodsService.buildMultiFilterClauses: 'unaffected' filter requires 'permissionRootId'. Skipping."
+            );
+            continue;
+          }
+          
+          // Get the parent paths for each selected journal
+          const goodsParentPaths: string[] = [];
+          for (const journalId of selectedJournalIds) {
+            const ancestorPath = await journalService.getJournalAncestorPath(journalId);
+            // Remove the deepest journal (the one selected) from the path to get parent path
+            const parentPath = ancestorPath.slice(1); // Remove the first element (deepest)
+            goodsParentPaths.push(...parentPath);
+          }
+          
+          // Remove duplicates from parent paths
+          const uniqueGoodsParentPaths = [...new Set(goodsParentPaths)];
+          
+          if (uniqueGoodsParentPaths.length === 0) {
+            serviceLogger.warn(
+              "goodsService.buildMultiFilterClauses: No parent paths found for 'unaffected' mode. Skipping."
+            );
+            continue;
+          }
+          
+          // Find goods linked directly to the selected (deepest) journals
+          const affectedGoodLinks = await prisma.journalGoodLink.findMany({
+            where: { journalId: { in: selectedJournalIds } },
+            select: { goodId: true },
+          });
+          const affectedGoodIds = affectedGoodLinks.map((p) => p.goodId);
+          
+          clauses.push({
+            AND: [
+              { approvalStatus: "APPROVED" },
+              {
+                journalGoodLinks: {
+                  some: { journalId: { in: uniqueGoodsParentPaths } },
+                },
+              },
+              { id: { notIn: affectedGoodIds } },
+            ],
+          });
+          break;
+          
+        case "inProcess":
+          clauses.push({
+            AND: [
+              { approvalStatus: "PENDING" },
+              {
+                journalGoodLinks: {
+                  some: { journalId: { in: allRelevantJournalIds } },
+                },
+              },
+            ],
+          });
+          break;
+      }
+    }
+    
+    return clauses;
   },
 };
 

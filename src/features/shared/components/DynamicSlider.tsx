@@ -63,6 +63,7 @@ interface DynamicSliderProps {
   creationMode?: string;
   // Filter color coding
   currentFilter?: string;
+  activeFilters?: string[]; // Multi-select filters
 }
 
 const DynamicSlider: React.FC<DynamicSliderProps> = ({
@@ -89,17 +90,40 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   isCreating = false,
   creationMode,
   currentFilter,
+  activeFilters = [],
 }) => {
   const initialSlideIndex = Math.max(
     0,
     data.findIndex((item) => item?.id === activeItemId)
   );
 
-  // Helper function to get filter dot CSS class and visibility
-  const getFilterDot = () => {
-    if (!currentFilter) return null;
+  // Helper function to determine which filter an entity matches
+  const getEntityFilter = (entity: DynamicSliderItem): string | null => {
+    // Use backend-provided matchedFilters if available
+    const matchedFilters = (entity as any).matchedFilters;
+    if (matchedFilters && matchedFilters.length > 0) {
+      // Return the first matched filter for color coding
+      // If entity matches multiple filters, prioritize: inProcess > affected > unaffected
+      if (matchedFilters.includes('inProcess')) return 'inProcess';
+      if (matchedFilters.includes('affected')) return 'affected';
+      if (matchedFilters.includes('unaffected')) return 'unaffected';
+      return matchedFilters[0];
+    }
     
-    switch (currentFilter) {
+    // Fallback to legacy behavior for backward compatibility
+    if (!activeFilters || activeFilters.length === 0) {
+      return currentFilter || null;
+    }
+    
+    return activeFilters[0] || null;
+  };
+
+  // Helper function to get filter dot CSS class and visibility for an entity
+  const getFilterDot = (entity: DynamicSliderItem) => {
+    const entityFilter = getEntityFilter(entity);
+    if (!entityFilter) return null;
+    
+    switch (entityFilter) {
       case 'affected':
         return <span className={`${styles.filterIndicatorDot} ${styles.filterDotAffected}`} />;
       case 'unaffected':
@@ -263,7 +287,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                     >
                       <div className={styles.slideTextContent}>
                         <span className={styles.slideName} style={{ display: 'flex', alignItems: 'center' }}>
-                          {getFilterDot()}
+                          {getFilterDot(item)}
                           {item.label || "Unnamed Item"}
                         </span>
                         {(item.code || item.unit_code) && (
