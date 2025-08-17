@@ -1,6 +1,5 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import { IoHelpCircleOutline } from "react-icons/io5";
 
 import styles from "./JournalHierarchySlider.module.css";
 import { findParentOfNode } from "@/lib/helpers";
@@ -91,81 +90,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   activeFilters,
   onToggleFilter,
 }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const helpButtonRef = useRef<HTMLDivElement>(null);
-  
-  // Handle tooltip interactions for both desktop (hover) and mobile (click)
-  const handleTooltipToggle = () => {
-    setShowTooltip(!showTooltip);
-  };
-  
-  const handleMouseEnter = () => {
-    // Only show on hover for non-touch devices
-    if (!('ontouchstart' in window)) {
-      setShowTooltip(true);
-    }
-  };
-  
-  const handleMouseLeave = () => {
-    // Only hide on mouse leave for non-touch devices
-    if (!('ontouchstart' in window)) {
-      setShowTooltip(false);
-    }
-  };
-  
-  // Close tooltip when clicking outside (useful for mobile)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (helpButtonRef.current && !helpButtonRef.current.contains(event.target as Node)) {
-        setShowTooltip(false);
-      }
-    };
-    
-    if (showTooltip) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [showTooltip]);
 
-  // Generate dynamic filter logic description
-  const getFilterLogicDescription = useMemo(() => {
-    if (activeFilters.length === 0) {
-      return "No filters selected. Select filter modes to view entities.";
-    }
-
-    const selectedJournals = [...selectedLevel2Ids, ...selectedLevel3Ids];
-    if (selectedJournals.length === 0) {
-      return "No journals selected. Select journals to enable filtering.";
-    }
-
-    // Get journal names from fullHierarchyData
-    const getJournalName = (id: string) => {
-      const journal = fullHierarchyData.find(j => j.id === id);
-      return journal ? `${journal.name} (${journal.code || id})` : `Journal ${id}`;
-    };
-
-    const journalNames = selectedJournals.map(getJournalName);
-    const journalList = journalNames.length <= 2 
-      ? journalNames.join(' OR ')
-      : `${journalNames.slice(0, 2).join(', ')} and ${journalNames.length - 2} more`;
-
-    const filterDescriptions = activeFilters.map(filter => {
-      switch (filter) {
-        case 'affected':
-          return `${journalList} (approved entities directly linked)`;
-        case 'unaffected':
-          return `Parent paths of ${journalList} (approved entities linked to parents but not selected journals)`;
-        case 'inProcess':
-          return `${journalList} (entities pending approval)`;
-        default:
-          return filter;
-      }
-    });
-
-    return activeFilters.length === 1 
-      ? filterDescriptions[0]
-      : filterDescriptions.join(' OR ');
-  }, [activeFilters, selectedLevel2Ids, selectedLevel3Ids, fullHierarchyData]);
   const level2NodesForScroller = useMemo(
     () => hierarchyData.filter((node): node is AccountNodeData => !!node?.id),
     [hierarchyData]
@@ -297,28 +222,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                 ))}
               </motion.div>
               
-              {/* --- Help button aligned with filters --- */}
-              <div className={styles.helpButtonContainer} ref={helpButtonRef}>
-                <button
-                  className={styles.helpButton}
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                  onClick={handleTooltipToggle}
-                  disabled={isLocked}
-                  aria-label="Show filter help"
-                >
-                  <IoHelpCircleOutline />
-                </button>
-                {showTooltip && (
-                  <div className={styles.tooltip}>
-                    <div className={styles.tooltipContent}>
-                      <strong>Current Filter Logic:</strong>
-                      <br />
-                      {getFilterLogicDescription}
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* --- L1 / Row 1 --- */}
