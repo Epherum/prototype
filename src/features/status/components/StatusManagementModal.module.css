@@ -1,0 +1,290 @@
+/* src/features/status/components/StatusManagementModal.module.css */
+
+.statusModalContent {
+  max-width: 800px;
+  width: 95%;
+  max-height: 85vh;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 2);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Status List */
+.statusList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 1.5);
+}
+
+.statusListHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: calc(var(--spacing-unit) * 1);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.statusListHeader h3 {
+  margin: 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.addButton {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border: none;
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  transition: background-color 0.2s ease;
+}
+
+.addButton:hover:not(:disabled) {
+  background-color: var(--accent-warm-hover);
+}
+
+.addButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.loading {
+  padding: calc(var(--spacing-unit) * 2);
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.statusItems {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 1);
+  max-height: 300px;
+  overflow-y: auto;
+  padding: calc(var(--spacing-unit) * 0.5);
+}
+
+.statusItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: calc(var(--spacing-unit) * 1);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.statusItem:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.statusInfo {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 1);
+  flex: 1;
+}
+
+.statusColor {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.statusDetails {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.25);
+}
+
+.statusName {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.95em;
+}
+
+.statusDescription {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.defaultBadge {
+  background-color: var(--accent-cool);
+  color: white;
+  padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.75);
+  border-radius: calc(var(--border-radius-md) * 2);
+  font-size: 0.75em;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusActions {
+  display: flex;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.editButton,
+.deleteButton {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  padding: calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+}
+
+.editButton:hover:not(:disabled) {
+  background-color: var(--accent-cool);
+  color: white;
+  border-color: var(--accent-cool);
+}
+
+.deleteButton:hover:not(:disabled) {
+  background-color: var(--danger-color, #dc3545);
+  color: white;
+  border-color: var(--danger-color, #dc3545);
+}
+
+.editButton:disabled,
+.deleteButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Status Form */
+.statusForm {
+  padding: calc(var(--spacing-unit) * 1.5);
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.statusForm h3 {
+  margin: 0 0 calc(var(--spacing-unit) * 1.5) 0;
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--spacing-unit) * 1.5);
+}
+
+.formGroup label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9em;
+}
+
+.formGroup input,
+.formGroup textarea {
+  padding: calc(var(--spacing-unit) * 0.75);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  color: var(--text-primary);
+  background-color: var(--bg-card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formGroup input:focus,
+.formGroup textarea:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 3px var(--accent-warm-focus, rgba(99, 102, 241, 0.1));
+}
+
+.formGroup input[type="color"] {
+  width: 60px;
+  height: 40px;
+  padding: 4px;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+}
+
+.formGroup input:disabled,
+.formGroup textarea:disabled {
+  background-color: var(--bg-disabled, #f5f5f5);
+  color: var(--text-disabled, #999);
+  cursor: not-allowed;
+}
+
+.errorText {
+  color: var(--danger-color, #dc3545);
+  font-size: 0.8em;
+  margin-top: calc(var(--spacing-unit) * 0.25);
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: calc(var(--spacing-unit) * 1);
+  margin-top: calc(var(--spacing-unit) * 2);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .statusModalContent {
+    max-width: 95%;
+    max-height: 90vh;
+  }
+  
+  .statusListHeader {
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 1);
+    align-items: flex-start;
+  }
+  
+  .statusItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--spacing-unit) * 1);
+  }
+  
+  .statusActions {
+    align-self: flex-end;
+  }
+  
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+  
+  .formActions {
+    flex-direction: column;
+  }
+}

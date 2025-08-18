@@ -95,22 +95,11 @@
   width: 100%;
   text-align: center;
 }
-.swiperInstance .swiper-pagination-bullet {
-  width: 7px;
-  height: 7px;
-  background-color: var(--accent-warm-light);
-  opacity: 0.6;
-  margin: 0 4px !important;
-  transition: background-color 0.2s ease, opacity 0.2s ease, width 0.2s ease,
-    height 0.2s ease;
-  display: inline-block;
-  border-radius: 50%;
-}
-.swiperInstance .swiper-pagination-bullet-active {
-  background-color: var(--swiper-theme-color);
-  opacity: 1;
-  width: 9px;
-  height: 9px;
+
+.paginationCounter {
+  font-size: 0.8em;
+  font-weight: 500;
+  color: var(--text-secondary);
 }
 
 /* Swiper Locked State (used by Partner slider in Doc Creation) */
@@ -365,82 +354,6 @@
   /* ✅ REMOVED flex properties from here to prevent collapsing the data container */
 }
 
-.fastScrollMode {
-  cursor: grabbing;
-  user-select: none;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-}
-
-.fastScrollOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  pointer-events: none;
-  border-radius: var(--border-radius-md);
-}
-
-.fastScrollIndicator {
-  background-color: var(--accent-warm);
-  color: white;
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
-  border-radius: var(--border-radius-pill);
-  font-size: 1em;
-  font-weight: 600;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  animation: fastScrollPulse 1s ease-in-out infinite alternate;
-}
-
-@keyframes fastScrollPulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-  100% {
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(232, 159, 113, 0.4);
-  }
-}
-
-.fastScrollBar {
-  width: 80%;
-  height: 6px;
-  background-color: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
-  position: relative;
-}
-
-.fastScrollProgress {
-  height: 100%;
-  background-color: var(--accent-warm);
-  border-radius: 3px;
-  transition: width 0.1s ease-out;
-  box-shadow: 0 0 8px rgba(232, 159, 113, 0.6);
-}
-
-.fastScrollCurrentItem {
-  color: rgba(255, 255, 255, 0.9);
-  font-size: 0.85em;
-  font-weight: 500;
-  margin-top: calc(var(--spacing-unit) * 1);
-  text-align: center;
-  padding: 0 calc(var(--spacing-unit) * 1);
-  max-width: 90%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Container for the actual Swiper, ensures it takes full width */
 .dataContainer {
@@ -720,13 +633,4 @@
     font-size: 1em;
   }
   
-  .fastScrollIndicator {
-    font-size: 0.9em;
-    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1);
-  }
-  
-  .fastScrollBar {
-    width: 90%;
-    height: 4px;
-  }
 }

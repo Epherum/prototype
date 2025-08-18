@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { IoClose } from "react-icons/io5";
+import { IoClose, IoAdd } from "react-icons/io5";
 
 // ✅ 1. Import new, robust types and schemas
 import { createGoodSchema, CreateGoodPayload } from "@/lib/schemas/good.schema";
@@ -14,6 +14,8 @@ import { AccountNodeData } from "@/lib/types/ui";
 // ✅ 2. Use a consistent styling approach
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import formStyles from "./AddEditGoodModal.module.css";
+import { useStatuses } from "@/hooks/useStatuses";
+import { StatusManagementModal } from "@/features/status/components/StatusManagementModal";
 
 // ✅ 3. Update the props to use the new types
 interface AddEditGoodModalProps {
@@ -40,6 +42,12 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
   
   // ✨ NEW: State for selected journal
   const [selectedJournal, setSelectedJournal] = useState<AccountNodeData | null>(null);
+  
+  // ✨ NEW: State for status management modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  
+  // ✨ NEW: Hook to fetch statuses
+  const { statuses, isLoading: statusesLoading } = useStatuses();
 
   // ✅ 4. Setup react-hook-form with Zod resolver
   const {
@@ -128,7 +136,8 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
   };
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {isOpen && (
         <motion.div
           className={baseStyles.modalOverlay}
@@ -230,6 +239,42 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
                 )}
               </div>
 
+              {/* Status field - only show in edit mode */}
+              {isEditing && (
+                <div className={formStyles.formGroup}>
+                  <div className={formStyles.labelWithButton}>
+                    <label htmlFor="statusId">Status</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowStatusModal(true)}
+                      className={formStyles.manageStatusButton}
+                      disabled={isSubmitting}
+                      title="Manage statuses"
+                    >
+                      <IoAdd size={14} />
+                    </button>
+                  </div>
+                  <select
+                    id="statusId"
+                    {...register("statusId")}
+                    disabled={isSubmitting || statusesLoading}
+                    defaultValue={initialData?.statusId || ""}
+                  >
+                    <option value="">Select status...</option>
+                    {statuses?.map((status) => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.statusId && (
+                    <p className={formStyles.error}>
+                      {errors.statusId.message}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* ✨ NEW: Journal selection for new goods */}
               {!isEditing && (
                 <div className={formStyles.formGroup}>
@@ -291,7 +336,14 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+      </AnimatePresence>
+      
+      {/* Status Management Modal */}
+      <StatusManagementModal
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+      />
+    </>
   );
 };
 

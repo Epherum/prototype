@@ -130,7 +130,7 @@ const documentService = {
         // Audit and state
         createdById,
         entityState: EntityState.ACTIVE,
-        approvalStatus: ApprovalStatus.PENDING,
+        statusId: "pending-default",
         // Nested line creation
         lines: {
           create: linesToCreate,

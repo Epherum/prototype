@@ -1,7 +1,7 @@
 // src/app/services/partnerService.ts
 
 import prisma from "@/app/utils/prisma";
-import { Partner, Prisma, EntityState, ApprovalStatus } from "@prisma/client";
+import { Partner, Prisma, EntityState } from "@prisma/client";
 import { journalService } from "./journalService";
 import {
   GetAllItemsOptions,
@@ -34,7 +34,7 @@ const partnerService = {
         ...partnerData,
         createdById: createdById,
         entityState: EntityState.ACTIVE,
-        approvalStatus: ApprovalStatus.PENDING,
+        statusId: "pending-default",
       },
     });
     
@@ -364,7 +364,7 @@ const partnerService = {
         case "affected":
           clauses.push({
             AND: [
-              { approvalStatus: "APPROVED" },
+              { status: { name: "Approved" } },
               {
                 journalPartnerLinks: {
                   some: { journalId: { in: selectedJournalIds } },
@@ -410,7 +410,7 @@ const partnerService = {
           
           clauses.push({
             AND: [
-              { approvalStatus: "APPROVED" },
+              { status: { name: "Approved" } },
               {
                 journalPartnerLinks: {
                   some: { journalId: { in: uniqueParentPaths } },
@@ -424,7 +424,7 @@ const partnerService = {
         case "inProcess":
           clauses.push({
             AND: [
-              { approvalStatus: "PENDING" },
+              { status: { name: "Pending" } },
               {
                 journalPartnerLinks: {
                   some: { journalId: { in: selectedJournalIds } },

@@ -56,6 +56,26 @@ model SystemSetting {
   updatedAt    DateTime @updatedAt
 }
 
+// Status table for flexible approval status management
+model Status {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String?  @db.VarChar(7) // Hex color code
+  isDefault   Boolean  @default(false) @map("is_default")
+  displayOrder Int?   @map("display_order")
+
+  // Relations to entities using this status
+  partners            Partner[]       @relation("PartnerStatus")
+  goodsAndServices    GoodsAndService[] @relation("GoodsStatus")
+  documents           Document[]      @relation("DocumentStatus")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("statuses")
+}
+
 // --- Core Auth Models (Single-Tenant) ---
 
 model User {
@@ -206,7 +226,8 @@ model Partner {
 
   // Audit, State, and Workflow Fields
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
-  approvalStatus    ApprovalStatus  @default(PENDING) @map("approval_status")
+  statusId          String?         @map("status_id")
+  status            Status?         @relation("PartnerStatus", fields: [statusId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
@@ -287,7 +308,8 @@ model GoodsAndService {
 
   // Audit, State, and Workflow Fields
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
-  approvalStatus    ApprovalStatus  @default(PENDING) @map("approval_status")
+  statusId          String?         @map("status_id")
+  status            Status?         @relation("GoodsStatus", fields: [statusId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
@@ -418,7 +440,8 @@ model Document {
 
   // Audit, State, and Versioning Fields (following the established Partner pattern)
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
-  approvalStatus    ApprovalStatus  @default(PENDING) @map("approval_status")
+  statusId          String?         @map("status_id")
+  status            Status?         @relation("DocumentStatus", fields: [statusId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")

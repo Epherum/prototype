@@ -17,6 +17,8 @@ export const createGoodSchema = z.object({
   price: z.number().optional().nullable(),
   // ✨ NEW: Required journal selection for good creation
   journalId: z.string().min(1, "Journal selection is required"),
+  // Status ID for flexible status management
+  statusId: z.string().optional(),
 });
 
 export const updateGoodSchema = createGoodSchema.partial().omit({

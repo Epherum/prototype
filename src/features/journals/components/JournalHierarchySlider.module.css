@@ -69,10 +69,8 @@
   transform: scale(1.02);
 }
 
-/* Container glow when multiple filters are active - covers all combinations of 2+ active filters */
-.rootFilterControls:has(button.activeFilter + button.activeFilter),
-.rootFilterControls:has(button.activeFilter + button + button.activeFilter),
-.rootFilterControls:has(button + button.activeFilter + button.activeFilter) {
+/* Container glow when any filter is active - covers all combinations of 1+ active filters */
+.rootFilterControls:has(button.activeFilter) {
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
   border-color: var(--accent-warm);
 }
@@ -139,12 +137,13 @@
 .level2WrappingContainer {
   background-color: #3d3d3d;
   padding: calc(var(--spacing-unit) * 1.5);
-
+  border: 1px solid var(--accent-warm);
 }
 
 .level3WrappingContainer {
   background-color: #3d3d3d;
   padding: calc(var(--spacing-unit) * 1.5);
+  border: 1px solid var(--accent-warm);
 }
 
 /* ... (all remaining styles from .l2ButtonInteractiveWrapper to .noDataSmall are unchanged) ... */

@@ -158,4 +158,6 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
+  // Allow NextAuth to work with different hosts in development
+  trustHost: true,
 };

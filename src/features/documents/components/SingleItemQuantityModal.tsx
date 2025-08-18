@@ -83,7 +83,6 @@ const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
                     onChange={(e) => setQuantity(Number(e.target.value))}
                     min="1"
                     className={styles.formInput}
-                    autoFocus
                   />
                 </div>
                 <div className={styles.modalActions}>

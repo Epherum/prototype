@@ -219,7 +219,6 @@ export const DocumentConfirmationModal = ({
                     onChange={(e) => setRefDoc(e.target.value)}
                     placeholder="e.g., INV-2025-001"
                     className={styles.formInput}
-                    autoFocus
                   />
                 </div>
                 <div className={styles.formGroupGrid}>

@@ -4,7 +4,6 @@ import {
   PrismaClient,
   PartnerType,
   Journal as PrismaJournal,
-  ApprovalStatus,
   EntityState,
   DocumentType,
   PartnershipType,
@@ -64,6 +63,7 @@ async function deleteAllData() {
     prisma.user.deleteMany({}),
     prisma.role.deleteMany({}),
     prisma.permission.deleteMany({}),
+    prisma.status.deleteMany({}),
   ]);
   console.log(
     "Deleted linking tables, auth models, and core business entities."
@@ -89,6 +89,58 @@ async function deleteAllData() {
   }
   console.log("Deleted all Journals.");
   console.log("--- Deletion complete. ---");
+}
+
+/**
+ * Creates default status options to replace the old ApprovalStatus enum.
+ */
+async function createDefaultStatuses() {
+  console.log("--- Creating default statuses... ---");
+  
+  const pendingStatus = await prisma.status.create({
+    data: {
+      id: "pending-default",
+      name: "Pending",
+      description: "Awaiting review and approval",
+      color: "#f59e0b",
+      isDefault: true,
+      displayOrder: 1,
+    },
+  });
+  
+  const approvedStatus = await prisma.status.create({
+    data: {
+      id: "approved-default", 
+      name: "Approved",
+      description: "Reviewed and approved for use",
+      color: "#10b981",
+      isDefault: false,
+      displayOrder: 2,
+    },
+  });
+  
+  const rejectedStatus = await prisma.status.create({
+    data: {
+      id: "rejected-default",
+      name: "Rejected", 
+      description: "Reviewed and rejected",
+      color: "#ef4444",
+      isDefault: false,
+      displayOrder: 3,
+    },
+  });
+  
+  console.log("Created default statuses:", {
+    pending: pendingStatus.id,
+    approved: approvedStatus.id, 
+    rejected: rejectedStatus.id
+  });
+  
+  return {
+    pending: pendingStatus,
+    approved: approvedStatus,
+    rejected: rejectedStatus,
+  };
 }
 
 /**
@@ -187,6 +239,9 @@ async function linkGoodToJournalWithHierarchy(
 async function main() {
   await deleteAllData();
   console.log(`--- Start seeding... ---`);
+
+  // --- 0. Create Default Statuses ---
+  const statuses = await createDefaultStatuses();
 
   // --- 1. Create ALL Permissions Programmatically ---
   console.log("Defining and creating all possible permissions...");
@@ -484,7 +539,7 @@ async function main() {
       name: "Premium Flour Mills",
       partnerType: PartnerType.LEGAL_ENTITY,
       createdById: procurementUser.id,
-      approvalStatus: ApprovalStatus.APPROVED,
+      statusId: statuses.approved.id,
       entityState: EntityState.ACTIVE,
       notes: "High-quality flour supplier with organic options",
     },
@@ -527,7 +582,7 @@ async function main() {
         name: customerData.name,
         partnerType: PartnerType.LEGAL_ENTITY,
         createdById: salesUser.id,
-        approvalStatus: ApprovalStatus.APPROVED,
+        statusId: statuses.approved.id,
         entityState: EntityState.ACTIVE,
         notes: customerData.notes,
       },
@@ -543,7 +598,7 @@ async function main() {
       label: "Premium Wheat Flour",
       referenceCode: "RM-FLOUR-001",
       createdById: procurementUser.id,
-      approvalStatus: ApprovalStatus.APPROVED,
+      statusId: statuses.approved.id,
       entityState: EntityState.ACTIVE,
       taxCodeId: taxTVA7.id,
       unitCodeId: uomKg.id,
@@ -591,7 +646,7 @@ async function main() {
         label: productData.label,
         referenceCode: productData.referenceCode,
         createdById: salesUser.id,
-        approvalStatus: ApprovalStatus.APPROVED,
+        statusId: statuses.approved.id,
         entityState: EntityState.ACTIVE,
         taxCodeId: productData.taxId,
         unitCodeId: productData.unitId,
@@ -692,7 +747,7 @@ async function main() {
       totalTax: new Prisma.Decimal(10.5),
       totalTTC: new Prisma.Decimal(160.5),
       balance: new Prisma.Decimal(160.5),
-      approvalStatus: ApprovalStatus.APPROVED,
+      statusId: statuses.approved.id,
       lines: {
         create: [
           {
@@ -736,7 +791,7 @@ async function main() {
       totalTax: new Prisma.Decimal(85.0),
       totalTTC: new Prisma.Decimal(585.0),
       balance: new Prisma.Decimal(585.0),
-      approvalStatus: ApprovalStatus.PENDING,
+      statusId: statuses.pending.id,
       lines: {
         create: [
           {

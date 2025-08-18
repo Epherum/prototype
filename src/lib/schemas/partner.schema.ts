@@ -16,14 +16,12 @@ export const createPartnerSchema = z.object({
   additionalDetails: z.any().optional(),
   // ✨ NEW: Required journal selection for partner creation
   journalId: z.string().min(1, "Journal selection is required"),
-  // Add approvalStatus to create schema as well for consistent typing
-  approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
+  // Status ID for flexible status management
+  statusId: z.string().optional(),
 });
 
 // The update schema allows partial updates but excludes journalId (journal assignment cannot be changed after creation)
-export const updatePartnerSchema = createPartnerSchema.omit({ journalId: true }).partial().extend({
-  approvalStatus: z.enum(["PENDING", "APPROVED", "REJECTED"]).optional(),
-});
+export const updatePartnerSchema = createPartnerSchema.omit({ journalId: true }).partial();
 
 export const getPartnersQuerySchema = z.object({
   take: z.coerce.number().int().positive().optional(),

@@ -12,7 +12,8 @@
       "Bash(npx tsx:*)",
       "Bash(find:*)",
       "Bash(cp:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(npx next:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

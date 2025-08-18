@@ -43,6 +43,7 @@ const goodsService = {
     const newGood = await prisma.goodsAndService.create({
       data: {
         ...restOfData,
+        statusId: restOfData.statusId || "pending-default", // Default to pending if not provided
         createdBy: { connect: { id: createdById } },
       },
     });
@@ -524,7 +525,7 @@ const goodsService = {
         case "affected":
           clauses.push({
             AND: [
-              { approvalStatus: "APPROVED" },
+              { status: { name: "Approved" } },
               {
                 journalGoodLinks: {
                   some: { journalId: { in: allRelevantJournalIds } },
@@ -570,7 +571,7 @@ const goodsService = {
           
           clauses.push({
             AND: [
-              { approvalStatus: "APPROVED" },
+              { status: { name: "Approved" } },
               {
                 journalGoodLinks: {
                   some: { journalId: { in: uniqueGoodsParentPaths } },
@@ -584,7 +585,7 @@ const goodsService = {
         case "inProcess":
           clauses.push({
             AND: [
-              { approvalStatus: "PENDING" },
+              { status: { name: "Pending" } },
               {
                 journalGoodLinks: {
                   some: { journalId: { in: allRelevantJournalIds } },

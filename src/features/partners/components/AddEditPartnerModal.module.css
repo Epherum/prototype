@@ -27,6 +27,35 @@
   color: var(--text-secondary, #374151);
 }
 
+.labelWithButton {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.manageStatusButton {
+  background-color: var(--accent-cool, #6366f1);
+  color: white;
+  border: none;
+  padding: 4px 6px;
+  border-radius: var(--border-radius-md, 6px);
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.manageStatusButton:hover:not(:disabled) {
+  background-color: var(--accent-cool-hover, #4f46e5);
+}
+
+.manageStatusButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .formGroup input,
 .formGroup select,
 .formGroup textarea {
