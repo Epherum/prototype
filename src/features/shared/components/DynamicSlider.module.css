@@ -1,12 +1,45 @@
 /* src/features/shared/components/DynamicSlider.module.css */
 
-.sliderTitle {
-  margin-top: 0;
+.sliderHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 1.5);
   margin-bottom: calc(var(--spacing-unit) * 2);
+  position: relative;
+}
+
+.sliderTitle {
+  margin: 0;
   font-size: 1.1em;
   color: var(--text-primary);
   font-weight: 600;
   text-align: center;
+  flex: 1;
+}
+
+.quickJumpButton {
+  background-color: var(--accent-slider);
+  border: 1px solid var(--accent-warm-light);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--accent-warm);
+  font-size: 1.1em;
+  transition: all 0.2s ease;
+  position: absolute;
+  right: 0;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.quickJumpButton:hover {
+  background-color: var(--accent-warm);
+  color: var(--text-primary);
+  transform: scale(1.05);
 }
 
 .swiperInstance {
@@ -332,6 +365,83 @@
   /* ✅ REMOVED flex properties from here to prevent collapsing the data container */
 }
 
+.fastScrollMode {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.fastScrollOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: none;
+  border-radius: var(--border-radius-md);
+}
+
+.fastScrollIndicator {
+  background-color: var(--accent-warm);
+  color: white;
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
+  border-radius: var(--border-radius-pill);
+  font-size: 1em;
+  font-weight: 600;
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: fastScrollPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes fastScrollPulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(232, 159, 113, 0.4);
+  }
+}
+
+.fastScrollBar {
+  width: 80%;
+  height: 6px;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+}
+
+.fastScrollProgress {
+  height: 100%;
+  background-color: var(--accent-warm);
+  border-radius: 3px;
+  transition: width 0.1s ease-out;
+  box-shadow: 0 0 8px rgba(232, 159, 113, 0.6);
+}
+
+.fastScrollCurrentItem {
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85em;
+  font-weight: 500;
+  margin-top: calc(var(--spacing-unit) * 1);
+  text-align: center;
+  padding: 0 calc(var(--spacing-unit) * 1);
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Container for the actual Swiper, ensures it takes full width */
 .dataContainer {
   width: 100%;
@@ -441,4 +551,182 @@
   font-size: 0.95em;
   color: var(--text-secondary);
   font-style: italic;
+}
+
+/* Quick Jump Menu Styles */
+.jumpMenuOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-unit);
+}
+
+.jumpMenuModal {
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.jumpMenuHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--accent-slider);
+}
+
+.jumpMenuHeader h3 {
+  margin: 0;
+  font-size: 1.1em;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.jumpMenuClose {
+  background: none;
+  border: none;
+  font-size: 1.5em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.jumpMenuClose:hover {
+  background-color: var(--accent-warm-light);
+  color: var(--text-primary);
+}
+
+.jumpMenuSearch {
+  position: relative;
+  padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.jumpMenuSearchIcon {
+  position: absolute;
+  left: calc(var(--spacing-unit) * 3);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font-size: 1.1em;
+}
+
+.jumpMenuSearchInput {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 0.9em;
+  transition: border-color 0.2s ease;
+}
+
+.jumpMenuSearchInput:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px rgba(232, 159, 113, 0.2);
+}
+
+.jumpMenuList {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 50vh;
+}
+
+.jumpMenuItem {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.jumpMenuItem:hover {
+  background-color: var(--accent-slider);
+}
+
+.jumpMenuItemActive {
+  background-color: var(--accent-warm-light);
+  border-bottom-color: var(--accent-warm);
+}
+
+.jumpMenuItemContent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--spacing-unit) * 1);
+}
+
+.jumpMenuItemLabel {
+  font-size: 0.9em;
+  color: var(--text-primary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.jumpMenuItemCode {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  font-family: monospace;
+  flex-shrink: 0;
+}
+
+.jumpMenuNoResults {
+  padding: calc(var(--spacing-unit) * 3) calc(var(--spacing-unit) * 2);
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 0.9em;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .jumpMenuModal {
+    max-width: 90vw;
+    max-height: 85vh;
+    margin: calc(var(--spacing-unit) * 1);
+  }
+  
+  .quickJumpButton {
+    width: 28px;
+    height: 28px;
+    font-size: 1em;
+  }
+  
+  .fastScrollIndicator {
+    font-size: 0.9em;
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1);
+  }
+  
+  .fastScrollBar {
+    width: 90%;
+    height: 4px;
+  }
 }

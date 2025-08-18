@@ -1,8 +1,9 @@
 //src/features/shared/components/DynamicSlider.tsx
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
-import { IoFilterCircleOutline, IoCloseCircleOutline } from "react-icons/io5";
+import { IoFilterCircleOutline, IoCloseCircleOutline, IoListOutline, IoSearchOutline } from "react-icons/io5";
 import { motion, AnimatePresence } from "framer-motion";
+import { useState, useRef, useCallback, useEffect } from "react";
 import styles from "./DynamicSlider.module.css";
 
 import "swiper/css";
@@ -92,6 +93,17 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   currentFilter,
   activeFilters = [],
 }) => {
+  // Quick Jump Menu state
+  const [isJumpMenuOpen, setIsJumpMenuOpen] = useState(false);
+  const [jumpSearchTerm, setJumpSearchTerm] = useState("");
+  
+  // Press & Hold Fast Scroll state
+  const [isFastScrollMode, setIsFastScrollMode] = useState(false);
+  const [fastScrollPosition, setFastScrollPosition] = useState(0);
+  const fastScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const fastScrollModeRef = useRef(false);
+  const swiperRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const initialSlideIndex = Math.max(
     0,
     data.findIndex((item) => item?.id === activeItemId)
@@ -143,6 +155,152 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
     }
   };
 
+  // Quick Jump Menu functions
+  const filteredDataForJump = data.filter(item => 
+    item.label?.toLowerCase().includes(jumpSearchTerm.toLowerCase()) ||
+    item.code?.toLowerCase().includes(jumpSearchTerm.toLowerCase())
+  );
+
+  const handleJumpToItem = useCallback((itemId: string) => {
+    const itemIndex = data.findIndex(item => item.id === itemId);
+    if (itemIndex !== -1 && swiperRef.current?.swiper) {
+      swiperRef.current.swiper.slideTo(itemIndex);
+      onSlideChange(itemId);
+    }
+    setIsJumpMenuOpen(false);
+    setJumpSearchTerm("");
+  }, [data, onSlideChange]);
+
+  // Press & Hold Fast Scroll functions
+  const startFastScroll = useCallback(() => {
+    if (isLocked || data.length < 2) return;
+    setIsFastScrollMode(true);
+    fastScrollModeRef.current = true;
+    const currentIndex = data.findIndex(item => item.id === activeItemId);
+    setFastScrollPosition(currentIndex !== -1 ? currentIndex : 0);
+  }, [isLocked, data, activeItemId]);
+
+  const endFastScroll = useCallback(() => {
+    setIsFastScrollMode(false);
+    fastScrollModeRef.current = false;
+    if (fastScrollTimerRef.current) {
+      clearTimeout(fastScrollTimerRef.current);
+      fastScrollTimerRef.current = null;
+    }
+  }, []);
+
+  const handleFastScrollMove = useCallback((clientX: number) => {
+    if (!isFastScrollMode || !containerRef.current || data.length < 2) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const relativeX = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, relativeX / rect.width));
+    const newIndex = Math.floor(percentage * (data.length - 1));
+    
+    // Always update the position for visual feedback, even if it's the same index
+    setFastScrollPosition(newIndex);
+    
+    // Debounce the actual slide change to avoid rapid API calls
+    if (fastScrollTimerRef.current) {
+      clearTimeout(fastScrollTimerRef.current);
+    }
+    
+    fastScrollTimerRef.current = setTimeout(() => {
+      if (swiperRef.current?.swiper && data[newIndex]) {
+        swiperRef.current.swiper.slideTo(newIndex);
+        onSlideChange(data[newIndex].id);
+      }
+    }, 50); // Reduced debounce time for more responsive feedback
+  }, [isFastScrollMode, data, onSlideChange]);
+
+  // Touch event handlers for fast scroll
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (isLocked) return;
+    const touch = e.touches[0];
+    const startTime = Date.now();
+    
+    // Start a timer to detect long press (500ms)
+    const longPressTimer = setTimeout(() => {
+      startFastScroll();
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50); // Haptic feedback if available
+      }
+    }, 500);
+    
+    const cleanup = () => {
+      clearTimeout(longPressTimer);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchmove', onTouchMove);
+    };
+    
+    const onTouchEnd = () => {
+      const endTime = Date.now();
+      if (endTime - startTime < 500) {
+        clearTimeout(longPressTimer);
+      }
+      endFastScroll();
+      cleanup();
+    };
+    
+    const onTouchMove = (moveEvent: TouchEvent) => {
+      if (fastScrollModeRef.current) {
+        moveEvent.preventDefault();
+        handleFastScrollMove(moveEvent.touches[0].clientX);
+      } else {
+        // Clear the timer if we're not in fast scroll mode yet but moving
+        clearTimeout(longPressTimer);
+      }
+    };
+    
+    document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+  }, [isLocked, startFastScroll, endFastScroll, isFastScrollMode, handleFastScrollMove]);
+
+  // Mouse event handlers for fast scroll (desktop support)
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (isLocked) return;
+    e.preventDefault();
+    const startTime = Date.now();
+    
+    const longPressTimer = setTimeout(() => {
+      startFastScroll();
+    }, 500);
+    
+    const cleanup = () => {
+      clearTimeout(longPressTimer);
+      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('mousemove', onMouseMove);
+    };
+    
+    const onMouseUp = () => {
+      const endTime = Date.now();
+      if (endTime - startTime < 500) {
+        clearTimeout(longPressTimer);
+      }
+      endFastScroll();
+      cleanup();
+    };
+    
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      if (fastScrollModeRef.current) {
+        moveEvent.preventDefault();
+        handleFastScrollMove(moveEvent.clientX);
+      }
+    };
+    
+    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('mousemove', onMouseMove);
+  }, [isLocked, startFastScroll, endFastScroll, isFastScrollMode, handleFastScrollMove]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (fastScrollTimerRef.current) {
+        clearTimeout(fastScrollTimerRef.current);
+      }
+    };
+  }, []);
+
   const currentItemForAccordion = data.find(
     (item) => item?.id === activeItemId
   );
@@ -151,7 +309,18 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
 
   return (
     <>
-      <h2 className={styles.sliderTitle}>{title}</h2>
+      <div className={styles.sliderHeader}>
+        <h2 className={styles.sliderTitle}>{title}</h2>
+        {data.length >= 2 && !isLocked && (
+          <button
+            onClick={() => setIsJumpMenuOpen(true)}
+            className={styles.quickJumpButton}
+            title="Quick jump to item"
+          >
+            <IoListOutline />
+          </button>
+        )}
+      </div>
 
       {showContextJournalFilterButton && onOpenContextJournalFilterModal && (
         <button
@@ -181,7 +350,28 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
         </div>
       )}
 
-      <div className={styles.contentWrapper}>
+      <div 
+        ref={containerRef}
+        className={`${styles.contentWrapper} ${isFastScrollMode ? styles.fastScrollMode : ''}`}
+        onTouchStart={handleTouchStart}
+        onMouseDown={handleMouseDown}
+      >
+        {isFastScrollMode && (
+          <div className={styles.fastScrollOverlay}>
+            <div className={styles.fastScrollIndicator}>
+              {fastScrollPosition + 1} / {data.length}
+            </div>
+            <div className={styles.fastScrollBar}>
+              <div 
+                className={styles.fastScrollProgress}
+                style={{ width: `${((fastScrollPosition + 1) / data.length) * 100}%` }}
+              />
+            </div>
+            <div className={styles.fastScrollCurrentItem}>
+              {data[fastScrollPosition]?.label || 'Unknown'}
+            </div>
+          </div>
+        )}
         <AnimatePresence mode="wait" initial={false}>
           {isLoading ? (
             <motion.div
@@ -254,6 +444,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
               )}
               <Swiper
                 key={swiperKey}
+                ref={swiperRef}
                 modules={[Navigation, Pagination]}
                 initialSlide={initialSlideIndex}
                 loop={false}
@@ -269,7 +460,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                 className={`${styles.swiperInstance} ${
                   isLocked ? styles.swiperLocked : ""
                 } ${isMultiSelect ? styles.swiperMultiSelect : ""}`}
-                allowTouchMove={!isLocked}
+                allowTouchMove={!isLocked && !isFastScrollMode}
               >
                 {data.map((item) => {
                   if (!item) return null;
@@ -475,6 +666,79 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
             </AnimatePresence>
           </div>
         )}
+
+      {/* Quick Jump Menu Modal */}
+      <AnimatePresence>
+        {isJumpMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className={styles.jumpMenuOverlay}
+            onClick={() => setIsJumpMenuOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className={styles.jumpMenuModal}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.jumpMenuHeader}>
+                <h3>Jump to {title}</h3>
+                <button
+                  onClick={() => setIsJumpMenuOpen(false)}
+                  className={styles.jumpMenuClose}
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className={styles.jumpMenuSearch}>
+                <IoSearchOutline className={styles.jumpMenuSearchIcon} />
+                <input
+                  type="text"
+                  placeholder={`Search ${title.toLowerCase()}...`}
+                  value={jumpSearchTerm}
+                  onChange={(e) => setJumpSearchTerm(e.target.value)}
+                  className={styles.jumpMenuSearchInput}
+                  autoFocus
+                />
+              </div>
+
+              <div className={styles.jumpMenuList}>
+                {filteredDataForJump.length === 0 ? (
+                  <div className={styles.jumpMenuNoResults}>
+                    No items match your search
+                  </div>
+                ) : (
+                  filteredDataForJump.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleJumpToItem(item.id)}
+                      className={`${styles.jumpMenuItem} ${
+                        item.id === activeItemId ? styles.jumpMenuItemActive : ''
+                      }`}
+                    >
+                      <div className={styles.jumpMenuItemContent}>
+                        <span className={styles.jumpMenuItemLabel}>
+                          {getFilterDot(item)}
+                          {item.label}
+                        </span>
+                        {item.code && (
+                          <span className={styles.jumpMenuItemCode}>
+                            {item.code}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 };
