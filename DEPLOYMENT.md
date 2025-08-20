@@ -1,372 +1,259 @@
-# ERP Application Local Deployment Guide
+  echo DATABASE_URL="postgresql://postgres:admin123@localhost:5432/erp_local" > .env.local
+  echo NEXTAUTH_URL="https://197.13.3.101" >> .env.local
+  echo NEXTAUTH_SECRET="your-secure-random-secret-key-here" >> .env.local
+  echo NODE_ENV=production >> .env.local
 
-This guide covers how to run your Next.js ERP application locally on a Windows machine accessible via RDP from your office.
 
-## Table of Contents
-1. [Simple Docker Setup (Recommended)](#simple-docker-setup-recommended)
-2. [Alternative: Direct Node.js Setup](#alternative-direct-nodejs-setup)
-3. [Troubleshooting](#troubleshooting)
 
-## Simple Docker Setup (Recommended)
 
-This is the easiest way to get your ERP application running locally with minimal setup.
+# ERP Application - Windows Server 2012 R2 Setup
 
-### Prerequisites
-- Windows 10/11 or Windows Server
-- At least 4GB RAM
-- Docker Desktop for Windows
+**GUIDE: Deploy ERP app accessible via public IP (https://197.13.3.101/) with office IP restrictions**
 
-### Step 1: Install Docker Desktop
+This guide shows you how to make your ERP application accessible from your office via the server's public IP address.
 
-1. **Download Docker Desktop** from [docker.com](https://www.docker.com/products/docker-desktop/)
-2. **Install** with default settings
-3. **Start Docker Desktop** and wait for it to be ready
-4. **Verify installation** by opening Command Prompt and running:
+## What You Need to Install
+
+1. **Node.js 18+** - Download from: https://nodejs.org/
+2. **PostgreSQL 14+** - Download from: https://www.postgresql.org/download/windows/
+
+## Step-by-Step Setup
+
+### Step 1: Get Your Project onto the Server
+
+**Option A: Copy via RDP (Easiest)**
+1. **On your local computer**, compress your ERP project folder into a ZIP file
+2. **Connect to RDP** and copy the ZIP file through clipboard or drag-and-drop
+3. **Extract** the ZIP to `C:\work\ERP` on the server
+
+**Option B: Download from Git Repository**
+1. **Install Git** on the server: https://git-scm.com/download/win
+2. **Open Command Prompt as Administrator**
+3. **Clone your repository**:
    ```cmd
-   docker --version
+   cd C:\work
+   git clone https://github.com/your-username/your-repo-name.git ERP
    ```
 
-### Step 2: Create Docker Files
+**Option C: Use a USB Drive**
+1. **Copy your project** to a USB drive from your local computer
+2. **Plug USB into the server** and copy to `C:\work\ERP`
 
-Create these files in your project root:
+### Step 2: Install Software
 
-**Dockerfile:**
-```dockerfile
-FROM node:18-alpine AS builder
+1. **Download and install Node.js 18** (choose Windows Installer)
+2. **Download and install PostgreSQL** with these settings:
+   - Password: `admin123` (remember this!)
+   - Port: `5432` (default)
+   - Leave everything else as default
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+### Step 3: Setup Your Application
 
-COPY . .
-RUN npx prisma generate
-RUN npm run build
+1. **Open Command Prompt as Administrator**
 
-FROM node:18-alpine AS runner
-
-WORKDIR /app
-ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy built application
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/prisma ./prisma
-
-USER nextjs
-
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
-```
-
-**docker-compose.yml:**
-```yaml
-version: '3.8'
-
-services:
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    restart: always
-    environment:
-      POSTGRES_DB: erp_local
-      POSTGRES_USER: erp_user
-      POSTGRES_PASSWORD: local_password_123
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U erp_user -d erp_local"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # ERP Application
-  app:
-    build: .
-    restart: always
-    ports:
-      - "3000:3000"
-    environment:
-      - DATABASE_URL=postgresql://erp_user:local_password_123@db:5432/erp_local
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=local-dev-secret-key-please-change-in-production
-      - NODE_ENV=production
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ./uploads:/app/uploads
-
-volumes:
-  postgres_data:
-```
-
-**.env.local:**
-```env
-DATABASE_URL="postgresql://erp_user:local_password_123@localhost:5432/erp_local"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="local-dev-secret-key-please-change-in-production"
-NODE_ENV=production
-```
-
-### Step 3: Update next.config.js
-
-Add this to your `next.config.js` for Docker compatibility:
-```javascript
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  // ... your existing config
-  output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['@prisma/client']
-  }
-}
-
-module.exports = nextConfig
-```
-
-### Step 4: Deploy
-
-1. **Open Command Prompt** as Administrator
-2. **Navigate to your project folder**:
+2. **Go to your app folder**:
    ```cmd
-   cd C:\path\to\your\erp-project
-   ```
-3. **Start the application**:
-   ```cmd
-   docker-compose up -d
-   ```
-4. **Wait for containers to start** (first time takes 5-10 minutes)
-5. **Run database migrations**:
-   ```cmd
-   docker-compose exec app npx prisma migrate deploy
-   ```
-6. **Seed the database** (if you have seed data):
-   ```cmd
-   docker-compose exec app npx prisma db seed
+   cd C:\work\ERP
    ```
 
-### Step 5: Access Your Application
+3. **Install the app packages**:
+   ```cmd
+   npm install
+   ```
 
-- **Open your browser** and go to: `http://localhost:3000`
-- **Login** with your application credentials
+4. **Create a file called `.env.local`** in your C:\work\ERP folder with this content:
+   ```env
+   DATABASE_URL="postgresql://postgres:admin123@localhost:5432/erp_local"
+   NEXTAUTH_URL="https://197.13.3.101"
+   NEXTAUTH_SECRET="your-secure-random-secret-key-here"
+   NODE_ENV=production
+   ```
 
-### Step 6: Create Desktop Shortcut (Optional)
+### Step 4: Create the Database
 
-Create a batch file `start-erp.bat`:
+1. **Open a new Command Prompt as Administrator**
+
+2. **Create the database**:
+   ```cmd
+   createdb -U postgres erp_local
+   ```
+   (It will ask for password - enter: `admin123`)
+
+3. **Setup the database tables**:
+   ```cmd
+   cd C:\work\ERP
+   npx prisma migrate deploy
+   npx prisma generate
+   ```
+
+4. **Add sample data** (if you want):
+   ```cmd
+   npx prisma db seed
+   ```
+
+### Step 5: Build and Start Your App
+
+1. **Build the app** (optimized for 4GB RAM):
+   ```cmd
+   set NODE_OPTIONS=--max_old_space_size=2048
+   npm run build
+   ```
+
+2. **Start the app**:
+   ```cmd
+   npm start
+   ```
+
+3. **Start the app on all network interfaces**:
+   ```cmd
+   npm start -- --hostname 0.0.0.0
+   ```
+
+### Step 6: Configure Windows Security & Access
+
+1. **Open Windows Firewall with Advanced Security** (search for "wf.msc")
+
+2. **Create Inbound Rule for Port 3000**:
+   - Right-click "Inbound Rules" → "New Rule"
+   - Rule Type: Port
+   - Protocol: TCP, Specific Local Ports: 3000
+   - Action: Allow the connection
+   - Profile: Check all three (Domain, Private, Public)
+   - Name: "ERP Application Port 3000"
+
+3. **Restrict Access to Your Office IP** (IMPORTANT for security):
+   - In the new rule, right-click → Properties
+   - Go to "Scope" tab
+   - Under "Remote IP address", select "These IP addresses"
+   - Click "Add" and enter your office's static IP address
+   - Click OK
+
+4. **Configure the app to listen on all interfaces**:
+   Update your `START-ERP.bat` file to:
+   ```batch
+   @echo off
+   title ERP Application
+   cd /d C:\work\ERP
+   set NODE_OPTIONS=--max_old_space_size=2048
+   echo Starting ERP Application...
+   npm start -- --hostname 0.0.0.0
+   pause
+   ```
+
+### Step 7: Setup HTTPS (Recommended)
+
+1. **Install a reverse proxy like Nginx** or use IIS
+2. **Get an SSL certificate** (Let's Encrypt or commercial)
+3. **Configure HTTPS redirect**
+
+**Quick HTTPS with IIS** (if available):
+- Install IIS role
+- Create site pointing to your app on port 3000
+- Add SSL certificate
+- Configure URL rewrite to proxy to localhost:3000
+
+### Step 8: Test Access
+
+1. **From your office**, open browser to: `https://197.13.3.101:3000`
+2. **If using HTTPS proxy**: `https://197.13.3.101`
+
+## Easy Start/Stop (Create These Files)
+
+**Create `START-ERP.bat`** on your Desktop:
 ```batch
 @echo off
-cd /d C:\path\to\your\erp-project
-docker-compose up -d
-echo ERP Application starting...
-echo Open http://localhost:3000 in your browser
+title ERP Application
+cd /d C:\work\ERP
+set NODE_OPTIONS=--max_old_space_size=2048
+echo Starting ERP Application...
+echo Application will be accessible at https://197.13.3.101:3000
+npm start -- --hostname 0.0.0.0
 pause
 ```
 
-Create another batch file `stop-erp.bat`:
+**Create `STOP-ERP.bat`** on your Desktop:
 ```batch
 @echo off
-cd /d C:\path\to\your\erp-project
-docker-compose down
+title Stop ERP
+echo Stopping ERP Application...
+taskkill /f /im node.exe
 echo ERP Application stopped.
 pause
 ```
 
----
-
-## Alternative: Direct Node.js Setup
-
-If you prefer not to use Docker, you can run it directly with Node.js.
-
-### Prerequisites
-- Node.js 18+ ([download here](https://nodejs.org/))
-- PostgreSQL 14+ ([download here](https://www.postgresql.org/download/windows/))
-- Git ([download here](https://git-scm.com/download/win))
-
-### Step 1: Install Dependencies
-
-1. **Install Node.js** (LTS version recommended)
-2. **Install PostgreSQL** with default settings
-3. **Install Git** for version control
-
-### Step 2: Setup Application
-
-1. **Clone your repository**:
-   ```cmd
-   git clone <your-repo-url> C:\erp-app
-   cd C:\erp-app
-   ```
-
-2. **Install packages**:
-   ```cmd
-   npm install
-   ```
-
-3. **Create environment file** (`.env.local`):
-   ```env
-   DATABASE_URL="postgresql://postgres:your_password@localhost:5432/erp_local"
-   NEXTAUTH_URL="http://localhost:3000"
-   NEXTAUTH_SECRET="local-dev-secret-key"
-   NODE_ENV=development
-   ```
-
-4. **Setup database**:
-   ```cmd
-   # Create database
-   createdb -U postgres erp_local
-   
-   # Run migrations
-   npx prisma migrate deploy
-   npx prisma generate
-   
-   # Seed data (if available)
-   npx prisma db seed
-   ```
-
-5. **Build and start**:
-   ```cmd
-   npm run build
-   npm start
-   ```
-
-6. **Access application**: Open `http://localhost:3000`
-
-### Step 3: Auto-Start with Windows (Optional)
-
-Create `start-erp.bat`:
-```batch
-@echo off
-cd /d C:\erp-app
-npm start
-```
-
-Add this batch file to Windows startup folder:
-- Press `Win+R`, type `shell:startup`
-- Copy the batch file there
-
----
-
-## Troubleshooting
-
-### Docker Issues
-
-1. **Docker not starting**:
-   - Make sure Hyper-V is enabled
-   - Restart Docker Desktop
-   - Check Windows version compatibility
-
-2. **Port already in use**:
-   ```cmd
-   # Stop existing containers
-   docker-compose down
-   
-   # Check what's using port 3000
-   netstat -ano | findstr :3000
-   ```
-
-3. **Database connection failed**:
-   ```cmd
-   # Check if database container is running
-   docker-compose ps
-   
-   # View database logs
-   docker-compose logs db
-   ```
-
-4. **Application won't build**:
-   ```cmd
-   # Clean and rebuild
-   docker-compose down
-   docker-compose build --no-cache
-   docker-compose up -d
-   ```
-
-### Node.js Issues
-
-1. **PostgreSQL connection error**:
-   - Check if PostgreSQL service is running
-   - Verify password and database name
-   - Check firewall settings
-
-2. **Module not found errors**:
-   ```cmd
-   # Clear and reinstall
-   rmdir /s /q node_modules
-   del package-lock.json
-   npm install
-   ```
-
-3. **Prisma errors**:
-   ```cmd
-   # Regenerate Prisma client
-   npx prisma generate
-   ```
-
-### General Tips
-
-- **Run Command Prompt as Administrator** for permissions
-- **Check Windows Firewall** if can't access from other devices
-- **Use Task Manager** to monitor resource usage
-- **Check Event Viewer** for Windows errors
-
----
-
 ## Daily Usage
 
-### Starting the Application
-```cmd
-# With Docker
-cd C:\path\to\erp
-docker-compose up -d
+- **Start**: Double-click `START-ERP.bat`
+- **Stop**: Double-click `STOP-ERP.bat` or close the command window
+- **Access from office**: Open browser to `https://197.13.3.101:3000`
+- **Local access**: `http://localhost:3000`
 
-# With Node.js
-cd C:\erp-app
+## Security Notes
+
+⚠️ **IMPORTANT**: The Windows Firewall rule restricts access to your office IP only. Without this restriction, your ERP would be accessible to anyone on the internet.
+
+**Your office static IP**: Make sure to replace "your office's static IP address" in Step 6 with your actual office IP address.
+
+## If Something Goes Wrong
+
+**Problem: Can't connect to database**
+- Open Services (services.msc) and make sure "postgresql" service is running
+- Try restarting PostgreSQL service
+
+**Problem: App won't build (out of memory)**
+```cmd
+# Use these commands instead:
+set NODE_OPTIONS=--max_old_space_size=3072
+npm run build
+```
+
+**Problem: App crashes**
+```cmd
+# Clear everything and reinstall:
+rmdir /s /q node_modules
+del package-lock.json
+npm install
+npx prisma generate
+npm run build
 npm start
 ```
 
-### Stopping the Application
-```cmd
-# With Docker
-docker-compose down
+**Problem: Can't access from office (https://197.13.3.101:3000)**
+- Check Windows Firewall rule is created and enabled
+- Verify your office IP is correctly added to the firewall rule
+- Test local access first: `http://localhost:3000`
+- Check if port 3000 is being used:
+  ```cmd
+  netstat -ano | findstr :3000
+  ```
 
-# With Node.js
-# Press Ctrl+C in the terminal
+**Problem: "This site can't be reached" error**
+- Verify the server's public IP (197.13.3.101) is correct
+- Check if your ISP/router forwards port 3000 to the server
+- Try accessing without HTTPS first: `http://197.13.3.101:3000`
+
+**Problem: PostgreSQL asks for password**
+- Use the password you set during installation (`admin123` if you followed this guide)
+
+## Memory Optimization for 4GB RAM
+
+The batch files include `NODE_OPTIONS=--max_old_space_size=2048` which limits Node.js to use 2GB RAM, leaving 2GB for PostgreSQL and Windows.
+
+## Backup Your Data (Optional)
+
+To backup your database:
+```cmd
+pg_dump -U postgres erp_local > C:\erp_backup.sql
 ```
 
-### Checking Status
-```cmd
-# With Docker
-docker-compose ps
+## Additional Network Configuration
 
-# With Node.js
-# Application runs in terminal window
-```
+If you can't access from your office, you may need to:
 
-### Viewing Logs
-```cmd
-# With Docker
-docker-compose logs app
+1. **Configure your router/firewall** to forward port 3000 to the Windows Server
+2. **Check if the server is behind a NAT** - you might need port forwarding
+3. **Verify the public IP** - use `whatismyip.com` from the server to confirm the public IP
 
-# With Node.js
-# Logs appear in terminal
-```
+---
 
-### Backing Up Data
-```cmd
-# Database backup
-docker-compose exec db pg_dump -U erp_user erp_local > backup.sql
-
-# Or with direct PostgreSQL
-pg_dump -U postgres erp_local > backup.sql
-```
-
-That's it! Your ERP application will be running locally on the Windows machine, accessible only from your office via RDP.
+**That's it! Your ERP app will be accessible at https://197.13.3.101:3000 from your office only.**
