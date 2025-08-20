@@ -33,7 +33,9 @@
   background-color: var(--bg-secondary);
   padding: calc(var(--spacing-unit) * 0.5);
   border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-subtle);
+  /* border: 1px solid rgba(255, 255, 255, 0.1); */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+
 }
 .rootFilterControls button {
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
@@ -71,8 +73,7 @@
 
 /* Container glow when any filter is active - covers all combinations of 1+ active filters */
 .rootFilterControls:has(button.activeFilter) {
-  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
-  border-color: var(--accent-warm);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* Filter color dots */
@@ -137,13 +138,15 @@
 .level2WrappingContainer {
   background-color: #3d3d3d;
   padding: calc(var(--spacing-unit) * 1.5);
-  border: 1px solid var(--accent-warm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
 }
 
 .level3WrappingContainer {
   background-color: #3d3d3d;
   padding: calc(var(--spacing-unit) * 1.5);
-  border: 1px solid var(--accent-warm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
 }
 
 /* ... (all remaining styles from .l2ButtonInteractiveWrapper to .noDataSmall are unchanged) ... */

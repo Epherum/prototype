@@ -3,7 +3,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import { IoFilterCircleOutline, IoCloseCircleOutline, IoListOutline, IoSearchOutline } from "react-icons/io5";
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import styles from "./DynamicSlider.module.css";
 
 import "swiper/css";
@@ -98,10 +98,25 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   const [jumpSearchTerm, setJumpSearchTerm] = useState("");
   
   const swiperRef = useRef<any>(null);
-  const initialSlideIndex = Math.max(
-    0,
-    data.findIndex((item) => item?.id === activeItemId)
-  );
+  const activeItemIndex = data.findIndex((item) => item?.id === activeItemId);
+  const initialSlideIndex = activeItemIndex !== -1 ? activeItemIndex : 0;
+
+  // Reset swiper to first slide when activeItemId becomes null (slider reset)
+  useEffect(() => {
+    if (activeItemId === null && swiperRef.current?.swiper && data.length > 0) {
+      swiperRef.current.swiper.slideTo(0, 0); // Slide to index 0 with no animation
+    }
+  }, [activeItemId, data.length]);
+
+  // Reset swiper when data changes significantly (like after order change)
+  useEffect(() => {
+    if (swiperRef.current?.swiper && data.length > 0) {
+      // If no active item is selected, make sure we're at the first slide
+      if (!activeItemId) {
+        swiperRef.current.swiper.slideTo(0, 0);
+      }
+    }
+  }, [data, activeItemId]);
 
   // Helper function to determine which filter an entity matches
   const getEntityFilter = (entity: DynamicSliderItem): string | null => {
@@ -242,7 +257,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
           ) : data.length === 0 ? (
             <motion.div
               key="no-data"
-              className={`${styles.stateOverlay} ${isCreating ? styles.creationState : ''}`}
+              className={`${styles.stateOverlay} ${isCreating ? styles.creationState : styles.emptyState}`}
               variants={sliderContentVariants}
               initial="hidden"
               animate="visible"

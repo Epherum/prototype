@@ -34,7 +34,18 @@ export async function getAllGoods(
   if (options.skip) queryParams.append("skip", String(options.skip));
 
   // Journal filtering modes
-  if (options.filterMode) {
+  if (options.activeFilterModes && options.activeFilterModes.length > 0) {
+    queryParams.append("activeFilterModes", options.activeFilterModes.join(","));
+    if (options.selectedJournalIds) {
+      queryParams.append(
+        "selectedJournalIds",
+        options.selectedJournalIds.join(",")
+      );
+    }
+    if (options.permissionRootId) {
+      queryParams.append("permissionRootId", options.permissionRootId);
+    }
+  } else if (options.filterMode) {
     queryParams.append("filterMode", options.filterMode);
     if (options.selectedJournalIds) {
       queryParams.append(

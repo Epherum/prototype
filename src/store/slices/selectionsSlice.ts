@@ -3,39 +3,6 @@
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import type { SelectionsSlice, SelectionsActions, SliderType } from "../types";
 
-const JOURNAL_SELECTION_KEY = 'erp_journal_selection';
-
-// Save journal selection to localStorage
-const saveJournalSelection = (journalState: any) => {
-  if (typeof window !== 'undefined') {
-    try {
-      localStorage.setItem(JOURNAL_SELECTION_KEY, JSON.stringify(journalState));
-    } catch (error) {
-      console.warn('Failed to save journal selection to localStorage:', error);
-    }
-  }
-};
-
-// Load journal selection from localStorage
-const loadJournalSelection = (restrictedJournalId = ROOT_JOURNAL_ID) => {
-  if (typeof window !== 'undefined') {
-    try {
-      const saved = localStorage.getItem(JOURNAL_SELECTION_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // Ensure topLevelId matches current user's restriction
-        return {
-          ...parsed,
-          topLevelId: restrictedJournalId,
-        };
-      }
-    } catch (error) {
-      console.warn('Failed to load journal selection from localStorage:', error);
-    }
-  }
-  return null;
-};
-
 // Get default selections without localStorage (for resets)
 export const getDefaultSelections = (
   restrictedJournalId = ROOT_JOURNAL_ID
@@ -56,14 +23,12 @@ export const getDefaultSelections = (
   effectiveJournalIds: [],
 });
 
-// Initial selections state (with localStorage restore on app start)
+// Initial selections state
 export const getInitialSelections = (
   restrictedJournalId = ROOT_JOURNAL_ID
 ): SelectionsSlice => {
-  const savedJournal = loadJournalSelection(restrictedJournalId);
-  
   return {
-    journal: savedJournal || {
+    journal: {
       topLevelId: restrictedJournalId,
       level2Ids: [],
       level3Ids: [],
@@ -97,9 +62,6 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
         }
         newSelections.journal.rootFilter = Array.from(currentFilters);
         clearSubsequent = false;
-        
-        // Save journal selection to localStorage
-        saveJournalSelection(newSelections.journal);
       } else if (sliderType === "journal") {
         const { effectiveJournalIds, selectedJournalId, ...journalUpdates } =
           value;
@@ -112,9 +74,6 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
         if (effectiveJournalIds !== undefined) {
           newSelections.effectiveJournalIds = effectiveJournalIds;
         }
-
-        // Save journal selection to localStorage
-        saveJournalSelection(newSelections.journal);
       } else {
         (newSelections[sliderType as keyof SelectionsSlice] as any) = value;
       }
@@ -145,18 +104,32 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
     }),
 
   resetSelections: () =>
+    set((state: any) => ({
+      selections: getDefaultSelections(state.effectiveRestrictedJournalId),
+    })),
+
+  clearSelectionsFromIndex: (startIndex: number) =>
     set((state: any) => {
-      // Clear saved journal selection
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem(JOURNAL_SELECTION_KEY);
-        } catch (error) {
-          console.warn('Failed to clear journal selection from localStorage:', error);
+      const newSelections = { ...state.selections };
+      const initialSelectionsForReset = getDefaultSelections(
+        state.effectiveRestrictedJournalId
+      );
+      const order = state.sliderOrder;
+      const slidersToReset = order.slice(startIndex);
+
+      slidersToReset.forEach((sliderIdToReset: any) => {
+        const key = sliderIdToReset === "GOODS"
+          ? "good"
+          : (sliderIdToReset.toLowerCase() as keyof typeof newSelections);
+        
+        if (key === "journal") {
+          newSelections.journal = initialSelectionsForReset.journal;
+        } else if (key in newSelections) {
+          (newSelections[key as keyof typeof newSelections] as any) =
+            initialSelectionsForReset[key as keyof typeof initialSelectionsForReset];
         }
-      }
-      
-      return {
-        selections: getDefaultSelections(state.effectiveRestrictedJournalId),
-      };
+      });
+
+      return { selections: newSelections };
     }),
 });

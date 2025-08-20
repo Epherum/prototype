@@ -48,6 +48,7 @@ export interface SelectionsSlice {
 export interface SelectionsActions {
   setSelection: (sliderType: string, value: any) => void;
   resetSelections: () => void;
+  clearSelectionsFromIndex: (startIndex: number) => void;
 }
 
 // --- Document Creation Slice Types ---

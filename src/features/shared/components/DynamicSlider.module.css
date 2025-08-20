@@ -382,7 +382,12 @@
 
 .errorState {
   color: var(--accent-danger);
-  border-color: var(--accent-danger-light);
+  border: 1px dashed var(--accent-danger) !important;
+}
+
+.emptyState {
+  border: 1px dashed white;
+  color: var(--text-secondary);
 }
 
 .lockedState {

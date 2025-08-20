@@ -67,37 +67,25 @@ export const createUiActions = (set: any, get: any): UiActions => ({
         }
       }
 
-      let breakPointIndex = -1;
-      for (let i = 0; i < newVisibleOrder.length; i++) {
-        if (newVisibleOrder[i] !== oldVisibleOrder[i]) {
-          breakPointIndex = i;
-          break;
-        }
-      }
-
-      if (breakPointIndex === -1) {
-        return {
-          sliderOrder: newFullSliderOrder,
-          ui: { ...state.ui, sliderOrder: newFullSliderOrder },
-        };
-      }
-
-      const slidersToReset = newVisibleOrder.slice(breakPointIndex);
+      // Always reset from the position of the moved slider onwards
+      const resetStartIndex = Math.min(currentIndex, targetIndex);
+      const slidersToReset = newVisibleOrder.slice(resetStartIndex);
       const newSelections = { ...state.selections };
       const initialSelectionsForReset = getDefaultSelections(
         state.effectiveRestrictedJournalId
       );
 
+      // Force reset all affected sliders
       slidersToReset.forEach((sliderIdToReset: SliderType) => {
-        const key = sliderIdToReset === SLIDER_TYPES.GOODS
+        const key = sliderIdToReset === "GOODS"
           ? "good"
           : (sliderIdToReset.toLowerCase() as keyof typeof newSelections);
         
         if (key === "journal") {
-          newSelections.journal = initialSelectionsForReset.journal;
+          newSelections.journal = { ...initialSelectionsForReset.journal };
+          newSelections.effectiveJournalIds = [];
         } else if (key in newSelections) {
-          (newSelections[key as keyof typeof newSelections] as any) =
-            initialSelectionsForReset[key as keyof typeof initialSelectionsForReset];
+          (newSelections[key as keyof typeof newSelections] as any) = null;
         }
       });
 
