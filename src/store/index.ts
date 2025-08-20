@@ -8,6 +8,7 @@ import { getInitialAuthState, createAuthActions } from "./slices/authSlice";
 import { getInitialSelections, createSelectionsActions } from "./slices/selectionsSlice";
 import { getInitialDocumentCreationState, createDocumentCreationActions } from "./slices/documentCreationSlice";
 import { getInitialUiState, createUiActions } from "./slices/uiSlice";
+import { getInitialThemeState, createThemeActions } from "./slices/themeSlice";
 
 // Create the main store
 export const useAppStore = create<AppState>()((set, get) => {
@@ -16,10 +17,12 @@ export const useAppStore = create<AppState>()((set, get) => {
   const selectionsActions = createSelectionsActions(set, get);
   const documentCreationActions = createDocumentCreationActions(set, get);
   const uiActions = createUiActions(set, get);
+  const themeActions = createThemeActions(set);
 
   // Get initial states
   const initialAuth = getInitialAuthState();
   const initialUi = getInitialUiState();
+  const initialTheme = getInitialThemeState();
   
   // Return the complete store state and actions
   return {
@@ -34,6 +37,9 @@ export const useAppStore = create<AppState>()((set, get) => {
     visibility: initialUi.visibility,
     accordionState: initialUi.accordionState,
     
+    // Theme state at root level
+    currentTheme: initialTheme.currentTheme,
+    
     // Nested state objects
     ui: {
       ...initialUi,
@@ -46,6 +52,7 @@ export const useAppStore = create<AppState>()((set, get) => {
     ...selectionsActions,
     ...documentCreationActions,
     ...uiActions,
+    ...themeActions,
   };
 });
 
@@ -57,5 +64,6 @@ export type {
   SliderType, 
   SliderVisibility, 
   DocumentCreationMode,
-  SessionStatus 
+  SessionStatus,
+  ThemeType
 } from "./types";

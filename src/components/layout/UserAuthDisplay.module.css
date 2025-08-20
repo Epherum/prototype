@@ -174,7 +174,7 @@
   position: absolute;
   top: calc(100% + calc(var(--spacing-unit) * 0.5));
   right: 0;
-  min-width: 160px;
+  min-width: 240px;
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--border-radius-md);
@@ -204,6 +204,12 @@
 
 .dropdownItem:first-child {
   border-top: none;
+}
+
+.dropdownDivider {
+  height: 1px;
+  background-color: var(--border-subtle);
+  margin: 0;
 }
 
 .dropdownItem + .dropdownItem {

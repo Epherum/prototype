@@ -34,7 +34,7 @@
   border-radius: var(--border-radius-sm);
   font-size: 1em;
   color: var(--text-primary);
-  background-color: #fff;
+  background-color: var(--bg-input);
 }
 .formGroup input[type="text"]:focus,
 .formGroup input[type="number"]:focus {
@@ -44,9 +44,9 @@
 }
 
 .formError {
-  color: #d8000c;
-  background-color: #ffd2d2;
-  border: 1px solid #d8000c;
+  color: var(--danger-color);
+  background-color: var(--danger-color-light-bg);
+  border: 1px solid var(--danger-color);
   padding: var(--spacing-unit);
   border-radius: var(--border-radius-sm);
   font-size: 0.85em;

@@ -7,6 +7,7 @@ import { motion, AnimatePresence, Variants } from "framer-motion";
 import Image from "next/image";
 import styles from "./UserAuthDisplay.module.css";
 import { usePermissions } from "@/hooks/usePermissions";
+import { ThemeSelector } from "@/components/shared/ThemeSelector";
 
 const revealVariants: Variants = {
   hidden: { opacity: 0 },
@@ -178,6 +179,8 @@ export default function UserAuthDisplay({
                           exit={{ opacity: 0, y: -10, scale: 0.95 }}
                           transition={{ duration: 0.15, ease: "easeOut" }}
                         >
+                          <ThemeSelector />
+                          <div className={styles.dropdownDivider} />
                           {canManageUsers && (
                             <button
                               onClick={() => {

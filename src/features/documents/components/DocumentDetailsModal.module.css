@@ -151,12 +151,12 @@
   padding: calc(var(--spacing-unit) * 1);
   background: transparent;
   border-radius: var(--border-radius-md);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: 1px solid var(--border-subtle);
   transition: background-color 0.2s ease;
 }
 
 .infoItem:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--bg-secondary);
 }
 
 .label {
@@ -197,23 +197,25 @@
 }
 
 .status.draft {
-  background-color: #fef3c7;
-  color: #92400e;
+  background-color: var(--accent-warm-light);
+  color: var(--text-primary);
 }
 
 .status.confirmed {
-  background-color: #d1fae5;
-  color: #065f46;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--accent-warm);
 }
 
 .status.invoiced {
-  background-color: #dbeafe;
-  color: #1e40af;
+  background-color: var(--accent-slider);
+  color: var(--accent-warm);
+  border-color: var(--accent-warm);
 }
 
 .status.paid {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
 }
 
 .lineItemsSection {

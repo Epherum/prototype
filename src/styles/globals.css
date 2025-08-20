@@ -6,22 +6,6 @@
   /* Font Family Variables */
   --font-text: 'TiemposText', Georgia, 'Times New Roman', serif;
   --font-headline: 'TiemposHeadline', Georgia, 'Times New Roman', serif;
-  /* Warm Palette - KEEP AS IS */
-  --bg-main: #fdf8f2;
-  --bg-card: #ffffff;
-  --text-primary: #3a3a3a;
-  --text-secondary: #7a7a7a;
-  --accent-warm: #e89f71;
-  --accent-warm-light: #f3d4c2;
-  --accent-slider: #f5eeea; /* This is now --accent-warm-lighter in my previous suggestions, let's stick to your original */
-  --border-subtle: #eee;
-  --shadow-color: rgba(100, 100, 100, 0.1);
-
-  /* ADDED DANGER COLORS */
-  --danger-color: #dc3545; /* A common bootstrap danger red */
-  --danger-color-hover: #c82333; /* Darker red for hover */
-  --danger-color-light-bg: #f8d7da; /* Light red background for less prominent danger items */
-  --text-on-danger: #ffffff; /* White text for dark danger backgrounds */
 
   /* Rounding - KEEP AS IS */
   --border-radius-lg: 16px;
@@ -31,10 +15,29 @@
 
   /* Spacing - KEEP AS IS */
   --spacing-unit: 8px;
+}
 
-  /* ADDED FROM MY PREVIOUS SUGGESTIONS IF YOU LIKE THEM */
-  --bg-secondary: #f9f9f9; /* For secondary buttons, light grey backgrounds */
-  --overlay-bg: rgba(0, 0, 0, 0.65); /* For modal overlays */
+/* Light Orange Theme (default) */
+:root,
+:root[data-theme="light-orange"] {
+  --bg-main: #fdf8f2;
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a;
+  --text-secondary: #7a7a7a;
+  --accent-warm: #e89f71;
+  --accent-warm-light: #f3d4c2;
+  --accent-slider: #f5eeea;
+  --border-subtle: #eee;
+  --shadow-color: rgba(100, 100, 100, 0.1);
+
+  /* ADDED DANGER COLORS */
+  --danger-color: #dc3545;
+  --danger-color-hover: #c82333;
+  --danger-color-light-bg: #f8d7da;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #f9f9f9;
+  --overlay-bg: rgba(0, 0, 0, 0.65);
   
   /* Form input variables */
   --bg-input: #ffffff;
@@ -52,47 +55,117 @@
   --primary-accent-color: #e89f71;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* Warm Palette - DARK MODE VERSION */
-    --bg-main: #262624;
-    --bg-card: #30302e;
-    /* --bg-main: #1e1e1e;
-    --bg-card: #2a2a2a; */
-    --text-primary: #f5f5f5;
-    --text-secondary: #c0c0c0;
-    --accent-warm: #e89f71;
-    --accent-warm-light: #a86541; /* Deeper version for dark mode */
-    --accent-slider: #3a2e28; /* Warm-muted background for sliders */
-    --border-subtle: #333;
-    --shadow-color: rgba(0, 0, 0, 0.4);
+/* Light Blue Theme */
+:root[data-theme="light-blue"] {
+  --bg-main: #f8fbff;
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a;
+  --text-secondary: #7a7a7a;
+  --accent-warm: #71a8e8;
+  --accent-warm-light: #c2d4f3;
+  --accent-slider: #eaf2ff;
+  --border-subtle: #e3eeff;
+  --shadow-color: rgba(100, 120, 150, 0.1);
 
-    /* ADDED DANGER COLORS - DARK MODE VERSION */
-    --danger-color: #ff6b6b;
-    --danger-color-hover: #e05252;
-    --danger-color-light-bg: #3d1e20; /* Deep muted red for dark bg */
-    --text-on-danger: #ffffff;
+  /* ADDED DANGER COLORS */
+  --danger-color: #dc3545;
+  --danger-color-hover: #c82333;
+  --danger-color-light-bg: #f8d7da;
+  --text-on-danger: #ffffff;
 
-    /* ADDED FROM PREVIOUS SUGGESTIONS */
-    --bg-secondary: #2f2f2f;
-    --overlay-bg: rgba(0, 0, 0, 0.75);
-    
-    /* Form input variables - dark mode */
-    --bg-input: #2a2a2a;
-    --bg-disabled: #1a1a1a;
-    --text-disabled: #666666;
-    --border-disabled: #444444;
-    --color-error: #ff6b6b;
-    
-    /* Button hover colors - dark mode */
-    --accent-warm-hover: #f5b088;
-    --bg-secondary-hover: #3a3a3a;
-    --border-hover: #555555;
-    
-    /* Primary accent for highlights - dark mode */
-    --primary-accent-color: #e89f71;
-  }
+  --bg-secondary: #f9fbff;
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+  
+  /* Form input variables */
+  --bg-input: #ffffff;
+  --bg-disabled: #f3f6ff;
+  --text-disabled: #6b7280;
+  --border-disabled: #d1d9ef;
+  --color-error: #dc3545;
+  
+  /* Button hover colors */
+  --accent-warm-hover: #5f97dd;
+  --bg-secondary-hover: #f0f4ff;
+  --border-hover: #c2d1ef;
+  
+  /* Primary accent for highlights */
+  --primary-accent-color: #71a8e8;
 }
+
+/* Dark Orange Theme */
+:root[data-theme="dark-orange"] {
+  --bg-main: #262624;
+  --bg-card: #30302e;
+  --text-primary: #f5f5f5;
+  --text-secondary: #c0c0c0;
+  --accent-warm: #e89f71;
+  --accent-warm-light: #a86541;
+  --accent-slider: #3a2e28;
+  --border-subtle: #333;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+
+  /* ADDED DANGER COLORS - DARK MODE VERSION */
+  --danger-color: #ff6b6b;
+  --danger-color-hover: #e05252;
+  --danger-color-light-bg: #3d1e20;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #2f2f2f;
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+  
+  /* Form input variables - dark mode */
+  --bg-input: #2a2a2a;
+  --bg-disabled: #1a1a1a;
+  --text-disabled: #666666;
+  --border-disabled: #444444;
+  --color-error: #ff6b6b;
+  
+  /* Button hover colors - dark mode */
+  --accent-warm-hover: #f5b088;
+  --bg-secondary-hover: #3a3a3a;
+  --border-hover: #555555;
+  
+  /* Primary accent for highlights - dark mode */
+  --primary-accent-color: #e89f71;
+}
+
+/* Dark Blue Theme */
+:root[data-theme="dark-blue"] {
+  --bg-main: #1a1f2e;
+  --bg-card: #232938;
+  --text-primary: #f5f5f5;
+  --text-secondary: #c0c0c0;
+  --accent-warm: #71a8e8;
+  --accent-warm-light: #4185c7;
+  --accent-slider: #28304a;
+  --border-subtle: #333a4a;
+  --shadow-color: rgba(0, 0, 0, 0.4);
+
+  /* ADDED DANGER COLORS - DARK MODE VERSION */
+  --danger-color: #ff6b6b;
+  --danger-color-hover: #e05252;
+  --danger-color-light-bg: #3d1e20;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #2a2f3f;
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+  
+  /* Form input variables - dark mode */
+  --bg-input: #2a2f3f;
+  --bg-disabled: #1a1a2a;
+  --text-disabled: #666677;
+  --border-disabled: #444455;
+  --color-error: #ff6b6b;
+  
+  /* Button hover colors - dark mode */
+  --accent-warm-hover: #88b8ff;
+  --bg-secondary-hover: #363c4f;
+  --border-hover: #555566;
+  
+  /* Primary accent for highlights - dark mode */
+  --primary-accent-color: #71a8e8;
+}
+
 
 body {
   /* Apply base font and background to body */

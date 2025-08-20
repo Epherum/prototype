@@ -15,6 +15,13 @@ export type SliderVisibility = Record<SliderType, boolean>;
 export type AccordionState = Partial<Record<SliderType, boolean>>;
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
+// --- Theme Types ---
+export type ThemeType = "light-orange" | "light-blue" | "dark-orange" | "dark-blue";
+
+export interface ThemeSlice {
+  currentTheme: ThemeType;
+}
+
 // --- Auth Slice Types ---
 export interface AuthSlice {
   sessionStatus: SessionStatus;
@@ -108,8 +115,13 @@ export interface UiActions {
   toggleAccordion: (sliderId: SliderType) => void;
 }
 
+// --- Theme Actions ---
+export interface ThemeActions {
+  setTheme: (theme: ThemeType) => void;
+}
+
 // --- Combined Store Type ---
-export interface AppState extends AuthActions, SelectionsActions, DocumentCreationActions, UiActions {
+export interface AppState extends AuthActions, SelectionsActions, DocumentCreationActions, UiActions, ThemeActions {
   // Auth state
   sessionStatus: SessionStatus;
   user: Partial<ExtendedUser>;
@@ -120,6 +132,9 @@ export interface AppState extends AuthActions, SelectionsActions, DocumentCreati
   sliderOrder: SliderType[];
   visibility: SliderVisibility;
   accordionState: AccordionState;
+  
+  // Theme state
+  currentTheme: ThemeType;
   
   // Nested slices
   ui: UiSlice;
