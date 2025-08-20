@@ -104,25 +104,20 @@ export default function Home() {
     >
       <UsersController ref={usersControllerRef} />
 
-      <motion.h1 variants={itemVariants} className={styles.title}>
-        ERP Application Interface
-      </motion.h1>
 
-      <motion.div variants={itemVariants}>
+      <motion.div variants={itemVariants} style={{ marginTop: 'calc(var(--spacing-unit) * 3)' }}>
         <UserAuthDisplay
           onOpenCreateUserModal={() => usersControllerRef.current?.open()}
         />
       </motion.div>
 
-      <motion.div variants={itemVariants}>
-        <StickyHeaderControls
-          visibility={visibility}
-          onToggleVisibility={useAppStore.getState().toggleSliderVisibility}
-          allSliderIds={INITIAL_ORDER}
-          visibleSliderOrder={visibleSliderOrder}
-          sliderConfigs={sliderConfigs}
-        />
-      </motion.div>
+      <StickyHeaderControls
+        visibility={visibility}
+        onToggleVisibility={useAppStore.getState().toggleSliderVisibility}
+        allSliderIds={INITIAL_ORDER}
+        visibleSliderOrder={visibleSliderOrder}
+        sliderConfigs={sliderConfigs}
+      />
 
       <motion.div variants={itemVariants}>
         <SliderLayoutManager

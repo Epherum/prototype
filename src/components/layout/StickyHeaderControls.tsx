@@ -65,8 +65,8 @@ export default function StickyHeaderControls({
             observer={true}
             observeParents={true}
           >
-            {/* We map over the static list of ALL possible sliders */}
-            {allSliderIds.map((sliderId) => {
+            {/* Map over visible sliders in their correct order, then add invisible ones */}
+            {[...visibleSliderOrder, ...allSliderIds.filter(id => !visibility[id])].map((sliderId, index) => {
               const config = sliderConfigs[sliderId];
               if (!config) return null;
 
@@ -74,8 +74,9 @@ export default function StickyHeaderControls({
               const isCurrentlyVisible = visibility[sliderId];
               const isExpanded = expandedButton === sliderId;
 
-              // Find the index in the *visible* order array to get the number
-              const visibleIndex = visibleSliderOrder.indexOf(sliderId);
+              // Calculate position for visible sliders
+              const visibleIndex = isCurrentlyVisible ? visibleSliderOrder.indexOf(sliderId) : -1;
+              const totalVisibleSliders = visibleSliderOrder.length;
 
               return (
                 <SwiperSlide
@@ -107,9 +108,11 @@ export default function StickyHeaderControls({
                       transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
                       {/* Display number only if it's visible */}
-                      {isCurrentlyVisible && visibleIndex !== -1
-                        ? `${visibleIndex + 1}: `
-                        : ""}
+                      {isCurrentlyVisible && visibleIndex !== -1 && totalVisibleSliders > 1 && (
+                        <span className={styles.sliderCount}>
+                          {visibleIndex + 1}/{totalVisibleSliders}
+                        </span>
+                      )}
                       {title}
                     </motion.button>
                   </motion.div>

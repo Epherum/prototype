@@ -2,15 +2,17 @@
 .stickyHeaderContainer {
   position: sticky;
   top: 0;
-  z-index: 100; /* Specific z-index */
+  z-index: 100;
   background-color: var(--bg-main);
   padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
-  margin: 0 calc(-1 * var(--spacing-unit) * 2);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08); /* Could use var(--shadow-color) with adjusted alpha if desired */
+  margin: 0 calc(-1 * var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   gap: calc(var(--spacing-unit) * 2);
-  margin-bottom: calc(var(--spacing-unit) * 3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .dataSourceSelector {
@@ -112,4 +114,10 @@
 }
 .visibilityButton.visibilityInactive:hover {
   border-color: #ccc; /* Slightly darker inactive border, could be a variable */
+}
+
+.sliderCount {
+  font-size: 0.8em;
+  font-weight: 600;
+  margin-right: calc(var(--spacing-unit) * 0.5);
 }

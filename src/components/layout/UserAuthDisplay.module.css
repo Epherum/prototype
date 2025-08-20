@@ -2,7 +2,7 @@
 .authContainer {
   display: flex;
   align-items: center;
-  justify-content: space-between; /* Pushes content to opposite ends */
+  justify-content: space-between;
   gap: calc(var(--spacing-unit) * 1.5);
 
   /* Restore the "card" look */
@@ -16,6 +16,44 @@
   width: 100%;
 }
 
+.logoContainer {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.logo {
+  display: block;
+  opacity: 0.8;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  border-radius: 50%;
+  cursor: pointer;
+  object-fit: cover;
+}
+
+.logo:hover {
+  opacity: 1;
+  transform: scale(1.05);
+}
+
+.logoText {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+  user-select: none;
+}
+
+.logoText:hover {
+  color: var(--accent-warm);
+  transform: scale(1.05);
+}
+
+.spacer {
+  flex: 1;
+}
+
 .buttonGroup {
   display: flex;
   align-items: center;
@@ -26,6 +64,8 @@
   font-size: 0.9em;
   color: var(--text-secondary);
   line-height: 1.3;
+  text-align: center;
+  flex: 1;
 }
 
 .userName {
@@ -84,4 +124,88 @@
   /* The overlay needs a background to hide the content underneath */
   background-color: var(--bg-card);
   border-radius: var(--border-radius-md); /* Match parent radius */
+}
+
+/* Dropdown Styles */
+.dropdownContainer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dropdownTrigger {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-pill);
+  background-color: transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  outline: none;
+}
+
+.dropdownTrigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent-warm);
+}
+
+.dropdownTrigger:hover {
+  background-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+  border-color: var(--accent-warm-light);
+}
+
+.dropdownArrow {
+  transition: transform 0.2s ease;
+}
+
+.dropdownArrowOpen {
+  transform: rotate(180deg);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + calc(var(--spacing-unit) * 0.5));
+  right: 0;
+  min-width: 160px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  box-shadow: 0 4px 12px var(--shadow-color);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.dropdownItem {
+  display: block;
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.dropdownItem:hover {
+  background-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+}
+
+.dropdownItem:first-child {
+  border-top: none;
+}
+
+.dropdownItem + .dropdownItem {
+  border-top: 1px solid var(--border-subtle);
 }
