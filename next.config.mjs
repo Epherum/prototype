@@ -5,6 +5,10 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  output: 'standalone',
+  experimental: {
+    serverComponentsExternalPackages: ['@prisma/client']
+  },
   images: {
     remotePatterns: [
       // Keep Unsplash if you might use it elsewhere, or remove
