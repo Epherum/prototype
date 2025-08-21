@@ -6,7 +6,7 @@ function getStoredTheme(): ThemeType {
   if (typeof window === 'undefined') return "light-orange";
   
   const stored = localStorage.getItem('app-theme');
-  if (stored && ['light-orange', 'light-blue', 'dark-orange', 'dark-blue', 'light-pink', 'light-green', 'dark-pink', 'dark-green'].includes(stored)) {
+  if (stored && ['light-orange', 'light-blue', 'dark-orange', 'dark-blue', 'light-pink', 'light-green', 'dark-pink', 'dark-green', 'light-purple', 'dark-purple'].includes(stored)) {
     return stored as ThemeType;
   }
   return "light-orange";

@@ -314,6 +314,81 @@
   --primary-accent-color: #6bc46b;
 }
 
+/* Light Purple Theme */
+:root[data-theme="light-purple"] {
+  --bg-main: #fdf9ff;
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a;
+  --text-secondary: #7a7a7a;
+  --accent-warm: #a271c8;
+  --accent-warm-light: #d4bbf0;
+  --accent-slider: #f5eefc;
+  --border-subtle: #ebe0f5;
+  --shadow-color: rgba(162, 113, 200, 0.1);
+
+  /* DANGER COLORS */
+  --danger-color: #dc3545;
+  --danger-color-hover: #c82333;
+  --danger-color-light-bg: #f8d7da;
+  --text-on-danger: #ffffff;
+
+  /* UI ELEMENT COLORS */
+  --bg-secondary: #faf6ff;
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+  
+  /* Form input variables */
+  --bg-input: #ffffff;
+  --bg-disabled: #faf6ff;
+  --text-disabled: #6b7280;
+  --border-disabled: #e5d9f2;
+  --color-error: #dc3545;
+  
+  /* Button hover colors */
+  --accent-warm-hover: #9461b8;
+  --bg-secondary-hover: #f3eafc;
+  --border-hover: #d4bbf0;
+  
+  /* Primary accent for highlights */
+  --primary-accent-color: #a271c8;
+}
+
+/* Dark Purple Theme */
+:root[data-theme="dark-purple"] {
+  --bg-main: #2a252f;
+  --bg-card: #342e3a;
+  --text-primary: #e8e8e8;
+  --text-secondary: #b8b8b8;
+  --accent-warm: #a271c8;
+  --accent-warm-light: #8f5fb3;
+  --accent-slider: #3d2f47;
+  --border-subtle: #453a4f;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* DANGER COLORS - DARK MODE VERSION */
+  --danger-color: #ff6b6b;
+  --danger-color-hover: #e05252;
+  --danger-color-light-bg: #3d1e20;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #3a2f42;
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+  
+  /* Form input variables - dark mode */
+  --bg-input: #3a2f42;
+  --bg-disabled: #2a252f;
+  --text-disabled: #7a6f8a;
+  --border-disabled: #4f4359;
+  --color-error: #ff6b6b;
+  
+  /* Button hover colors - dark mode */
+  --accent-warm-hover: #b584d6;
+  --bg-secondary-hover: #453a4f;
+  --border-hover: #5d5166;
+  
+  /* Primary accent for highlights - dark mode */
+  --primary-accent-color: #a271c8;
+}
+
 
 html {
   /* Prevent horizontal overflow on mobile */

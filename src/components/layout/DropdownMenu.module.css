@@ -16,6 +16,10 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
+  border-color: var(--accent-warm);
+  /* CHECK HERE */
+
+
 }
 
 .triggerButton:hover:not(:disabled) {
