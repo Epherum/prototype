@@ -11,19 +11,39 @@ const themes: { id: ThemeType; name: string; preview: { bg: string; accent: stri
     preview: { bg: "#fdf8f2", accent: "#e89f71" }
   },
   {
-    id: "light-blue",
-    name: "Light Blue",
-    preview: { bg: "#f8fbff", accent: "#71a8e8" }
-  },
-  {
     id: "dark-orange",
     name: "Dark Orange",
     preview: { bg: "#262624", accent: "#e89f71" }
   },
   {
+    id: "light-blue",
+    name: "Light Blue",
+    preview: { bg: "#f8fbff", accent: "#71a8e8" }
+  },
+  {
     id: "dark-blue",
     name: "Dark Blue",
     preview: { bg: "#1a1f2e", accent: "#71a8e8" }
+  },
+  {
+    id: "light-pink",
+    name: "Sakura Blossom",
+    preview: { bg: "#fdf9fa", accent: "#c97694" }
+  },
+  {
+    id: "dark-pink",
+    name: "Midnight Rose",
+    preview: { bg: "#2a2428", accent: "#c97694" }
+  },
+  {
+    id: "light-green",
+    name: "Forest Dawn",
+    preview: { bg: "#f7fef7", accent: "#71e871" }
+  },
+  {
+    id: "dark-green",
+    name: "Deep Forest",
+    preview: { bg: "#242a24", accent: "#6bc46b" }
   }
 ];
 

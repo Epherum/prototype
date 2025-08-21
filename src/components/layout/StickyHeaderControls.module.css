@@ -13,6 +13,19 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  /* Fix mobile overflow while maintaining sticky */
+  contain: layout style;
+  transform: translateZ(0);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 768px) {
+  .stickyHeaderContainer {
+    margin-left: calc(-1 * var(--spacing-unit) * 1.5);
+    margin-right: calc(-1 * var(--spacing-unit) * 1.5);
+    padding-left: calc(var(--spacing-unit) * 1.5);
+    padding-right: calc(var(--spacing-unit) * 1.5);
+  }
 }
 
 .dataSourceSelector {
@@ -42,7 +55,7 @@
   /* ... looks good */
   width: 100%;
   flex-shrink: 0;
-  overflow: hidden; /* Good for containing Swiper */
+  overflow: visible; /* Allow touch events to work properly on mobile */
 }
 
 .visibilitySwiper {
@@ -84,6 +97,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 120px;
+  /* Mobile touch optimizations */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .visibilityButton.expanded {

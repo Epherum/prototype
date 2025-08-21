@@ -16,7 +16,7 @@ export type AccordionState = Partial<Record<SliderType, boolean>>;
 export type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
 // --- Theme Types ---
-export type ThemeType = "light-orange" | "light-blue" | "dark-orange" | "dark-blue";
+export type ThemeType = "light-orange" | "light-blue" | "dark-orange" | "dark-blue" | "light-pink" | "light-green" | "dark-pink" | "dark-green";
 
 export interface ThemeSlice {
   currentTheme: ThemeType;

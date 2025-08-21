@@ -166,6 +166,159 @@
   --primary-accent-color: #71a8e8;
 }
 
+/* Light Pink Theme */
+:root[data-theme="light-pink"] {
+  --bg-main: #fdf9fa;
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a;
+  --text-secondary: #7a7a7a;
+  --accent-warm: #c97694;
+  --accent-warm-light: #e8bcc9;
+  --accent-slider: #f9f2f4;
+  --border-subtle: #f2e8eb;
+  --shadow-color: rgba(120, 90, 100, 0.08);
+
+  /* ADDED DANGER COLORS */
+  --danger-color: #dc3545;
+  --danger-color-hover: #c82333;
+  --danger-color-light-bg: #f8d7da;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #fdf8f9;
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+  
+  /* Form input variables */
+  --bg-input: #ffffff;
+  --bg-disabled: #faf6f7;
+  --text-disabled: #6b7280;
+  --border-disabled: #e5d5d9;
+  --color-error: #dc3545;
+  
+  /* Button hover colors */
+  --accent-warm-hover: #b66885;
+  --bg-secondary-hover: #f8f3f5;
+  --border-hover: #e2cdd2;
+  
+  /* Primary accent for highlights */
+  --primary-accent-color: #c97694;
+}
+
+/* Light Green Theme */
+:root[data-theme="light-green"] {
+  --bg-main: #f7fef7;
+  --bg-card: #ffffff;
+  --text-primary: #3a3a3a;
+  --text-secondary: #7a7a7a;
+  --accent-warm: #71e871;
+  --accent-warm-light: #c2f3c2;
+  --accent-slider: #ebffeb;
+  --border-subtle: #e3ffe3;
+  --shadow-color: rgba(100, 150, 100, 0.1);
+
+  /* ADDED DANGER COLORS */
+  --danger-color: #dc3545;
+  --danger-color-hover: #c82333;
+  --danger-color-light-bg: #f8d7da;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #f9fff9;
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+  
+  /* Form input variables */
+  --bg-input: #ffffff;
+  --bg-disabled: #f3fff3;
+  --text-disabled: #6b7280;
+  --border-disabled: #d1efd1;
+  --color-error: #dc3545;
+  
+  /* Button hover colors */
+  --accent-warm-hover: #5fdd5f;
+  --bg-secondary-hover: #f0fff0;
+  --border-hover: #c2efc2;
+  
+  /* Primary accent for highlights */
+  --primary-accent-color: #71e871;
+}
+
+/* Dark Pink Theme */
+:root[data-theme="dark-pink"] {
+  --bg-main: #2a2428;
+  --bg-card: #343038;
+  --text-primary: #e8e8e8;
+  --text-secondary: #b8b8b8;
+  --accent-warm: #c97694;
+  --accent-warm-light: #985c7a;
+  --accent-slider: #3e323a;
+  --border-subtle: #423a42;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* ADDED DANGER COLORS - DARK MODE VERSION */
+  --danger-color: #ff6b6b;
+  --danger-color-hover: #e05252;
+  --danger-color-light-bg: #3d1e20;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #372f34;
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+  
+  /* Form input variables - dark mode */
+  --bg-input: #372f34;
+  --bg-disabled: #252025;
+  --text-disabled: #706670;
+  --border-disabled: #4a424a;
+  --color-error: #ff6b6b;
+  
+  /* Button hover colors - dark mode */
+  --accent-warm-hover: #d688a2;
+  --bg-secondary-hover: #3f3539;
+  --border-hover: #554f55;
+  
+  /* Primary accent for highlights - dark mode */
+  --primary-accent-color: #c97694;
+}
+
+/* Dark Green Theme */
+:root[data-theme="dark-green"] {
+  --bg-main: #242a24;
+  --bg-card: #303830;
+  --text-primary: #e8e8e8;
+  --text-secondary: #b8b8b8;
+  --accent-warm: #6bc46b;
+  --accent-warm-light: #5a9b5a;
+  --accent-slider: #323e32;
+  --border-subtle: #3a423a;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  /* ADDED DANGER COLORS - DARK MODE VERSION */
+  --danger-color: #ff6b6b;
+  --danger-color-hover: #e05252;
+  --danger-color-light-bg: #3d1e20;
+  --text-on-danger: #ffffff;
+
+  --bg-secondary: #2f372f;
+  --overlay-bg: rgba(0, 0, 0, 0.75);
+  
+  /* Form input variables - dark mode */
+  --bg-input: #2f372f;
+  --bg-disabled: #202520;
+  --text-disabled: #667066;
+  --border-disabled: #424a42;
+  --color-error: #ff6b6b;
+  
+  /* Button hover colors - dark mode */
+  --accent-warm-hover: #7dd17d;
+  --bg-secondary-hover: #353f35;
+  --border-hover: #4f554f;
+  
+  /* Primary accent for highlights - dark mode */
+  --primary-accent-color: #6bc46b;
+}
+
+
+html {
+  /* Prevent horizontal overflow on mobile */
+  overflow-x: hidden;
+}
 
 body {
   /* Apply base font and background to body */
@@ -175,6 +328,8 @@ body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent horizontal overflow on mobile */
+  overflow-x: hidden;
 }
 
 /* Global heading styles */
@@ -250,6 +405,21 @@ p {
 /* Touch action for preventing double-tap zoom (can be applied via className in JS) */
 .touchManipulation {
   touch-action: manipulation;
+}
+
+/* Global mobile touch optimizations for all interactive elements */
+button, [role="button"], input[type="button"], input[type="submit"], input[type="reset"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Prevent text selection on mobile for better UX */
+button, [role="button"] {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 /* Utility: No Data placeholders (These are good to keep global) */

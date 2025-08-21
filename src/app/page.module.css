@@ -5,6 +5,17 @@
   margin: 0 auto;
   padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
   min-height: 100vh;
+  /* Prevent horizontal overflow */
+  overflow-x: hidden;
+}
+
+/* Mobile adjustments for page container */
+@media (max-width: 768px) {
+  .pageContainer {
+    padding-left: calc(var(--spacing-unit) * 1.5);
+    padding-right: calc(var(--spacing-unit) * 1.5);
+    max-width: 100%;
+  }
 }
 
 .title {
