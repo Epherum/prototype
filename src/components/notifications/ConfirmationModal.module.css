@@ -1,0 +1,102 @@
+/* src/components/notifications/ConfirmationModal.module.css */
+
+.confirmationContent {
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 1);
+}
+
+.confirmationIcon {
+  font-size: 3em;
+  margin-bottom: calc(var(--spacing-unit) * 2);
+  color: var(--accent-warm);
+}
+
+.confirmationIcon.warning {
+  color: #f59e0b;
+}
+
+.confirmationIcon.danger {
+  color: var(--danger-color);
+}
+
+.confirmationIcon.info {
+  color: var(--accent-warm);
+}
+
+.confirmationTitle {
+  font-family: var(--font-headline);
+  font-size: 1.25em;
+  font-weight: 600;
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  color: var(--text-primary);
+}
+
+.confirmationMessage {
+  font-size: 0.95em;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: calc(var(--spacing-unit) * 3);
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.confirmationActions {
+  display: flex;
+  justify-content: center;
+  gap: calc(var(--spacing-unit) * 2);
+  margin-top: calc(var(--spacing-unit) * 3);
+}
+
+.confirmationButton {
+  padding: calc(var(--spacing-unit) * 1.2) calc(var(--spacing-unit) * 2.5);
+  font-size: 0.95em;
+  font-weight: 500;
+  border-radius: var(--border-radius-md);
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  transition: background-color 0.2s ease, transform 0.1s ease;
+  min-width: 100px;
+  justify-content: center;
+}
+
+.confirmationButton:hover {
+  transform: translateY(-1px);
+}
+
+.confirmationButton:active {
+  transform: translateY(0);
+}
+
+.confirmationButtonPrimary {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+}
+
+.confirmationButtonPrimary:hover {
+  background-color: var(--accent-warm-hover);
+}
+
+.confirmationButtonDanger {
+  background-color: var(--danger-color);
+  color: var(--text-on-danger);
+}
+
+.confirmationButtonDanger:hover {
+  background-color: var(--danger-color-hover);
+}
+
+.confirmationButtonSecondary {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.confirmationButtonSecondary:hover {
+  background-color: var(--bg-secondary-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}

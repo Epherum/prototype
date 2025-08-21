@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { userKeys, roleKeys } from "@/lib/queryKeys";
+import { useToast } from "@/contexts/ToastContext";
 
 import { useCurrentUser } from "@/hooks/useCurrentUser";
 import { useJournalManager } from "@/features/journals/useJournalManager";
@@ -66,6 +67,7 @@ export function useUserManagement(
   const queryClient = useQueryClient();
   const currentUser = useCurrentUser();
   const isEditMode = !!userIdToEdit;
+  const toast = useToast();
 
   // Fetch the FULL journal hierarchy from the base manager
   const {
@@ -212,7 +214,7 @@ export function useUserManagement(
   // ✨ MODIFIED: Build a payload that strictly matches the Zod schema.
   const handleSubmit = useCallback(async () => {
     if (formState.roleAssignments.length === 0) {
-      alert("A user must have at least one role.");
+      toast.error("Validation Error", "A user must have at least one role.");
       return;
     }
 

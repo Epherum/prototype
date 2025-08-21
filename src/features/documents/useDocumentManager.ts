@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
 import { documentKeys } from "@/lib/queryKeys";
 import { createDocument } from "@/services/clientDocumentService";
+import { toastService } from "@/lib/services/toastService";
 import { fetchPartnerById } from "@/services/clientPartnerService";
 import { SLIDER_TYPES } from "@/lib/constants";
 
@@ -227,7 +228,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
     },
     onError: (error: Error) => {
       // This will alert for each failure.
-      alert(`Error creating a document: ${error.message}`);
+      toastService.error("Error creating document", error.message);
     },
   });
 
@@ -394,7 +395,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
       
       try {
         await createSingleDocument(journalId, partnerId, headerData);
-        alert("Document created successfully!");
+        toastService.success("Document created successfully!");
         handleCancelCreation();
         setFinalizeModalOpen(false);
       } catch (e) {

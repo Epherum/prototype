@@ -18,6 +18,7 @@ import { getDocumentById, deleteDocument, updateDocument } from "@/services/clie
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { documentKeys } from "@/lib/queryKeys";
 import type { UpdateDocumentPayload } from "@/lib/schemas/document.schema";
+import { useToast } from "@/contexts/ToastContext";
 
 // ✅ NEW: Import client model
 import type { DocumentClient } from "@/lib/types/models.client";
@@ -52,6 +53,7 @@ export const DocumentSliderController = forwardRef<
     const setSelection = useAppStore((state) => state.setSelection);
     const activeDocumentId = useAppStore((state) => state.selections.document);
     const queryClient = useQueryClient();
+    const toast = useToast();
 
     const [isDocMenuOpen, setDocMenuOpen] = useState(false);
     const [docMenuAnchorEl, setDocMenuAnchorEl] = useState<HTMLElement | null>(
@@ -72,10 +74,10 @@ export const DocumentSliderController = forwardRef<
         if (activeDocumentId) {
           setSelection("document", null);
         }
-        alert("Document deleted successfully!");
+        toast.success("Document deleted successfully!");
       },
       onError: (error: Error) => {
-        alert(`Failed to delete document: ${error.message}`);
+        toast.error("Failed to delete document", error.message);
       },
     });
 
@@ -92,10 +94,10 @@ export const DocumentSliderController = forwardRef<
           setSelectedDocumentDetails(updatedDocument);
         }
         setIsEditModalOpen(false);
-        alert("Document updated successfully!");
+        toast.success("Document updated successfully!");
       },
       onError: (error: Error) => {
-        alert(`Failed to update document: ${error.message}`);
+        toast.error("Failed to update document", error.message);
       },
     });
 

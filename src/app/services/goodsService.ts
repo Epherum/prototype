@@ -43,7 +43,7 @@ const goodsService = {
     const newGood = await prisma.goodsAndService.create({
       data: {
         ...restOfData,
-        statusId: restOfData.statusId || "pending-default", // Default to pending if not provided
+        status: { connect: { id: restOfData.statusId || "pending-default" } }, // Connect to status
         createdBy: { connect: { id: createdById } },
       },
     });
@@ -52,7 +52,6 @@ const goodsService = {
     const journalGoodLinks = ancestorPath.map(journalId => ({
       journalId,
       goodId: newGood.id,
-      createdById: createdById,
     }));
     
     await prisma.journalGoodLink.createMany({

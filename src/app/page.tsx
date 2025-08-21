@@ -5,7 +5,6 @@ import { useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import styles from "./page.module.css";
 import { SLIDER_TYPES, INITIAL_ORDER } from "@/lib/constants";
-import "swiper/css";
 import { useAppStore } from "@/store/appStore";
 import { useAuthStoreInitializer } from "@/hooks/useAuthStoreInitializer";
 import { type JournalSliderControllerRef } from "@/features/journals/JournalSliderController";

@@ -6,6 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { IoClose, IoAdd, IoTrash, IoPencil } from "react-icons/io5";
 import { z } from "zod";
+import { useToast } from "@/contexts/ToastContext";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationModal } from "@/components/notifications/ConfirmationModal";
 
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./StatusManagementModal.module.css";
@@ -32,6 +35,8 @@ export const StatusManagementModal: React.FC<StatusManagementModalProps> = ({
 }) => {
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const toast = useToast();
+  const { confirmation, hideConfirmation, confirmDelete } = useConfirmation();
   
   const {
     statuses,
@@ -86,20 +91,28 @@ export const StatusManagementModal: React.FC<StatusManagementModalProps> = ({
       const usage = await checkStatusUsage(statusId);
       
       if (usage.totalUsage > 0) {
-        alert(
-          `Cannot delete this status. It is currently used by:\n` +
-          `• ${usage.partners} partners\n` +
-          `• ${usage.goods} goods/services\n` +
-          `• ${usage.documents} documents`
+        toast.error(
+          "Cannot delete status",
+          `This status is currently used by: ${usage.partners} partners, ${usage.goods} goods/services, and ${usage.documents} documents.`
         );
         return;
       }
 
-      if (confirm("Are you sure you want to delete this status?")) {
-        await deleteStatus.mutateAsync(statusId);
-      }
+      confirmDelete(
+        "status",
+        async () => {
+          try {
+            await deleteStatus.mutateAsync(statusId);
+            toast.success("Status deleted successfully");
+          } catch (error) {
+            console.error("Error deleting status:", error);
+            toast.error("Error deleting status", "An error occurred while deleting the status");
+          }
+        }
+      );
     } catch (error) {
       console.error("Error deleting status:", error);
+      toast.error("Error", "An error occurred while checking status usage");
     }
   };
 
@@ -322,6 +335,16 @@ export const StatusManagementModal: React.FC<StatusManagementModalProps> = ({
           </motion.div>
         </motion.div>
       )}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={hideConfirmation}
+        onConfirm={confirmation.onConfirm}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        type={confirmation.type}
+      />
     </AnimatePresence>
   );
 };

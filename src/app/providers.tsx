@@ -7,6 +7,8 @@ import { useState } from "react";
 import { SessionProvider } from "next-auth/react";
 import { ThemeInitializer } from "@/components/layout/ThemeInitializer";
 import { SessionValidator } from "@/components/auth/SessionValidator";
+import { ToastProvider } from "@/contexts/ToastContext";
+import { ToastContainer } from "@/components/notifications/ToastContainer";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -14,10 +16,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        <ThemeInitializer />
-        <SessionValidator />
-        {children}
-        <ReactQueryDevtools initialIsOpen={false} />
+        <ToastProvider>
+          <ThemeInitializer />
+          <SessionValidator />
+          {children}
+          <ToastContainer />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </ToastProvider>
       </QueryClientProvider>
     </SessionProvider>
   );

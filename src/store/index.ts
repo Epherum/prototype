@@ -1,6 +1,7 @@
 // src/store/index.ts
 
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { AppState } from "./types";
 
 // Import slice creators
@@ -10,8 +11,17 @@ import { getInitialDocumentCreationState, createDocumentCreationActions } from "
 import { getInitialUiState, createUiActions } from "./slices/uiSlice";
 import { getInitialThemeState, createThemeActions } from "./slices/themeSlice";
 
-// Create the main store
-export const useAppStore = create<AppState>()((set, get) => {
+// ✅ OPTIMIZATION: Add state persistence for user preferences
+interface PersistedState {
+  sliderOrder?: string[];
+  visibility?: Record<string, boolean>;
+  currentTheme?: string;
+}
+
+// Create the main store with persistence
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => {
   // Create all action sets
   const authActions = createAuthActions(set);
   const selectionsActions = createSelectionsActions(set, get);
@@ -54,7 +64,30 @@ export const useAppStore = create<AppState>()((set, get) => {
     ...uiActions,
     ...themeActions,
   };
-});
+},
+{
+  name: 'erp-user-preferences',
+  storage: createJSONStorage(() => localStorage),
+  partialize: (state): PersistedState => ({
+    // Only persist user preferences, not sensitive data
+    sliderOrder: state.sliderOrder,
+    visibility: state.visibility,
+    currentTheme: state.currentTheme,
+  }),
+  // Merge persisted state safely
+  merge: (persistedState, currentState) => {
+    const persisted = persistedState as PersistedState;
+    const mergedState: AppState = { ...currentState };
+    if (persisted?.sliderOrder) mergedState.sliderOrder = persisted.sliderOrder;
+    if (persisted?.visibility) mergedState.visibility = persisted.visibility;
+    if (persisted?.currentTheme) mergedState.currentTheme = persisted.currentTheme as any;
+    return mergedState;
+  },
+  // Skip hydration during SSR
+  skipHydration: true,
+}
+)
+);
 
 // Export types for consumers
 export type * from "./types";
@@ -67,3 +100,5 @@ export type {
   SessionStatus,
   ThemeType
 } from "./types";
+
+// Note: Memoized selectors can be added later when needed for specific components

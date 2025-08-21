@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { permissionKeys, roleKeys } from "@/lib/queryKeys";
+import { useToast } from "@/contexts/ToastContext";
 import {
   CreateRolePayload,
   UpdateRolePayload,
@@ -47,6 +48,7 @@ export function useRoleManagement({
   const queryClient = useQueryClient();
   const [formState, setFormState] = useState<RoleFormState>(initialFormState);
   const isEditMode = !!roleIdToEdit;
+  const toast = useToast();
 
   // Effect to populate the form when a roleId is provided for editing
   useEffect(() => {
@@ -78,7 +80,7 @@ export function useRoleManagement({
       onSuccess(); // The controller will handle closing the modal
     },
     onError: (error: Error) => {
-      alert(`Error: ${error.message}`);
+      toast.error("Error", error.message);
     },
   };
 

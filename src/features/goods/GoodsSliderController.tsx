@@ -7,6 +7,8 @@ import { IoOptionsOutline } from "react-icons/io5";
 import styles from "@/app/page.module.css";
 import { useAppStore } from "@/store/appStore";
 import { useGoodManager } from "./useGoodManager";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationModal } from "@/components/notifications/ConfirmationModal";
 import { useGoodJournalLinking } from "@/features/linking/useGoodJournalLinking";
 import { getJournalGoodLinks } from "@/services/clientJournalGoodLinkService";
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
@@ -60,10 +62,15 @@ export const GoodsSliderController = forwardRef<
     ref
   ) => {
     const goodManager = useGoodManager();
+    const { confirmation, hideConfirmation, confirmDelete } = useConfirmation();
     const goodJournalLinking = useGoodJournalLinking();
     const { isCreating, mode, items: documentItems } = useAppStore(
       (state) => state.ui.documentCreationState
     );
+
+    const handleDeleteWithConfirmation = useCallback(() => {
+      confirmDelete("goods/service", goodManager.deleteCurrentGood);
+    }, [confirmDelete, goodManager.deleteCurrentGood]);
     const updateDocumentItem = useAppStore((state) => state.updateDocumentItem);
     const isDetailsAccordionOpen = useAppStore(
       (state) => !!state.accordionState[SLIDER_TYPES.GOODS]
@@ -207,7 +214,7 @@ export const GoodsSliderController = forwardRef<
                 selectedGoodsId={goodManager.selectedGoodsId}
                 onAdd={goodManager.handleOpenAddGoodModal}
                 onEdit={goodManager.handleOpenEditGoodModal}
-                onDelete={goodManager.handleDeleteCurrentGood}
+                onDelete={handleDeleteWithConfirmation}
                 onLinkToJournals={goodJournalLinking.openLinkModal}
                 onUnlinkFromJournals={goodJournalLinking.openUnlinkModal}
                 onOpenLinkGoodToPartnersModal={onOpenLinkGoodToPartnersModal}
@@ -336,6 +343,16 @@ export const GoodsSliderController = forwardRef<
               isUnlinking={goodJournalLinking.isSubmittingUnlink}
             />
           )}
+        <ConfirmationModal
+          isOpen={confirmation.isOpen}
+          onClose={hideConfirmation}
+          onConfirm={confirmation.onConfirm}
+          title={confirmation.title}
+          message={confirmation.message}
+          confirmText={confirmation.confirmText}
+          cancelText={confirmation.cancelText}
+          type={confirmation.type}
+        />
       </>
     );
   }

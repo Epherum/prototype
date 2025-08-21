@@ -47,15 +47,43 @@
   --swiper-navigation-color: var(--accent-warm);
   --swiper-navigation-size: 18px;
   width: 100%;
+  max-width: 100%;
   border-radius: var(--border-radius-md);
-  overflow: hidden;
+  overflow: hidden !important;
   padding-left: 45px;
   padding-right: 45px;
   position: relative;
   margin-bottom: var(--spacing-unit);
-  min-height: 150px; /* ✅ FIXED: Ensure this matches the slide's min-height */
+  min-height: 150px;
+  height: 150px;
   box-sizing: border-box;
 }
+
+/* ✅ FIXED: Ensure proper Swiper slide behavior within this component */
+.swiperInstance .swiper-wrapper {
+  min-height: 150px;
+  height: 150px;
+  display: flex !important;
+  transform-style: preserve-3d;
+  transition-property: transform;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.swiperInstance .swiper-slide {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-height: 150px;
+  height: 150px;
+  position: relative;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  flex-basis: 100% !important;
+  display: block !important;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
 
 .swiperInstance .swiper-button-next,
 .swiperInstance .swiper-button-prev {
@@ -121,7 +149,9 @@
   align-items: center;
   justify-content: center;
   min-height: 150px;
-  height: 100%;
+  height: 150px;
+  width: 100%;
+  max-width: 100%;
   border-radius: var(--border-radius-md);
   padding: calc(var(--spacing-unit) * 1.5) var(--spacing-unit);
   box-sizing: border-box;
@@ -129,14 +159,18 @@
   overflow: hidden;
   text-align: center;
   position: relative;
+  margin: 0 !important;
 }
 
 .slideTextContent {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: calc(var(--spacing-unit) * 0.5);
   width: 100%;
+  height: 100%;
+  flex: 1;
   box-sizing: border-box;
 }
 

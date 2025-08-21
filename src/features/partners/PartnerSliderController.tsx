@@ -6,6 +6,8 @@ import { IoOptionsOutline } from "react-icons/io5";
 import styles from "@/app/page.module.css";
 import { useAppStore } from "@/store/appStore";
 import { usePartnerManager } from "./usePartnerManager";
+import { useConfirmation } from "@/hooks/useConfirmation";
+import { ConfirmationModal } from "@/components/notifications/ConfirmationModal";
 import { usePartnerJournalLinking } from "@/features/linking/usePartnerJournalLinking";
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
 import { getJournalPartnerLinks } from "@/services/clientJournalPartnerLinkService";
@@ -54,10 +56,15 @@ export const PartnerSliderController: React.FC<
   const partnerJournalLinking = usePartnerJournalLinking();
   const jpqlLinking = useJournalPartnerGoodLinking();
   const { isCreating, mode } = useAppStore((state) => state.ui.documentCreationState);
+  const { confirmation, hideConfirmation, confirmDelete } = useConfirmation();
   const isDetailsAccordionOpen = useAppStore(
     (state) => !!state.accordionState[SLIDER_TYPES.PARTNER]
   );
   const toggleAccordion = useAppStore((state) => state.toggleAccordion);
+
+  const handleDeleteWithConfirmation = useCallback(() => {
+    confirmDelete("partner", partnerManager.deleteCurrentPartner);
+  }, [confirmDelete, partnerManager.deleteCurrentPartner]);
   const sliderOrder = useAppStore((state) => state.sliderOrder);
   const visibility = useAppStore((state) => state.visibility);
   const { gpgContextJournalId, good: selectedGoodId, journal: journalSelection } = useAppStore(
@@ -159,7 +166,7 @@ export const PartnerSliderController: React.FC<
               selectedPartnerId={partnerManager.selectedPartnerId}
               onAdd={partnerManager.handleOpenAddPartnerModal}
               onEdit={partnerManager.handleOpenEditPartnerModal}
-              onDelete={partnerManager.handleDeleteCurrentPartner}
+              onDelete={handleDeleteWithConfirmation}
               onLinkToJournals={partnerJournalLinking.openLinkModal}
               onUnlinkFromJournals={partnerJournalLinking.openUnlinkModal}
               onCreateGPGLink={
@@ -265,6 +272,16 @@ export const PartnerSliderController: React.FC<
             isUnlinking={partnerJournalLinking.isSubmittingUnlink}
           />
         )}
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={hideConfirmation}
+        onConfirm={confirmation.onConfirm}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmText={confirmation.confirmText}
+        cancelText={confirmation.cancelText}
+        type={confirmation.type}
+      />
     </>
   );
 };

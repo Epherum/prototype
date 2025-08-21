@@ -18,12 +18,14 @@ import {
   UpdatePartnerPayload,
 } from "@/lib/schemas/partner.schema";
 import { SLIDER_TYPES } from "@/lib/constants";
+import { useToast } from "@/contexts/ToastContext";
 
 export const usePartnerManager = () => {
   const queryClient = useQueryClient();
   const { documentCreationState } = useAppStore((state) => state.ui);
   const selections = useAppStore((state) => state.selections);
   const setSelection = useAppStore((state) => state.setSelection);
+  const toast = useToast();
 
   const [isPartnerOptionsMenuOpen, setIsPartnerOptionsMenuOpen] =
     useState(false);
@@ -84,13 +86,13 @@ export const usePartnerManager = () => {
     onSuccess: (newPartner) => {
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
-      alert(`Partner '${newPartner.name}' created successfully!`);
+      toast.success(`Partner '${newPartner.name}' created successfully!`);
       // Select the newly created partner
       setSelectedPartnerId(newPartner.id);
     },
     // Optional: Add onError for better user feedback
     onError: (error) => {
-      alert(`Error creating partner: ${error.message}`);
+      toast.error("Error creating partner", error.message);
       setIsAddEditPartnerModalOpen(false);
     },
   });
@@ -104,11 +106,11 @@ export const usePartnerManager = () => {
     onSuccess: (updatedPartner) => {
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       setIsAddEditPartnerModalOpen(false);
-      alert(`Partner '${updatedPartner.name}' updated successfully!`);
+      toast.success(`Partner '${updatedPartner.name}' updated successfully!`);
     },
     // Optional: Add onError for better user feedback
     onError: (error) => {
-      alert(`Error updating partner: ${error.message}`);
+      toast.error("Error updating partner", error.message);
       setIsAddEditPartnerModalOpen(false);
     },
   });
@@ -118,16 +120,16 @@ export const usePartnerManager = () => {
       mutationFn: deletePartner,
       onSuccess: (response, deletedPartnerId) => {
         queryClient.invalidateQueries({ queryKey: partnerKeys.all });
-        alert(
+        toast.success(
           response.message ||
-            `Partner ${deletedPartnerId} deleted successfully!`
+            `Partner deleted successfully!`
         );
         if (selectedPartnerId === deletedPartnerId) {
           setSelectedPartnerId(null);
         }
       },
       onError: (error, deletedPartnerId) => {
-        alert(`Error deleting partner ${deletedPartnerId}: ${error.message}`);
+        toast.error("Error deleting partner", error.message);
       },
     }
   );
@@ -189,14 +191,23 @@ export const usePartnerManager = () => {
     [editingPartnerData, createPartnerMutation, updatePartnerMutation]
   );
 
-  const handleDeleteCurrentPartner = useCallback(() => {
+  const handleDeleteCurrentPartner = useCallback((confirmCallback?: () => void) => {
     if (selectedPartnerId) {
-      if (window.confirm("Are you sure you want to delete this partner?")) {
+      if (confirmCallback) {
+        confirmCallback();
+      } else {
+        // Fallback for backward compatibility
         deletePartnerMutation.mutate(selectedPartnerId);
       }
     }
     handleClosePartnerOptionsMenu();
   }, [selectedPartnerId, deletePartnerMutation, handleClosePartnerOptionsMenu]);
+
+  const deleteCurrentPartner = useCallback(() => {
+    if (selectedPartnerId) {
+      deletePartnerMutation.mutate(selectedPartnerId);
+    }
+  }, [selectedPartnerId, deletePartnerMutation]);
 
   return {
     // State
@@ -222,5 +233,6 @@ export const usePartnerManager = () => {
     handleCloseAddEditPartnerModal,
     handleAddOrUpdatePartnerSubmit,
     handleDeleteCurrentPartner,
+    deleteCurrentPartner,
   };
 };

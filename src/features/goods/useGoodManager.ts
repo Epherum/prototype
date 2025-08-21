@@ -143,13 +143,21 @@ export const useGoodManager = () => {
     }
   };
 
-  const handleDeleteCurrentGood = () => {
-    if (
-      selectedGoodsId &&
-      window.confirm("Are you sure you want to delete this good?")
-    ) {
-      deleteGoodMutation.mutate(selectedGoodsId);
+  const handleDeleteCurrentGood = (confirmCallback?: () => void) => {
+    if (selectedGoodsId) {
+      if (confirmCallback) {
+        confirmCallback();
+      } else {
+        // Fallback for backward compatibility
+        deleteGoodMutation.mutate(selectedGoodsId);
+      }
       setGoodsOptionsMenuOpen(false);
+    }
+  };
+
+  const deleteCurrentGood = () => {
+    if (selectedGoodsId) {
+      deleteGoodMutation.mutate(selectedGoodsId);
     }
   };
 
@@ -199,6 +207,7 @@ export const useGoodManager = () => {
     handleOpenAddGoodModal,
     handleOpenEditGoodModal,
     handleDeleteCurrentGood,
+    deleteCurrentGood,
     handleCloseAddEditGoodModal,
     handleAddOrUpdateGoodSubmit,
     handleOpenGoodsOptionsMenu,

@@ -6,10 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useRef, useCallback, useEffect } from "react";
 import styles from "./DynamicSlider.module.css";
 
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
-
 // Define animation variants for the slider content area.
 const sliderContentVariants = {
   hidden: { opacity: 0, y: 15 },
@@ -104,19 +100,35 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
   // Reset swiper to first slide when activeItemId becomes null (slider reset)
   useEffect(() => {
     if (activeItemId === null && swiperRef.current?.swiper && data.length > 0) {
-      swiperRef.current.swiper.slideTo(0, 0); // Slide to index 0 with no animation
+      const swiper = swiperRef.current.swiper;
+      // Use setTimeout to ensure the DOM is stable before sliding
+      setTimeout(() => {
+        if (swiper && !swiper.destroyed) {
+          swiper.slideTo(0, 0);
+        }
+      }, 0);
     }
   }, [activeItemId, data.length]);
 
-  // Reset swiper when data changes significantly (like after order change)
+  // Update swiper slide when activeItemId changes to a valid item
   useEffect(() => {
-    if (swiperRef.current?.swiper && data.length > 0) {
-      // If no active item is selected, make sure we're at the first slide
-      if (!activeItemId) {
-        swiperRef.current.swiper.slideTo(0, 0);
+    if (activeItemId && swiperRef.current?.swiper && data.length > 0) {
+      const swiper = swiperRef.current.swiper;
+      const targetIndex = data.findIndex(item => item?.id === activeItemId);
+      if (targetIndex !== -1 && targetIndex !== swiper.activeIndex && !swiper.destroyed) {
+        swiper.slideTo(targetIndex, 300); // Smooth transition
       }
     }
-  }, [data, activeItemId]);
+  }, [activeItemId, data]);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (swiperRef.current?.swiper && !swiperRef.current.swiper.destroyed) {
+        swiperRef.current.swiper.destroy(true, true);
+      }
+    };
+  }, []);
 
   // Helper function to determine which filter an entity matches
   const getEntityFilter = (entity: DynamicSliderItem): string | null => {
@@ -139,7 +151,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
     return activeFilters[0] || null;
   };
 
-  // Helper function to get filter dot CSS class and visibility for an entity
+  // Helper function to get filter dot for a specific entity
   const getFilterDot = (entity: DynamicSliderItem) => {
     const entityFilter = getEntityFilter(entity);
     if (!entityFilter) return null;
@@ -156,15 +168,15 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
     }
   };
 
-  const handleSwiperChange = (swiper: any) => {
-    if (isLocked) return;
+  const handleSwiperChange = useCallback((swiper: any) => {
+    if (isLocked || swiper.destroyed) return;
     const currentRealIndex = swiper.activeIndex;
     if (data?.[currentRealIndex]) {
       onSlideChange(data[currentRealIndex].id);
     }
-  };
+  }, [isLocked, data, onSlideChange]);
 
-  // Quick Jump Menu functions
+  // Filtered data for jump menu
   const filteredDataForJump = data.filter(item => 
     item.label?.toLowerCase().includes(jumpSearchTerm.toLowerCase()) ||
     item.code?.toLowerCase().includes(jumpSearchTerm.toLowerCase())
@@ -172,20 +184,15 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
 
   const handleJumpToItem = useCallback((itemId: string) => {
     const itemIndex = data.findIndex(item => item.id === itemId);
-    if (itemIndex !== -1 && swiperRef.current?.swiper) {
-      swiperRef.current.swiper.slideTo(itemIndex);
+    if (itemIndex !== -1 && swiperRef.current?.swiper && !swiperRef.current.swiper.destroyed) {
+      swiperRef.current.swiper.slideTo(itemIndex, 300); // Smooth transition
       onSlideChange(itemId);
     }
     setIsJumpMenuOpen(false);
     setJumpSearchTerm("");
   }, [data, onSlideChange]);
 
-
-  const currentItemForAccordion = data.find(
-    (item) => item?.id === activeItemId
-  );
-
-  const swiperKey = `${sliderId}-len${data.length}-active${activeItemId}-locked${isLocked}-multi${isMultiSelect}`;
+  const currentItemForAccordion = data.find((item) => item?.id === activeItemId);
 
   return (
     <>
@@ -302,35 +309,44 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                 </div>
               )}
               <Swiper
-                key={swiperKey}
+                key={`${sliderId}-${data.length}`}
                 ref={swiperRef}
                 modules={[Navigation, Pagination]}
                 initialSlide={initialSlideIndex}
                 loop={false}
-                spaceBetween={20}
+                spaceBetween={0}
                 slidesPerView={1}
-                navigation={data.length > 1 && !isLocked}
-                pagination={
-                  data.length > 1 && !isLocked ? {
-                    clickable: false,
-                    type: 'custom',
-                    renderCustom: (swiper: any, current: number, total: number) => `<span class="${styles.paginationCounter}">${current}/${total}</span>`
-                  } : false
-                }
-                onSlideChangeTransitionEnd={handleSwiperChange}
+                slidesPerGroup={1}
+                centeredSlides={false}
+                freeMode={false}
+                watchSlidesProgress={false}
+                grabCursor={!isLocked}
+                direction="horizontal"
+                effect="slide"
+                speed={300}
+                autoHeight={false}
+                height={150}
+                width={undefined}
                 observer={true}
                 observeParents={true}
+                navigation={data.length > 1 && !isLocked}
+                pagination={data.length > 1 && !isLocked ? {
+                  clickable: false,
+                  type: 'custom',
+                  renderCustom: (swiper: any, current: number, total: number) => 
+                    `<span class="${styles.paginationCounter}">${current}/${total}</span>`
+                } : false}
+                onSlideChangeTransitionEnd={handleSwiperChange}
                 className={`${styles.swiperInstance} ${
                   isLocked ? styles.swiperLocked : ""
                 } ${isMultiSelect ? styles.swiperMultiSelect : ""}`}
                 allowTouchMove={!isLocked}
+                resistance={true}
+                resistanceRatio={0.85}
               >
                 {data.map((item) => {
                   if (!item) return null;
-                  const isSelectedForDoc = isItemSelected
-                    ? isItemSelected(item)
-                    : false;
-
+                  const isSelectedForDoc = isItemSelected ? isItemSelected(item) : false;
                   return (
                     <SwiperSlide
                       key={item.id}
@@ -389,7 +405,7 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
             <AnimatePresence initial={false}>
               {isAccordionOpen && (
                 <motion.div
-                  key={`details-accordion-${currentItemForAccordion.id}`}
+                  key={`details-accordion-${currentItemForAccordion?.id || 'document-items'}`}
                   initial="collapsed"
                   animate="open"
                   exit="collapsed"

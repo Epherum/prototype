@@ -7,6 +7,7 @@ import type {
   DocumentCreationMode 
 } from "../types";
 import type { DocumentItem } from "@/lib/types/ui";
+import { toastService } from "@/lib/services/toastService";
 
 // Initial document creation state
 export const getInitialDocumentCreationState = (): DocumentCreationSlice => ({
@@ -67,8 +68,8 @@ export const createDocumentCreationActions = (set: any, get: any): DocumentCreat
     console.log("prepareDocumentForFinalization: Items to finalize:", itemsToFinalize);
 
     if (itemsToFinalize.length === 0) {
-      console.log("prepareDocumentForFinalization: No items to finalize, showing alert");
-      alert("No items have been selected for the document.");
+      console.log("prepareDocumentForFinalization: No items to finalize, showing toast");
+      toastService.error("Validation Error", "No items have been selected for the document.");
       return false;
     }
 

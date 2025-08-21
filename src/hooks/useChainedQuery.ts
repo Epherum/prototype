@@ -34,6 +34,14 @@ import {
 } from "@/lib/types/serviceOptions";
 import { FetchPartnersParams } from "@/services/clientPartnerService";
 
+// ✅ OPTIMIZATION: Strategic stale times based on data volatility
+const STALE_TIMES = {
+  JOURNALS: 30 * 60 * 1000,    // 30 min - journals rarely change
+  PARTNERS: 10 * 60 * 1000,    // 10 min - partners semi-stable  
+  GOODS: 5 * 60 * 1000,        // 5 min - goods more dynamic
+  DOCUMENTS: 1 * 60 * 1000,    // 1 min - documents frequently updated
+} as const;
+
 /**
  * Mapper to ensure a consistent Journal data shape for the UI.
  */
@@ -170,6 +178,15 @@ export const useChainedQuery = <T extends SliderType>(
               return { data, totalCount: data.length };
             },
             enabled: !!effectiveDocumentId,
+            staleTime: STALE_TIMES.JOURNALS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(journal => ({
+                ...journal,
+                displayName: `${journal.name} (${journal.code})`,
+                isTerminal: journal.isTerminal ?? true
+              }))
+            }),
           });
         }
         if (goodsIndex < myIndex && selectedGoodId) {
@@ -183,6 +200,15 @@ export const useChainedQuery = <T extends SliderType>(
               return { data, totalCount: data.length };
             },
             enabled: !!selectedGoodId,
+            staleTime: STALE_TIMES.JOURNALS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(journal => ({
+                ...journal,
+                displayName: `${journal.name} (${journal.code})`,
+                isTerminal: journal.isTerminal ?? true
+              }))
+            }),
           });
         }
         if (partnerIndex < myIndex && selectedPartnerId) {
@@ -197,6 +223,15 @@ export const useChainedQuery = <T extends SliderType>(
               return { data, totalCount: data.length };
             },
             enabled: !!selectedPartnerId,
+            staleTime: STALE_TIMES.JOURNALS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(journal => ({
+                ...journal,
+                displayName: `${journal.name} (${journal.code})`,
+                isTerminal: journal.isTerminal ?? true
+              }))
+            }),
           });
         }
         return queryOptions({
@@ -207,6 +242,15 @@ export const useChainedQuery = <T extends SliderType>(
             );
             return { data, totalCount: data.length };
           },
+          staleTime: STALE_TIMES.JOURNALS,
+          select: (data) => ({
+            ...data,
+            data: data.data.map(journal => ({
+              ...journal,
+              displayName: journal.name,
+              isTerminal: journal.isTerminal ?? true
+            }))
+          }),
         });
 
       case SLIDER_TYPES.PARTNER:
@@ -217,6 +261,15 @@ export const useChainedQuery = <T extends SliderType>(
             queryKey: partnerKeys.listByDocument(effectiveDocumentId),
             queryFn: () => partnerService.fetchPartnersForDocument(effectiveDocumentId),
             enabled: !!effectiveDocumentId,
+            staleTime: STALE_TIMES.PARTNERS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(partner => ({
+                ...partner,
+                displayName: `${partner.name}`,
+                isActive: true // Simplified for now
+              }))
+            }),
           });
         }
         
@@ -230,6 +283,15 @@ export const useChainedQuery = <T extends SliderType>(
             queryKey: partnerKeys.list(params),
             queryFn: () => partnerService.fetchPartners(params),
             enabled: selectedGoodIds.length > 0,
+            staleTime: STALE_TIMES.PARTNERS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(partner => ({
+                ...partner,
+                displayName: `${partner.name}`,
+                isActive: true // Simplified for now
+              }))
+            }),
           });
         }
         
@@ -242,6 +304,15 @@ export const useChainedQuery = <T extends SliderType>(
             queryKey: partnerKeys.list(params),
             queryFn: () => partnerService.fetchPartners(params),
             enabled: !!selectedGoodId,
+            staleTime: STALE_TIMES.PARTNERS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(partner => ({
+                ...partner,
+                displayName: `${partner.name}`,
+                isActive: true // Simplified for now
+              }))
+            }),
           });
         }
         
@@ -296,6 +367,15 @@ export const useChainedQuery = <T extends SliderType>(
             
             return hasRequiredJournalData;
           })(),
+          staleTime: STALE_TIMES.PARTNERS,
+          select: (data) => ({
+            ...data,
+            data: data.data.map(partner => ({
+              ...partner,
+              displayName: `${partner.name}`,
+              isActive: true // Simplified for now
+            }))
+          }),
         });
 
       case SLIDER_TYPES.GOODS:
@@ -305,6 +385,15 @@ export const useChainedQuery = <T extends SliderType>(
             queryKey: goodKeys.listByDocument(effectiveDocumentId),
             queryFn: () => goodService.findGoodsForDocument(effectiveDocumentId),
             enabled: !!effectiveDocumentId,
+            staleTime: STALE_TIMES.GOODS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(good => ({
+                ...good,
+                displayName: `${(good as any).description || (good as any).name || 'Good'}`,
+                isActive: true // Simplified for now
+              }))
+            }),
           });
         }
         
@@ -320,6 +409,15 @@ export const useChainedQuery = <T extends SliderType>(
             }),
             queryFn: () => goodService.findGoodsForPartners(params),
             enabled: selectedPartnerIds.length > 0,
+            staleTime: STALE_TIMES.GOODS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(good => ({
+                ...good,
+                displayName: `${(good as any).description || (good as any).name || 'Good'}`,
+                isActive: true // Simplified for now
+              }))
+            }),
           });
         }
         
@@ -334,6 +432,15 @@ export const useChainedQuery = <T extends SliderType>(
               effectiveJournalIds
             ),
             enabled: !!selectedPartnerId,
+            staleTime: STALE_TIMES.GOODS,
+            select: (data) => ({
+              ...data,
+              data: data.data.map(good => ({
+                ...good,
+                displayName: `${(good as any).description || (good as any).name || 'Good'}`,
+                isActive: true // Simplified for now
+              }))
+            }),
           });
         }
         // Handle journal filtering for goods
@@ -381,6 +488,15 @@ export const useChainedQuery = <T extends SliderType>(
             
             return hasRequiredJournalData;
           })(),
+          staleTime: STALE_TIMES.GOODS,
+          select: (data) => ({
+            ...data,
+            data: data.data.map(good => ({
+              ...good,
+              displayName: `${(good as any).description || (good as any).name || 'Good'}`,
+              isActive: true // Simplified for now
+            }))
+          }),
         });
 
       case SLIDER_TYPES.DOCUMENT:
@@ -420,6 +536,15 @@ export const useChainedQuery = <T extends SliderType>(
             // Otherwise disabled to avoid unnecessary queries
             return false;
           })(),
+          staleTime: STALE_TIMES.DOCUMENTS,
+          select: (data) => ({
+            ...data,
+            data: data.data.map(document => ({
+              ...document,
+              displayName: `Document ${document.id}`,
+              isApproved: true // Simplified for now
+            }))
+          }),
         });
 
       default:
