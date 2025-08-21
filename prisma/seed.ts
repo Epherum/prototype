@@ -4,6 +4,8 @@ import {
   PrismaClient,
   EntityState,
   Prisma,
+  Journal as PrismaJournal,
+  PartnershipType,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
