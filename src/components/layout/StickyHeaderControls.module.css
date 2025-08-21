@@ -26,6 +26,10 @@
     padding-left: calc(var(--spacing-unit) * 1.5);
     padding-right: calc(var(--spacing-unit) * 1.5);
   }
+  
+  .visibilitySwiperContainer {
+    max-width: 100%; /* Full width on mobile to match page container */
+  }
 }
 
 .dataSourceSelector {
@@ -54,6 +58,8 @@
 .visibilitySwiperContainer {
   /* ... looks good */
   width: 100%;
+  max-width: 600px; /* Match the page container max-width */
+  margin: 0 auto; /* Center align within the header */
   flex-shrink: 0;
   overflow: visible; /* Allow touch events to work properly on mobile */
 }

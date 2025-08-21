@@ -14,7 +14,6 @@ export const createGoodSchema = z.object({
   packagingTypeCode: z.string().optional().nullable(),
   photoUrl: z.string().url("Must be a valid URL").optional().nullable(),
   additionalDetails: z.any().optional(),
-  price: z.number().optional().nullable(),
   // ✨ NEW: Required journal selection for good creation
   journalId: z.string().min(1, "Journal selection is required"),
   // Status ID for flexible status management

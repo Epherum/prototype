@@ -73,6 +73,34 @@
   color: var(--text-primary);
 }
 
+.userDropdownTrigger {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-pill);
+  background-color: transparent;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  outline: none;
+}
+
+.userDropdownTrigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent-warm);
+}
+
+.userDropdownTrigger:hover {
+  background-color: var(--accent-warm-light);
+  color: var(--accent-warm);
+  border-color: var(--accent-warm-light);
+}
+
 .authButton {
   padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.5);
   font-size: 0.85em;

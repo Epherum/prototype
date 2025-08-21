@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/authOptions";
 // Step 1: Import the new, strong Permission type from our single source of truth.
 import { type Permission } from "@/lib/auth/permissions";
+import prisma from "@/app/utils/prisma";
 
 type ApiHandler = (
   req: NextRequest,
@@ -74,6 +75,31 @@ export function withAuthorization(
       console.log("UNAUTHORIZED: No session or user ID");
       return new Response(JSON.stringify({ message: "Unauthorized" }), {
         status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Check if the user still exists and is active in the database
+    try {
+      const userExists = await prisma.user.findUnique({
+        where: { 
+          id: session.user.id,
+          entityState: "ACTIVE"
+        },
+        select: { id: true }
+      });
+
+      if (!userExists) {
+        console.log(`UNAUTHORIZED: User ${session.user.id} no longer exists in database`);
+        return new Response(JSON.stringify({ message: "Unauthorized - User no longer exists" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    } catch (error) {
+      console.error("Error checking user existence:", error);
+      return new Response(JSON.stringify({ message: "Internal server error" }), {
+        status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }

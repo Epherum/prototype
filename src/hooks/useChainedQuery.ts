@@ -106,6 +106,56 @@ export const useChainedQuery = <T extends SliderType>(
     const goodsIndex = visibleOrder.indexOf(SLIDER_TYPES.GOODS);
     const documentIndex = visibleOrder.indexOf(SLIDER_TYPES.DOCUMENT);
 
+    // ✅ OPTIMIZATION: Check if any preceding slider is empty (except for document dependencies)
+    const checkPrecedingSliderEmpty = (precedingIndex: number, precedingType: SliderType): boolean => {
+      if (precedingIndex === -1 || precedingIndex >= myIndex) return false;
+      
+      // Special case: If document is before this slider, we check document selection
+      if (precedingType === SLIDER_TYPES.DOCUMENT) {
+        return !effectiveDocumentId;
+      }
+      
+      // For other sliders, check their selections
+      switch (precedingType) {
+        case SLIDER_TYPES.JOURNAL:
+          return effectiveJournalIds.length === 0 || journalSelection.rootFilter.length === 0;
+        case SLIDER_TYPES.PARTNER:
+          return !selectedPartnerId && selectedPartnerIds.length === 0;
+        case SLIDER_TYPES.GOODS:
+          return !selectedGoodId && selectedGoodIds.length === 0;
+        default:
+          return false;
+      }
+    };
+
+    // ✅ OPTIMIZATION: For D->J->P->G pattern, only check document dependency, not sequential dependencies
+    const hasDocumentDependency = documentIndex !== -1 && documentIndex < myIndex;
+    
+    // If document comes before this slider and is empty, disable (except for journal which can work without document)
+    if (hasDocumentDependency && !effectiveDocumentId && sliderType !== SLIDER_TYPES.JOURNAL) {
+      return queryOptions({
+        queryKey: [sliderType, "disabled_empty_document"],
+        queryFn: async () => ({ data: [], totalCount: 0 }),
+        enabled: false,
+      });
+    }
+    
+    // ✅ OPTIMIZATION: For sequential dependencies (non-document), check if previous slider is empty
+    if (!hasDocumentDependency) {
+      // Find the immediately preceding slider in the order
+      const precedingSliders = visibleOrder.slice(0, myIndex);
+      for (let i = precedingSliders.length - 1; i >= 0; i--) {
+        const precedingType = precedingSliders[i];
+        if (precedingType !== SLIDER_TYPES.DOCUMENT && checkPrecedingSliderEmpty(i, precedingType)) {
+          return queryOptions({
+            queryKey: [sliderType, "disabled_empty_preceding", precedingType],
+            queryFn: async () => ({ data: [], totalCount: 0 }),
+            enabled: false,
+          });
+        }
+      }
+    }
+
     switch (sliderType) {
       case SLIDER_TYPES.JOURNAL:
         // Handle document filtering first (for standard mode only)
@@ -233,8 +283,19 @@ export const useChainedQuery = <T extends SliderType>(
         return queryOptions({
           queryKey: partnerKeys.list(params),
           queryFn: () => partnerService.fetchPartners(params),
-          // Only enabled if no journal selection is required OR if we have selections AND at least one filter
-          enabled: !isJournalBeforePartner || (hasJournalSelections && journalSelection.rootFilter.length > 0),
+          // ✅ OPTIMIZATION: More precise enabled condition
+          enabled: (() => {
+            // If no journal before partner, always enabled
+            if (!isJournalBeforePartner) return true;
+            
+            // If journal before partner, need both selections and filters
+            const hasRequiredJournalData = hasJournalSelections && journalSelection.rootFilter.length > 0;
+            
+            // Additional check: if we have document dependency, we might still be enabled even without journal
+            if (hasDocumentDependency && effectiveDocumentId) return true;
+            
+            return hasRequiredJournalData;
+          })(),
         });
 
       case SLIDER_TYPES.GOODS:
@@ -307,8 +368,19 @@ export const useChainedQuery = <T extends SliderType>(
         return queryOptions({
           queryKey: goodKeys.list(goodsParams),
           queryFn: () => goodService.getAllGoods(goodsParams),
-          // Only enabled if no journal selection is required OR if we have selections AND at least one filter
-          enabled: !isJournalBeforeGoods || (hasJournalSelectionsForGoods && journalSelection.rootFilter.length > 0),
+          // ✅ OPTIMIZATION: More precise enabled condition
+          enabled: (() => {
+            // If no journal before goods, always enabled
+            if (!isJournalBeforeGoods) return true;
+            
+            // If journal before goods, need both selections and filters
+            const hasRequiredJournalData = hasJournalSelectionsForGoods && journalSelection.rootFilter.length > 0;
+            
+            // Additional check: if we have document dependency, we might still be enabled even without journal
+            if (hasDocumentDependency && effectiveDocumentId) return true;
+            
+            return hasRequiredJournalData;
+          })(),
         });
 
       case SLIDER_TYPES.DOCUMENT:
@@ -337,7 +409,17 @@ export const useChainedQuery = <T extends SliderType>(
         return queryOptions({
           queryKey: documentKeys.list(docParams),
           queryFn: () => documentService.getAllDocuments(docParams),
-          enabled: hasFilters || isDocumentFirst,
+          // ✅ OPTIMIZATION: More precise enabled condition
+          enabled: (() => {
+            // If document is first in order, always enabled to show all accessible documents
+            if (isDocumentFirst) return true;
+            
+            // If we have any filters, enabled
+            if (hasFilters) return true;
+            
+            // Otherwise disabled to avoid unnecessary queries
+            return false;
+          })(),
         });
 
       default:

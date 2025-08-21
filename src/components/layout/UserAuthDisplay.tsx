@@ -54,7 +54,9 @@ export default function UserAuthDisplay({
     resource: "USER",
   });
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
   const [logoState, setLogoState] = useState<'light' | 'dark' | 'text'>('dark');
 
   const toggleLogo = () => {
@@ -69,17 +71,34 @@ export default function UserAuthDisplay({
   };
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+    const handleClickOutside = (event: Event) => {
+      const target = event.target as Node;
+      
+      // Only proceed if we have a valid target
+      if (!target) return;
+      
+      // Check if the click is outside the options dropdown
+      if (isDropdownOpen && dropdownRef.current && !dropdownRef.current.contains(target)) {
         setIsDropdownOpen(false);
+      }
+      
+      // Check if the click is outside the user dropdown
+      if (isUserDropdownOpen && userDropdownRef.current && !userDropdownRef.current.contains(target)) {
+        setIsUserDropdownOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    // Only add event listeners if dropdowns are open
+    if (isDropdownOpen || isUserDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, []);
+  }, [isDropdownOpen, isUserDropdownOpen]);
 
   return (
     <motion.div variants={revealVariants} initial="hidden" animate="visible">
@@ -130,14 +149,65 @@ export default function UserAuthDisplay({
                     )}
                   </motion.div>
 
-                  {/* Username in the middle */}
+                  {/* Username dropdown in the middle */}
                   <motion.div
                     variants={itemRevealUpVariants}
-                    className={styles.userInfo}
+                    className={styles.dropdownContainer}
+                    ref={userDropdownRef}
                   >
-                    <span className={styles.userName}>
-                      {session.user.name || session.user.email}
-                    </span>
+                    <button
+                      onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                      className={`${styles.userDropdownTrigger} ${styles.userName}`}
+                      aria-expanded={isUserDropdownOpen}
+                      aria-haspopup="true"
+                    >
+                      <span>{session.user.name || session.user.email}</span>
+                      <svg
+                        className={`${styles.dropdownArrow} ${isUserDropdownOpen ? styles.dropdownArrowOpen : ''}`}
+                        width="12"
+                        height="12"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path
+                          d="M3 4.5L6 7.5L9 4.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    
+                    <AnimatePresence>
+                      {isUserDropdownOpen && (
+                        <motion.div
+                          className={styles.dropdownMenu}
+                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                          transition={{ duration: 0.15, ease: "easeOut" }}
+                        >
+                          {canManageUsers && (
+                            <button
+                              onClick={() => {
+                                onOpenCreateUserModal();
+                                setIsUserDropdownOpen(false);
+                              }}
+                              className={styles.dropdownItem}
+                            >
+                              Manage Users
+                            </button>
+                          )}
+                          <button
+                            onClick={() => signOut({ callbackUrl: "/login" })}
+                            className={styles.dropdownItem}
+                          >
+                            Logout
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </motion.div>
 
                   {/* Dropdown menu on the right */}
@@ -180,24 +250,6 @@ export default function UserAuthDisplay({
                           transition={{ duration: 0.15, ease: "easeOut" }}
                         >
                           <ThemeSelector />
-                          <div className={styles.dropdownDivider} />
-                          {canManageUsers && (
-                            <button
-                              onClick={() => {
-                                onOpenCreateUserModal();
-                                setIsDropdownOpen(false);
-                              }}
-                              className={styles.dropdownItem}
-                            >
-                              Manage Users
-                            </button>
-                          )}
-                          <button
-                            onClick={() => signOut({ callbackUrl: "/login" })}
-                            className={styles.dropdownItem}
-                          >
-                            Logout
-                          </button>
                         </motion.div>
                       )}
                     </AnimatePresence>

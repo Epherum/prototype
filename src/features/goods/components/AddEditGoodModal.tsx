@@ -63,7 +63,6 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
       referenceCode: "",
       barcode: "",
       description: "",
-      price: undefined,
       taxCodeId: undefined,
       unitCodeId: undefined,
       typeCode: "",
@@ -115,7 +114,6 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
           referenceCode: initialData.referenceCode || "",
           barcode: initialData.barcode || "",
           description: initialData.description || "",
-          price: 0 as number, // Default to 0 if not provided
           taxCodeId: initialData.taxCodeId ?? undefined,
           unitCodeId: initialData.unitCodeId ?? undefined,
           typeCode: initialData.typeCode || "",
@@ -224,20 +222,6 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
                 )}
               </div>
 
-              <div className={formStyles.formGroup}>
-                <label htmlFor="price">Price</label>
-                {/* ✅ 10. `valueAsNumber` automatically handles string-to-number conversion */}
-                <input
-                  type="number"
-                  step="0.01"
-                  id="price"
-                  {...register("price", { valueAsNumber: true })}
-                  disabled={isSubmitting}
-                />
-                {errors.price && (
-                  <p className={formStyles.error}>{errors.price.message}</p>
-                )}
-              </div>
 
               {/* Status field - only show in edit mode */}
               {isEditing && (
