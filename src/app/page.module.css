@@ -5,8 +5,8 @@
   margin: 0 auto;
   padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
   min-height: 100vh;
-  /* Prevent horizontal overflow */
-  overflow-x: hidden;
+  /* Use max-width and margin auto to prevent overflow while preserving sticky positioning */
+  box-sizing: border-box;
 }
 
 /* Mobile adjustments for page container */

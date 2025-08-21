@@ -121,20 +121,20 @@
 }
 
 .visibilityButton.visibilityInactive {
-  border-color: #ddd; /* Consider var(--border-subtle) or a new --border-inactive */
-  color: #aaa; /* Consider var(--text-disabled) or a shade of --text-secondary */
-  background-color: var(--bg-secondary); /* Good use of --bg-secondary */
+  border-color: var(--border-subtle);
+  color: var(--text-disabled);
+  background-color: var(--bg-secondary);
 }
 
 .visibilityButton:hover:not(.visibilityActive) {
   border-color: var(--accent-warm);
 }
 .visibilityButton.visibilityActive:hover {
-  background-color: #d68f63; /* Darker accent, could be a variable */
-  border-color: #d68f63;
+  background-color: var(--accent-warm-hover);
+  border-color: var(--accent-warm-hover);
 }
 .visibilityButton.visibilityInactive:hover {
-  border-color: #ccc; /* Slightly darker inactive border, could be a variable */
+  border-color: var(--border-hover);
 }
 
 .sliderCount {

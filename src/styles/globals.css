@@ -391,8 +391,8 @@
 
 
 html {
-  /* Prevent horizontal overflow on mobile */
-  overflow-x: hidden;
+  /* Use scrollbar-gutter to prevent layout shift instead of overflow-x: hidden */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -403,8 +403,8 @@ body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* Prevent horizontal overflow on mobile */
-  overflow-x: hidden;
+  /* Use max-width constraints instead of overflow-x: hidden to preserve sticky positioning */
+  max-width: 100vw;
 }
 
 /* Global heading styles */
