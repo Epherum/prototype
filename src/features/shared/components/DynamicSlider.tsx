@@ -314,10 +314,11 @@ const DynamicSlider: React.FC<DynamicSliderProps> = ({
                 modules={[Navigation, Pagination]}
                 initialSlide={initialSlideIndex}
                 loop={false}
-                spaceBetween={0}
-                slidesPerView={1}
+                spaceBetween={15}
+                slidesPerView={1.2}
+                
                 slidesPerGroup={1}
-                centeredSlides={false}
+                centeredSlides={true}
                 freeMode={false}
                 watchSlidesProgress={false}
                 grabCursor={!isLocked}
