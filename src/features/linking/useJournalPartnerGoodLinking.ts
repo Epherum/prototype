@@ -8,6 +8,7 @@ import {
   goodKeys,
   partnerKeys,
 } from "@/lib/queryKeys";
+import { useToast } from "@/contexts/ToastContext";
 
 // ✅ CHANGED: Imports now use the correct function names from the provided service files.
 import {
@@ -35,6 +36,7 @@ import { PaginatedPartnersResponse } from "@/services/clientPartnerService"; // 
 // No props needed. The hook is self-contained.
 export const useJournalPartnerGoodLinking = () => {
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
 
   // Consume state from the global store
   const sliderOrder = useAppStore((state) => state.sliderOrder);
@@ -119,10 +121,10 @@ export const useJournalPartnerGoodLinking = () => {
       queryClient.invalidateQueries({ queryKey: goodKeys.all });
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
       queryClient.invalidateQueries({ queryKey: jpgLinkKeys.all });
+      success("3-Way Link Created", "Journal-Partner-Good relationship has been created successfully.");
     },
-    onError: (error: Error) => {
-      console.error("Failed to create 3-way link:", error);
-      alert(`Error creating 3-way link: ${error.message}`);
+    onError: (err: Error) => {
+      error("Link Failed", err.message || "Failed to create 3-way link. Please try again.");
     },
   });
 
@@ -135,10 +137,10 @@ export const useJournalPartnerGoodLinking = () => {
           journalForUnlinkingContext!.id
         ),
       });
+      success("3-Way Link Removed", "Journal-Partner-Good relationship has been removed successfully.");
     },
-    onError: (error: Error, linkId) => {
-      console.error(`Failed to delete 3-way link ${linkId}:`, error);
-      alert(`Error unlinking 3-way link: ${error.message}`);
+    onError: (err: Error) => {
+      error("Unlink Failed", err.message || "Failed to remove 3-way link. Please try again.");
     },
   });
 

@@ -6,6 +6,7 @@ import {
   createJournal as createJournalApi,
   deleteJournal as deleteJournalApi,
 } from "@/services/clientJournalService";
+import { useToast } from "@/contexts/ToastContext";
 import type { CreateJournalData } from "@/app/services/journalService";
 import type { JournalClient } from "@/lib/types/models.client";
 
@@ -19,6 +20,7 @@ export const useJournalMutations = ({
   resetJournalSelections,
 }: MutationProps) => {
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
 
   const [isAddJournalModalOpen, setIsAddJournalModalOpen] = useState(false);
   const [addJournalContext, setAddJournalContext] = useState<any>(null);
@@ -47,22 +49,30 @@ export const useJournalMutations = ({
     CreateJournalData
   >({
     mutationFn: createJournalApi,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({
         queryKey: journalKeys.hierarchy(restrictedJournalId),
       });
       closeAddJournalModal();
+      success("Journal Created", `Journal "${data.name}" has been created successfully.`);
+    },
+    onError: (err) => {
+      error("Create Failed", err.message || "Failed to create journal. Please try again.");
     },
   });
 
   const deleteJournalMutation = useMutation<{ message: string }, Error, string>(
     {
       mutationFn: deleteJournalApi,
-      onSuccess: () => {
+      onSuccess: (data) => {
         queryClient.invalidateQueries({
           queryKey: journalKeys.hierarchy(restrictedJournalId),
         });
         resetJournalSelections(); // Use the passed-in reset function
+        success("Journal Deleted", data.message || "Journal has been deleted successfully.");
+      },
+      onError: (err) => {
+        error("Delete Failed", err.message || "Failed to delete journal. Please try again.");
       },
     }
   );

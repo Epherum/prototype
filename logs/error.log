@@ -1,0 +1,244 @@
+{
+  service: 'api',
+  error: '\n' +
+    'Invalid `prisma.partner.create()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  data: {\n' +
+    '    name: "wawa",\n' +
+    '    partnerType: "LEGAL_ENTITY",\n' +
+    '    notes: "",\n' +
+    '    registrationNumber: "",\n' +
+    '    taxId: "",\n' +
+    '    createdById: "cmele524t000ko1001ku8s49u",\n' +
+    '    entityState: "ACTIVE",\n' +
+    '    status: {\n' +
+    '    ~~~~~~\n' +
+    '      connect: {\n' +
+    '        id: "pending-default"\n' +
+    '      }\n' +
+    '    },\n' +
+    '?   id?: BigInt,\n' +
+    '?   logoUrl?: String | Null,\n' +
+    '?   photoUrl?: String | Null,\n' +
+    '?   isUs?: Boolean | Null,\n' +
+    '?   bioFatherName?: String | Null,\n' +
+    '?   bioMotherName?: String | Null,\n' +
+    '?   additionalDetails?: NullableJsonNullValueInput | Json,\n' +
+    '?   statusId?: String | Null,\n' +
+    '?   createdByIp?: String | Null,\n' +
+    '?   deletedById?: String | Null,\n' +
+    '?   deletedByIp?: String | Null,\n' +
+    '?   deletedAt?: DateTime | Null,\n' +
+    '?   previousVersionId?: BigInt | Null,\n' +
+    '?   nextVersionId?: BigInt | Null,\n' +
+    '?   createdAt?: DateTime,\n' +
+    '?   updatedAt?: DateTime,\n' +
+    '?   journalPartnerLinks?: JournalPartnerLinkUncheckedCreateNestedManyWithoutPartnerInput,\n' +
+    '?   documents?: DocumentUncheckedCreateNestedManyWithoutPartnerInput,\n' +
+    '?   partnerPreviousVersionOf?: PartnerUncheckedCreateNestedOneWithoutNextVersionInput,\n' +
+    '?   partnerNextVersionOf?: PartnerUncheckedCreateNestedOneWithoutPreviousVersionInput\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Unknown argument `status`. Did you mean `statusId`? Available options are marked with ?.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.partner.create()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  data: {\n' +
+    '    name: "wawa",\n' +
+    '    partnerType: "LEGAL_ENTITY",\n' +
+    '    notes: "",\n' +
+    '    registrationNumber: "",\n' +
+    '    taxId: "",\n' +
+    '    createdById: "cmele524t000ko1001ku8s49u",\n' +
+    '    entityState: "ACTIVE",\n' +
+    '    status: {\n' +
+    '    ~~~~~~\n' +
+    '      connect: {\n' +
+    '        id: "pending-default"\n' +
+    '      }\n' +
+    '    },\n' +
+    '?   id?: BigInt,\n' +
+    '?   logoUrl?: String | Null,\n' +
+    '?   photoUrl?: String | Null,\n' +
+    '?   isUs?: Boolean | Null,\n' +
+    '?   bioFatherName?: String | Null,\n' +
+    '?   bioMotherName?: String | Null,\n' +
+    '?   additionalDetails?: NullableJsonNullValueInput | Json,\n' +
+    '?   statusId?: String | Null,\n' +
+    '?   createdByIp?: String | Null,\n' +
+    '?   deletedById?: String | Null,\n' +
+    '?   deletedByIp?: String | Null,\n' +
+    '?   deletedAt?: DateTime | Null,\n' +
+    '?   previousVersionId?: BigInt | Null,\n' +
+    '?   nextVersionId?: BigInt | Null,\n' +
+    '?   createdAt?: DateTime,\n' +
+    '?   updatedAt?: DateTime,\n' +
+    '?   journalPartnerLinks?: JournalPartnerLinkUncheckedCreateNestedManyWithoutPartnerInput,\n' +
+    '?   documents?: DocumentUncheckedCreateNestedManyWithoutPartnerInput,\n' +
+    '?   partnerPreviousVersionOf?: PartnerUncheckedCreateNestedOneWithoutNextVersionInput,\n' +
+    '?   partnerNextVersionOf?: PartnerUncheckedCreateNestedOneWithoutPreviousVersionInput\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Unknown argument `status`. Did you mean `statusId`? Available options are marked with ?.\n' +
+    '    at Dn (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:29:1363)\n' +
+    '    at ri.handleRequestError (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:7102)\n' +
+    '    at ri.handleAndLogRequestError (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:6784)\n' +
+    '    at ri.request (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:6491)\n' +
+    '    at async l (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:130:9812)\n' +
+    '    at async Object.createPartner (C:\\work\\ERP\\.next\\server\\chunks\\481.js:34:7603)\n' +
+    '    at async m.action (C:\\work\\ERP\\.next\\server\\app\\api\\partners\\route.js:1:1824)\n' +
+    '    at async to.do (C:\\work\\ERP\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.prod.js:18:18605)\n' +
+    '    at async to.handle (C:\\work\\ERP\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.prod.js:18:23632)\n' +
+    '    at async doRender (C:\\work\\ERP\\node_modules\\next\\dist\\server\\base-server.js:1513:42)',
+  level: 'error',
+  message: 'API POST /api/partners Error',
+  timestamp: '2025-08-22 03:47:06'
+}
+{
+  service: 'api',
+  error: '\n' +
+    'Invalid `prisma.journal.findUnique()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "2"\n' +
+    '  },\n' +
+    '  select: {\n' +
+    '    id: true,\n' +
+    '    parent_id: true,\n' +
+    '    ~~~~~~~~~\n' +
+    '?   name?: true,\n' +
+    '?   parentId?: true,\n' +
+    '?   isTerminal?: true,\n' +
+    '?   additionalDetails?: true,\n' +
+    '?   createdAt?: true,\n' +
+    '?   updatedAt?: true,\n' +
+    '?   parent?: true,\n' +
+    '?   children?: true,\n' +
+    '?   journalPartnerLinks?: true,\n' +
+    '?   journalGoodLinks?: true,\n' +
+    '?   userRestrictions?: true,\n' +
+    '?   documents?: true,\n' +
+    '?   _count?: true\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Unknown field `parent_id` for select statement on model `Journal`. Available options are marked with ?.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.journal.findUnique()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "2"\n' +
+    '  },\n' +
+    '  select: {\n' +
+    '    id: true,\n' +
+    '    parent_id: true,\n' +
+    '    ~~~~~~~~~\n' +
+    '?   name?: true,\n' +
+    '?   parentId?: true,\n' +
+    '?   isTerminal?: true,\n' +
+    '?   additionalDetails?: true,\n' +
+    '?   createdAt?: true,\n' +
+    '?   updatedAt?: true,\n' +
+    '?   parent?: true,\n' +
+    '?   children?: true,\n' +
+    '?   journalPartnerLinks?: true,\n' +
+    '?   journalGoodLinks?: true,\n' +
+    '?   userRestrictions?: true,\n' +
+    '?   documents?: true,\n' +
+    '?   _count?: true\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Unknown field `parent_id` for select statement on model `Journal`. Available options are marked with ?.\n' +
+    '    at Dn (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:29:1363)\n' +
+    '    at ri.handleRequestError (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:7102)\n' +
+    '    at ri.handleAndLogRequestError (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:6784)\n' +
+    '    at ri.request (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:6491)\n' +
+    '    at async l (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:130:9812)\n' +
+    '    at async Promise.all (index 0)\n' +
+    '    at async Object.createLink (C:\\work\\ERP\\.next\\server\\app\\api\\journal-good-links\\route.js:1:3865)\n' +
+    '    at async w.action (C:\\work\\ERP\\.next\\server\\app\\api\\journal-good-links\\route.js:1:6889)\n' +
+    '    at async to.do (C:\\work\\ERP\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.prod.js:18:18605)\n' +
+    '    at async to.handle (C:\\work\\ERP\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.prod.js:18:23632)',
+  level: 'error',
+  message: 'API POST /api/journal-good-links Error',
+  timestamp: '2025-08-22 03:48:52'
+}
+{
+  service: 'api',
+  error: '\n' +
+    'Invalid `prisma.journal.findUnique()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "2"\n' +
+    '  },\n' +
+    '  select: {\n' +
+    '    id: true,\n' +
+    '    parent_id: true,\n' +
+    '    ~~~~~~~~~\n' +
+    '?   name?: true,\n' +
+    '?   parentId?: true,\n' +
+    '?   isTerminal?: true,\n' +
+    '?   additionalDetails?: true,\n' +
+    '?   createdAt?: true,\n' +
+    '?   updatedAt?: true,\n' +
+    '?   parent?: true,\n' +
+    '?   children?: true,\n' +
+    '?   journalPartnerLinks?: true,\n' +
+    '?   journalGoodLinks?: true,\n' +
+    '?   userRestrictions?: true,\n' +
+    '?   documents?: true,\n' +
+    '?   _count?: true\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Unknown field `parent_id` for select statement on model `Journal`. Available options are marked with ?.',
+  stack: 'PrismaClientValidationError: \n' +
+    'Invalid `prisma.journal.findUnique()` invocation:\n' +
+    '\n' +
+    '{\n' +
+    '  where: {\n' +
+    '    id: "2"\n' +
+    '  },\n' +
+    '  select: {\n' +
+    '    id: true,\n' +
+    '    parent_id: true,\n' +
+    '    ~~~~~~~~~\n' +
+    '?   name?: true,\n' +
+    '?   parentId?: true,\n' +
+    '?   isTerminal?: true,\n' +
+    '?   additionalDetails?: true,\n' +
+    '?   createdAt?: true,\n' +
+    '?   updatedAt?: true,\n' +
+    '?   parent?: true,\n' +
+    '?   children?: true,\n' +
+    '?   journalPartnerLinks?: true,\n' +
+    '?   journalGoodLinks?: true,\n' +
+    '?   userRestrictions?: true,\n' +
+    '?   documents?: true,\n' +
+    '?   _count?: true\n' +
+    '  }\n' +
+    '}\n' +
+    '\n' +
+    'Unknown field `parent_id` for select statement on model `Journal`. Available options are marked with ?.\n' +
+    '    at Dn (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:29:1363)\n' +
+    '    at ri.handleRequestError (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:7102)\n' +
+    '    at ri.handleAndLogRequestError (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:6784)\n' +
+    '    at ri.request (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:121:6491)\n' +
+    '    at async l (C:\\work\\ERP\\node_modules\\@prisma\\client\\runtime\\library.js:130:9812)\n' +
+    '    at async Promise.all (index 0)\n' +
+    '    at async Object.createLink (C:\\work\\ERP\\.next\\server\\app\\api\\journal-partner-links\\route.js:1:3931)\n' +
+    '    at async y.action (C:\\work\\ERP\\.next\\server\\app\\api\\journal-partner-links\\route.js:1:7876)\n' +
+    '    at async to.do (C:\\work\\ERP\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.prod.js:18:18605)\n' +
+    '    at async to.handle (C:\\work\\ERP\\node_modules\\next\\dist\\compiled\\next-server\\app-route.runtime.prod.js:18:23632)',
+  level: 'error',
+  message: 'API POST /api/journal-partner-links Error',
+  timestamp: '2025-08-22 03:50:15'
+}

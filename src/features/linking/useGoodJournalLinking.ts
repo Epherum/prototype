@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { goodKeys, journalGoodLinkKeys, journalKeys } from "@/lib/queryKeys";
+import { useToast } from "@/contexts/ToastContext";
 
 // ✅ CHANGED: Services now import from the new, consistent client service files.
 import {
@@ -20,6 +21,7 @@ import { CreateJournalGoodLinkPayload } from "@/lib/schemas/journalGoodLink.sche
 // No props needed.
 export const useGoodJournalLinking = () => {
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
 
   // ✅ CHANGED: state.selections.goods -> state.selections.good (for consistency)
   const selectedGoodId = useAppStore((state) => state.selections.good);
@@ -51,10 +53,10 @@ export const useGoodJournalLinking = () => {
       queryClient.invalidateQueries({
         queryKey: journalGoodLinkKeys.listForGood(newLink.goodId),
       });
+      success("Link Created", "Good has been successfully linked to journal.");
     },
-    onError: (error: Error) => {
-      console.error("Failed to create journal-good link:", error);
-      alert(`Error linking good to journal: ${error.message}`);
+    onError: (err: Error) => {
+      error("Link Failed", err.message || "Failed to link good to journal. Please try again.");
     },
   });
 
@@ -62,8 +64,6 @@ export const useGoodJournalLinking = () => {
     // ✅ CHANGED: Uses the new service function `deleteJournalGoodLinkById`.
     mutationFn: deleteJournalGoodLinkById,
     onSuccess: () => {
-      // ✅ CHANGED: The new service returns void, so we use a static message.
-      alert(`Link unlinked successfully!`);
       // Invalidation logic remains correct.
       queryClient.invalidateQueries({
         queryKey: journalGoodLinkKeys.listForGood(goodForAction!.id),
@@ -74,10 +74,10 @@ export const useGoodJournalLinking = () => {
           queryKey: journalKeys.flatListByGood(goodForAction.id),
         });
       }
+      success("Link Removed", "Good has been successfully unlinked from journal.");
     },
-    onError: (error: Error) => {
-      console.error(`Failed to unlink good-journal:`, error);
-      alert(`Error unlinking: ${error.message}`);
+    onError: (err: Error) => {
+      error("Unlink Failed", err.message || "Failed to unlink good from journal. Please try again.");
     },
   });
 

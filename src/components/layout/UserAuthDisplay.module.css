@@ -96,9 +96,7 @@
 }
 
 .userDropdownTrigger:hover {
-  background-color: var(--accent-warm-light);
   color: var(--accent-warm);
-  border-color: var(--accent-warm-light);
 }
 
 .authButton {
@@ -185,9 +183,7 @@
 }
 
 .dropdownTrigger:hover {
-  background-color: var(--accent-warm-light);
   color: var(--accent-warm);
-  border-color: var(--accent-warm-light);
 }
 
 .dropdownArrow {
@@ -209,6 +205,23 @@
   box-shadow: 0 4px 12px var(--shadow-color);
   z-index: 1000;
   overflow: hidden;
+}
+
+/* Center the user dropdown specifically */
+.userDropdownMenu {
+  right: auto;
+  left: 50%;
+  transform-origin: top center;
+}
+
+/* Mobile adjustments for user dropdown */
+@media (max-width: 480px) {
+  .userDropdownMenu {
+    left: auto;
+    right: 0;
+    min-width: 200px;
+    transform-origin: top right;
+  }
 }
 
 .dropdownItem {

@@ -27,7 +27,7 @@ const journalPartnerLinkService = {
     const [journal, partnerExists] = await Promise.all([
       prisma.journal.findUnique({
         where: { id: data.journalId },
-        select: { id: true, parent_id: true },
+        select: { id: true, parentId: true },
       }),
       prisma.partner.findUnique({
         where: { id: data.partnerId },

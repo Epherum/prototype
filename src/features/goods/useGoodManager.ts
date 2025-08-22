@@ -7,6 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAppStore } from "@/store/appStore";
 import { goodKeys } from "@/lib/queryKeys";
 import { SLIDER_TYPES } from "@/lib/constants";
+import { useToast } from "@/contexts/ToastContext";
 import {
   // ✅ REMOVED: Old, individual service function imports
   // fetchGoods,
@@ -27,6 +28,7 @@ import { useChainedQuery } from "@/hooks/useChainedQuery";
 
 export const useGoodManager = () => {
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
 
   // --- No changes to Zustand state consumption ---
   const { documentCreationState } = useAppStore((state) => state.ui);
@@ -59,9 +61,13 @@ export const useGoodManager = () => {
   const createGoodMutation = useMutation({
     // ✅ CHANGED: The mutation function now accepts the Zod-inferred payload.
     mutationFn: (data: CreateGoodPayload) => createGood(data),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
       handleCloseAddEditGoodModal();
+      success("Good Created", `Good "${data.label}" has been created successfully.`);
+    },
+    onError: (err) => {
+      error("Create Failed", err.message || "Failed to create good. Please try again.");
     },
   });
 
@@ -69,12 +75,16 @@ export const useGoodManager = () => {
     // ✅ CHANGED: The mutation now accepts the full GoodClient object,
     // but the service function receives the id and the UpdateGoodPayload.
     mutationFn: (data: GoodClient) => updateGood(data.id, data),
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: goodKeys.detail(variables.id),
       });
       handleCloseAddEditGoodModal();
+      success("Good Updated", `Good "${data.label}" has been updated successfully.`);
+    },
+    onError: (err) => {
+      error("Update Failed", err.message || "Failed to update good. Please try again.");
     },
   });
 
@@ -84,6 +94,10 @@ export const useGoodManager = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
       setSelectedGoodsId(null);
+      success("Good Deleted", "Good has been deleted successfully.");
+    },
+    onError: (err) => {
+      error("Delete Failed", err.message || "Failed to delete good. Please try again.");
     },
   });
 

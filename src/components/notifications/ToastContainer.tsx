@@ -72,6 +72,14 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast }) => {
     removeToast(toast.id);
   };
 
+  const handleToastClick = (e: React.MouseEvent) => {
+    // Don't close if clicking the close button (it has its own handler)
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+    handleClose();
+  };
+
   return (
     <motion.div
       className={`${styles.toast} ${styles[toast.type]}`}
@@ -80,6 +88,7 @@ const ToastItem: React.FC<ToastItemProps> = ({ toast }) => {
       animate="animate"
       exit="exit"
       layout
+      onClick={handleToastClick}
     >
       <div className={styles.toastIcon}>
         <IconComponent />

@@ -34,7 +34,7 @@ const partnerService = {
         ...partnerData,
         createdById: createdById,
         entityState: EntityState.ACTIVE,
-        status: { connect: { id: "pending-default" } },
+        statusId: partnerData.statusId || "pending-default",
       },
     });
     

@@ -8,6 +8,7 @@ import {
   journalPartnerLinkKeys,
   journalKeys,
 } from "@/lib/queryKeys";
+import { useToast } from "@/contexts/ToastContext";
 
 // ✅ CHANGED: Services now import from the new, consistent client service files.
 import {
@@ -29,6 +30,7 @@ import { CreateJournalPartnerLinkPayload } from "@/lib/schemas/journalPartnerLin
 // The hook is now self-sufficient and takes no props.
 export const usePartnerJournalLinking = () => {
   const queryClient = useQueryClient();
+  const { success, error } = useToast();
 
   // Consume the selected partner ID from the global store
   const selectedPartnerId = useAppStore((state) => state.selections.partner);
@@ -63,10 +65,10 @@ export const usePartnerJournalLinking = () => {
       queryClient.invalidateQueries({
         queryKey: journalPartnerLinkKeys.listForPartner(newLink.partnerId),
       });
+      success("Link Created", "Partner has been successfully linked to journal.");
     },
-    onError: (error: Error) => {
-      console.error("Failed to create journal-partner link:", error);
-      alert(`Error linking partner to journal: ${error.message}`);
+    onError: (err: Error) => {
+      error("Link Failed", err.message || "Failed to link partner to journal. Please try again.");
     },
   });
 
@@ -74,8 +76,6 @@ export const usePartnerJournalLinking = () => {
     // ✅ CHANGED: Uses the new service function `deleteJournalPartnerLinkById`.
     mutationFn: deleteJournalPartnerLinkById,
     onSuccess: () => {
-      // ✅ CHANGED: The new service returns void, so we use a static message.
-      alert(`Link unlinked successfully!`);
       // Invalidation logic remains correct.
       queryClient.invalidateQueries({
         queryKey: journalPartnerLinkKeys.listForPartner(partnerForAction!.id),
@@ -86,10 +86,11 @@ export const usePartnerJournalLinking = () => {
           queryKey: journalKeys.flatListByPartner(partnerForAction.id),
         });
       }
+      success("Link Removed", "Partner has been successfully unlinked from journal.");
     },
-    onError: (error: Error) => {
-      console.error(`Failed to unlink partner-journal:`, error);
-      alert(`Error unlinking: ${error.message}`);
+    onError: (err: Error) => {
+      error("Unlink Failed", err.message || "Failed to unlink partner from journal. Please try again.");
+      alert(`Error unlinking: ${err.message}`);
     },
   });
 

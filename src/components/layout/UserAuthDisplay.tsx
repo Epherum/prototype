@@ -58,6 +58,7 @@ export default function UserAuthDisplay({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const [logoState, setLogoState] = useState<'light' | 'dark' | 'text'>('dark');
+  const [isMobile, setIsMobile] = useState(false);
 
   const toggleLogo = () => {
     setLogoState(prev => {
@@ -88,6 +89,14 @@ export default function UserAuthDisplay({
       }
     };
 
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 480);
+    };
+
+    // Set initial mobile state
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
     // Only add event listeners if dropdowns are open
     if (isDropdownOpen || isUserDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
@@ -97,6 +106,7 @@ export default function UserAuthDisplay({
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
+      window.removeEventListener('resize', handleResize);
     };
   }, [isDropdownOpen, isUserDropdownOpen]);
 
@@ -182,12 +192,34 @@ export default function UserAuthDisplay({
                     <AnimatePresence>
                       {isUserDropdownOpen && (
                         <motion.div
-                          className={styles.dropdownMenu}
-                          initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                          className={`${styles.dropdownMenu} ${styles.userDropdownMenu}`}
+                          initial={{ 
+                            opacity: 0, 
+                            y: -10, 
+                            scale: 0.95, 
+                            x: isMobile ? 0 : "-50%" 
+                          }}
+                          animate={{ 
+                            opacity: 1, 
+                            y: 0, 
+                            scale: 1, 
+                            x: isMobile ? 0 : "-50%" 
+                          }}
+                          exit={{ 
+                            opacity: 0, 
+                            y: -10, 
+                            scale: 0.95, 
+                            x: isMobile ? 0 : "-50%" 
+                          }}
                           transition={{ duration: 0.15, ease: "easeOut" }}
                         >
+                          <Link
+                            href="/departments"
+                            className={styles.dropdownItem}
+                            onClick={() => setIsUserDropdownOpen(false)}
+                          >
+                            Departments
+                          </Link>
                           {canManageUsers && (
                             <button
                               onClick={() => {
