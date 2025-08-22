@@ -96,46 +96,94 @@
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
   .container {
-    padding: calc(var(--spacing-unit) * 2);
+    padding: calc(var(--spacing-unit) * 1.5);
+  }
+  
+  .header {
+    margin-bottom: calc(var(--spacing-unit) * 2);
   }
   
   .title {
-    font-size: 2rem;
+    font-size: 1.8rem;
   }
   
   .departmentGrid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: calc(var(--spacing-unit) * 2);
-  }
-  
-  .departmentCard {
-    padding: calc(var(--spacing-unit) * 2);
-    min-height: 100px;
-  }
-  
-  .departmentNumber {
-    font-size: 1.5rem;
-  }
-  
-  .departmentName {
-    font-size: 1rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: calc(var(--spacing-unit) * 1);
-  }
-  
-  .departmentGrid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     gap: calc(var(--spacing-unit) * 1.5);
   }
   
   .departmentCard {
-    padding: calc(var(--spacing-unit) * 2);
-    min-height: 80px;
+    padding: calc(var(--spacing-unit) * 1.5);
+    min-height: 85px;
+    gap: calc(var(--spacing-unit) * 1);
+  }
+  
+  .departmentNumber {
+    font-size: 1.4rem;
+  }
+  
+  .departmentName {
+    font-size: 0.9rem;
+    line-height: 1.2;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: calc(var(--spacing-unit) * 1);
+  }
+  
+  .header {
+    margin-bottom: calc(var(--spacing-unit) * 1.5);
+    gap: calc(var(--spacing-unit) * 1);
+  }
+  
+  .title {
+    font-size: 1.6rem;
+  }
+  
+  .departmentGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: calc(var(--spacing-unit) * 1);
+  }
+  
+  .departmentCard {
+    padding: calc(var(--spacing-unit) * 1.2);
+    min-height: 75px;
+    gap: calc(var(--spacing-unit) * 0.8);
+  }
+  
+  .departmentNumber {
+    font-size: 1.2rem;
+  }
+  
+  .departmentName {
+    font-size: 0.85rem;
+    line-height: 1.1;
+  }
+}
+
+/* Extra small screens - more compact layout */
+@media (max-width: 360px) {
+  .container {
+    padding: calc(var(--spacing-unit) * 0.8);
+  }
+  
+  .departmentGrid {
+    gap: calc(var(--spacing-unit) * 0.8);
+  }
+  
+  .departmentCard {
+    padding: calc(var(--spacing-unit) * 1);
+    min-height: 65px;
+    gap: calc(var(--spacing-unit) * 0.6);
+  }
+  
+  .departmentNumber {
+    font-size: 1.1rem;
+  }
+  
+  .departmentName {
+    font-size: 0.8rem;
   }
 }
