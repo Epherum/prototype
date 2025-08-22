@@ -9,8 +9,29 @@
   flex-direction: column;
   gap: 1rem;
   padding: 0.5rem 0.25rem;
-  max-height: 60vh; /* Allow form to scroll if it's very long */
-  overflow-y: auto;
+  flex-grow: 1; /* Allow form to take available space */
+  overflow-y: auto; /* Enable scrolling for form content */
+  /* Add scrollbar styling for better UX */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+/* Webkit scrollbar styling */
+.goodForm::-webkit-scrollbar {
+  width: 6px;
+}
+
+.goodForm::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.goodForm::-webkit-scrollbar-thumb {
+  background-color: var(--border-subtle);
+  border-radius: 3px;
+}
+
+.goodForm::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-hover);
 }
 
 .formGroup {
@@ -151,4 +172,35 @@
   font-size: 0.825rem;
   margin-top: 0.25rem;
   font-style: italic;
+}
+
+/* Mobile responsive improvements */
+@media (max-width: 768px) {
+  .addEditGoodModalContent {
+    width: 100%;
+  }
+
+  .goodForm {
+    gap: 0.875rem;
+    padding: 0.25rem 0;
+  }
+
+  .formGroup input[type="text"],
+  .formGroup input[type="url"],
+  .formGroup input[type="number"],
+  .formGroup select,
+  .formGroup textarea {
+    font-size: 16px; /* Prevent zoom on iOS */
+    padding: 0.75rem;
+  }
+
+  .selectedJournalDisplay {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .changeJournalButton {
+    align-self: flex-end;
+  }
 }

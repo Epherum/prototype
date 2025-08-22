@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from "react-dom";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./JournalModal.module.css";
 import AccountNode from "./AccountNode";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
 import { findNodeById } from "@/lib/helpers";
 import { AccountNodeData } from "@/lib/types/ui";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // Define props interface for better type checking and to make certain props optional.
 interface JournalModalProps {
@@ -41,6 +43,9 @@ function JournalModal({
   modalTitle,
   zIndex,
 }: JournalModalProps) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [openNodes, setOpenNodes] = useState<Record<string, boolean>>({});
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
     null
@@ -155,20 +160,20 @@ function JournalModal({
     hierarchy,
   ]);
 
-  if (!isOpen) return null;
-
-  return (
-    <motion.div
-      className={`${baseStyles.modalOverlay} ${styles.journalModalOverlay}`}
-      onClick={onClose}
-      key="journal-modal-overlay"
-      initial="closed"
-      animate="open"
-      exit="closed"
-      variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
-      style={zIndex ? { zIndex } : {}}
-      transition={{ duration: 0.2 }}
-    >
+  const modalContent = (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          className={`${baseStyles.modalOverlay} ${styles.journalModalOverlay}`}
+          onClick={onClose}
+          key="journal-modal-overlay"
+          initial="closed"
+          animate="open"
+          exit="closed"
+          variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
+          style={zIndex ? { zIndex } : {}}
+          transition={{ duration: 0.2 }}
+        >
       <motion.div
         className={`${baseStyles.modalContent} ${styles.journalModalContentSizing}`}
         onClick={(e) => e.stopPropagation()}
@@ -245,9 +250,17 @@ function JournalModal({
             </button>
           </div>
         )}
+        </motion.div>
       </motion.div>
-    </motion.div>
+      )}
+    </AnimatePresence>
   );
+
+  // Ensure this code only runs on the client
+  if (typeof window === "object") {
+    return createPortal(modalContent, document.body);
+  }
+  return null;
 }
 
 export default JournalModal;

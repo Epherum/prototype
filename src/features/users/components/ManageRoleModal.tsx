@@ -9,6 +9,7 @@ import type { PermissionClient } from "@/lib/types/models.client";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./ManageUserModal.module.css"; // Re-using styles for consistency
 import roleStyles from "./ManageRoleModal.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // --- 1. DEFINE THE PROPS INTERFACE ---
 // This modal is a "presentational" component. It receives everything it needs as props.
@@ -42,6 +43,9 @@ export const ManageRoleModal: React.FC<ManageRoleModalProps> = ({
   handlePermissionToggle,
   handleSubmit,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const modalTitle = isEditMode ? `Edit Role` : "Create New Role";
 
   // Group permissions by resource for better organization

@@ -13,6 +13,7 @@ import { ConfirmationModal } from "@/components/notifications/ConfirmationModal"
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./StatusManagementModal.module.css";
 import { useStatusManagement } from "../hooks/useStatusManagement";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // Validation schema for status form
 const statusSchema = z.object({
@@ -33,6 +34,9 @@ export const StatusManagementModal: React.FC<StatusManagementModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const toast = useToast();

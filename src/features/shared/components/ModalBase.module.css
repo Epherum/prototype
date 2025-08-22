@@ -32,7 +32,15 @@
   display: flex;
   flex-direction: column;
   margin: auto; /* Helps with centering if overlay uses overflow */
-  overflow: hidden; /* Prevent content overflow */
+  overflow: hidden; /* Prevent content overflow from modal container */
+}
+
+/* Add a scrollable container for modal body content */
+.modalBody {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: calc(var(--spacing-unit) * 0.5);
+  margin-right: calc(var(--spacing-unit) * -0.5);
 }
 
 .modalTitle {
@@ -138,4 +146,50 @@
 }
 .modalButtonDanger:hover:not(:disabled) {
   background-color: var(--danger-color-hover, #c82333);
+}
+
+/* Mobile responsive improvements */
+@media (max-width: 768px) {
+  .modalOverlay {
+    padding: calc(var(--spacing-unit) * 1);
+    padding-top: calc(var(--spacing-unit) * 2);
+    padding-bottom: calc(var(--spacing-unit) * 2);
+    align-items: flex-start; /* Keep aligned to top on mobile */
+  }
+
+  .modalContent {
+    width: 100%;
+    max-width: 100%;
+    max-height: 95vh; /* Use more screen space on mobile */
+    margin: 0;
+  }
+
+  .modalBody {
+    /* Ensure proper scrolling on mobile */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modalActions {
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.75);
+  }
+
+  .modalActionButton {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .modalContent {
+    max-height: 98vh; /* Use even more screen space on small mobile */
+    padding: calc(var(--spacing-unit) * 1);
+  }
+
+  .modalTitle {
+    font-size: 1.1em;
+    margin-bottom: calc(var(--spacing-unit) * 1.5);
+    padding-bottom: calc(var(--spacing-unit) * 1);
+  }
 }

@@ -5,6 +5,7 @@ import type { GoodClient } from "@/lib/types/models.client";
 import type { AccountNodeData } from "@/lib/types/ui";
 import type { CreateJournalGoodLinkPayload } from "@/lib/schemas/journalGoodLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // Reusing the CSS module from partner linking for similar structure.
 // You can create a dedicated one if distinctions grow.
@@ -29,6 +30,9 @@ export default function LinkGoodToJournalsModal({
   isSubmitting,
   onOpenJournalSelector,
 }: LinkGoodToJournalsModalProps) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [selectedJournals, setSelectedJournals] = useState<AccountNodeData[]>(
     []
   );

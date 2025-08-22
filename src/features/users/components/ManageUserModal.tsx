@@ -8,6 +8,7 @@ import { FaPlus, FaPencilAlt, FaTrash } from "react-icons/fa";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./ManageUserModal.module.css";
 import JournalModal from "@/features/journals/components/JournalModal";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 import { useUserManagement } from "../useUserManagement"; // Corrected Path
 import { deleteRole } from "@/services/clientRoleService";
@@ -47,6 +48,9 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
   onLaunchRoleCreate,
   onLaunchRoleEdit,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const queryClient = useQueryClient();
   const [isJournalModalOpen, setIsJournalModalOpen] = useState(false);
 

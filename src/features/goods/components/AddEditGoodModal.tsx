@@ -15,6 +15,7 @@ import { AccountNodeData } from "@/lib/types/ui";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import formStyles from "./AddEditGoodModal.module.css";
 import { useStatuses } from "@/hooks/useStatuses";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { StatusManagementModal } from "@/features/status/components/StatusManagementModal";
 
 // ✅ 3. Update the props to use the new types
@@ -88,18 +89,19 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
     }
   }, [isOpen, isEditing]);
 
-  // Effect for escape key & body scroll (Good practice, retained from your original)
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+
+  // Effect for escape key
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
     }
     return () => {
       document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
     };
   }, [isOpen, onClose]);
 
@@ -162,12 +164,13 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
               {isEditing ? "Edit Good/Service" : "Add New Good/Service"}
             </h2>
 
-            {/* ✅ 7. The form now uses the `handleSubmit` wrapper */}
-            <form
-              onSubmit={handleSubmit(handleFormSubmit)}
-              className={formStyles.goodForm}
-              noValidate
-            >
+            <div className={baseStyles.modalBody}>
+              {/* ✅ 7. The form now uses the `handleSubmit` wrapper */}
+              <form
+                onSubmit={handleSubmit(handleFormSubmit)}
+                className={formStyles.goodForm}
+                noValidate
+              >
               <div className={formStyles.formGroup}>
                 <label htmlFor="label">Label *</label>
                 {/* ✅ 8. Use `register` instead of manual value/onChange */}
@@ -299,24 +302,25 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
 
               {/* Other fields follow the same pattern */}
 
-              <div className={baseStyles.modalActions}>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Saving..." : "Save"}
-                </button>
-              </div>
-            </form>
+                <div className={baseStyles.modalActions}>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Saving..." : "Save"}
+                  </button>
+                </div>
+              </form>
+            </div>
           </motion.div>
         </motion.div>
       )}

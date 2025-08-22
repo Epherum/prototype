@@ -6,6 +6,7 @@ import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./DocumentDetailsModal.module.css";
 import { DocumentClient } from "@/lib/types/models.client";
 import { IoDocumentTextOutline, IoCalendarOutline, IoPersonOutline, IoReceiptOutline } from "react-icons/io5";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface DocumentDetailsModalProps {
   isOpen: boolean;
@@ -41,6 +42,9 @@ const DocumentDetailsModal: React.FC<DocumentDetailsModalProps> = ({
   document,
   isLoading = false,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const formatCurrency = (amount: number | string) => {

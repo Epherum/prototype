@@ -8,6 +8,7 @@ import type {
   JournalClient,
 } from "@/lib/types/models.client";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 // Reusing the CSS module from partner unlinking for similar structure.
 // You can create a dedicated one if distinctions grow.
 import unlinkStyles from "./UnlinkPartnerFromJournalsModal.module.css"; // Assuming this exists from previous step
@@ -34,6 +35,9 @@ export default function UnlinkGoodFromJournalsModal({
   fetchLinksFn,
   isUnlinking,
 }: UnlinkGoodFromJournalsModalProps) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [selectedLinkIds, setSelectedLinkIds] = useState<string[]>([]);
 
   const queryKey = ["goodJournalLinks", good?.id]; // Use good's ID in the query key

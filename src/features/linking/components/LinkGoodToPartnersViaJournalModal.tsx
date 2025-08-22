@@ -5,6 +5,7 @@ import type { GoodClient, PartnerClient } from "@/lib/types/models.client";
 import type { AccountNodeData } from "@/lib/types/ui";
 import type { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import listStyles from "./LinkGoodToPartnersViaJournalModal.module.css"; // A new CSS module for the list items
 import { IoClose } from "react-icons/io5";
 
@@ -27,6 +28,9 @@ export default function LinkGoodToPartnersViaJournalModal({
   availablePartners,
   isSubmitting,
 }: LinkGoodToPartnersViaJournalModalProps) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [selectedPartnerIds, setSelectedPartnerIds] = useState<Set<string>>(
     new Set()
   );

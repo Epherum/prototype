@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { IoClose, IoWarning, IoTrash, IoInformationCircle, IoCheckmarkCircle } from "react-icons/io5";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./ConfirmationModal.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 export type ConfirmationType = "info" | "warning" | "danger";
 
@@ -55,6 +56,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   type = "info",
   isLoading = false,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   const IconComponent = confirmationIcons[type];

@@ -8,6 +8,7 @@ import Image from "next/image";
 import styles from "./UserAuthDisplay.module.css";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ThemeSelector } from "@/components/shared/ThemeSelector";
+import { useAppStore } from "@/store/appStore";
 
 const revealVariants: Variants = {
   hidden: { opacity: 0 },
@@ -53,22 +54,40 @@ export default function UserAuthDisplay({
     action: "MANAGE",
     resource: "USER",
   });
+  const currentTheme = useAppStore((state) => state.currentTheme);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
-  const [logoState, setLogoState] = useState<'light' | 'dark' | 'text'>('dark');
   const [isMobile, setIsMobile] = useState(false);
 
-  const toggleLogo = () => {
-    setLogoState(prev => {
-      switch (prev) {
-        case 'dark': return 'light';
-        case 'light': return 'text';
-        case 'text': return 'dark';
-        default: return 'dark';
-      }
-    });
+  // Function to get logo source based on theme
+  const getLogoSource = () => {
+    const isDark = currentTheme?.includes('dark') || false;
+    return isDark ? "/insen_logo_dark.png" : "/insen_logo.png";
+  };
+
+  // Function to get logo filter based on theme accent color
+  const getLogoFilter = () => {
+    switch (currentTheme) {
+      case 'light-orange':
+      case 'dark-orange':
+        return 'hue-rotate(-60deg) saturate(1.2)'; // Shift green more toward orange
+      case 'light-blue':
+      case 'dark-blue':
+        return 'hue-rotate(180deg) saturate(1.1)'; // Shift green toward blue spectrum
+      case 'light-pink':
+      case 'dark-pink':
+        return 'hue-rotate(-80deg) saturate(0.8)'; // Adjust towards pink from green base
+      case 'light-green':
+      case 'dark-green':
+        return 'none'; // Keep the original green
+      case 'light-purple':
+      case 'dark-purple':
+        return 'hue-rotate(-120deg) saturate(0.9)'; // Adjust towards purple from green base
+      default:
+        return 'none';
+    }
   };
 
   useEffect(() => {
@@ -144,19 +163,19 @@ export default function UserAuthDisplay({
                   <motion.div
                     variants={itemRevealUpVariants}
                     className={styles.logoContainer}
-                    onClick={toggleLogo}
                   >
-                    {logoState === 'text' ? (
-                      <span className={styles.logoText}>Insen</span>
-                    ) : (
+                    <Link href="/departments">
                       <Image
-                        src={logoState === 'dark' ? "/insen_logo_dark.jpg" : "/insen_logo.jpg"}
+                        src={getLogoSource()}
                         alt="Insen Logo"
                         width={32}
                         height={32}
                         className={styles.logo}
+                        style={{
+                          filter: getLogoFilter()
+                        }}
                       />
-                    )}
+                    </Link>
                   </motion.div>
 
                   {/* Username dropdown in the middle */}
@@ -213,13 +232,6 @@ export default function UserAuthDisplay({
                           }}
                           transition={{ duration: 0.15, ease: "easeOut" }}
                         >
-                          <Link
-                            href="/departments"
-                            className={styles.dropdownItem}
-                            onClick={() => setIsUserDropdownOpen(false)}
-                          >
-                            Departments
-                          </Link>
                           {canManageUsers && (
                             <button
                               onClick={() => {
@@ -253,17 +265,26 @@ export default function UserAuthDisplay({
                       className={styles.dropdownTrigger}
                       aria-expanded={isDropdownOpen}
                       aria-haspopup="true"
+                      aria-label="Theme options"
                     >
-                      <span>Options</span>
                       <svg
-                        className={`${styles.dropdownArrow} ${isDropdownOpen ? styles.dropdownArrowOpen : ''}`}
-                        width="12"
-                        height="12"
-                        viewBox="0 0 12 12"
+                        className={styles.settingsIcon}
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
                         fill="none"
                       >
                         <path
-                          d="M3 4.5L6 7.5L9 4.5"
+                          d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="3"
                           stroke="currentColor"
                           strokeWidth="1.5"
                           strokeLinecap="round"
@@ -293,19 +314,17 @@ export default function UserAuthDisplay({
                   <motion.div
                     variants={itemRevealUpVariants}
                     className={styles.logoContainer}
-                    onClick={toggleLogo}
                   >
-                    {logoState === 'text' ? (
-                      <span className={styles.logoText}>Insen</span>
-                    ) : (
-                      <Image
-                        src={logoState === 'dark' ? "/insen_logo_dark.jpg" : "/insen_logo.jpg"}
-                        alt="Insen Logo"
-                        width={32}
-                        height={32}
-                        className={styles.logo}
-                      />
-                    )}
+                    <Image
+                      src={getLogoSource()}
+                      alt="Insen Logo"
+                      width={32}
+                      height={32}
+                      className={styles.logo}
+                      style={{
+                        filter: getLogoFilter()
+                      }}
+                    />
                   </motion.div>
                   
                   {/* Spacer */}

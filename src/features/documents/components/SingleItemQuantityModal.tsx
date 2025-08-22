@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import styles from "./SingleItemQuantityModal.module.css";
 // ✅ CHANGED: Import the correct client-side model
 import type { GoodClient } from "@/lib/types/models.client";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface SingleItemQuantityModalProps {
   isOpen: boolean;
@@ -22,6 +23,9 @@ const SingleItemQuantityModal: React.FC<SingleItemQuantityModalProps> = ({
   onSubmit,
   good,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [quantity, setQuantity] = useState(1);
 
   // No need to fetch - we already have the good data from the slider

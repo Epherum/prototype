@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 // Import styles
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./DocumentConfirmationModal.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 // ✅ CHANGED: Import the Zod schema payload type for strong typing
 import type { CreateDocumentPayload } from "@/lib/schemas/document.schema";
@@ -54,6 +55,9 @@ export const DocumentConfirmationModal = ({
   currentDocumentIndex,
   allPartners,
 }: ConfirmationModalProps) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [refDoc, setRefDoc] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   // ✅ CHANGED: The type is now correctly inferred from the payload type

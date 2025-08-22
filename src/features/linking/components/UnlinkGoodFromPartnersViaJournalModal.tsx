@@ -8,6 +8,7 @@ import type {
 } from "@/lib/types/models.client";
 import type { AccountNodeData } from "@/lib/types/ui";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import listStyles from "./UnlinkPartnerFromJournalsModal.module.css"; // Reuse the list styling
 import { IoClose } from "react-icons/io5";
 
@@ -38,6 +39,9 @@ export default function UnlinkGoodFromPartnersViaJournalModal({
   isSubmitting,
   isLoadingLinks = false,
 }: UnlinkGoodFromPartnersViaJournalModalProps) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(
     new Set()
   );

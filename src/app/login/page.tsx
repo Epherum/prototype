@@ -4,6 +4,7 @@
 import { useState, FormEvent, Suspense } from "react"; // Import Suspense
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import styles from "./login.module.css";
 
 // This component uses useSearchParams, so it needs to be inside Suspense
@@ -84,7 +85,16 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <div className={styles.loginContainer}>
-      <h1 className={styles.appTitle}>ERP Application Interface</h1>
+      <div className={styles.logoContainer}>
+        <Image
+          src="/insen_login_logo.png"
+          alt="Insen - Intelligent System Engineering"
+          width={400}
+          height={120}
+          className={styles.loginLogo}
+          priority
+        />
+      </div>
       <Suspense
         fallback={<div className={styles.loadingForm}>Loading form...</div>}
       >

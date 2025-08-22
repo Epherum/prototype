@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { IoClose } from "react-icons/io5";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "@/features/users/components/ManageUserModal.module.css";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface ManageProjectModalProps {
   isOpen: boolean;
@@ -19,6 +20,9 @@ const ManageProjectModal: React.FC<ManageProjectModalProps> = ({
   isSubmitting,
   onSubmit,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [name, setName] = React.useState("");
   const [template, setTemplate] = React.useState("Template A");
 

@@ -9,13 +9,48 @@
   background-color: var(--bg-main); /* Use main background */
 }
 
-.appTitle {
-  /* Added for a title above the form */
-  font-size: 2.5em; /* Larger title */
-  font-weight: 300; /* Lighter font weight for modern feel */
-  color: var(--accent-warm); /* Use accent color */
-  margin-bottom: calc(var(--spacing-unit) * 4);
-  text-align: center;
+.logoContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: calc(var(--spacing-unit) * 6);
+  padding: calc(var(--spacing-unit) * 2);
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--accent-slider) 100%);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 32px var(--shadow-color);
+  border: 1px solid var(--border-subtle);
+}
+
+.loginLogo {
+  max-width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.1));
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.loginLogo:hover {
+  transform: scale(1.02);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.15));
+}
+
+/* Responsive adjustments for logo */
+@media (max-width: 768px) {
+  .logoContainer {
+    margin-bottom: calc(var(--spacing-unit) * 4);
+    padding: calc(var(--spacing-unit) * 1.5);
+  }
+  
+  .loginLogo {
+    width: 300px;
+    height: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .loginLogo {
+    width: 250px;
+    height: auto;
+  }
 }
 
 .loginForm {
@@ -104,4 +139,17 @@
   margin-bottom: var(--spacing-unit) * 2;
   text-align: center;
   font-size: 0.9em;
+}
+
+.loadingForm {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 6px 12px var(--shadow-color);
+  border: 1px solid var(--border-subtle);
 }

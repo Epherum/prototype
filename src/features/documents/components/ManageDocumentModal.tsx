@@ -6,6 +6,7 @@ import styles from "./ManageDocumentModal.module.css";
 // ✅ CHANGED: Import the new, correct types
 import type { DocumentClient } from "@/lib/types/models.client";
 import type { UpdateDocumentPayload } from "@/lib/schemas/document.schema";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface ManageDocumentModalProps {
   isOpen: boolean;
@@ -39,6 +40,9 @@ export const ManageDocumentModal: React.FC<ManageDocumentModalProps> = ({
   isSaving,
   isViewOnly,
 }) => {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   // ✅ CHANGED: State is now correctly typed
   const [formData, setFormData] = useState<UpdateDocumentPayload>({});
 

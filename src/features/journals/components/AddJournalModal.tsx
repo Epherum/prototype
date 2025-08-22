@@ -4,10 +4,14 @@ import { motion } from "framer-motion";
 import { IoAddCircleOutline } from "react-icons/io5";
 
 import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 import specificStyles from "./AddJournalModal.module.css"; // Styles unique to AddJournalModal form
 
 function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [newCodeSuffix, setNewCodeSuffix] = useState("");
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");

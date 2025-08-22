@@ -25,9 +25,8 @@
 .logo {
   display: block;
   opacity: 0.8;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition: opacity 0.2s ease, transform 0.2s ease, filter 0.3s ease;
   border-radius: 50%;
-  cursor: pointer;
   object-fit: cover;
 }
 
@@ -163,8 +162,9 @@
 .dropdownTrigger {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: calc(var(--spacing-unit) * 0.5);
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+  padding: calc(var(--spacing-unit) * 0.75);
   font-size: 0.85em;
   font-weight: 500;
   cursor: pointer;
@@ -176,6 +176,8 @@
   transition: all 0.2s ease;
   white-space: nowrap;
   outline: none;
+  width: 40px;
+  height: 40px;
 }
 
 .dropdownTrigger:focus-visible {
@@ -184,6 +186,15 @@
 
 .dropdownTrigger:hover {
   color: var(--accent-warm);
+  border-color: var(--accent-warm-light);
+}
+
+.settingsIcon {
+  transition: transform 0.2s ease;
+}
+
+.dropdownTrigger:hover .settingsIcon {
+  transform: rotate(90deg);
 }
 
 .dropdownArrow {

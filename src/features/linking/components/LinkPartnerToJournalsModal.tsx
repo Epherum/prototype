@@ -6,6 +6,7 @@ import type { AccountNodeData } from "@/lib/types/ui";
 import type { CreateJournalPartnerLinkPayload } from "@/lib/schemas/journalPartnerLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./LinkItemToJournalsModal.module.css"; // Create this CSS module
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface LinkPartnerToJournalsModalProps {
   isOpen: boolean;
@@ -30,6 +31,9 @@ export default function LinkPartnerToJournalsModal({
   fullJournalHierarchy,
 }: // isJournalSelectorOpen,
 LinkPartnerToJournalsModalProps) {
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
+  
   const [selectedJournals, setSelectedJournals] = useState<AccountNodeData[]>(
     []
   );

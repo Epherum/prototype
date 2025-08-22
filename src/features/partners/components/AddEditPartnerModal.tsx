@@ -10,6 +10,7 @@ import { PartnerType } from "@prisma/client";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import formStyles from "./AddEditPartnerModal.module.css";
 import { useStatuses } from "@/hooks/useStatuses";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import { StatusManagementModal } from "@/features/status/components/StatusManagementModal";
 
 // ✅ Use both create and update schemas
@@ -113,14 +114,8 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
-  // Effect to handle body scroll lock
-  useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "unset";
-    return () => {
-      document.body.style.overflow = "unset";
-    };
-  }, [isOpen]);
+  // Handle body scroll lock
+  useBodyScrollLock(isOpen);
 
   const partnerTypeOptions = Object.values(PartnerType).map((pt) => (
     <option key={pt} value={pt}>
@@ -160,11 +155,12 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
                 {isEditMode ? "Edit Partner" : "Add New Partner"}
               </h2>
 
-              {/* ✅ The `handleSubmit` function from react-hook-form now passes a fully-typed `CreatePartnerPayload` to our `onSubmit` prop. */}
-              <form
-                onSubmit={handleSubmit(onSubmit)}
-                className={formStyles.partnerForm}
-              >
+              <div className={baseStyles.modalBody}>
+                {/* ✅ The `handleSubmit` function from react-hook-form now passes a fully-typed `CreatePartnerPayload` to our `onSubmit` prop. */}
+                <form
+                  onSubmit={handleSubmit(onSubmit)}
+                  className={formStyles.partnerForm}
+                >
                 <div className={formStyles.formGroup}>
                   <label htmlFor="name">Name *</label>
                   <input
@@ -322,30 +318,31 @@ const AddEditPartnerModal: React.FC<AddEditPartnerModalProps> = ({
                   </div>
                 )}
 
-                <div className={baseStyles.modalActions}>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting
-                      ? isEditMode
-                        ? "Saving..."
-                        : "Adding..."
-                      : isEditMode
-                      ? "Save Changes"
-                      : "Add Partner"}
-                  </button>
-                </div>
-              </form>
+                  <div className={baseStyles.modalActions}>
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting
+                        ? isEditMode
+                          ? "Saving..."
+                          : "Adding..."
+                        : isEditMode
+                        ? "Save Changes"
+                        : "Add Partner"}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </motion.div>
           </motion.div>
         )}
