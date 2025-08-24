@@ -52,13 +52,11 @@ export const useMultiLevelSelection = (
   );
   const setSelection = useAppStore((state) => state.setSelection);
   
-  console.log('📖 useMultiLevelSelection - reading from store:', {
-    levelSelections,
-    level0: levelSelections[0],
-    level1: levelSelections[1], 
-    level2: levelSelections[2]
-  });
+  // Track cycle states for each node at each level (moved up to be accessible everywhere)
+  const nodeCycleStates = useRef<Record<string, CycleState>>({});
   
+  // Helper to get unique key for node at specific level
+  const getNodeKey = (levelIndex: number, nodeId: string) => `${levelIndex}-${nodeId}`;
   
   // Calculate the hierarchy levels based on current selections
   const levelsData = useMemo<LevelData[]>(() => {
@@ -107,9 +105,19 @@ export const useMultiLevelSelection = (
         const parentNode = findNodeInHierarchy(hierarchyData, parentId);
         
         if (parentNode?.children && parentNode.children.length > 0) {
-          currentLevelNodes.push(...parentNode.children);
-          visibleChildrenMap[parentId] = true;
-          hasAnyChildren = true;
+          // Check if this parent is in STEP_3 (hidden) state
+          const nodeKey = `${levelIndex - 1}-${parentId}`;
+          const parentState = nodeCycleStates.current?.[nodeKey];
+          
+          // Only show children if parent is NOT in hidden state
+          if (parentState !== CYCLE_STATES.STEP_3_PARENT_SELECTED_CHILDREN_HIDDEN) {
+            currentLevelNodes.push(...parentNode.children);
+            visibleChildrenMap[parentId] = true;
+            hasAnyChildren = true;
+          } else {
+            // Parent is in hidden state - don't show children
+            visibleChildrenMap[parentId] = false;
+          }
         } else {
           // Parent has no children, but we still mark it as processed
           visibleChildrenMap[parentId] = false;
@@ -138,13 +146,6 @@ export const useMultiLevelSelection = (
       levelIndex++;
     }
 
-    console.log('🔍 levelsData calculated:', levels.map((level, index) => ({
-      levelIndex: index,
-      nodesCount: level.nodes.length,
-      selectedIds: level.selectedIds,
-      shouldShowLevel: level.shouldShowLevel,
-      nodeIds: level.nodes.map(n => n.id)
-    })));
 
     return levels;
   }, [hierarchyData, topLevelId, levelSelections]);
@@ -176,16 +177,10 @@ export const useMultiLevelSelection = (
     return levelSelections[deepestSelectedLevel] || [];
   }, [levelSelections, deepestSelectedLevel]);
 
-  // Track cycle states for each node at each level
-  const nodeCycleStates = useRef<Record<string, CycleState>>({});
-  
-  // Helper to get unique key for node at specific level
-  const getNodeKey = (levelIndex: number, nodeId: string) => `${levelIndex}-${nodeId}`;
-  
   // Calculate next cycle state - simply moves to next step in sequence
   const calculateNextCycleState = useCallback((levelIndex: number, nodeId: string) => {
     const nodeKey = getNodeKey(levelIndex, nodeId);
-    const lastState = nodeCycleStates.current[nodeKey];
+    const lastState = nodeCycleStates.current?.[nodeKey];
     
     // Simple 4-step cycle - always go to next step
     const cycle = [
@@ -242,7 +237,7 @@ export const useMultiLevelSelection = (
     }
     
     if (!hasChildren) {
-      // Terminal node - simple toggle
+      // Terminal node - simple toggle (no clearing of lower levels)
       const currentSelections = updatedLevelSelections[levelIndex] || [];
       const newSelections = currentSelections.includes(nodeId)
         ? currentSelections.filter(id => id !== nodeId)
@@ -250,10 +245,7 @@ export const useMultiLevelSelection = (
       
       updatedLevelSelections[levelIndex] = newSelections;
       
-      // Clear all levels below this one
-      for (let i = levelIndex + 1; i < updatedLevelSelections.length; i++) {
-        updatedLevelSelections[i] = [];
-      }
+      // Terminal nodes don't affect lower levels - other parent nodes may have children there
       
       
       // Calculate effective IDs from the deepest level with selections
@@ -282,11 +274,6 @@ export const useMultiLevelSelection = (
         effectiveJournalIds: Array.from(allEffectiveIds),
       };
       
-      console.log('🔄 Terminal node - updating store with:', updateData);
-      console.log('🔄 Specifically, levelSelections:', updateData.levelSelections);
-      console.log('🔄 Level 0 selections:', updateData.levelSelections[0]);
-      console.log('🔄 Level 1 selections:', updateData.levelSelections[1]); 
-      console.log('🔄 Level 2 selections:', updateData.levelSelections[2]);
       setSelection("journal", updateData);
       return;
     }
@@ -386,11 +373,6 @@ export const useMultiLevelSelection = (
       effectiveJournalIds: Array.from(allEffectiveIds),
     };
     
-    console.log('🔄 Parent node - updating store with:', updateData);
-    console.log('🔄 Specifically, levelSelections:', updateData.levelSelections);
-    console.log('🔄 Level 0 selections:', updateData.levelSelections[0]);
-    console.log('🔄 Level 1 selections:', updateData.levelSelections[1]); 
-    console.log('🔄 Level 2 selections:', updateData.levelSelections[2]);
     setSelection("journal", updateData);
   }, [levelSelections, calculateNextCycleState, setSelection, hierarchyData]);
 

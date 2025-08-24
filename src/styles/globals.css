@@ -61,11 +61,11 @@
   --bg-card: #ffffff;
   --text-primary: #3a3a3a;
   --text-secondary: #7a7a7a;
-  --accent-warm: #71a8e8;
-  --accent-warm-light: #c2d4f3;
-  --accent-slider: #eaf2ff;
-  --border-subtle: #e3eeff;
-  --shadow-color: rgba(100, 120, 150, 0.1);
+  --accent-warm: #0ea8d8;
+  --accent-warm-light: #a8e2f3;
+  --accent-slider: #e8f7fc;
+  --border-subtle: #d1ecf5;
+  --shadow-color: rgba(14, 168, 216, 0.1);
 
   /* ADDED DANGER COLORS */
   --danger-color: #dc3545;
@@ -84,12 +84,12 @@
   --color-error: #dc3545;
   
   /* Button hover colors */
-  --accent-warm-hover: #5f97dd;
-  --bg-secondary-hover: #f0f4ff;
-  --border-hover: #c2d1ef;
+  --accent-warm-hover: #0d94c2;
+  --bg-secondary-hover: #f0fafc;
+  --border-hover: #b8dae8;
   
   /* Primary accent for highlights */
-  --primary-accent-color: #71a8e8;
+  --primary-accent-color: #0ea8d8;
 }
 
 /* Dark Orange Theme */
@@ -135,10 +135,10 @@
   --bg-card: #232938;
   --text-primary: #f5f5f5;
   --text-secondary: #c0c0c0;
-  --accent-warm: #71a8e8;
-  --accent-warm-light: #4185c7;
-  --accent-slider: #28304a;
-  --border-subtle: #333a4a;
+  --accent-warm: #0ea8d8;
+  --accent-warm-light: #0b7ca3;
+  --accent-slider: #253a44;
+  --border-subtle: #2d4952;
   --shadow-color: rgba(0, 0, 0, 0.4);
 
   /* ADDED DANGER COLORS - DARK MODE VERSION */
@@ -158,12 +158,12 @@
   --color-error: #ff6b6b;
   
   /* Button hover colors - dark mode */
-  --accent-warm-hover: #88b8ff;
-  --bg-secondary-hover: #363c4f;
-  --border-hover: #555566;
+  --accent-warm-hover: #40bbea;
+  --bg-secondary-hover: #2f3f48;
+  --border-hover: #495a63;
   
   /* Primary accent for highlights - dark mode */
-  --primary-accent-color: #71a8e8;
+  --primary-accent-color: #0ea8d8;
 }
 
 /* Light Pink Theme */

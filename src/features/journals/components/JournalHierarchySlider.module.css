@@ -159,7 +159,7 @@
   font-size: 0.8em;
   font-weight: 500;
   cursor: pointer;
-  border: 2px solid var(--text-secondary);
+  border: 2px solid var(--border-color, var(--text-secondary));
   border-radius: var(--border-radius-pill);
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
@@ -213,7 +213,7 @@
 .terminalNode {
   border-style: dotted;
   border-width: 2px;
-  border-color: var(--text-secondary);
+  border-color: var(--border-color, var(--text-secondary));
 }
 .terminalNode.level2ButtonActive {
   border-color: var(--accent-warm);

@@ -97,20 +97,11 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
         newSelections.journal.rootFilter = Array.from(currentFilters);
         clearSubsequent = false;
       } else if (sliderType === "journal") {
-        console.log('🏪 Store: Processing journal update, value:', value);
-        
         const { effectiveJournalIds, selectedJournalId, levelIndex, levelSelections: levelSelectionsUpdate, ...journalUpdates } =
           value;
         
-        console.log('🏪 Store: Parsed values:', {
-          hasLevelIndex: levelIndex !== undefined,
-          hasLevelSelectionsUpdate: levelSelectionsUpdate !== undefined,
-          hasJournalUpdatesLevelSelections: !!journalUpdates.levelSelections
-        });
-        
         // Handle dynamic level selections (new multi-level system)
         if (levelIndex !== undefined && levelSelectionsUpdate !== undefined) {
-          console.log('🏪 Store: Taking levelIndex path');
           const updatedLevelSelections = updateLevelSelection(
             newSelections.journal.levelSelections,
             levelIndex,
@@ -127,25 +118,17 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
           };
         } else if (levelSelectionsUpdate) {
           // Direct level selections update (from multi-level hook)
-          console.log('🏪 Store: Taking direct levelSelections path');
-          console.log('🏪 Store: incoming levelSelections:', levelSelectionsUpdate);
-          
           const backwardCompatibility = syncBackwardCompatibility(levelSelectionsUpdate);
-          console.log('🏪 Store: backwardCompatibility:', backwardCompatibility);
           
-          const updatedJournal = {
+          newSelections.journal = {
             ...newSelections.journal,
             ...journalUpdates,
             levelSelections: levelSelectionsUpdate, // ✅ Use the correct variable
             ...backwardCompatibility,
             selectedJournalId,
           };
-          
-          console.log('🏪 Store: final journal state:', updatedJournal);
-          newSelections.journal = updatedJournal;
         } else {
           // Legacy update path
-          console.log('🏪 Store: Taking legacy path');
           newSelections.journal = {
             ...newSelections.journal,
             ...journalUpdates,

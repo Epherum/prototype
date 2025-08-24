@@ -121,6 +121,7 @@ export const JournalSliderController = forwardRef<
           }
           effectiveJournalIds={journalManager.effectiveSelectedJournalIds}
           topLevelId={journalManager.selectedTopLevelId}
+          onNavigateToLevel={(nodeId) => journalManager.handleSelectTopLevelJournal(nodeId)}
         />
       );
     }

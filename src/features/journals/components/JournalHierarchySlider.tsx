@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
 import styles from "./JournalHierarchySlider.module.css";
@@ -84,6 +84,8 @@ interface JournalHierarchySliderProps {
   isLocked?: boolean;
   // New props for multi-level support
   topLevelId: string;
+  // Double-click navigation handler
+  onNavigateToLevel?: (nodeId: string) => void;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
@@ -101,6 +103,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   activeFilters,
   onToggleFilter,
   topLevelId,
+  onNavigateToLevel,
 }) => {
   // Use the new multi-level selection hook
   const {
@@ -120,15 +123,57 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     return map;
   }, [levelsData]);
 
+  // Double-click navigation handling
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingClickRef = useRef<{ levelIndex: number; id: string } | null>(null);
+
+  const handleDoubleClick = useCallback((nodeId: string) => {
+    if (!onNavigateToLevel) return;
+    
+    // Cancel any pending single click
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+      pendingClickRef.current = null;
+    }
+    
+    // Navigate to the double-clicked node as new root
+    onNavigateToLevel(nodeId);
+  }, [onNavigateToLevel]);
+
+  const handleSingleClick = useCallback((levelIndex: number, id: string) => {
+    // Cancel any existing timeout
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+    }
+    
+    // Store pending click
+    pendingClickRef.current = { levelIndex, id };
+    
+    // Set timeout for single click - delay to detect double-click
+    clickTimeoutRef.current = setTimeout(() => {
+      const pending = pendingClickRef.current;
+      if (pending) {
+        handleLevelSelection(pending.levelIndex, pending.id);
+      }
+      clickTimeoutRef.current = null;
+      pendingClickRef.current = null;
+    }, 250); // 250ms delay to detect double-click
+  }, [handleLevelSelection]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Generic level interaction handler that replaces all legacy logic
   const handleLevelInteract = (levelIndex: number, id: string) => {
-    console.log(`🎯 Component handleLevelInteract called: levelIndex=${levelIndex}, id=${id}`);
-    
-    // Use our unified multi-level logic for all levels
-    handleLevelSelection(levelIndex, id);
-    
-    // DON'T call legacy handlers to avoid double execution
-    // The multi-level system handles everything now
+    // Use the delayed single click logic to prevent selection on double-click
+    handleSingleClick(levelIndex, id);
   };
 
   const renderFilterInfo = () => {
@@ -242,12 +287,6 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
 
             {/* --- DYNAMIC MULTI-LEVEL DISPLAY --- */}
             {levelsData.map((levelData, levelIndex) => {
-              console.log(`🎨 Rendering level ${levelIndex}:`, {
-                shouldShowLevel: levelData.shouldShowLevel,
-                nodesCount: levelData.nodes.length,
-                selectedIds: levelData.selectedIds
-              });
-              
               // Always show first level, show subsequent levels if they should be visible
               if (!levelData.shouldShowLevel && levelIndex > 0) return null;
               
@@ -282,10 +321,8 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                             <motion.button
                               key={node.id}
                               variants={itemVariants}
-                              onClick={() => {
-                                console.log(`🖱️ Button clicked: level=${levelIndex}, nodeId=${node.id}, nodeCode=${node.code}`);
-                                handleLevelInteract(levelIndex, node.id);
-                              }}
+                              onClick={() => handleLevelInteract(levelIndex, node.id)}
+                              onDoubleClick={() => handleDoubleClick(node.id)}
                               onContextMenu={(e) => e.preventDefault()}
                               className={`${styles.level2Button} ${
                                 isSelected ? styles.level2ButtonActive : ""
@@ -294,7 +331,10 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                                   ? styles.terminalNode
                                   : ""
                               }`}
-                              style={{ "--item-color": color } as React.CSSProperties}
+                              style={{ 
+                                "--item-color": color,
+                                "--border-color": color || "transparent",
+                              } as React.CSSProperties}
                               title={`${node.code} - ${capitalizeFirstLetter(node.name)}`}
                               disabled={isLocked}
                               whileHover={{
