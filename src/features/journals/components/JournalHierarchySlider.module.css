@@ -195,9 +195,12 @@
   font-weight: 600;
 }
 
-.level2Button.level2ButtonActive:not(.terminalNode),
-.level2Button.colored.level2ButtonActive:not(.terminalNode) {
+.level2Button.level2ButtonActive:not(.terminalNode) {
   border-color: var(--accent-warm);
+  box-shadow: inset 0 0 0 2px var(--bg-card);
+}
+.level2Button.colored.level2ButtonActive:not(.terminalNode) {
+  border-color: var(--item-color);
   box-shadow: inset 0 0 0 2px var(--bg-card);
 }
 .filterInfoRow {
@@ -220,7 +223,7 @@
   box-shadow: inset 0 0 0 2px var(--bg-card);
 }
 .terminalNode.colored.level2ButtonActive {
-  border-color: #333;
+  border-color: var(--item-color);
   box-shadow: inset 0 0 0 2px var(--bg-card);
 }
 .filterInfoNone {

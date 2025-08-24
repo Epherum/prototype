@@ -72,19 +72,19 @@ export default function UserAuthDisplay({
     switch (currentTheme) {
       case 'light-orange':
       case 'dark-orange':
-        return 'hue-rotate(-150deg) saturate(1.2)'; // Shift blue to orange
+        return 'hue-rotate(-170deg) saturate(1.2)'; // Shift blue to orange
       case 'light-blue':
       case 'dark-blue':
         return 'none'; // Keep original blue #2bbde6
       case 'light-pink':
       case 'dark-pink':
-        return 'hue-rotate(60deg) saturate(0.8)'; // Shift blue to teal
+        return 'hue-rotate(130deg) saturate(0.8)'; // Shift blue to teal
       case 'light-green':
       case 'dark-green':
-        return 'hue-rotate(-60deg) saturate(1.1)'; // Shift blue to pink
+        return 'hue-rotate(-100deg) saturate(1.1)'; // Shift blue to pink
       case 'light-purple':
       case 'dark-purple':
-        return 'hue-rotate(120deg) saturate(0.9)'; // Shift blue to green
+        return 'hue-rotate(80deg) saturate(0.9)'; // Shift blue to green
       default:
         return 'none';
     }

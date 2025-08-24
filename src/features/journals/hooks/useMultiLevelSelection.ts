@@ -6,7 +6,7 @@ import { useAppStore } from "@/store/appStore";
 import type { AccountNodeData } from "@/lib/types/ui";
 import { findNodeById, findParentOfNode } from "@/lib/helpers";
 
-const MAX_LEVELS = 6; // Reasonable limit for performance
+const MAX_LEVELS = 100; // Effectively unlimited levels
 
 // Helper function to find full path to root
 const findFullPathToRoot = (nodeId: string, hierarchyData: AccountNodeData[]): string[] => {

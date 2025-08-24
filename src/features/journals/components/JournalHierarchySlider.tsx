@@ -25,16 +25,16 @@ const getOrdinalNumber = (num: number): string => {
 };
 
 const pastelColors = [
-  "#BFFCC6",
-  "#FFFFBA",
-  "#B5EAD7",
-  "#E6E6FA",
-  "#FFB3BA",
-  "#BAE1FF",
-  "#FFDAC1",
-  "#D5AAFF",
-  "#C2F0FC",
-  "#FFD6FC",
+  "#66D466",  // Green
+  "#FFD966",  // Yellow  
+  "#66D4B8",  // Mint/Teal
+  "#FF9966",  // Orange
+  "#FF6B9D",  // Pink/Rose
+  "#6BA3FF",  // Blue
+  "#FFB366",  // Peach
+  "#B366FF",  // Purple
+  "#66D4FF",  // Sky Blue
+  "#FF66CC",  // Magenta
 ];
 
 // ✅ 1. Copy the animation variants from DynamicSlider for consistency
