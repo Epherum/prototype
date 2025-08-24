@@ -8,6 +8,7 @@ import {
   IoTrashOutline,
   IoLinkOutline,
   IoGitNetworkOutline,
+  IoGridOutline,
 } from "react-icons/io5";
 
 interface GoodsOptionsMenuProps {
@@ -24,6 +25,8 @@ interface GoodsOptionsMenuProps {
   onOpenLinkGoodToPartnersModal?: () => void;
   canOpenUnlinkGoodFromPartnersModal?: boolean;
   onOpenUnlinkGoodFromPartnersModal?: () => void;
+  // +++ New Prop for Journal-Partner-Good Link Management +++
+  onManagePartnerLinks?: () => void; // Callback to open the new link management modal
 }
 
 const menuVariants = {
@@ -62,6 +65,7 @@ const GoodsOptionsMenu: React.FC<GoodsOptionsMenuProps> = ({
   onOpenLinkGoodToPartnersModal,
   canOpenUnlinkGoodFromPartnersModal,
   onOpenUnlinkGoodFromPartnersModal,
+  onManagePartnerLinks,
 }) => {
   return (
     <AnimatePresence>
@@ -168,6 +172,24 @@ const GoodsOptionsMenu: React.FC<GoodsOptionsMenuProps> = ({
                 <IoGitNetworkOutline /> Unlink from Partners (3-way)
               </button>
             )}
+
+            {/* +++ New Journal-Partner-Good Link Management Button +++ */}
+            {onManagePartnerLinks && selectedGoodsId && (
+              <>
+                <div className={styles.menuDivider} />
+                <button
+                  onClick={() => {
+                    onManagePartnerLinks();
+                    onClose();
+                  }}
+                  className={styles.optionButton}
+                  title="Manage links between this good and partners in selected journal contexts"
+                >
+                  <IoGridOutline /> Manage Partner Links
+                </button>
+              </>
+            )}
+            {/* +++ End Journal-Partner-Good Link Management Button +++ */}
           </motion.div>
         </>
       )}

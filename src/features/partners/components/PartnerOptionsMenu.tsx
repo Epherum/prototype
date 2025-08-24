@@ -8,6 +8,7 @@ import {
   IoTrashOutline,
   IoLinkOutline,
   IoGitNetworkOutline,
+  IoGridOutline,
 } from "react-icons/io5";
 
 interface PartnerOptionsMenuProps {
@@ -22,6 +23,8 @@ interface PartnerOptionsMenuProps {
   onUnlinkFromJournals: () => void; // +++ NEW PROP
   // +++ New Prop for GPG Link Creation +++
   onCreateGPGLink?: () => void; // Callback to trigger GPG link creation
+  // +++ New Prop for Journal-Partner-Good Link Management +++
+  onManageGoodLinks?: () => void; // Callback to open the new link management modal
 }
 
 const menuVariants = {
@@ -61,6 +64,7 @@ const PartnerOptionsMenu: React.FC<PartnerOptionsMenuProps> = ({
   onLinkToJournals,
   onUnlinkFromJournals, // +++ DESTRUCTURE
   onCreateGPGLink,
+  onManageGoodLinks,
 }) => {
   return (
     <AnimatePresence>
@@ -157,6 +161,21 @@ const PartnerOptionsMenu: React.FC<PartnerOptionsMenuProps> = ({
                 </>
               )}
             {/* +++ End GPG Link Button +++ */}
+
+            {/* +++ New Journal-Partner-Good Link Management Button +++ */}
+            {onManageGoodLinks && selectedPartnerId && (
+              <button
+                onClick={() => {
+                  onManageGoodLinks();
+                  onClose();
+                }}
+                className={styles.optionButton}
+                title="Manage links between this partner and goods in selected journal contexts"
+              >
+                <IoGridOutline /> Manage Good Links
+              </button>
+            )}
+            {/* +++ End Journal-Partner-Good Link Management Button +++ */}
           </motion.div>
         </>
       )}

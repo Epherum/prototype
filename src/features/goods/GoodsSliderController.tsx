@@ -16,6 +16,8 @@ import GoodsOptionsMenu from "./components/GoodsOptionsMenu";
 import AddEditGoodModal from "./components/AddEditGoodModal";
 import LinkGoodToJournalsModal from "@/features/linking/components/LinkGoodToJournalsModal";
 import UnlinkGoodFromJournalsModal from "@/features/linking/components/UnlinkGoodFromJournalsModal";
+import JournalPartnerGoodLinkModal from "@/features/linking/components/JournalPartnerGoodLinkModal";
+import { useJournalPartnerGoodLinkManager } from "@/features/linking/useJournalPartnerGoodLinkManager";
 import { SLIDER_TYPES } from "@/lib/constants";
 import type { AccountNodeData } from "@/lib/types/ui";
 
@@ -78,9 +80,22 @@ export const GoodsSliderController = forwardRef<
     const toggleAccordion = useAppStore((state) => state.toggleAccordion);
     const sliderOrder = useAppStore((state) => state.sliderOrder);
     const visibility = useAppStore((state) => state.visibility);
-    const { journal: journalSelections, gpgContextJournalId } = useAppStore(
+    const { journal: journalSelections, gpgContextJournalId, effectiveJournalIds } = useAppStore(
       (state) => state.selections
     );
+
+    // Get selected good for the new link management modal
+    const selectedGood = useMemo(() => {
+      if (!goodManager.selectedGoodsId) return null;
+      return goodManager.goodsForSlider.find(g => g.id === goodManager.selectedGoodsId) || null;
+    }, [goodManager.selectedGoodsId, goodManager.goodsForSlider]);
+
+    // New Journal-Partner-Good link management
+    const jpgLinkManager = useJournalPartnerGoodLinkManager({
+      selectedJournalIds: effectiveJournalIds,
+      selectedEntity: selectedGood,
+      mode: "good-to-partners",
+    });
 
     // Check if journal slider comes before goods slider for filter color coding
     const shouldShowFilterColors = useMemo(() => {
@@ -225,6 +240,7 @@ export const GoodsSliderController = forwardRef<
                 canOpenUnlinkGoodFromPartnersModal={
                   canUnlinkGoodFromPartnersViaJournal
                 }
+                onManagePartnerLinks={effectiveJournalIds.length > 0 ? jpgLinkManager.openModal : undefined}
               />
             </div>
             <div className={styles.countDisplay}>
@@ -343,6 +359,21 @@ export const GoodsSliderController = forwardRef<
               isUnlinking={goodJournalLinking.isSubmittingUnlink}
             />
           )}
+
+        {/* New Journal-Partner-Good Link Management Modal */}
+        <JournalPartnerGoodLinkModal
+          isOpen={jpgLinkManager.isModalOpen}
+          onClose={jpgLinkManager.closeModal}
+          mode="good-to-partners"
+          selectedJournalIds={effectiveJournalIds}
+          selectedEntity={selectedGood}
+          availableItems={jpgLinkManager.availableItems}
+          existingLinks={jpgLinkManager.existingLinks}
+          onCreateLinks={jpgLinkManager.handleCreateLinks}
+          onDeleteLinks={jpgLinkManager.handleDeleteLinks}
+          isSubmitting={jpgLinkManager.isSubmitting}
+        />
+
         <ConfirmationModal
           isOpen={confirmation.isOpen}
           onClose={hideConfirmation}

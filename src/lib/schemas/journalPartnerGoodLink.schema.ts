@@ -16,6 +16,7 @@ export const getLinksQuerySchema = z.object({
   linkId: z.coerce.bigint().optional(),
   journalPartnerLinkId: z.coerce.bigint().optional(),
   journalId: z.string().optional(),
+  journalIds: z.string().optional().transform(val => val ? val.split(',') : undefined),
   partnerId: z
     .string()
     .transform((val) => parseBigInt(val, "partner ID"))
@@ -24,6 +25,7 @@ export const getLinksQuerySchema = z.object({
     .string()
     .transform((val) => parseBigInt(val, "good ID"))
     .optional(),
+  expandRelations: z.string().optional().transform(val => val === 'true'),
 });
 
 export const deleteLinksQuerySchema = z.object({

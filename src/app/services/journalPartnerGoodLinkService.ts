@@ -30,8 +30,20 @@ export type CreateRawJPGLData = z.infer<typeof CreateRawJPGLSchema>;
 // Update the Zod Schema to remove companyId
 export const OrchestratedCreateJPGLSchema = z.object({
   journalId: z.string().min(1, "Journal ID is required"),
-  partnerId: z.bigint().positive("Partner ID must be a positive number"),
-  goodId: z.bigint().positive("Good ID must be a positive number"),
+  partnerId: z.string().transform((val) => {
+    try {
+      return BigInt(val);
+    } catch {
+      throw new Error(`Invalid partner ID: ${val}`);
+    }
+  }),
+  goodId: z.string().transform((val) => {
+    try {
+      return BigInt(val);
+    } catch {
+      throw new Error(`Invalid good ID: ${val}`);
+    }
+  }),
   partnershipType: z.string().optional().default("STANDARD_TRANSACTION"),
   descriptiveText: z.string().optional().nullable(),
   contextualTaxCodeId: z.number().int().positive().optional().nullable(),
@@ -55,7 +67,7 @@ const jpgLinkService = {
     } = OrchestratedCreateJPGLSchema.parse(data);
 
     serviceLogger.debug(
-      `Chef (JPGLService): Orchestrating 3-way link for J:'${journalId}', P:'${partnerId}', G:'${goodId}', JPL Type:'${partnershipType}'.`
+      `Chef (JPGLService): Orchestrating 3-way link for J:'${journalId}', P:'${partnerId.toString()}', G:'${goodId.toString()}', JPL Type:'${partnershipType}'.`
     );
 
     // Step 1: Find or Create the JournalPartnerLink
@@ -82,7 +94,7 @@ const jpgLinkService = {
           },
         });
         serviceLogger.debug(
-          ` -> Created JournalPartnerLink with ID: ${journalPartnerLink.id}`
+          ` -> Created JournalPartnerLink with ID: ${journalPartnerLink.id.toString()}`
         );
       } catch (error: any) {
         if (error.code === "P2002") {
@@ -112,7 +124,7 @@ const jpgLinkService = {
       }
     } else {
       serviceLogger.debug(
-        ` -> Found existing JournalPartnerLink with ID: ${journalPartnerLink.id}`
+        ` -> Found existing JournalPartnerLink with ID: ${journalPartnerLink.id.toString()}`
       );
     }
 
@@ -152,7 +164,7 @@ const jpgLinkService = {
         contextualTaxCode: true,
       },
     });
-    serviceLogger.debug(` -> JournalPartnerGoodLink created with ID '${newLink.id}'.`);
+    serviceLogger.debug(` -> JournalPartnerGoodLink created with ID '${newLink.id.toString()}'.`);
     return newLink;
   },
 
@@ -195,7 +207,7 @@ const jpgLinkService = {
   // RECIPE 1: Create a new three-way link
   async createLink(data: CreateJPGLData): Promise<JournalPartnerGoodLink> {
     serviceLogger.debug(
-      `Chef (JPGLService): Linking JPL ID '${data.journalPartnerLinkId}' with Good ID '${data.goodId}'.`
+      `Chef (JPGLService): Linking JPL ID '${data.journalPartnerLinkId.toString()}' with Good ID '${data.goodId.toString()}'.`
     );
 
     // Validation: Check if JournalPartnerLink exists
@@ -233,7 +245,7 @@ const jpgLinkService = {
       data: data,
     });
     serviceLogger.debug(
-      `Chef (JPGLService): 3-way link created with ID '${newLink.id}'.`
+      `Chef (JPGLService): 3-way link created with ID '${newLink.id.toString()}'.`
     );
     return newLink;
   },
@@ -252,7 +264,7 @@ const jpgLinkService = {
 
   // RECIPE 3: Delete a 3-way link by its ID
   async deleteLinkById(id: bigint): Promise<JournalPartnerGoodLink | null> {
-    serviceLogger.debug(`Chef (JPGLService): Deleting 3-way link with ID '${id}'.`);
+    serviceLogger.debug(`Chef (JPGLService): Deleting 3-way link with ID '${id.toString()}'.`);
     try {
       return await prisma.journalPartnerGoodLink.delete({
         where: { id },
@@ -523,6 +535,104 @@ const jpgLinkService = {
       ),
     ];
     return journalIds as string[];
+  },
+
+  /**
+   * Fetches all three-way links for a specific partner across multiple journals.
+   * Used by the new link management modal.
+   */
+  async getLinksForPartnerInJournals(
+    partnerId: bigint,
+    journalIds: string[],
+    expandRelations: boolean = false
+  ): Promise<JournalPartnerGoodLink[]> {
+    serviceLogger.debug(
+      `jpgLinkService.getLinksForPartnerInJournals: Input - partnerId: ${partnerId.toString()}, journalIds: ${journalIds.join(',')}, expandRelations: ${expandRelations}`
+    );
+
+    if (!partnerId || !journalIds || journalIds.length === 0) {
+      return [];
+    }
+
+    const includeClause = expandRelations ? {
+      journalPartnerLink: {
+        include: {
+          journal: {
+            select: { id: true, name: true }
+          },
+          partner: {
+            select: { id: true, name: true }
+          }
+        }
+      },
+      good: {
+        select: { id: true, label: true }
+      }
+    } : {};
+
+    const links = await prisma.journalPartnerGoodLink.findMany({
+      where: {
+        journalPartnerLink: {
+          partnerId: partnerId,
+          journalId: { in: journalIds }
+        }
+      },
+      include: includeClause,
+    });
+
+    serviceLogger.debug(
+      `jpgLinkService.getLinksForPartnerInJournals: Output - Found ${links.length} links`
+    );
+    return links;
+  },
+
+  /**
+   * Fetches all three-way links for a specific good across multiple journals.
+   * Used by the new link management modal.
+   */
+  async getLinksForGoodInJournals(
+    goodId: bigint,
+    journalIds: string[],
+    expandRelations: boolean = false
+  ): Promise<JournalPartnerGoodLink[]> {
+    serviceLogger.debug(
+      `jpgLinkService.getLinksForGoodInJournals: Input - goodId: ${goodId.toString()}, journalIds: ${journalIds.join(',')}, expandRelations: ${expandRelations}`
+    );
+
+    if (!goodId || !journalIds || journalIds.length === 0) {
+      return [];
+    }
+
+    const includeClause = expandRelations ? {
+      journalPartnerLink: {
+        include: {
+          journal: {
+            select: { id: true, name: true }
+          },
+          partner: {
+            select: { id: true, name: true }
+          }
+        }
+      },
+      good: {
+        select: { id: true, label: true }
+      }
+    } : {};
+
+    const links = await prisma.journalPartnerGoodLink.findMany({
+      where: {
+        goodId: goodId,
+        journalPartnerLink: {
+          journalId: { in: journalIds }
+        }
+      },
+      include: includeClause,
+    });
+
+    serviceLogger.debug(
+      `jpgLinkService.getLinksForGoodInJournals: Output - Found ${links.length} links`
+    );
+    return links;
   },
 };
 

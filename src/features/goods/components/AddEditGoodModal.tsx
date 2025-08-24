@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { IoClose, IoAdd } from "react-icons/io5";
 
 // ✅ 1. Import new, robust types and schemas
-import { createGoodSchema, CreateGoodPayload } from "@/lib/schemas/good.schema";
+import { createGoodSchema, updateGoodSchema, CreateGoodPayload, UpdateGoodPayload } from "@/lib/schemas/good.schema";
 import { GoodClient } from "@/lib/types/models.client";
 import { AccountNodeData } from "@/lib/types/ui";
 
@@ -50,7 +50,7 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
   // ✨ NEW: Hook to fetch statuses
   const { statuses, isLoading: statusesLoading } = useStatuses();
 
-  // ✅ 4. Setup react-hook-form with Zod resolver
+  // ✅ 4. Setup react-hook-form with Zod resolver - use correct schema based on mode
   const {
     register,
     handleSubmit,
@@ -58,7 +58,7 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
     setValue,
     formState: { errors },
   } = useForm<CreateGoodPayload>({
-    resolver: zodResolver(createGoodSchema),
+    resolver: zodResolver(isEditing ? updateGoodSchema : createGoodSchema),
     defaultValues: {
       label: "",
       referenceCode: "",
@@ -132,6 +132,8 @@ const AddEditGoodModal: React.FC<AddEditGoodModalProps> = ({
   // This function only runs if validation succeeds.
   // The 'data' is guaranteed to be `CreateGoodPayload`.
   const handleFormSubmit = (data: CreateGoodPayload) => {
+    console.log('Form submitted with data:', data);
+    console.log('Is editing:', isEditing);
     onSubmit(data);
   };
 

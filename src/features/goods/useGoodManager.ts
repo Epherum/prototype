@@ -72,9 +72,8 @@ export const useGoodManager = () => {
   });
 
   const updateGoodMutation = useMutation({
-    // ✅ CHANGED: The mutation now accepts the full GoodClient object,
-    // but the service function receives the id and the UpdateGoodPayload.
-    mutationFn: (data: GoodClient) => updateGood(data.id, data),
+    // ✅ FIXED: The mutation now correctly accepts an object with id and UpdateGoodPayload data
+    mutationFn: ({ id, data }: { id: string; data: UpdateGoodPayload }) => updateGood(id, data),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: goodKeys.lists() });
       queryClient.invalidateQueries({
@@ -177,16 +176,33 @@ export const useGoodManager = () => {
 
   const handleCloseAddEditGoodModal = () => setAddEditGoodModalOpen(false);
 
-  // ✅ CHANGED: The submit handler now receives a Zod-validated payload.
+  // ✅ FIXED: The submit handler now properly handles update vs create
   const handleAddOrUpdateGoodSubmit = (data: CreateGoodPayload) => {
+    console.log('handleAddOrUpdateGoodSubmit called with data:', data);
+    console.log('editingGoodData:', editingGoodData);
+    
     if (editingGoodData) {
-      // For updates, we merge the existing data with the form data to create the full GoodClient object.
-      // The updateGood service function will correctly pick the fields it needs from the payload.
+      // For updates, extract only the fields that are allowed to be updated
+      const updateData: UpdateGoodPayload = {
+        label: data.label,
+        taxCodeId: data.taxCodeId,
+        typeCode: data.typeCode,
+        description: data.description,
+        unitCodeId: data.unitCodeId,
+        stockTrackingMethod: data.stockTrackingMethod,
+        packagingTypeCode: data.packagingTypeCode,
+        photoUrl: data.photoUrl,
+        additionalDetails: data.additionalDetails,
+        statusId: data.statusId,
+      };
+      
+      console.log('Calling updateGoodMutation.mutate with:', { id: editingGoodData.id, data: updateData });
       updateGoodMutation.mutate({
-        ...editingGoodData,
-        ...data,
+        id: editingGoodData.id,
+        data: updateData,
       });
     } else {
+      console.log('Calling createGoodMutation.mutate with:', data);
       createGoodMutation.mutate(data);
     }
   };

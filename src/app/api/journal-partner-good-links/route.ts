@@ -101,7 +101,7 @@ export const GET = withAuthorization(
         );
       }
 
-      const { linkId, journalPartnerLinkId, goodId, journalId } =
+      const { linkId, journalPartnerLinkId, goodId, journalId, journalIds, partnerId, expandRelations } =
         validation.data;
       let result;
 
@@ -111,6 +111,12 @@ export const GET = withAuthorization(
         result = result ? [result] : []; // Standardize to array
       } else if (journalPartnerLinkId) {
         result = await jpgLinkService.getFullLinksForJPL(journalPartnerLinkId);
+      } else if (partnerId && journalIds) {
+        // New: Fetch links for a partner across multiple journals
+        result = await jpgLinkService.getLinksForPartnerInJournals(partnerId, journalIds, expandRelations);
+      } else if (goodId && journalIds) {
+        // New: Fetch links for a good across multiple journals
+        result = await jpgLinkService.getLinksForGoodInJournals(goodId, journalIds, expandRelations);
       } else if (goodId && journalId) {
         result = await jpgLinkService.getJpglsForGoodAndJournalContext(
           goodId,
@@ -118,7 +124,7 @@ export const GET = withAuthorization(
         );
       } else {
         return NextResponse.json(
-          { message: "Insufficient query parameters provided." },
+          { message: "Insufficient query parameters provided. Require either: linkId, journalPartnerLinkId, (partnerId + journalIds), (goodId + journalIds), or (goodId + journalId)." },
           { status: 400 }
         );
       }
