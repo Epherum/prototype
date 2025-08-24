@@ -3,6 +3,7 @@ import { motion, AnimatePresence, Variants } from "framer-motion";
 
 import styles from "./JournalHierarchySlider.module.css";
 import { findParentOfNode } from "@/lib/helpers";
+import { useMultiLevelSelection } from "../hooks/useMultiLevelSelection";
 import type {
   AccountNodeData,
   ActivePartnerFilters,
@@ -13,6 +14,14 @@ import type {
 const capitalizeFirstLetter = (text: string): string => {
   if (!text) return text;
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+};
+
+// Helper function to get ordinal numbers (1st, 2nd, 3rd, etc.)
+const getOrdinalNumber = (num: number): string => {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const value = num % 100;
+  const suffix = suffixes[(value - 20) % 10] || suffixes[value] || suffixes[0];
+  return num + suffix;
 };
 
 const pastelColors = [
@@ -61,59 +70,66 @@ interface JournalHierarchySliderProps {
   sliderId: string;
   hierarchyData: AccountNodeData[];
   fullHierarchyData: AccountNodeData[];
-  selectedLevel2Ids: string[];
-  selectedLevel3Ids: string[];
-  visibleChildrenMap: Record<string, boolean>;
+  selectedLevel2Ids: string[]; // Legacy prop - will be derived from multi-level selection
+  selectedLevel3Ids: string[]; // Legacy prop - will be derived from multi-level selection
+  visibleChildrenMap: Record<string, boolean>; // Legacy prop - will be managed internally
   effectiveJournalIds: string[];
-  onL1ItemInteract: (id: string) => void;
-  onL2ItemInteract: (id: string) => void;
+  onL1ItemInteract: (id: string) => void; // Legacy - will be replaced with level-agnostic handler
+  onL2ItemInteract: (id: string) => void; // Legacy - will be replaced with level-agnostic handler
   isLoading?: boolean;
-  isError?: boolean; // ✅ 2. Add isError and error props
+  isError?: boolean;
   error?: Error | null;
   activeFilters: ActivePartnerFilters;
   onToggleFilter: (status: PartnerGoodFilterStatus) => void;
   isLocked?: boolean;
+  // New props for multi-level support
+  topLevelId: string;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   hierarchyData,
   fullHierarchyData,
-  selectedLevel2Ids,
-  selectedLevel3Ids,
-  visibleChildrenMap,
+  selectedLevel2Ids, // Legacy - used for backward compatibility
+  selectedLevel3Ids, // Legacy - used for backward compatibility
+  visibleChildrenMap, // Legacy - ignored in favor of multi-level logic
   effectiveJournalIds,
-  onL1ItemInteract,
-  onL2ItemInteract,
+  onL1ItemInteract, // Legacy - will map to handleLevelSelection(0, id)
+  onL2ItemInteract, // Legacy - will map to handleLevelSelection(1, id)
   isLoading,
-  isError, // ✅ 3. Destructure new props
+  isError,
   isLocked,
   activeFilters,
   onToggleFilter,
+  topLevelId,
 }) => {
+  // Use the new multi-level selection hook
+  const {
+    levelsData,
+    combinedVisibilityMap,
+    handleLevelSelection,
+    hasChildrenAtLevel,
+    getNodeColor,
+  } = useMultiLevelSelection(hierarchyData, topLevelId);
 
-  const level2NodesForScroller = useMemo(
-    () => hierarchyData.filter((node): node is AccountNodeData => !!node?.id),
-    [hierarchyData]
-  );
-
+  // Create color map for top-level nodes (Level 0)
   const colorMap = useMemo(() => {
     const map = new Map<string, string>();
-    level2NodesForScroller.forEach((node, index) => {
+    levelsData[0]?.nodes.forEach((node, index) => {
       map.set(node.id, pastelColors[index % pastelColors.length]);
     });
     return map;
-  }, [level2NodesForScroller]);
+  }, [levelsData]);
 
-  const level3Nodes = useMemo(() => {
-    return level2NodesForScroller.flatMap(
-      (l1Node) =>
-        (visibleChildrenMap[l1Node.id] &&
-          l1Node.children?.filter(
-            (child): child is AccountNodeData => !!child?.id
-          )) ||
-        []
-    );
-  }, [level2NodesForScroller, visibleChildrenMap]);
+  // Generic level interaction handler that replaces all legacy logic
+  const handleLevelInteract = (levelIndex: number, id: string) => {
+    console.log(`🎯 Component handleLevelInteract called: levelIndex=${levelIndex}, id=${id}`);
+    
+    // Use our unified multi-level logic for all levels
+    handleLevelSelection(levelIndex, id);
+    
+    // DON'T call legacy handlers to avoid double execution
+    // The multi-level system handles everything now
+  };
 
   const renderFilterInfo = () => {
     const text =
@@ -224,121 +240,93 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               
             </div>
 
-            {/* --- L1 / Row 1 --- */}
-            <h3 className={styles.level2ScrollerTitle}>1st Row</h3>
-            <motion.div
-              className={styles.level2ScrollerContainer}
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              <div className={`${styles.wrappingItemContainer} ${styles.level2WrappingContainer}`}>
-                {level2NodesForScroller.map((l1Node) => (
-                  <motion.button
-                    key={l1Node.id}
-                    variants={itemVariants}
-                    onClick={() => onL1ItemInteract(l1Node.id)}
-                    onContextMenu={(e) => e.preventDefault()}
-                    className={`${styles.level2Button} ${
-                      selectedLevel2Ids.includes(l1Node.id)
-                        ? styles.level2ButtonActive
-                        : ""
-                    } ${
-                      selectedLevel2Ids.includes(l1Node.id) &&
-                      colorMap.get(l1Node.id)
-                        ? styles.colored
-                        : ""
-                    } ${
-                      !l1Node.children || l1Node.children.length === 0
-                        ? styles.terminalNode
-                        : ""
-                    }`}
-                    style={
-                      {
-                        "--item-color": colorMap.get(l1Node.id),
-                      } as React.CSSProperties
-                    }
-                    title={`${l1Node.code} - ${capitalizeFirstLetter(l1Node.name)}`}
-                    disabled={isLocked}
-                    whileHover={{
-                      scale: 1.08,
-                      zIndex: 1,
-                      transition: { duration: 0.2, ease: "easeOut" },
-                    }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    {l1Node.code || "N/A"}
-                  </motion.button>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* --- L2 / Row 2 --- */}
-            <h3 className={styles.level2ScrollerTitle}>2nd Row</h3>
-
-            {/* --- THE REFACTORED L2 / ROW 2 DISPLAY --- */}
-            <AnimatePresence mode="popLayout">
-              {level3Nodes.length > 0 ? (
-                <motion.div
-                  key="l3-grid-present"
-                  className={`${styles.wrappingItemContainer} ${styles.level3WrappingContainer}`}
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="hidden"
-                >
-                  {/* The change is in this map function */}
-                  {level3Nodes.map((l2Node) => {
-                    const parent = findParentOfNode(
-                      l2Node.id,
-                      fullHierarchyData
-                    );
-                    const color = parent ? colorMap.get(parent.id) : undefined;
-                    return (
-                      // ✅ FIX: The key and variants are moved directly to the button.
-                      // The redundant <motion.div> wrapper is REMOVED.
-                      <motion.button
-                        key={l2Node.id}
-                        variants={itemVariants}
-                        onClick={() => onL2ItemInteract(l2Node.id)}
-                        onContextMenu={(e) => e.preventDefault()}
-                        className={`${styles.level2Button} ${
-                          selectedLevel3Ids.includes(l2Node.id)
-                            ? styles.level2ButtonActive
-                            : ""
-                        } ${color ? styles.colored : ""} ${
-                          !l2Node.children || l2Node.children.length === 0
-                            ? styles.terminalNode
-                            : ""
+            {/* --- DYNAMIC MULTI-LEVEL DISPLAY --- */}
+            {levelsData.map((levelData, levelIndex) => {
+              console.log(`🎨 Rendering level ${levelIndex}:`, {
+                shouldShowLevel: levelData.shouldShowLevel,
+                nodesCount: levelData.nodes.length,
+                selectedIds: levelData.selectedIds
+              });
+              
+              // Always show first level, show subsequent levels if they should be visible
+              if (!levelData.shouldShowLevel && levelIndex > 0) return null;
+              
+              const levelTitle = `${getOrdinalNumber(levelIndex + 1)} Row`;
+              const isFirstLevel = levelIndex === 0;
+              
+              return (
+                <div key={`level-${levelIndex}`}>
+                  <h3 className={styles.level2ScrollerTitle}>{levelTitle}</h3>
+                  
+                  <AnimatePresence mode="popLayout">
+                    {levelData.nodes.length > 0 ? (
+                      <motion.div
+                        key={`level-${levelIndex}-present`}
+                        className={`${styles.wrappingItemContainer} ${
+                          isFirstLevel ? styles.level2WrappingContainer : styles.level3WrappingContainer
                         }`}
-                        style={{ "--item-color": color } as React.CSSProperties}
-                        title={`${l2Node.code} - ${capitalizeFirstLetter(l2Node.name)}`}
-                        disabled={isLocked}
-                        whileHover={{
-                          scale: 1.08,
-                          zIndex: 1,
-                          transition: { duration: 0.2, ease: "easeOut" },
-                        }}
-                        whileTap={{ scale: 0.95 }}
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                        exit="hidden"
                       >
-                        {l2Node.code || "N/A"}
-                      </motion.button>
-                    );
-                  })}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="l3-placeholder"
-                  className={styles.noDataSmall}
-                  initial={{ opacity: 0 }}
-                  animate={{
-                    opacity: 1,
-                    transition: { delay: 0.2, duration: 0.3 },
-                  }}
-                  exit={{ opacity: 0, transition: { duration: 0.2 } }}
-                />
-              )}
-            </AnimatePresence>
+                        {levelData.nodes.map((node) => {
+                          const isSelected = levelData.selectedIds.includes(node.id);
+                          const colorIndex = isFirstLevel ? 
+                            levelsData[0].nodes.findIndex(n => n.id === node.id) :
+                            getNodeColor(node.id, levelIndex);
+                          const color = colorIndex !== null && colorIndex >= 0 ? 
+                            pastelColors[colorIndex % pastelColors.length] : undefined;
+                          
+                          return (
+                            <motion.button
+                              key={node.id}
+                              variants={itemVariants}
+                              onClick={() => {
+                                console.log(`🖱️ Button clicked: level=${levelIndex}, nodeId=${node.id}, nodeCode=${node.code}`);
+                                handleLevelInteract(levelIndex, node.id);
+                              }}
+                              onContextMenu={(e) => e.preventDefault()}
+                              className={`${styles.level2Button} ${
+                                isSelected ? styles.level2ButtonActive : ""
+                              } ${color && isSelected ? styles.colored : ""} ${
+                                !node.children || node.children.length === 0
+                                  ? styles.terminalNode
+                                  : ""
+                              }`}
+                              style={{ "--item-color": color } as React.CSSProperties}
+                              title={`${node.code} - ${capitalizeFirstLetter(node.name)}`}
+                              disabled={isLocked}
+                              whileHover={{
+                                scale: 1.08,
+                                zIndex: 1,
+                                transition: { duration: 0.2, ease: "easeOut" },
+                              }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              {node.code || "N/A"}
+                            </motion.button>
+                          );
+                        })}
+                      </motion.div>
+                    ) : levelData.shouldShowLevel && levelIndex > 0 ? (
+                      <motion.div
+                        key={`level-${levelIndex}-empty`}
+                        className={styles.noDataSmall}
+                        initial={{ opacity: 0 }}
+                        animate={{
+                          opacity: 1,
+                          transition: { delay: 0.2, duration: 0.3 },
+                        }}
+                        exit={{ opacity: 0, transition: { duration: 0.2 } }}
+                      >
+                        No child journals available
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>

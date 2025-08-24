@@ -290,13 +290,15 @@ export const useJournalInteraction = ({
       const hasSavedSelection = !!savedSelectionsRef.current[l1ItemId];
 
       // Define the complete, ordered cycle.
+      // UPDATED: Reversed order - first click shows children but selects nothing, 
+      // second click selects all children
       const potentialCycle: JournalItemCycleState[] = [];
       if (hasSavedSelection) {
         potentialCycle.push(CYCLE_STATES.RESTORE_SAVED);
       }
       potentialCycle.push(
-        CYCLE_STATES.CHILDREN_VISIBLE_ALL_SELECTED,
-        CYCLE_STATES.CHILDREN_VISIBLE_PARENT_ONLY,
+        CYCLE_STATES.CHILDREN_VISIBLE_PARENT_ONLY,    // First: show children, select nothing
+        CYCLE_STATES.CHILDREN_VISIBLE_ALL_SELECTED,  // Second: show children, select all
         CYCLE_STATES.CHILDREN_HIDDEN_PARENT_SELECTED,
         CYCLE_STATES.UNSELECTED
       );

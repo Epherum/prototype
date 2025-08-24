@@ -86,8 +86,66 @@ const findTerminalIdFromEffectiveIds = (
 };
 
 /**
+ * Calculates the "effective" journal IDs from multi-level selections.
+ * Updated to support dynamic levels beyond just level2Ids and level3Ids.
+ * This function implements the business requirement to use the deepest selected level
+ * for filtering purposes.
+ */
+const calculateEffectiveIdsFromLevels = (
+  levelSelections: string[][],
+  hierarchyData: AccountNodeData[],
+  visibleChildrenMap: Record<string, boolean>
+): string[] => {
+  if (!hierarchyData || hierarchyData.length === 0 || !levelSelections.length) return [];
+
+  const finalPathIds = new Set<string>();
+  
+  // Find the deepest level with selections - this is the key requirement
+  let deepestLevelWithSelections = -1;
+  for (let i = levelSelections.length - 1; i >= 0; i--) {
+    if (levelSelections[i] && levelSelections[i].length > 0) {
+      deepestLevelWithSelections = i;
+      break;
+    }
+  }
+  
+  if (deepestLevelWithSelections === -1) return [];
+  
+  // Process each selection at the deepest level
+  levelSelections[deepestLevelWithSelections].forEach((nodeId) => {
+    const node = findNodeById(hierarchyData, nodeId);
+    if (!node) return;
+    
+    // Check if this is a terminal node (no children)
+    const hasChildren = node.children && node.children.length > 0;
+    
+    if (!hasChildren) {
+      // Terminal node - add full path to root
+      const path = findFullPathToRootInternal(nodeId, hierarchyData);
+      path.forEach((id) => finalPathIds.add(id));
+    } else {
+      // Non-terminal node - check visibility and child selections
+      const childrenVisible = visibleChildrenMap[nodeId] === true;
+      const hasSelectedChildren = levelSelections[deepestLevelWithSelections + 1]?.some(childId => {
+        const childNode = findNodeById(hierarchyData, childId);
+        return childNode && findParentOfNode(childNode.id, hierarchyData)?.id === nodeId;
+      }) || false;
+      
+      // If children are not visible or no children selected, treat as terminal
+      if (!childrenVisible || !hasSelectedChildren) {
+        const path = findFullPathToRootInternal(nodeId, hierarchyData);
+        path.forEach((id) => finalPathIds.add(id));
+      }
+      // If children are visible and selected, they will be processed instead
+    }
+  });
+  
+  return Array.from(finalPathIds);
+};
+
+/**
+ * Legacy function for backward compatibility
  * Calculates the "effective" journal IDs, with visibility context.
- * This function remains unchanged as its path-based output is correct for filtering.
  */
 const calculateEffectiveIds = (
   level2Ids: string[],
@@ -151,6 +209,7 @@ export const useJournalSelection = (
     topLevelId,
     level2Ids,
     level3Ids,
+    levelSelections = [[], []], // Default to 2 levels for backward compatibility
     flatId,
     rootFilter,
     selectedJournalId: selectedHierarchyId,
@@ -162,32 +221,56 @@ export const useJournalSelection = (
         topLevelId?: string;
         level2Ids?: string[];
         level3Ids?: string[];
+        levelSelections?: string[][];
       },
-      visibleChildrenMap: Record<string, boolean>
+      visibleChildrenMap: Record<string, boolean> = {}
     ) => {
-      const finalL2Ids = newRawSelections.level2Ids ?? level2Ids;
-      const finalL3Ids = newRawSelections.level3Ids ?? level3Ids;
+      let effectiveIds: string[];
+      let finalLevelSelections: string[][];
+      
+      // Use new multi-level system if provided, otherwise fall back to legacy
+      if (newRawSelections.levelSelections) {
+        finalLevelSelections = newRawSelections.levelSelections;
+        
+        effectiveIds = calculateEffectiveIdsFromLevels(
+          finalLevelSelections,
+          hierarchyData,
+          visibleChildrenMap
+        );
+      } else {
+        // Convert legacy format to new format
+        const finalL2Ids = newRawSelections.level2Ids ?? level2Ids;
+        const finalL3Ids = newRawSelections.level3Ids ?? level3Ids;
+        
+        finalLevelSelections = [finalL2Ids, finalL3Ids];
+        
+        effectiveIds = calculateEffectiveIds(
+          finalL2Ids,
+          finalL3Ids,
+          hierarchyData,
+          visibleChildrenMap
+        );
+      }
 
-      const effectiveIds = calculateEffectiveIds(
-        finalL2Ids,
-        finalL3Ids,
-        hierarchyData,
-        visibleChildrenMap
-      );
-
-      // ✅ FIX: Calculate the single terminal ID and pass it to the store.
+      // Calculate the single terminal ID for the deepest selections
       const terminalId = findTerminalIdFromEffectiveIds(
         effectiveIds,
         hierarchyData
       );
 
-      setSelection("journal", {
+      // Always update both new and legacy format
+      const updateData = {
         ...newRawSelections,
+        levelSelections: finalLevelSelections,
+        level2Ids: finalLevelSelections[0] || [],
+        level3Ids: finalLevelSelections[1] || [],
         effectiveJournalIds: effectiveIds,
-        selectedJournalId: terminalId, // Pass the new, correctly derived ID
-      });
+        selectedJournalId: terminalId,
+      };
+
+      setSelection("journal", updateData);
     },
-    [hierarchyData, setSelection, level2Ids, level3Ids]
+    [hierarchyData, setSelection, level2Ids, level3Ids, levelSelections]
   );
 
   const resetJournalSelections = useCallback(() => {
@@ -220,6 +303,7 @@ export const useJournalSelection = (
     topLevelId,
     level2Ids,
     level3Ids,
+    levelSelections,
     flatId,
     rootFilter,
     effectiveJournalIds,

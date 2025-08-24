@@ -37,6 +37,7 @@ export const useJournalManager = () => {
     topLevelId,
     level2Ids,
     level3Ids,
+    levelSelections,
     flatId,
     rootFilter,
     effectiveJournalIds,
@@ -58,6 +59,7 @@ export const useJournalManager = () => {
     return topNode?.children || [];
   }, [isHierarchyMode, hierarchyData, topLevelId]);
 
+  // Legacy interaction handlers - will be phased out in favor of multi-level system
   const {
     visibleChildrenMap,
     handleSelectTopLevelJournal,
@@ -107,6 +109,7 @@ export const useJournalManager = () => {
     selectedTopLevelId: topLevelId,
     selectedLevel2Ids: level2Ids,
     selectedLevel3Ids: level3Ids,
+    levelSelections, // New multi-level selections
     selectedFlatJournalId: flatId,
     activeJournalRootFilters: rootFilter,
     isJournalSliderPrimary,

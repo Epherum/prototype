@@ -3,12 +3,45 @@
 import { SLIDER_TYPES, ROOT_JOURNAL_ID } from "@/lib/constants";
 import type { SelectionsSlice, SelectionsActions, SliderType } from "../types";
 
+// Helper functions for dynamic level management
+export const ensureLevelExists = (levelSelections: string[][], levelIndex: number): string[][] => {
+  const newLevelSelections = [...levelSelections];
+  while (newLevelSelections.length <= levelIndex) {
+    newLevelSelections.push([]);
+  }
+  return newLevelSelections;
+};
+
+export const updateLevelSelection = (
+  levelSelections: string[][],
+  levelIndex: number,
+  selectedIds: string[]
+): string[][] => {
+  const newLevelSelections = ensureLevelExists(levelSelections, levelIndex);
+  newLevelSelections[levelIndex] = [...selectedIds];
+  
+  // Clear all levels below this one when making a selection
+  for (let i = levelIndex + 1; i < newLevelSelections.length; i++) {
+    newLevelSelections[i] = [];
+  }
+  
+  return newLevelSelections;
+};
+
+export const syncBackwardCompatibility = (levelSelections: string[][]) => {
+  return {
+    level2Ids: levelSelections[0] || [],
+    level3Ids: levelSelections[1] || [],
+  };
+};
+
 // Get default selections without localStorage (for resets)
 export const getDefaultSelections = (
   restrictedJournalId = ROOT_JOURNAL_ID
 ): SelectionsSlice => ({
   journal: {
     topLevelId: restrictedJournalId,
+    levelSelections: [[], []], // Start with 2 levels for backward compatibility
     level2Ids: [],
     level3Ids: [],
     flatId: null,
@@ -30,6 +63,7 @@ export const getInitialSelections = (
   return {
     journal: {
       topLevelId: restrictedJournalId,
+      levelSelections: [[], []], // Start with 2 levels for backward compatibility
       level2Ids: [],
       level3Ids: [],
       flatId: null,
@@ -63,13 +97,69 @@ export const createSelectionsActions = (set: any, get: any): SelectionsActions =
         newSelections.journal.rootFilter = Array.from(currentFilters);
         clearSubsequent = false;
       } else if (sliderType === "journal") {
-        const { effectiveJournalIds, selectedJournalId, ...journalUpdates } =
+        console.log('🏪 Store: Processing journal update, value:', value);
+        
+        const { effectiveJournalIds, selectedJournalId, levelIndex, levelSelections: levelSelectionsUpdate, ...journalUpdates } =
           value;
-        newSelections.journal = {
-          ...newSelections.journal,
-          ...journalUpdates,
-          selectedJournalId,
-        };
+        
+        console.log('🏪 Store: Parsed values:', {
+          hasLevelIndex: levelIndex !== undefined,
+          hasLevelSelectionsUpdate: levelSelectionsUpdate !== undefined,
+          hasJournalUpdatesLevelSelections: !!journalUpdates.levelSelections
+        });
+        
+        // Handle dynamic level selections (new multi-level system)
+        if (levelIndex !== undefined && levelSelectionsUpdate !== undefined) {
+          console.log('🏪 Store: Taking levelIndex path');
+          const updatedLevelSelections = updateLevelSelection(
+            newSelections.journal.levelSelections,
+            levelIndex,
+            levelSelectionsUpdate
+          );
+          
+          const backwardCompatibility = syncBackwardCompatibility(updatedLevelSelections);
+          
+          newSelections.journal = {
+            ...newSelections.journal,
+            levelSelections: updatedLevelSelections,
+            ...backwardCompatibility,
+            selectedJournalId,
+          };
+        } else if (levelSelectionsUpdate) {
+          // Direct level selections update (from multi-level hook)
+          console.log('🏪 Store: Taking direct levelSelections path');
+          console.log('🏪 Store: incoming levelSelections:', levelSelectionsUpdate);
+          
+          const backwardCompatibility = syncBackwardCompatibility(levelSelectionsUpdate);
+          console.log('🏪 Store: backwardCompatibility:', backwardCompatibility);
+          
+          const updatedJournal = {
+            ...newSelections.journal,
+            ...journalUpdates,
+            levelSelections: levelSelectionsUpdate, // ✅ Use the correct variable
+            ...backwardCompatibility,
+            selectedJournalId,
+          };
+          
+          console.log('🏪 Store: final journal state:', updatedJournal);
+          newSelections.journal = updatedJournal;
+        } else {
+          // Legacy update path
+          console.log('🏪 Store: Taking legacy path');
+          newSelections.journal = {
+            ...newSelections.journal,
+            ...journalUpdates,
+            selectedJournalId,
+          };
+          
+          // Sync legacy changes to new format
+          if (journalUpdates.level2Ids || journalUpdates.level3Ids) {
+            const updatedLevelSelections = [...newSelections.journal.levelSelections];
+            if (journalUpdates.level2Ids) updatedLevelSelections[0] = journalUpdates.level2Ids;
+            if (journalUpdates.level3Ids) updatedLevelSelections[1] = journalUpdates.level3Ids;
+            newSelections.journal.levelSelections = updatedLevelSelections;
+          }
+        }
 
         if (effectiveJournalIds !== undefined) {
           newSelections.effectiveJournalIds = effectiveJournalIds;

@@ -107,7 +107,7 @@ export const JournalSliderController = forwardRef<
         <JournalHierarchySlider
           isLocked={isCreating}
           sliderId={SLIDER_TYPES.JOURNAL}
-          hierarchyData={journalManager.currentHierarchy}
+          hierarchyData={journalManager.hierarchyData} // ✅ Pass full hierarchy for multi-level navigation
           fullHierarchyData={journalManager.hierarchyData}
           selectedLevel2Ids={journalManager.selectedLevel2Ids}
           selectedLevel3Ids={journalManager.selectedLevel3Ids}
@@ -120,6 +120,7 @@ export const JournalSliderController = forwardRef<
             journalManager.activeJournalRootFilters as PartnerGoodFilterStatus[]
           }
           effectiveJournalIds={journalManager.effectiveSelectedJournalIds}
+          topLevelId={journalManager.selectedTopLevelId}
         />
       );
     }

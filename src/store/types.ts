@@ -38,6 +38,9 @@ export interface AuthActions {
 export interface SelectionsSlice {
   journal: {
     topLevelId: string;
+    // Dynamic multi-level selections: levelSelections[0] = 1st Row, levelSelections[1] = 2nd Row, etc.
+    levelSelections: string[][];
+    // Backward compatibility - these map to levelSelections[0] and levelSelections[1]
     level2Ids: string[];
     level3Ids: string[];
     flatId: string | null;
