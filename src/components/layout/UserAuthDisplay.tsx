@@ -72,19 +72,19 @@ export default function UserAuthDisplay({
     switch (currentTheme) {
       case 'light-orange':
       case 'dark-orange':
-        return 'hue-rotate(-60deg) saturate(1.2)'; // Shift green more toward orange
+        return 'hue-rotate(-150deg) saturate(1.2)'; // Shift blue to orange
       case 'light-blue':
       case 'dark-blue':
-        return 'hue-rotate(180deg) saturate(1.1)'; // Shift green toward blue spectrum
+        return 'none'; // Keep original blue #2bbde6
       case 'light-pink':
       case 'dark-pink':
-        return 'hue-rotate(-80deg) saturate(0.8)'; // Adjust towards pink from green base
+        return 'hue-rotate(60deg) saturate(0.8)'; // Shift blue to teal
       case 'light-green':
       case 'dark-green':
-        return 'none'; // Keep the original green
+        return 'hue-rotate(-60deg) saturate(1.1)'; // Shift blue to pink
       case 'light-purple':
       case 'dark-purple':
-        return 'hue-rotate(-120deg) saturate(0.9)'; // Adjust towards purple from green base
+        return 'hue-rotate(120deg) saturate(0.9)'; // Shift blue to green
       default:
         return 'none';
     }
@@ -168,8 +168,8 @@ export default function UserAuthDisplay({
                       <Image
                         src={getLogoSource()}
                         alt="Insen Logo"
-                        width={32}
-                        height={32}
+                        width={36}
+                        height={36}
                         className={styles.logo}
                         style={{
                           filter: getLogoFilter()
@@ -318,8 +318,8 @@ export default function UserAuthDisplay({
                     <Image
                       src={getLogoSource()}
                       alt="Insen Logo"
-                      width={32}
-                      height={32}
+                      width={36}
+                      height={36}
                       className={styles.logo}
                       style={{
                         filter: getLogoFilter()
