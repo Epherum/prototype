@@ -26,6 +26,20 @@
   font-weight: 600;
 }
 
+.compatibilityWarning {
+  background: var(--warning-alpha-10);
+  border: 1px solid var(--warning-alpha-30);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.compatibilityWarning strong {
+  color: var(--warning-dark);
+}
+
 .journalContexts {
   display: flex;
   gap: 1rem;
@@ -157,6 +171,97 @@
 .item input[type="checkbox"] {
   margin: 0;
   pointer-events: none;
+}
+
+/* Color coding for shared journals */
+.item.fullMatch {
+  background: var(--success-alpha-10);
+  border: 1px solid var(--success-alpha-30);
+}
+
+.item.fullMatch:hover {
+  background: var(--success-alpha-15);
+}
+
+.item.partialMatch {
+  background: var(--warning-alpha-10);
+  border: 1px solid var(--warning-alpha-30);
+}
+
+.item.partialMatch:hover {
+  background: var(--warning-alpha-15);
+}
+
+.item.fullMatch.itemSelected {
+  background: var(--success-alpha-20);
+  border: 1px solid var(--success);
+}
+
+.item.partialMatch.itemSelected {
+  background: var(--warning-alpha-20);
+  border: 1px solid var(--warning);
+}
+
+.sharedJournalInfo {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+  font-style: italic;
+}
+
+.itemContainer {
+  border-radius: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.detailsButton {
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  margin-left: 0.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+}
+
+.detailsButton:hover {
+  background: var(--surface-tertiary);
+  color: var(--primary);
+}
+
+.itemDetails {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.detailRow {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.detailRow:last-child {
+  margin-bottom: 0;
+}
+
+.detailRow strong {
+  color: var(--text-primary);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.detailRow span {
+  color: var(--text-secondary);
 }
 
 .linkPreview {

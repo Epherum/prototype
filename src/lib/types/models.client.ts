@@ -47,6 +47,7 @@ export type GoodClient = WithStringId<GoodPrisma> & {
   jpqLinkId?: string;
   // Filter metadata for color coding
   matchedFilters?: string[];
+  journalGoodLinks?: JournalGoodLinkWithDetailsClient[];
 };
 export type JournalClient = JournalPrisma;
 
@@ -99,6 +100,11 @@ export type JournalPartnerGoodLinkClient = WithStringKeys<
 export type JournalPartnerLinkWithDetailsClient = JournalPartnerLinkClient & {
   journal?: JournalClient & { parentId?: string | null };
   partner?: PartnerClient;
+};
+
+export type JournalGoodLinkWithDetailsClient = JournalGoodLinkClient & {
+  journal?: JournalClient & { parentId?: string | null };
+  good?: GoodClient;
 };
 
 // ✨ NEWLY ADDED for Auth/Authz ✨

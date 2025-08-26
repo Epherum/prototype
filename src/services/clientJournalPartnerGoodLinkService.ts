@@ -107,17 +107,28 @@ export async function createBulkJournalPartnerGoodLinks(
     body: JSON.stringify({ links: sanitizedLinks }),
   });
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Unknown error" }));
-    
-    // Better error message with details
-    const errorMessage = error.message || "Failed to create bulk journal-partner-good links";
-    const errorDetails = error.errors ? JSON.stringify(error.errors) : "";
+  const responseData = await response.json();
+  
+  if (!response.ok && response.status !== 207) {
+    // Complete failure (400, 500, etc.)
+    const errorMessage = responseData.message || "Failed to create bulk journal-partner-good links";
+    const errorDetails = responseData.errors ? JSON.stringify(responseData.errors) : "";
     throw new Error(`${errorMessage}${errorDetails ? ` - ${errorDetails}` : ""}`);
   }
-  const newLinks: PrismaJPGL[] = await response.json();
+  
+  if (response.status === 207) {
+    // Partial success - log warnings but return created links
+    console.warn("Partial success creating links:", {
+      created: responseData.links?.length || 0,
+      errors: responseData.errors?.length || 0,
+      message: responseData.message
+    });
+    // Return created links even if some failed
+    return (responseData.links || []).map(mapToJpglClient);
+  }
+  
+  // Complete success (201)
+  const newLinks: PrismaJPGL[] = Array.isArray(responseData) ? responseData : (responseData.links || []);
   return newLinks.map(mapToJpglClient);
 }
 
@@ -134,11 +145,20 @@ export async function deleteBulkJournalPartnerGoodLinks(
     body: JSON.stringify({ linkIds }),
   });
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ message: "Unknown error" }));
-    throw new Error(error.message || "Failed to delete bulk links");
+  const responseData = await response.json();
+  
+  if (!response.ok && response.status !== 207) {
+    // Complete failure (400, 500, etc.)
+    throw new Error(responseData.message || "Failed to delete bulk links");
+  }
+  
+  if (response.status === 207) {
+    // Partial success - log warnings but consider successful
+    console.warn("Partial success deleting links:", {
+      deleted: responseData.deleted?.length || 0,
+      errors: responseData.errors?.length || 0,
+      message: responseData.message
+    });
   }
 }
 

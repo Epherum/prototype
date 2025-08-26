@@ -1,15 +1,16 @@
 // src/app/api/journal-partner-good-links/bulk/route.ts
 
 import { NextRequest, NextResponse } from "next/server";
-import jpgLinkService, { OrchestratedCreateJPGLSchema } from "@/app/services/journalPartnerGoodLinkService";
+import jpgLinkService from "@/app/services/journalPartnerGoodLinkService";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
 import { apiLogger } from "@/lib/logger";
 import { z } from "zod";
+import { createJournalPartnerGoodLinkSchema } from "@/lib/schemas/journalPartnerGoodLink.schema";
 
-// Bulk create schema
+// Bulk create schema - use the client-side schema for validation, not the orchestrated one
 const BulkCreateSchema = z.object({
-  links: z.array(OrchestratedCreateJPGLSchema).min(1, "At least one link is required"),
+  links: z.array(createJournalPartnerGoodLinkSchema).min(1, "At least one link is required"),
 });
 
 // Bulk delete schema
@@ -47,19 +48,46 @@ export const POST = withAuthorization(
 
       const { links } = validation.data;
 
+      // Debug logging to see what data types we're receiving
+      apiLogger.debug("Received links data for bulk creation:", {
+        count: links.length,
+        firstLink: links.length > 0 ? {
+          journalId: `${links[0].journalId} (${typeof links[0].journalId})`,
+          partnerId: `${links[0].partnerId} (${typeof links[0].partnerId})`,
+          goodId: `${links[0].goodId} (${typeof links[0].goodId})`,
+        } : null
+      });
+
       // Create links one by one (could be optimized for better transaction handling)
       const createdLinks = [];
       const errors = [];
 
       for (let i = 0; i < links.length; i++) {
         try {
-          const newLink = await jpgLinkService.createFullJpgLink(links[i]);
+          // Convert string IDs to bigint as expected by the service
+          const linkData = {
+            ...links[i],
+            partnerId: BigInt(links[i].partnerId),
+            goodId: BigInt(links[i].goodId),
+          };
+          const newLink = await jpgLinkService.createFullJpgLink(linkData);
           createdLinks.push(newLink);
         } catch (error) {
           const e = error as Error;
+          const errorMessage = e.message || 'Unknown error occurred';
+          apiLogger.error(`Failed to create link at index ${i}`, {
+            index: i,
+            linkData: {
+              journalId: links[i].journalId,
+              partnerId: links[i].partnerId?.toString(),
+              goodId: links[i].goodId?.toString(),
+            },
+            error: errorMessage,
+            stack: e.stack
+          });
           errors.push({
             index: i,
-            error: e.message
+            error: errorMessage
           });
         }
       }
@@ -68,6 +96,7 @@ export const POST = withAuthorization(
         // All failed
         apiLogger.error("Bulk create journal-partner-good-links - All failed", { 
           errorCount: errors.length,
+          detailedErrors: errors.map(e => `Link ${e.index}: ${e.error}`).join(' | '),
           errors: errors.map(e => ({
             index: e.index,
             error: e.error,
@@ -87,6 +116,7 @@ export const POST = withAuthorization(
         apiLogger.warn("Bulk create journal-partner-good-links - Partial success", { 
           created: createdLinks.length,
           failed: errors.length,
+          detailedErrors: errors.map(e => `Link ${e.index}: ${e.error}`).join(' | '),
           errors: errors.map(e => ({
             index: e.index,
             error: e.error,

@@ -294,7 +294,7 @@ export const PartnerSliderController: React.FC<
         isOpen={jpgLinkManager.isModalOpen}
         onClose={jpgLinkManager.closeModal}
         mode="partner-to-goods"
-        selectedJournalIds={effectiveJournalIds}
+        entityLinkedJournalIds={jpgLinkManager.entityLinkedJournalIds}
         selectedEntity={selectedPartner}
         availableItems={jpgLinkManager.availableItems}
         existingLinks={jpgLinkManager.existingLinks}

@@ -1,7 +1,7 @@
 // src/features/linking/useJournalPartnerGoodLinkManager.ts
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/contexts/ToastContext";
 import type { GoodClient, PartnerClient, JournalPartnerGoodLinkClient } from "@/lib/types/models.client";
@@ -37,45 +37,96 @@ export function useJournalPartnerGoodLinkManager({
   const toast = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch available items to link to (partners or goods)
-  const { data: availableItems = [], isLoading: isLoadingItems } = useQuery({
-    queryKey: ['linkable-items', mode, selectedJournalIds],
+  // Extract journal IDs that the selected entity is linked to
+  const entityLinkedJournalIds = useMemo(() => {
+    if (!selectedEntity) return [];
+    
+    if (mode === "partner-to-goods" && 'journalPartnerLinks' in selectedEntity) {
+      return selectedEntity.journalPartnerLinks?.map(link => link.journalId).filter(Boolean) || [];
+    } else if (mode === "good-to-partners" && 'journalGoodLinks' in selectedEntity) {
+      return selectedEntity.journalGoodLinks?.map(link => link.journalId).filter(Boolean) || [];
+    }
+    
+    return [];
+  }, [selectedEntity, mode]);
+
+  // Fetch available items to link to (partners or goods) with color coding
+  const { data: rawAvailableItems = [], isLoading: isLoadingItems } = useQuery({
+    queryKey: ['linkable-items', mode, entityLinkedJournalIds],
     queryFn: async () => {
-      if (selectedJournalIds.length === 0) return [];
+      if (entityLinkedJournalIds.length === 0) return [];
       
       if (mode === "partner-to-goods") {
-        // Fetch goods that are linked to the selected journals
+        // Fetch goods that are linked to the same journals as the selected partner
         const response = await getAllGoods({
-          selectedJournalIds,
+          selectedJournalIds: entityLinkedJournalIds,
           filterMode: "affected", // Only show goods linked to these journals
         });
         return response.data;
       } else {
-        // Fetch partners that are linked to the selected journals
+        // Fetch partners that are linked to the same journals as the selected good
         const response = await fetchPartners({
-          selectedJournalIds,
+          selectedJournalIds: entityLinkedJournalIds,
           filterMode: "affected", // Only show partners linked to these journals
         });
         return response.data;
       }
     },
-    enabled: selectedJournalIds.length > 0,
+    enabled: entityLinkedJournalIds.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Enhance items with shared journal information for color coding
+  const availableItems = useMemo(() => {
+    if (!selectedEntity || entityLinkedJournalIds.length === 0) return rawAvailableItems;
+    
+    return rawAvailableItems.map(item => {
+      let itemJournalIds: string[] = [];
+      
+      if (mode === "partner-to-goods" && 'journalGoodLinks' in item) {
+        itemJournalIds = item.journalGoodLinks?.map(link => link.journalId).filter(Boolean) || [];
+      } else if (mode === "good-to-partners" && 'journalPartnerLinks' in item) {
+        itemJournalIds = item.journalPartnerLinks?.map(link => link.journalId).filter(Boolean) || [];
+      }
+      
+      // Find shared journals
+      const sharedJournals = itemJournalIds.filter(journalId => 
+        entityLinkedJournalIds.includes(journalId)
+      );
+      
+      // Color code based on shared journals
+      let colorCode = '';
+      if (sharedJournals.length === entityLinkedJournalIds.length) {
+        colorCode = 'full-match'; // All entity's journals are shared
+      } else if (sharedJournals.length > 0) {
+        colorCode = 'partial-match'; // Some journals are shared
+      }
+      
+      return {
+        ...item,
+        sharedJournals,
+        sharedJournalCount: sharedJournals.length,
+        totalJournalCount: itemJournalIds.length,
+        colorCode,
+        // Add to matchedFilters for existing color coding system
+        matchedFilters: colorCode ? [colorCode] : [],
+      };
+    });
+  }, [rawAvailableItems, selectedEntity, entityLinkedJournalIds, mode]);
+
   // Fetch existing links for the selected entity
   const { data: existingLinks = [], isLoading: isLoadingLinks } = useQuery({
-    queryKey: ['existing-links', selectedEntity?.id, selectedJournalIds, mode],
+    queryKey: ['existing-links', selectedEntity?.id, entityLinkedJournalIds, mode],
     queryFn: async () => {
-      if (!selectedEntity || selectedJournalIds.length === 0) return [];
+      if (!selectedEntity || entityLinkedJournalIds.length === 0) return [];
       
       if (mode === "partner-to-goods") {
-        return getLinksForPartnerInJournals(selectedEntity.id, selectedJournalIds);
+        return getLinksForPartnerInJournals(selectedEntity.id, entityLinkedJournalIds);
       } else {
-        return getLinksForGoodInJournals(selectedEntity.id, selectedJournalIds);
+        return getLinksForGoodInJournals(selectedEntity.id, entityLinkedJournalIds);
       }
     },
-    enabled: !!selectedEntity && selectedJournalIds.length > 0,
+    enabled: !!selectedEntity && entityLinkedJournalIds.length > 0,
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 
@@ -83,15 +134,19 @@ export function useJournalPartnerGoodLinkManager({
   const createLinksMutation = useMutation({
     mutationFn: createBulkJournalPartnerGoodLinks,
     onSuccess: (createdLinks) => {
-      toast.success(`Successfully created ${createdLinks.length} links`);
-      
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['existing-links'] });
-      queryClient.invalidateQueries({ queryKey: ['goods'] });
-      queryClient.invalidateQueries({ queryKey: ['partners'] });
-      queryClient.invalidateQueries({ queryKey: ['journal-partner-good-links'] });
-      
-      setIsModalOpen(false);
+      if (createdLinks.length > 0) {
+        toast.success(`Successfully created ${createdLinks.length} links`);
+        
+        // Invalidate relevant queries
+        queryClient.invalidateQueries({ queryKey: ['existing-links'] });
+        queryClient.invalidateQueries({ queryKey: ['goods'] });
+        queryClient.invalidateQueries({ queryKey: ['partners'] });
+        queryClient.invalidateQueries({ queryKey: ['journal-partner-good-links'] });
+        
+        setIsModalOpen(false);
+      } else {
+        toast.warning("No links were created. Please check console for details.");
+      }
     },
     onError: (error: Error) => {
       toast.error("Failed to create links", error.message);
@@ -170,6 +225,7 @@ export function useJournalPartnerGoodLinkManager({
     // Data
     availableItems,
     existingLinks,
+    entityLinkedJournalIds,
     
     // Actions
     handleCreateLinks,

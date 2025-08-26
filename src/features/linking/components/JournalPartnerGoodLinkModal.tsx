@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import { IoClose, IoSearch, IoTrashOutline, IoAddOutline } from "react-icons/io5";
+import { IoClose, IoSearch, IoTrashOutline, IoAddOutline, IoInformationCircleOutline } from "react-icons/io5";
 import type { GoodClient, PartnerClient, JournalPartnerGoodLinkClient } from "@/lib/types/models.client";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import styles from "./JournalPartnerGoodLinkModal.module.css";
@@ -16,7 +16,7 @@ interface JournalPartnerGoodLinkModalProps {
   onClose: () => void;
   mode: LinkMode;
   // Context data
-  selectedJournalIds: string[];
+  entityLinkedJournalIds: string[];
   selectedEntity: PartnerClient | GoodClient | null; // The partner or good being linked
   // Available items to link to
   availableItems: (PartnerClient | GoodClient)[];
@@ -48,7 +48,7 @@ export default function JournalPartnerGoodLinkModal({
   isOpen,
   onClose,
   mode,
-  selectedJournalIds,
+  entityLinkedJournalIds,
   selectedEntity,
   availableItems,
   existingLinks,
@@ -62,18 +62,20 @@ export default function JournalPartnerGoodLinkModal({
   const [selectedJournalContexts, setSelectedJournalContexts] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [descriptiveTexts, setDescriptiveTexts] = useState<Record<string, string>>({});
+  const [showingDetailsFor, setShowingDetailsFor] = useState<string | null>(null);
 
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setSelectedItemIds(new Set());
-      setSelectedJournalContexts(new Set(selectedJournalIds)); // Default to all journals
+      setSelectedJournalContexts(new Set(entityLinkedJournalIds)); // Default to all linked journals
       setSearchTerm("");
       setDescriptiveTexts({});
+      setShowingDetailsFor(null);
     } else {
-      setSelectedJournalContexts(new Set(selectedJournalIds));
+      setSelectedJournalContexts(new Set(entityLinkedJournalIds));
     }
-  }, [isOpen, selectedJournalIds]);
+  }, [isOpen, entityLinkedJournalIds]);
 
   // Filter available items based on search
   const filteredItems = useMemo(() => {
@@ -162,6 +164,54 @@ export default function JournalPartnerGoodLinkModal({
     setDescriptiveTexts(prev => ({ ...prev, [contextKey]: text }));
   };
 
+  const handleToggleDetails = (itemId: string) => {
+    setShowingDetailsFor(prev => prev === itemId ? null : itemId);
+  };
+
+  const renderItemDetails = (item: PartnerClient | GoodClient) => {
+    if (showingDetailsFor !== item.id) return null;
+    
+    const itemWithColorCode = item as any;
+    const isPartner = 'name' in item;
+    
+    return (
+      <div className={styles.itemDetails}>
+        <div className={styles.detailRow}>
+          <strong>ID:</strong> {item.id}
+        </div>
+        {isPartner && (
+          <>
+            <div className={styles.detailRow}>
+              <strong>Registration Number:</strong> {(item as PartnerClient).registrationNumber || 'N/A'}
+            </div>
+            <div className={styles.detailRow}>
+              <strong>Tax ID:</strong> {(item as PartnerClient).taxId || 'N/A'}
+            </div>
+          </>
+        )}
+        {!isPartner && (
+          <>
+            <div className={styles.detailRow}>
+              <strong>Code:</strong> {(item as GoodClient).referenceCode || 'N/A'}
+            </div>
+            <div className={styles.detailRow}>
+              <strong>Unit:</strong> {(item as any).unitOfMeasure?.name || 'N/A'}
+            </div>
+          </>
+        )}
+        <div className={styles.detailRow}>
+          <strong>Status:</strong> {(item as any).status?.name || 'N/A'}
+        </div>
+        <div className={styles.detailRow}>
+          <strong>Linked Journals:</strong> {itemWithColorCode.sharedJournals?.join(', ') || 'None shared'}
+        </div>
+        <div className={styles.detailRow}>
+          <strong>Total Journal Links:</strong> {itemWithColorCode.totalJournalCount || 0}
+        </div>
+      </div>
+    );
+  };
+
   const handleCreateLinks = () => {
     const linksToCreate = linkContexts
       .filter(context => !context.existingLinkId)
@@ -229,11 +279,19 @@ export default function JournalPartnerGoodLinkModal({
         </h2>
 
         <div className={styles.modalBody}>
+          {/* Compatibility Warning */}
+          <div className={styles.section}>
+            <div className={styles.compatibilityWarning}>
+              <strong>⚠️ Journal Compatibility:</strong> You can only create links in journals where BOTH the selected {mode === "partner-to-goods" ? "partner" : "good"} and the target {targetType.toLowerCase()} are already linked. 
+              Only journals {entityLinkedJournalIds.join(', ')} are available for linking.
+            </div>
+          </div>
+
           {/* Journal Context Selection */}
           <div className={styles.section}>
-            <h3>Journal Contexts ({selectedJournalIds.length})</h3>
+            <h3>Available Journal Contexts ({entityLinkedJournalIds.length})</h3>
             <div className={styles.journalContexts}>
-              {selectedJournalIds.map(journalId => (
+              {entityLinkedJournalIds.map(journalId => (
                 <label key={journalId} className={styles.journalContext}>
                   <input
                     type="checkbox"
@@ -275,18 +333,42 @@ export default function JournalPartnerGoodLinkModal({
                 {filteredItems.length > 0 ? (
                   filteredItems.map(item => {
                     const itemName = 'name' in item ? item.name : 'label' in item ? item.label : 'Unknown';
+                    const itemWithColorCode = item as any;
+                    const colorClass = itemWithColorCode.colorCode === 'full-match' 
+                      ? styles.fullMatch 
+                      : itemWithColorCode.colorCode === 'partial-match' 
+                        ? styles.partialMatch 
+                        : '';
+                    
                     return (
-                      <div
-                        key={item.id}
-                        className={`${styles.item} ${selectedItemIds.has(item.id) ? styles.itemSelected : ''}`}
-                        onClick={() => handleToggleItem(item.id)}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedItemIds.has(item.id)}
-                          onChange={() => handleToggleItem(item.id)}
-                        />
-                        <span>{itemName}</span>
+                      <div key={item.id} className={styles.itemContainer}>
+                        <div
+                          className={`${styles.item} ${selectedItemIds.has(item.id) ? styles.itemSelected : ''} ${colorClass}`}
+                          onClick={() => handleToggleItem(item.id)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedItemIds.has(item.id)}
+                            onChange={() => handleToggleItem(item.id)}
+                          />
+                          <span>{itemName}</span>
+                          {itemWithColorCode.sharedJournalCount > 0 && (
+                            <span className={styles.sharedJournalInfo}>
+                              {itemWithColorCode.sharedJournalCount}/{entityLinkedJournalIds.length} shared journals
+                            </span>
+                          )}
+                          <button
+                            className={styles.detailsButton}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleDetails(item.id);
+                            }}
+                            aria-label="Show details"
+                          >
+                            <IoInformationCircleOutline />
+                          </button>
+                        </div>
+                        {renderItemDetails(item)}
                       </div>
                     );
                   })

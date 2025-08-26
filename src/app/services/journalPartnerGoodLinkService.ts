@@ -70,6 +70,37 @@ const jpgLinkService = {
       `Chef (JPGLService): Orchestrating 3-way link for J:'${journalId}', P:'${partnerId.toString()}', G:'${goodId.toString()}', JPL Type:'${partnershipType}'.`
     );
 
+    // Step 0: Validate that both partner and good are linked to the journal
+    const partnerJournalLink = await prisma.journalPartnerLink.findFirst({
+      where: {
+        journalId: journalId,
+        partnerId: partnerId,
+      },
+    });
+
+    if (!partnerJournalLink) {
+      const errorMsg = `Partner ${partnerId.toString()} is not linked to journal ${journalId}. Cannot create three-way link.`;
+      serviceLogger.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    const goodJournalLink = await prisma.journalGoodLink.findFirst({
+      where: {
+        journalId: journalId,
+        goodId: goodId,
+      },
+    });
+
+    if (!goodJournalLink) {
+      const errorMsg = `Good ${goodId.toString()} is not linked to journal ${journalId}. Cannot create three-way link.`;
+      serviceLogger.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+
+    serviceLogger.debug(
+      `✓ Validation passed: Partner ${partnerId.toString()} and Good ${goodId.toString()} are both linked to journal ${journalId}`
+    );
+
     // Step 1: Find or Create the JournalPartnerLink
     let journalPartnerLink = await prisma.journalPartnerLink.findUnique({
       where: {
