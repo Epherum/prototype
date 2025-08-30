@@ -92,7 +92,7 @@
   background-color: #f97316 !important; /* Orange */
 }
 
-.rootFilterControls button .filterDotInProcess {
+.rootFilterControls button .filterDotPending {
   background-color: #3b82f6 !important; /* Blue */
 }
 
@@ -105,7 +105,7 @@
   background-color: #f97316 !important; /* Orange */
 }
 
-.rootFilterControls button.activeFilter .filterDotInProcess {
+.rootFilterControls button.activeFilter .filterDotPending {
   background-color: #3b82f6 !important; /* Blue */
 }
 

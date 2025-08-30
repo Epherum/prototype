@@ -1,0 +1,355 @@
+/* src/features/journals/components/ApprovalCenter.module.css */
+
+.approvalCenterContainer {
+  background: var(--bg-card);
+  border: 2px solid var(--accent-warm);
+  border-radius: var(--border-radius-md);
+  margin: 1rem 0;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 4px 12px var(--shadow-color);
+}
+
+.approvalCenterHeader {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.approvalCenterTitle {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.titleIcon {
+  font-size: 1.2rem;
+  color: var(--accent-warm);
+}
+
+.closeButton {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background: var(--bg-secondary-hover);
+  border-color: var(--accent-warm);
+  color: var(--accent-warm);
+}
+
+.entityFilterRow {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.filterSwiper {
+  width: 100%;
+  overflow: visible;
+}
+
+.filterSlide {
+  width: auto !important;
+  flex-shrink: 0;
+}
+
+.filterLabel {
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.entityFilterButton {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.entityFilterButton:hover {
+  background: var(--bg-secondary-hover);
+  border-color: var(--accent-warm);
+}
+
+.entityFilterButtonActive {
+  background: var(--accent-warm-light);
+  color: #000000;
+  border-color: var(--accent-warm);
+}
+
+.filterBadge {
+  background: var(--accent-warm);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.4rem;
+  border-radius: 10px;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.25rem;
+}
+
+.approvalCenterContent {
+  padding: 1.5rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.journalScopeInfo {
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius-sm);
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--accent-warm);
+  font-weight: 300;
+}
+
+.loadingState,
+.errorState,
+.emptyState {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.errorState {
+  color: var(--danger-color);
+  background: var(--danger-color-light-bg);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--danger-color-hover);
+}
+
+.emptyState {
+  color: var(--text-secondary);
+}
+
+.pendingItemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.pendingEntityCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px var(--shadow-color);
+}
+
+.pendingEntityCard:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 6px var(--shadow-color);
+}
+
+.entityInfo {
+  flex: 1;
+}
+
+.entityHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.entityName {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.statusBadgePendingRoot {
+  background: #fbbf24;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusBadgePendingLevel {
+  background: #f59e0b;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.statusBadgePendingFinal {
+  background: #10b981;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.entityMeta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.entityType {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.entityDate {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.progressIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.progressDot {
+  color: var(--text-disabled);
+  font-size: 0.75rem;
+}
+
+.progressDotFilled {
+  color: var(--accent-warm);
+  font-size: 0.75rem;
+}
+
+.entityActions {
+  margin-left: 1rem;
+}
+
+.approveButton {
+  background: var(--accent-warm);
+  color: white;
+  border: 1px solid var(--accent-warm);
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.approveButton:hover {
+  background: var(--accent-warm-hover);
+  border-color: var(--accent-warm-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--shadow-color);
+}
+
+.approveButton:active {
+  transform: translateY(0);
+}
+
+.viewOnlyLabel {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.75rem 1rem;
+  background: var(--bg-disabled);
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .approvalCenterHeader {
+    padding: 0.75rem 1rem;
+  }
+  
+  .entityFilterRow {
+    gap: 0.5rem;
+  }
+  
+  .entityFilterButton {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+  }
+  
+  .approvalCenterContent {
+    padding: 1rem;
+    max-height: 300px;
+  }
+  
+  .pendingEntityCard {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .entityActions {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .approveButton {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -4,6 +4,7 @@ import { motion, AnimatePresence, Variants } from "framer-motion";
 import styles from "./JournalHierarchySlider.module.css";
 import { findParentOfNode } from "@/lib/helpers";
 import { useMultiLevelSelection } from "../hooks/useMultiLevelSelection";
+import ApprovalCenter from "./ApprovalCenter";
 import type {
   AccountNodeData,
   ActivePartnerFilters,
@@ -255,7 +256,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
             {/* --- Filter controls with help button --- */}
             <div className={styles.headerFilterRow}>
               <motion.div className={styles.rootFilterControls}>
-                {["affected", "unaffected", "inProcess"].map((filter) => (
+                {["affected", "unaffected", "pending"].map((filter) => (
                   <motion.button
                     key={filter}
                     className={
@@ -275,7 +276,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                       className={`${styles.filterDot} ${
                         filter === 'affected' ? styles.filterDotAffected :
                         filter === 'unaffected' ? styles.filterDotUnaffected :
-                        styles.filterDotInProcess
+                        styles.filterDotPending
                       }`}
                     />
                     {filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -284,8 +285,8 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
               </motion.div>
               
             </div>
-
-            {/* --- DYNAMIC MULTI-LEVEL DISPLAY --- */}
+            
+            {/* --- DYNAMIC MULTI-LEVEL DISPLAY (always visible) --- */}
             {levelsData.map((levelData, levelIndex) => {
               // Always show first level, show subsequent levels if they should be visible
               if (!levelData.shouldShowLevel && levelIndex > 0) return null;
@@ -367,6 +368,17 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
                 </div>
               );
             })}
+
+            {/* --- APPROVAL CENTER (shown below journals when pending filter is active) --- */}
+            <AnimatePresence>
+              {activeFilters.includes('pending') && (
+                <ApprovalCenter
+                  isOpen={true}
+                  selectedJournals={effectiveJournalIds}
+                  onClose={() => onToggleFilter('pending')}
+                />
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

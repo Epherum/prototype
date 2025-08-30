@@ -206,7 +206,14 @@ async function linkPartnerToJournalWithHierarchy(
         },
       },
       update: {},
-      create: { journalId: journal.id, partnerId, partnershipType },
+      create: { 
+        journalId: journal.id, 
+        partnerId, 
+        partnershipType,
+        creationLevel: 0,
+        currentPendingLevel: 0,
+        approvalStatus: 'APPROVED'
+      },
     });
   }
 }
@@ -228,7 +235,13 @@ async function linkGoodToJournalWithHierarchy(
         },
       },
       update: {},
-      create: { journalId: journal.id, goodId },
+      create: { 
+        journalId: journal.id, 
+        goodId,
+        creationLevel: 0,
+        currentPendingLevel: 0,
+        approvalStatus: 'APPROVED'
+      },
     });
   }
 }

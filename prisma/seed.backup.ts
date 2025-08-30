@@ -8,6 +8,7 @@ import {
   DocumentType,
   PartnershipType,
   DocumentState,
+  ApprovalStatus,
   Prisma,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
@@ -209,7 +210,14 @@ async function linkPartnerToJournalWithHierarchy(
         },
       },
       update: {},
-      create: { journalId: journal.id, partnerId, partnershipType },
+      create: { 
+        journalId: journal.id, 
+        partnerId, 
+        partnershipType,
+        creationLevel: 0,
+        currentPendingLevel: 0,
+        approvalStatus: 'APPROVED'
+      },
     });
   }
 }
@@ -231,7 +239,13 @@ async function linkGoodToJournalWithHierarchy(
         },
       },
       update: {},
-      create: { journalId: journal.id, goodId },
+      create: { 
+        journalId: journal.id, 
+        goodId,
+        creationLevel: 0,
+        currentPendingLevel: 0,
+        approvalStatus: 'APPROVED'
+      },
     });
   }
 }
@@ -542,6 +556,11 @@ async function main() {
       statusId: statuses.approved.id,
       entityState: EntityState.ACTIVE,
       notes: "High-quality flour supplier with organic options",
+      approvalStatus: ApprovalStatus.APPROVED,
+      creationJournalLevel: 0,
+      currentPendingLevel: 0,
+      approvedByUserIds: [procurementUser.id],
+      approvalTimestamps: [new Date()],
     },
   });
 
@@ -585,6 +604,11 @@ async function main() {
         statusId: statuses.approved.id,
         entityState: EntityState.ACTIVE,
         notes: customerData.notes,
+        approvalStatus: ApprovalStatus.APPROVED,
+        creationJournalLevel: 0,
+        currentPendingLevel: 0,
+        approvedByUserIds: [salesUser.id],
+        approvalTimestamps: [new Date()],
       },
     });
   }
@@ -602,6 +626,11 @@ async function main() {
       entityState: EntityState.ACTIVE,
       taxCodeId: taxTVA7.id,
       unitCodeId: uomKg.id,
+      approvalStatus: ApprovalStatus.APPROVED,
+      creationJournalLevel: 0,
+      currentPendingLevel: 0,
+      approvedByUserIds: [procurementUser.id],
+      approvalTimestamps: [new Date()],
     },
   });
 
@@ -650,6 +679,11 @@ async function main() {
         entityState: EntityState.ACTIVE,
         taxCodeId: productData.taxId,
         unitCodeId: productData.unitId,
+        approvalStatus: ApprovalStatus.APPROVED,
+        creationJournalLevel: 0,
+        currentPendingLevel: 0,
+        approvedByUserIds: [salesUser.id],
+        approvalTimestamps: [new Date()],
       },
     });
   }
@@ -714,6 +748,9 @@ async function main() {
           journalPartnerLinkId: jpl.id,
           goodId: product.id,
           descriptiveText: `Regular purchase of ${product.label} by ${link.customer.name}`,
+          creationLevel: 0,
+          currentPendingLevel: 0,
+          approvalStatus: 'APPROVED',
         },
       });
     }
@@ -748,6 +785,11 @@ async function main() {
       totalTTC: new Prisma.Decimal(160.5),
       balance: new Prisma.Decimal(160.5),
       statusId: statuses.approved.id,
+      approvalStatus: ApprovalStatus.APPROVED,
+      creationJournalLevel: 0,
+      currentPendingLevel: 0,
+      approvedByUserIds: [salesUser.id],
+      approvalTimestamps: [new Date()],
       lines: {
         create: [
           {
@@ -792,6 +834,11 @@ async function main() {
       totalTTC: new Prisma.Decimal(585.0),
       balance: new Prisma.Decimal(585.0),
       statusId: statuses.pending.id,
+      approvalStatus: ApprovalStatus.PENDING,
+      creationJournalLevel: 0,
+      currentPendingLevel: 0,
+      approvedByUserIds: [],
+      approvalTimestamps: [],
       lines: {
         create: [
           {

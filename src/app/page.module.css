@@ -87,7 +87,7 @@
   font-weight: 500;
   cursor: pointer;
   background-color: var(--accent-warm-light);
-  color: var(--accent-warm);
+  color: #000000;
   border: none;
   border-radius: var(--border-radius-pill);
   transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.1s ease,
@@ -100,7 +100,7 @@
 }
 .controlButton:hover {
   background-color: var(--accent-warm);
-  color: var(--bg-card);
+  color: #000000;
 }
 .controlButton:active {
   transform: scale(0.95);

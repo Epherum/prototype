@@ -22,7 +22,7 @@ export type PartnerTypeClient = "LEGAL_ENTITY" | "NATURAL_PERSON";
 /**
  * The possible states for the Journal-based filtering control.
  */
-export type PartnerGoodFilterStatus = "affected" | "unaffected" | "inProcess";
+export type PartnerGoodFilterStatus = "affected" | "unaffected" | "pending";
 export type ActivePartnerFilters = PartnerGoodFilterStatus[];
 
 /**

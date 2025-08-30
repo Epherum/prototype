@@ -228,6 +228,15 @@ model Partner {
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
   statusId          String?         @map("status_id")
   status            Status?         @relation("PartnerStatus", fields: [statusId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  
+  // Approval System Fields
+  approvalStatus        ApprovalStatus  @default(PENDING) @map("approval_status")
+  creationJournalLevel  Int             @map("creation_journal_level")
+  currentPendingLevel   Int             @default(0) @map("current_pending_level")
+  approvalHistory       Json?           @map("approval_history") @db.JsonB
+  approvedByUserIds     String[]        @map("approved_by_user_ids")
+  approvalTimestamps    DateTime[]      @map("approval_timestamps")
+  
   createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
@@ -310,6 +319,15 @@ model GoodsAndService {
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
   statusId          String?         @map("status_id")
   status            Status?         @relation("GoodsStatus", fields: [statusId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  
+  // Approval System Fields
+  approvalStatus        ApprovalStatus  @default(PENDING) @map("approval_status")
+  creationJournalLevel  Int             @map("creation_journal_level")
+  currentPendingLevel   Int             @default(0) @map("current_pending_level")
+  approvalHistory       Json?           @map("approval_history") @db.JsonB
+  approvedByUserIds     String[]        @map("approved_by_user_ids")
+  approvalTimestamps    DateTime[]      @map("approval_timestamps")
+  
   createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
@@ -356,6 +374,12 @@ model JournalPartnerLink {
   partner             Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   journalPartnerGoodLinks JournalPartnerGoodLink[]
+  
+  // Approval System Fields for Journal-Partner Links
+  approvalStatus        ApprovalStatus  @default(PENDING) @map("approval_status")
+  creationLevel         Int             @map("creation_level")
+  currentPendingLevel   Int             @default(0) @map("current_pending_level")
+  approvalMetadata      Json?           @map("approval_metadata") @db.JsonB
 
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
@@ -371,6 +395,12 @@ model JournalGoodLink {
 
   journal     Journal         @relation(fields: [journalId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   good        GoodsAndService @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  
+  // Approval System Fields for Journal-Good Links
+  approvalStatus        ApprovalStatus  @default(PENDING) @map("approval_status")
+  creationLevel         Int             @map("creation_level")
+  currentPendingLevel   Int             @default(0) @map("current_pending_level")
+  approvalMetadata      Json?           @map("approval_metadata") @db.JsonB
 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -392,6 +422,12 @@ model JournalPartnerGoodLink {
   journalPartnerLink      JournalPartnerLink @relation(fields: [journalPartnerLinkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   good                    GoodsAndService    @relation(fields: [goodId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   contextualTaxCode       TaxCode?           @relation("ContextualTaxForJPGLink", fields: [contextualTaxCodeId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  
+  // Approval System Fields for Journal-Partner-Good Links  
+  approvalStatus        ApprovalStatus  @default(PENDING) @map("approval_status")
+  creationLevel         Int             @map("creation_level")
+  currentPendingLevel   Int             @default(0) @map("current_pending_level")
+  approvalMetadata      Json?           @map("approval_metadata") @db.JsonB
 
   createdAt               DateTime           @default(now()) @map("created_at")
   updatedAt               DateTime           @updatedAt @map("updated_at")
@@ -442,6 +478,15 @@ model Document {
   entityState       EntityState     @default(ACTIVE) @map("entity_state")
   statusId          String?         @map("status_id")
   status            Status?         @relation("DocumentStatus", fields: [statusId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  
+  // Approval System Fields
+  approvalStatus        ApprovalStatus  @default(PENDING) @map("approval_status")
+  creationJournalLevel  Int             @map("creation_journal_level")
+  currentPendingLevel   Int             @default(0) @map("current_pending_level")
+  approvalHistory       Json?           @map("approval_history") @db.JsonB
+  approvedByUserIds     String[]        @map("approved_by_user_ids")
+  approvalTimestamps    DateTime[]      @map("approval_timestamps")
+  
   createdById       String          @map("created_by_id")
   createdByIp       String?         @map("created_by_ip") @db.VarChar(45)
   deletedById       String?         @map("deleted_by_id")
