@@ -30,7 +30,7 @@ export const getPartnersQuerySchema = z.object({
   activeFilterModes: z
     .string()
     .transform((val) => val.split(","))
-    .pipe(z.array(z.enum(["affected", "unaffected", "inProcess"])))
+    .pipe(z.array(z.enum(["affected", "unaffected", "inProcess", "pending"])))
     .optional(),
   permissionRootId: z.string().optional(),
   selectedJournalIds: z

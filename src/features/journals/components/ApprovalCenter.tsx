@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FiCheck, FiClock, FiUser, FiFileText, FiBox, FiFolderPlus } from "react-icons/fi";
+import { FiCheck, FiClock, FiUser, FiFileText, FiBox, FiFolderPlus, FiTarget, FiHome } from "react-icons/fi";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { FreeMode } from 'swiper/modules';
 import 'swiper/css';
@@ -33,7 +33,9 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
   onClose,
 }) => {
   const [activeEntityFilters, setActiveEntityFilters] = useState<string[]>([]);
+  const [useSelectedJournals, setUseSelectedJournals] = useState<boolean>(false);
   const user = useAppStore((state) => state.user);
+  const effectiveRestrictedJournalId = useAppStore((state) => state.effectiveRestrictedJournalId);
   const queryClient = useQueryClient();
 
   // Entity filter options with icons
@@ -45,15 +47,29 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
     { type: 'project', label: 'Project', icon: <FiFolderPlus />, active: activeEntityFilters.includes('project') },
   ], [activeEntityFilters]);
 
+  // Determine which journal IDs to use based on toggle state
+  const effectiveJournalIds = useMemo(() => {
+    if (useSelectedJournals) {
+      return selectedJournals; // Use the current journal selections
+    } else {
+      // Use restricted journal or empty array for root level
+      if (effectiveRestrictedJournalId && effectiveRestrictedJournalId !== '__ROOT__') {
+        return [effectiveRestrictedJournalId];
+      } else {
+        return []; // Root level - no journal restriction
+      }
+    }
+  }, [useSelectedJournals, selectedJournals, effectiveRestrictedJournalId]);
+
   // Fetch pending items for approval
   const { data: pendingItems, isLoading, error } = useQuery({
     queryKey: clientApprovalService.approvalKeys.inProcessFiltered({ 
       entityTypes: activeEntityFilters, 
-      journalIds: selectedJournals,
+      journalIds: effectiveJournalIds,
     }),
     queryFn: () => clientApprovalService.getInProcessItems({
       entityTypes: activeEntityFilters,
-      journalIds: selectedJournals,
+      journalIds: effectiveJournalIds,
     }),
     enabled: isOpen,
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -130,7 +146,7 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
         <div className={styles.headerLeft}>
           <h3 className={styles.approvalCenterTitle}>
             <FiClock className={styles.titleIcon} />
-            PENDING CENTER
+            Pending Center
           </h3>
           <button 
             className={styles.closeButton}
@@ -139,6 +155,29 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
           >
             ×
           </button>
+        </div>
+        
+        {/* Journal Scope Toggle */}
+        <div className={styles.journalScopeToggle}>
+          <motion.button
+            className={`${styles.scopeToggleButton} ${useSelectedJournals ? styles.scopeToggleActive : ''}`}
+            onClick={() => setUseSelectedJournals(!useSelectedJournals)}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            title={useSelectedJournals ? "Using selected journals" : "Using root/restricted level"}
+          >
+            {useSelectedJournals ? (
+              <>
+                <FiTarget className={styles.toggleIcon} />
+                Selected Journals
+              </>
+            ) : (
+              <>
+                <FiHome className={styles.toggleIcon} />
+                Root Level
+              </>
+            )}
+          </motion.button>
         </div>
         
         <div className={styles.entityFilterRow}>
@@ -173,11 +212,17 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
       </div>
 
       <div className={styles.approvalCenterContent}>
-        {selectedJournals.length > 0 && (
-          <div className={styles.journalScopeInfo}>
-            <strong>Selected Journals:</strong> {selectedJournals.join(', ')}
-          </div>
-        )}
+        <div className={styles.journalScopeInfo}>
+          <strong>Scope:</strong> {
+            useSelectedJournals
+              ? (selectedJournals.length > 0 
+                  ? `Selected Journals (${selectedJournals.join(', ')})` 
+                  : 'Selected Journals (none selected)')
+              : (effectiveJournalIds.length > 0
+                  ? `Restricted Level (${effectiveJournalIds.join(', ')})`
+                  : 'Root Level (all journals)')
+          }
+        </div>
         
         <AnimatePresence mode="wait">
           {isLoading ? (

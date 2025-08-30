@@ -146,86 +146,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* ... (all remaining styles from .l2ButtonInteractiveWrapper to .noDataSmall are unchanged) ... */
-.l2ButtonInteractiveWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--border-radius-pill);
-}
-.level2Button {
-  padding: calc(var(--spacing-unit) * 0.65) calc(var(--spacing-unit) * 1.25);
-  font-size: 0.8em;
-  font-weight: 500;
-  cursor: pointer;
-  border: 2px solid var(--border-color, var(--text-secondary));
-  border-radius: var(--border-radius-pill);
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
-  transition: background-color 0.2s ease, color 0.2s ease,
-    border-color 0.2s ease, outline-color 0.2s ease;
-  white-space: nowrap;
-  min-width: 50px;
-  text-align: center;
-  position: relative;
-  z-index: 5;
-  box-sizing: border-box;
-  outline: none;
-  -webkit-tap-highlight-color: transparent; /* For mobile tap highlight */
-}
-@media (hover: hover) {
-  .level2Button:hover:not(.level2ButtonActive) {
-    border-color: var(--accent-warm-light);
-    background-color: var(--accent-slider);
-  }
-}
-.level2ButtonActive,
-.level2ButtonActive:hover {
-  background-color: var(--accent-warm);
-  color: var(--bg-card);
-  border-color: var(--accent-warm);
-  font-weight: 600;
-}
-.level2Button.colored.level2ButtonActive,
-.level2Button.colored.level2ButtonActive:hover {
-  background-color: var(--item-color);
-  border-color: var(--item-color);
-  color: #333;
-  font-weight: 600;
-}
-
-.level2Button.level2ButtonActive:not(.terminalNode) {
-  border-color: var(--accent-warm);
-  box-shadow: inset 0 0 0 2px var(--bg-card);
-}
-.level2Button.colored.level2ButtonActive:not(.terminalNode) {
-  border-color: var(--item-color);
-  box-shadow: inset 0 0 0 2px var(--bg-card);
-}
-.filterInfoRow {
-  text-align: center;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  font-family: monospace;
-  padding-bottom: calc(var(--spacing-unit) * 0.5);
-  margin-top: calc(var(--spacing-unit) * -0.5);
-  min-height: 1rem;
-  overflow-wrap: break-word;
-}
-.terminalNode {
-  border-style: dotted;
-  border-width: 2px;
-  border-color: var(--border-color, var(--text-secondary));
-}
-.terminalNode.level2ButtonActive {
-  border-color: var(--accent-warm);
-  box-shadow: inset 0 0 0 2px var(--bg-card);
-}
-.terminalNode.colored.level2ButtonActive {
-  border-color: var(--item-color);
-  box-shadow: inset 0 0 0 2px var(--bg-card);
-}
+/* Terminal node styles now handled by general active button styles above */
 .filterInfoNone {
   font-style: italic;
   opacity: 0.7;
@@ -268,4 +189,70 @@
 .errorState {
   color: var(--accent-danger);
   border-color: var(--accent-danger-light);
+}
+
+/* Journal button styles */
+.level2Button {
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1);
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 2px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  text-align: center;
+  line-height: 1;
+  user-select: none;
+}
+
+.level2Button:hover {
+  background-color: var(--bg-hover);
+  border-color: var(--accent-warm);
+  transform: scale(1.02);
+}
+
+.level2Button:active {
+  transform: scale(0.98);
+}
+
+.level2Button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Active/selected state */
+.level2ButtonActive {
+  background-color: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.level2ButtonActive:hover {
+  background-color: var(--accent-warm-hover);
+  border-color: var(--accent-warm-hover);
+}
+
+/* Terminal node styling - dotted border for terminal nodes */
+.terminalNode {
+  border-style: dotted !important;
+  border-width: 2px !important;
+}
+
+/* Non-terminal nodes keep solid border (default) */
+.level2Button:not(.terminalNode) {
+  border-style: solid;
+}
+
+/* Colored state for selected items */
+.colored {
+  border-color: var(--border-color) !important;
 }

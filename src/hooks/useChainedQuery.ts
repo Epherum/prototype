@@ -327,14 +327,8 @@ export const useChainedQuery = <T extends SliderType>(
           // Handle multiple active filter modes
           const activeFilters = journalSelection.rootFilter;
           
-          // For all filter modes, we need the terminal (deepest) selected journals
-          // If level3Ids exist, use those; otherwise use level2Ids; otherwise use topLevelId
-          const terminalIds = journalSelection.level3Ids.length > 0 
-            ? journalSelection.level3Ids
-            : journalSelection.level2Ids.length > 0 
-              ? journalSelection.level2Ids
-              : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
-          params.selectedJournalIds = terminalIds;
+          // Use the properly calculated effectiveJournalIds which supports unlimited levels
+          params.selectedJournalIds = effectiveJournalIds;
           
           // Pass all active filter modes for multi-select support
           if (activeFilters.length > 0) {
@@ -454,13 +448,8 @@ export const useChainedQuery = <T extends SliderType>(
           // Handle multiple active filter modes
           const activeFilters = journalSelection.rootFilter;
           
-          // Use terminal IDs like in the partner section for consistency
-          const terminalIds = journalSelection.level3Ids.length > 0 
-            ? journalSelection.level3Ids
-            : journalSelection.level2Ids.length > 0 
-              ? journalSelection.level2Ids
-              : journalSelection.topLevelId ? [journalSelection.topLevelId] : [];
-          goodsParams.selectedJournalIds = terminalIds;
+          // Use the properly calculated effectiveJournalIds which supports unlimited levels
+          goodsParams.selectedJournalIds = effectiveJournalIds;
           
           // Pass all active filter modes for multi-select support
           if (activeFilters.length > 0) {

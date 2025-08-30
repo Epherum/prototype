@@ -31,7 +31,6 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -102,15 +101,17 @@
   flex-shrink: 0;
 }
 
-.entityFilterButton:hover {
+.entityFilterButton:hover:not(.entityFilterButtonActive) {
   background: var(--bg-secondary-hover);
   border-color: var(--accent-warm);
 }
 
 .entityFilterButtonActive {
-  background: var(--accent-warm-light);
-  color: #000000;
+  background: var(--accent-warm);
+  color: var(--bg-card);
   border-color: var(--accent-warm);
+  font-weight: 600;
+  transform: scale(1.02);
 }
 
 .filterBadge {
@@ -211,7 +212,6 @@
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -222,7 +222,6 @@
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -233,7 +232,6 @@
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -291,7 +289,6 @@
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s ease;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -313,7 +310,6 @@
   padding: 0.75rem 1rem;
   background: var(--bg-disabled);
   border-radius: 6px;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -352,4 +348,44 @@
     width: 100%;
     justify-content: center;
   }
+}
+
+/* Journal Scope Toggle Styles */
+.journalScopeToggle {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.scopeToggleButton {
+  background: var(--bg-card);
+  border: 2px solid var(--accent-warm);
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--border-radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.scopeToggleButton:hover:not(.scopeToggleActive) {
+  background: var(--bg-secondary-hover);
+  border-color: var(--accent-warm);
+}
+
+.scopeToggleActive {
+  background: var(--accent-warm);
+  color: var(--bg-card);
+  border-color: var(--accent-warm);
+  font-weight: 600;
+}
+
+.toggleIcon {
+  font-size: 1rem;
 }

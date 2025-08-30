@@ -7,7 +7,7 @@
   color: var(--text-primary);
 }
 
-.header {
+.pageHeader {
   display: flex;
   align-items: center;
   gap: calc(var(--spacing-unit) * 2);
@@ -99,7 +99,7 @@
     padding: calc(var(--spacing-unit) * 1.5);
   }
   
-  .header {
+  .pageHeader {
     margin-bottom: calc(var(--spacing-unit) * 2);
   }
   
@@ -133,7 +133,7 @@
     padding: calc(var(--spacing-unit) * 1);
   }
   
-  .header {
+  .pageHeader {
     margin-bottom: calc(var(--spacing-unit) * 1.5);
     gap: calc(var(--spacing-unit) * 1);
   }

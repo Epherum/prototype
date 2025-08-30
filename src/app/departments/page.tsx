@@ -4,22 +4,23 @@ import React from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
+import Header from "@/components/layout/Header";
 
 const departments = [
-  { id: 0, name: "Top Management" },
-  { id: 1, name: "Matrix Operationnelle" },
-  { id: 2, name: "Juridique" },
-  { id: 3, name: "Logistique" },
-  { id: 4, name: "R&D" },
-  { id: 5, name: "GRH" },
-  { id: 6, name: "Comptabilité" },
-  { id: 7, name: "Finance" },
-  { id: 8, name: "Magasin" },
-  { id: 9, name: "Prod" },
-  { id: 10, name: "Achat" },
-  { id: 11, name: "Vente" },
-  { id: 12, name: "Maintenance" },
-  { id: 13, name: "Support" },
+  { id: 1, name: "Top Management" },
+  { id: 2, name: "Matrix Operationnelle" },
+  { id: 3, name: "Juridique" },
+  { id: 4, name: "Logistique" },
+  { id: 5, name: "R&D" },
+  { id: 6, name: "GRH" },
+  { id: 7, name: "Comptabilité" },
+  { id: 8, name: "Finance" },
+  { id: 9, name: "Magasin" },
+  { id: 10, name: "Prod" },
+  { id: 11, name: "Achat" },
+  { id: 12, name: "Vente" },
+  { id: 13, name: "Maintenance" },
+  { id: 14, name: "Support" },
 ];
 
 const containerVariants = {
@@ -58,8 +59,10 @@ export default function DepartmentsPage() {
 
   return (
     <div className={styles.container}>
+      <Header />
+      
       <motion.div
-        className={styles.header}
+        className={styles.pageHeader}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
