@@ -140,6 +140,7 @@ export const useJournalManager = () => {
     handleToggleJournalRootFilter,
     handleL1Interaction,
     handleL2Interaction,
+    updateJournalSelections, // For terminal ID calculation
     // --- NEW EXPLICIT HANDLERS ---
     handleNavigateUpOneLevel,
     handleRestoreLastSelection,

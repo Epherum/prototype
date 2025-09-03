@@ -16,7 +16,7 @@ type RouteContext = { params: { id: string } };
  * @param {NextRequest} _request - The incoming Next.js request object.
  * @param {object} context - The context object containing route parameters.
  * @param {object} context.params - The parameters for the route.
- * @param {string} context.params.id - The ID of the Good/Service to fetch (can be a string representation of BigInt).
+ * @param {string} context.resolvedParams.id - The ID of the Good/Service to fetch (can be a string representation of BigInt).
  * @returns {NextResponse} A JSON response containing the Good/Service data if found, or an error message.
  * @status 200 - OK: Good/Service found and returned.
  * @status 400 - Bad Request: Invalid Good/Service ID format.
@@ -27,10 +27,11 @@ type RouteContext = { params: { id: string } };
 export const GET = withAuthorization(
   async function GET(_request: NextRequest, { params }: RouteContext) {
     try {
-      const goodId = parseBigInt(params.id, "good ID");
+      const resolvedParams = await params;
+      const goodId = parseBigInt(resolvedParams.id, "good ID");
       if (goodId === null) {
         return NextResponse.json(
-          { message: `Invalid good ID format: '${params.id}'.` },
+          { message: `Invalid good ID format: '${resolvedParams.id}'.` },
           { status: 400 }
         );
       }
@@ -38,7 +39,7 @@ export const GET = withAuthorization(
       const good = await goodsService.getGoodById(goodId);
       if (!good) {
         return NextResponse.json(
-          { message: `Good/Service with ID '${params.id}' not found.` },
+          { message: `Good/Service with ID '${resolvedParams.id}' not found.` },
           { status: 404 }
         );
       }
@@ -50,7 +51,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      apiLogger.error(`API GET /api/goods/${params.id} Error:`, e);
+      apiLogger.error(`API GET /api/goods/${resolvedParams.id} Error:`, e);
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -66,7 +67,7 @@ export const GET = withAuthorization(
  * @param {NextRequest} request - The incoming Next.js request object containing the update payload.
  * @param {object} context - The context object containing route parameters.
  * @param {object} context.params - The parameters for the route.
- * @param {string} context.params.id - The ID of the Good/Service to update (can be a string representation of BigInt).
+ * @param {string} context.resolvedParams.id - The ID of the Good/Service to update (can be a string representation of BigInt).
  * @body {UpdateGoodsData} - The Good/Service fields to update.
  * @returns {NextResponse} A JSON response containing the updated Good/Service data or an error message.
  * @status 200 - OK: Good/Service successfully updated.
@@ -78,10 +79,11 @@ export const GET = withAuthorization(
 export const PUT = withAuthorization(
   async function PUT(request: NextRequest, { params }: RouteContext) {
     try {
-      const goodId = parseBigInt(params.id, "good ID");
+      const resolvedParams = await params;
+      const goodId = parseBigInt(resolvedParams.id, "good ID");
       if (goodId === null) {
         return NextResponse.json(
-          { message: `Invalid good ID format: '${params.id}'.` },
+          { message: `Invalid good ID format: '${resolvedParams.id}'.` },
           { status: 400 }
         );
       }
@@ -111,11 +113,11 @@ export const PUT = withAuthorization(
       });
     } catch (error) {
       const e = error as Error & { code?: string };
-      apiLogger.error(`API PUT /api/goods/${params.id} Error:`, e);
+      apiLogger.error(`API PUT /api/goods/${resolvedParams.id} Error:`, e);
 
       if (e.code === "P2025") {
         return NextResponse.json(
-          { message: `Good with ID '${params.id}' not found for update.` },
+          { message: `Good with ID '${resolvedParams.id}' not found for update.` },
           { status: 404 }
         );
       }
@@ -134,7 +136,7 @@ export const PUT = withAuthorization(
  * @param {NextRequest} _request - The incoming Next.js request object.
  * @param {object} context - The context object containing route parameters.
  * @param {object} context.params - The parameters for the route.
- * @param {string} context.params.id - The ID of the Good/Service to delete (can be a string representation of BigInt).
+ * @param {string} context.resolvedParams.id - The ID of the Good/Service to delete (can be a string representation of BigInt).
  * @returns {NextResponse} A JSON response indicating success or an error message.
  * @status 200 - OK: Good/Service successfully deleted.
  * @status 400 - Bad Request: Invalid Good/Service ID format.
@@ -145,10 +147,11 @@ export const PUT = withAuthorization(
 export const DELETE = withAuthorization(
   async function DELETE(_request: NextRequest, { params }: RouteContext) {
     try {
-      const goodId = parseBigInt(params.id, "good ID");
+      const resolvedParams = await params;
+      const goodId = parseBigInt(resolvedParams.id, "good ID");
       if (goodId === null) {
         return NextResponse.json(
-          { message: `Invalid good ID format: '${params.id}'.` },
+          { message: `Invalid good ID format: '${resolvedParams.id}'.` },
           { status: 400 }
         );
       }
@@ -157,17 +160,17 @@ export const DELETE = withAuthorization(
 
       return NextResponse.json(
         {
-          message: `Good/Service with ID '${params.id}' successfully deleted.`,
+          message: `Good/Service with ID '${resolvedParams.id}' successfully deleted.`,
         },
         { status: 200 }
       );
     } catch (error) {
       const e = error as Error & { code?: string };
-      apiLogger.error(`API DELETE /api/goods/${params.id} Error:`, e);
+      apiLogger.error(`API DELETE /api/goods/${resolvedParams.id} Error:`, e);
 
       if (e.code === "P2025") {
         return NextResponse.json(
-          { message: `Good with ID '${params.id}' not found for deletion.` },
+          { message: `Good with ID '${resolvedParams.id}' not found for deletion.` },
           { status: 404 }
         );
       }

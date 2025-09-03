@@ -64,13 +64,8 @@ export const POST = withAuthorization(
 
       for (let i = 0; i < links.length; i++) {
         try {
-          // Convert string IDs to bigint as expected by the service
-          const linkData = {
-            ...links[i],
-            partnerId: BigInt(links[i].partnerId),
-            goodId: BigInt(links[i].goodId),
-          };
-          const newLink = await jpgLinkService.createFullJpgLink(linkData);
+          // Pass data directly to service - schema will handle string/bigint conversion
+          const newLink = await jpgLinkService.createFullJpgLink(links[i]);
           createdLinks.push(newLink);
         } catch (error) {
           const e = error as Error;

@@ -6,6 +6,7 @@ import {
   JournalPartnerLink as PrismaJPL,
 } from "@prisma/client";
 import { getDescendantJournalIdsAsSet } from "@/app/utils/journalUtils";
+import { journalService } from "./journalService";
 
 import { z } from "zod";
 import { serviceLogger } from "@/lib/logger";
@@ -15,6 +16,7 @@ export type CreateJPGLData = {
   goodId: bigint;
   descriptiveText?: string | null;
   contextualTaxCodeId?: number | null;
+  creationLevel: number;
 };
 
 // --- Zod Schemas for Validation ---
@@ -24,20 +26,27 @@ const CreateRawJPGLSchema = z.object({
   goodId: z.bigint(),
   descriptiveText: z.string().optional().nullable(),
   contextualTaxCodeId: z.number().int().positive().optional().nullable(),
+  creationLevel: z.number().int().nonnegative(),
 });
 export type CreateRawJPGLData = z.infer<typeof CreateRawJPGLSchema>;
 
 // Update the Zod Schema to remove companyId
 export const OrchestratedCreateJPGLSchema = z.object({
   journalId: z.string().min(1, "Journal ID is required"),
-  partnerId: z.string().transform((val) => {
+  partnerId: z.union([z.string(), z.bigint()]).transform((val) => {
+    if (typeof val === 'bigint') {
+      return val;
+    }
     try {
       return BigInt(val);
     } catch {
       throw new Error(`Invalid partner ID: ${val}`);
     }
   }),
-  goodId: z.string().transform((val) => {
+  goodId: z.union([z.string(), z.bigint()]).transform((val) => {
+    if (typeof val === 'bigint') {
+      return val;
+    }
     try {
       return BigInt(val);
     } catch {
@@ -116,12 +125,19 @@ const jpgLinkService = {
     if (!journalPartnerLink) {
       serviceLogger.debug(` -> JournalPartnerLink not found. Creating new one...`);
       try {
+        // Get the journal level for the creation level
+        const journalLevel = await journalService.getJournalLevel(journalId);
+        
         journalPartnerLink = await prisma.journalPartnerLink.create({
           data: {
             // No companyId needed
             journalId: journalId,
             partnerId: partnerId,
             partnershipType: partnershipType,
+            // Auto-approve journal-partner links (no approval workflow needed)
+            creationLevel: journalLevel,
+            approvalStatus: "APPROVED",
+            currentPendingLevel: journalLevel,
           },
         });
         serviceLogger.debug(
@@ -160,12 +176,16 @@ const jpgLinkService = {
     }
 
     // Step 2: Create the JournalPartnerGoodLink
+    // Get the journal level for the creation level
+    const journalLevel = await journalService.getJournalLevel(journalId);
+    
     const rawJpglData = {
       // No companyId needed for the JPGL record either
       journalPartnerLinkId: journalPartnerLink.id,
       goodId: goodId,
       descriptiveText: descriptiveText,
       contextualTaxCodeId: contextualTaxCodeId,
+      creationLevel: journalLevel,
     };
 
     // Validation for good and tax code (optional here if you trust the inputs, but good for safety)

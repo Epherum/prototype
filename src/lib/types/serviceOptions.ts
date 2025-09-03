@@ -1,6 +1,6 @@
 // src/lib/types/serviceOptions.ts
 
-export type FilterMode = "affected" | "unaffected" | "inProcess";
+export type FilterMode = "affected" | "unaffected" | "inProcess" | "pending";
 
 // For findPartnersForGoods / findGoodsForPartners
 export interface IntersectionFindOptions {

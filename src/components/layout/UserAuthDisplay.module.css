@@ -22,6 +22,27 @@
   flex-shrink: 0;
 }
 
+.logoButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+  outline: none;
+}
+
+.logoButton:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent-warm);
+}
+
+.logoButton:hover {
+  background-color: var(--accent-warm-light);
+}
+
 .logo {
   display: block;
   opacity: 0.8;
@@ -30,7 +51,7 @@
   object-fit: cover;
 }
 
-.logo:hover {
+.logoButton:hover .logo {
   opacity: 1;
   transform: scale(1.05);
 }

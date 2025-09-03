@@ -12,7 +12,7 @@ const roleAssignmentSchema = z.object({
 export const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string().min(1, "Password is required"),
   roleAssignments: z.array(roleAssignmentSchema),
   restrictedTopLevelJournalId: z.string().nullable().optional(),
 });
@@ -25,7 +25,7 @@ export const updateUserSchema = z.object({
   // or a valid password.
   password: z
     .string()
-    .min(8, "Password must be at least 8 characters")
+    .min(1, "Password is required")
     .or(z.literal(""))
     .optional(),
   roleAssignments: z.array(roleAssignmentSchema),

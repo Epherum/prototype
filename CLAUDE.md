@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Development Commands
 
 **Build and Start:**
-- `npm run dev` - Start development server ⚠️ **DO NOT RUN** - causes port conflicts and bugs
+- `npm run dev` - Start development server 
 - `npm run build` - Build production (includes Prisma generation)
 - `npm run serve` - Build and start production server
 - `npm run start` - Start production server

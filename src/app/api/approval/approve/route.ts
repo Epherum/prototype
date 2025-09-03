@@ -10,7 +10,7 @@ import approvalService from "@/app/services/approvalService";
 
 // Schema for approval request
 const approveRequestSchema = z.object({
-  entityType: z.enum(['partner', 'good', 'document', 'journalPartnerLink', 'journalGoodLink', 'journalPartnerGoodLink']),
+  entityType: z.enum(['partner', 'good', 'document', 'link']),
   entityId: z.string().min(1),
   comments: z.string().optional(),
 });

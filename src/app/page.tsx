@@ -57,8 +57,8 @@ export default function Home() {
   const visibility = useAppStore((state) => state.visibility);
 
   const goodManager = useGoodManager();
-  const docManager = useDocumentManager(goodManager.goodsForSlider);
   const journalManager = useJournalManager();
+  const docManager = useDocumentManager(goodManager.goodsForSlider, journalManager);
   const jpqlLinking = useJournalPartnerGoodLinking();
 
   const { isCreating } = docManager;

@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FiCheck, FiClock, FiUser, FiFileText, FiBox, FiFolderPlus, FiTarget, FiHome } from "react-icons/fi";
+import { FiCheck, FiClock, FiUser, FiFileText, FiBox, FiFolderPlus, FiTarget, FiHome, FiLoader, FiEye, FiLink } from "react-icons/fi";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { FreeMode } from 'swiper/modules';
 import 'swiper/css';
@@ -11,6 +11,8 @@ import 'swiper/css/free-mode';
 import styles from "./ApprovalCenter.module.css";
 import { useAppStore } from "@/store/appStore";
 import clientApprovalService, { type InProcessItem } from "@/services/clientApprovalService";
+import { partnerKeys, goodKeys } from "@/lib/queryKeys";
+import EntityDetailsModal from "@/features/shared/modal/EntityDetailsModal";
 
 export interface ApprovalCenterProps {
   isOpen: boolean;
@@ -34,6 +36,8 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
 }) => {
   const [activeEntityFilters, setActiveEntityFilters] = useState<string[]>([]);
   const [useSelectedJournals, setUseSelectedJournals] = useState<boolean>(false);
+  const [selectedEntity, setSelectedEntity] = useState<InProcessItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const user = useAppStore((state) => state.user);
   const effectiveRestrictedJournalId = useAppStore((state) => state.effectiveRestrictedJournalId);
   const queryClient = useQueryClient();
@@ -42,7 +46,7 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
   const entityFilters: EntityFilter[] = useMemo(() => [
     { type: 'partner', label: 'Partner', icon: <FiUser />, active: activeEntityFilters.includes('partner') },
     { type: 'good', label: 'Good', icon: <FiBox />, active: activeEntityFilters.includes('good') },
-    { type: 'link', label: 'Link', icon: <FiCheck />, active: activeEntityFilters.includes('link') },
+    { type: 'link', label: 'Link', icon: <FiLink />, active: activeEntityFilters.includes('link') },
     { type: 'document', label: 'Document', icon: <FiFileText />, active: activeEntityFilters.includes('document') },
     { type: 'project', label: 'Project', icon: <FiFolderPlus />, active: activeEntityFilters.includes('project') },
   ], [activeEntityFilters]);
@@ -52,27 +56,59 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
     if (useSelectedJournals) {
       return selectedJournals; // Use the current journal selections
     } else {
-      // Use restricted journal or empty array for root level
-      if (effectiveRestrictedJournalId && effectiveRestrictedJournalId !== '__ROOT__') {
-        return [effectiveRestrictedJournalId];
-      } else {
-        return []; // Root level - no journal restriction
-      }
+      // Don't pass journalIds when not using selected journals
+      // Let the approval service handle the restricted journal logic internally
+      return []; // Empty array - approval service will use restrictedJournalId
     }
   }, [useSelectedJournals, selectedJournals, effectiveRestrictedJournalId]);
 
-  // Fetch pending items for approval
-  const { data: pendingItems, isLoading, error } = useQuery({
+  // Fetch pending items for approval 
+  // Fixed: now uses empty journalIds to let approval service handle restrictedJournalId
+  const { data: pendingItems, isLoading: queryIsLoading, error } = useQuery({
     queryKey: clientApprovalService.approvalKeys.inProcessFiltered({ 
       entityTypes: activeEntityFilters, 
       journalIds: effectiveJournalIds,
     }),
-    queryFn: () => clientApprovalService.getInProcessItems({
-      entityTypes: activeEntityFilters,
-      journalIds: effectiveJournalIds,
-    }),
+    queryFn: () => {
+      console.log("🔍 ApprovalCenter DEBUG: Calling getInProcessItems", {
+        entityTypes: activeEntityFilters,
+        journalIds: effectiveJournalIds,
+        useSelectedJournals,
+        effectiveRestrictedJournalId
+      });
+      return clientApprovalService.getInProcessItems({
+        entityTypes: activeEntityFilters,
+        journalIds: effectiveJournalIds,
+      });
+    },
     enabled: isOpen,
     refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Add minimum loading time to make loading state more visible
+  const [isMinLoadingComplete, setIsMinLoadingComplete] = useState(false);
+  const isLoading = queryIsLoading || !isMinLoadingComplete;
+
+  // Reset minimum loading state when query starts
+  React.useEffect(() => {
+    if (queryIsLoading) {
+      setIsMinLoadingComplete(false);
+      const timer = setTimeout(() => {
+        setIsMinLoadingComplete(true);
+      }, 500); // Minimum 500ms loading state
+      return () => clearTimeout(timer);
+    }
+  }, [queryIsLoading]);
+
+  // Debug log
+  console.log("🔍 ApprovalCenter DEBUG: Query result", {
+    pendingItems,
+    queryIsLoading,
+    isMinLoadingComplete,
+    isLoading,
+    error,
+    effectiveJournalIds,
+    activeEntityFilters,
   });
 
   const toggleEntityFilter = (entityType: string) => {
@@ -96,10 +132,27 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
         queryKey: clientApprovalService.approvalKeys.inProcess()
       });
       
+      // Also invalidate partner and goods queries based on entity type
+      if (entityType === 'partner') {
+        queryClient.invalidateQueries({ queryKey: partnerKeys.all });
+      } else if (entityType === 'good') {
+        queryClient.invalidateQueries({ queryKey: goodKeys.all });
+      }
+      
     } catch (error) {
       console.error('Error approving entity:', error);
       alert(`Error approving entity: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  const openEntityModal = (entity: InProcessItem) => {
+    setSelectedEntity(entity);
+    setIsModalOpen(true);
+  };
+
+  const closeEntityModal = () => {
+    setSelectedEntity(null);
+    setIsModalOpen(false);
   };
 
   const getStatusBadge = (entity: InProcessItem) => {
@@ -114,22 +167,36 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
     }
   };
 
-  const getProgressIndicator = (entity: InProcessItem) => {
-    const { creationJournalLevel, currentPendingLevel } = entity;
-    const dots = [];
+
+  const renderLinkEntity = (entity: InProcessItem) => {
+    const linkParts = entity.name.split(' ↔ ');
+    const [journal, partner, good] = linkParts;
     
-    for (let i = 0; i <= creationJournalLevel; i++) {
-      dots.push(
-        <span 
-          key={i} 
-          className={i <= currentPendingLevel ? styles.progressDotFilled : styles.progressDot}
-        >
-          ●
-        </span>
-      );
-    }
-    
-    return <div className={styles.progressIndicator}>{dots}</div>;
+    return (
+      <div className={styles.linkEntityDisplay}>
+        <div className={styles.linkHeader}>
+          <FiLink className={styles.linkIcon} />
+          <span className={styles.linkTitle}>Journal-Partner-Good Link</span>
+          {getStatusBadge(entity)}
+        </div>
+        <div className={styles.linkComponents}>
+          <div className={styles.linkComponent}>
+            <span className={styles.componentLabel}>Journal</span>
+            <span className={styles.componentValue}>{journal}</span>
+          </div>
+          <div className={styles.linkArrow}>↔</div>
+          <div className={styles.linkComponent}>
+            <span className={styles.componentLabel}>Partner</span>
+            <span className={styles.componentValue}>{partner}</span>
+          </div>
+          <div className={styles.linkArrow}>↔</div>
+          <div className={styles.linkComponent}>
+            <span className={styles.componentLabel}>Good</span>
+            <span className={styles.componentValue}>{good}</span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   if (!isOpen) return null;
@@ -233,6 +300,13 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
+              <motion.div
+                className={styles.loadingSpinner}
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              >
+                <FiLoader />
+              </motion.div>
               Loading pending approvals...
             </motion.div>
           ) : error ? (
@@ -266,48 +340,85 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
               {pendingItems?.data.map((entity: InProcessItem) => (
                 <motion.div
                   key={`${entity.type}-${entity.id}`}
-                  className={styles.pendingEntityCard}
+                  className={`${styles.pendingEntityCard} ${entity.type === 'link' ? styles.linkEntityCard : ''}`}
                   layout
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
                   whileHover={{ scale: 1.02 }}
                 >
-                  <div className={styles.entityInfo}>
-                    <div className={styles.entityHeader}>
-                      <span className={styles.entityName}>{entity.name}</span>
-                      {getStatusBadge(entity)}
-                    </div>
-                    <div className={styles.entityMeta}>
-                      <span className={styles.entityType}>{entity.type.toUpperCase()}</span>
-                      <span className={styles.entityDate}>
-                        Created: {new Date(entity.createdAt).toLocaleDateString()}
-                      </span>
-                    </div>
-                    {getProgressIndicator(entity)}
-                  </div>
-                  
-                  <div className={styles.entityActions}>
-                    {entity.canApprove ? (
-                      <motion.button
-                        className={styles.approveButton}
-                        onClick={() => handleApprove(entity.type, entity.id)}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        <FiCheck />
-                        APPROVE
-                      </motion.button>
-                    ) : (
-                      <span className={styles.viewOnlyLabel}>VIEW ONLY</span>
-                    )}
-                  </div>
+                  {entity.type === 'link' ? (
+                    <>
+                      {renderLinkEntity(entity)}
+                      <div className={styles.entityActions}>
+                        {entity.canApprove ? (
+                          <motion.button
+                            className={styles.approveButton}
+                            onClick={() => handleApprove(entity.type, entity.id)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <FiCheck />
+                            APPROVE
+                          </motion.button>
+                        ) : (
+                          <span className={styles.viewOnlyLabel}>VIEW ONLY</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className={styles.entityInfo}>
+                        <div className={styles.entityHeader}>
+                          <span className={styles.entityName}>{entity.name}</span>
+                          {getStatusBadge(entity)}
+                        </div>
+                        <div className={styles.entityMeta}>
+                          <span className={styles.entityType}>{entity.type.toUpperCase()}</span>
+                          <span className={styles.entityDate}>
+                            Created: {new Date(entity.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className={styles.entityActions}>
+                        <motion.button
+                          className={styles.viewDetailsButton}
+                          onClick={() => openEntityModal(entity)}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          <FiEye />
+                          VIEW DETAILS
+                        </motion.button>
+                        {entity.canApprove ? (
+                          <motion.button
+                            className={styles.approveButton}
+                            onClick={() => handleApprove(entity.type, entity.id)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <FiCheck />
+                            APPROVE
+                          </motion.button>
+                        ) : (
+                          <span className={styles.viewOnlyLabel}>VIEW ONLY</span>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </motion.div>
               ))}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+      
+      <EntityDetailsModal
+        entity={selectedEntity}
+        isOpen={isModalOpen}
+        onClose={closeEntityModal}
+      />
     </motion.div>
   );
 };

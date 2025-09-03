@@ -8,13 +8,14 @@ import { journalService } from "./journalService";
 
 export interface InProcessItem {
   id: string;
-  type: 'partner' | 'good' | 'document' | 'journalPartnerLink' | 'journalGoodLink' | 'journalPartnerGoodLink';
+  type: 'partner' | 'good' | 'document' | 'link';
   name: string;
   approvalStatus: ApprovalStatus;
   creationJournalLevel: number;
   currentPendingLevel: number;
   createdAt: Date;
   createdById: string;
+  canApprove: boolean;
   approvalHistory?: any;
 }
 
@@ -43,42 +44,81 @@ export interface ApproveEntityOptions {
  * - Level 2 User: Level 2
  * etc.
  */
-function getUserApprovalLevel(restrictedTopLevelJournalId: string | null): number {
+async function getUserApprovalLevel(restrictedTopLevelJournalId: string | null): Promise<number> {
+  serviceLogger.debug(`getUserApprovalLevel: Input restrictedTopLevelJournalId: ${restrictedTopLevelJournalId}, ROOT_JOURNAL_ID: ${ROOT_JOURNAL_ID}`);
+  console.log(`🔍 DEBUG: getUserApprovalLevel - input: ${restrictedTopLevelJournalId}, ROOT_JOURNAL_ID: ${ROOT_JOURNAL_ID}`);
+  
   if (!restrictedTopLevelJournalId || restrictedTopLevelJournalId === ROOT_JOURNAL_ID) {
-    return 0; // Admin/Root level
+    console.log(`🔍 DEBUG: getUserApprovalLevel - returning 0 (admin/root level)`);
+    return 0; // Admin/Root level - only truly unrestricted users
   }
   
-  // TODO: Calculate the actual level based on journal hierarchy depth
-  // For now, we'll use a simple mapping, but this should be enhanced
-  // to dynamically calculate the level based on journal hierarchy
-  
-  // This is a placeholder - you'll need to implement proper level calculation
-  // based on the journal's depth in the hierarchy
-  return 1; // Default to level 1 for restricted users
+  // For ANY journal restriction (even if it's the root journal in the DB),
+  // the user can only approve at level 1 and above (never at root level 0)
+  console.log(`🔍 DEBUG: getUserApprovalLevel - calling getJournalLevel for journal ${restrictedTopLevelJournalId}`);
+  const level = await getJournalLevel(restrictedTopLevelJournalId);
+  const approvalLevel = Math.max(1, level + 1); // Always at least level 1 for restricted users
+  console.log(`🔍 DEBUG: getUserApprovalLevel - journal level: ${level}, approval level: ${approvalLevel}`);
+  return approvalLevel;
 }
 
 /**
  * Gets the journal level for a given journal ID by counting its depth in the hierarchy
+ * Level 0 = root, Level 1 = first child, etc.
  */
 async function getJournalLevel(journalId: string): Promise<number> {
-  const result = await prisma.$queryRaw<Array<{ level: number }>>`
-    WITH RECURSIVE "JournalLevel" AS (
-      SELECT "id", "parent_id", 0 AS level FROM "journals" WHERE "id" = ${journalId}
-      UNION ALL
-      SELECT j."id", j."parent_id", jl.level + 1 FROM "journals" j
-      INNER JOIN "JournalLevel" jl ON j."id" = jl."parent_id"
-    )
-    SELECT level FROM "JournalLevel" WHERE "id" = ${journalId} LIMIT 1;
-  `;
+  serviceLogger.debug(`getJournalLevel: Input journalId: ${journalId}`);
   
-  return result[0]?.level ?? 0;
+  // First, let's check the journal and its parent
+  const journal = await prisma.journal.findUnique({
+    where: { id: journalId },
+    select: { id: true, parentId: true, name: true }
+  });
+  
+  console.log(`🔍 DEBUG: getJournalLevel - journal info:`, { 
+    id: journal?.id?.toString(),
+    parentId: journal?.parentId?.toString(),
+    name: journal?.name 
+  });
+  
+  if (!journal) {
+    console.log(`🔍 DEBUG: getJournalLevel - journal not found, returning 0`);
+    return 0;
+  }
+  
+  if (!journal.parentId) {
+    console.log(`🔍 DEBUG: getJournalLevel - journal has no parent (is root), returning 0`);
+    return 0; // This is the root journal
+  }
+  
+  // Count levels by walking up the hierarchy
+  let currentJournalId = journal.parentId;
+  let level = 1; // Start at 1 since we have at least one parent
+  
+  while (currentJournalId) {
+    const parentJournal = await prisma.journal.findUnique({
+      where: { id: currentJournalId },
+      select: { parentId: true }
+    });
+    
+    if (!parentJournal?.parentId) {
+      break; // Reached root
+    }
+    
+    currentJournalId = parentJournal.parentId;
+    level++;
+  }
+  
+  console.log(`🔍 DEBUG: getJournalLevel - journal ${journalId} -> level ${level}`);
+  return level;
 }
 
 /**
  * Fetches entities that are pending approval for the user's level
  */
 async function getInProcessItems(options: GetInProcessItemsOptions) {
-  serviceLogger.debug("approvalService.getInProcessItems", { options });
+  serviceLogger.debug("approvalService.getInProcessItems - START", { options });
+  console.log("🔍 DEBUG: START options", JSON.stringify(options, null, 2));
 
   const { userApprovalLevel, entityTypes, journalIds, restrictedJournalId, take, skip } = options;
 
@@ -93,10 +133,23 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
     journalScope = [restrictedJournalId, ...descendants];
   }
 
+  serviceLogger.debug("approvalService.getInProcessItems - journal scope calculated", { 
+    journalScope, 
+    journalIds, 
+    restrictedJournalId 
+  });
+
   const results: InProcessItem[] = [];
 
-  // If no entity types selected, show only items at user's level (default behavior)
-  const showOnlyUserLevel = entityTypes.length === 0;
+  // Show all pending items in user's journal scope for oversight
+  // User can approve items at their level, but can see all pending items in their scope
+  const showOnlyUserLevel = false;
+  
+  serviceLogger.debug("approvalService.getInProcessItems - filtering settings", { 
+    showOnlyUserLevel, 
+    userApprovalLevel,
+    entityTypesCount: entityTypes.length 
+  });
 
   // Partners
   if (entityTypes.length === 0 || entityTypes.includes('partner')) {
@@ -111,6 +164,11 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
         }
       })
     };
+
+    serviceLogger.debug("approvalService.getInProcessItems - partner query", { 
+      partnerWhere: JSON.stringify(partnerWhere, null, 2),
+      journalScopeLength: journalScope.length 
+    });
 
     const partners = await prisma.partner.findMany({
       where: partnerWhere,
@@ -128,10 +186,21 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
       take,
     });
 
+    serviceLogger.debug("approvalService.getInProcessItems - partner results", { 
+      partnersFound: partners.length,
+      partnerIds: partners.map(p => p.id.toString())
+    });
+    console.log("🔍 DEBUG: Partner query results", { 
+      partnersFound: partners.length,
+      partnerIds: partners.map(p => p.id.toString()),
+      partnerDetails: partners.map(p => ({ id: p.id.toString(), name: p.name, approvalStatus: p.approvalStatus, currentPendingLevel: p.currentPendingLevel }))
+    });
+
     results.push(...partners.map(p => ({
       ...p,
       id: p.id.toString(),
       type: 'partner' as const,
+      canApprove: p.currentPendingLevel === userApprovalLevel,
     })));
   }
 
@@ -170,6 +239,7 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
       id: g.id.toString(),
       name: g.label,
       type: 'good' as const,
+      canApprove: g.currentPendingLevel === userApprovalLevel,
     })));
   }
 
@@ -204,43 +274,68 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
       id: d.id.toString(),
       name: d.refDoc,
       type: 'document' as const,
+      canApprove: d.currentPendingLevel === userApprovalLevel,
     })));
   }
 
-  // Links (if requested)
-  if (entityTypes.includes('link')) {
-    // Journal-Partner Links
-    const jpLinks = await prisma.journalPartnerLink.findMany({
+  // Links (if requested or if no specific entity types requested)
+  if (entityTypes.length === 0 || entityTypes.includes('link')) {
+    // Journal-Partner-Good Links (3-way relationships that need approval)
+    serviceLogger.debug("approvalService.getInProcessItems - jpgLinks query", { 
+      journalScope, 
+      showOnlyUserLevel, 
+      userApprovalLevel 
+    });
+    
+    const jpgLinks = await prisma.journalPartnerGoodLink.findMany({
       where: {
         approvalStatus: ApprovalStatus.PENDING,
         ...(showOnlyUserLevel && { currentPendingLevel: userApprovalLevel }),
         ...(journalScope.length > 0 && {
-          journalId: { in: journalScope }
+          journalPartnerLink: {
+            journalId: { in: journalScope }
+          }
         })
       },
       include: {
-        journal: { select: { name: true } },
-        partner: { select: { name: true } },
+        journalPartnerLink: {
+          include: {
+            journal: { select: { name: true } },
+            partner: { select: { name: true } }
+          }
+        },
+        good: { select: { label: true } }
       },
       skip,
       take,
     });
 
-    results.push(...jpLinks.map(link => ({
+    serviceLogger.debug("approvalService.getInProcessItems - jpgLinks results", { 
+      jpgLinksFound: jpgLinks.length,
+      jpgLinkIds: jpgLinks.map(link => link.id.toString())
+    });
+
+    results.push(...jpgLinks.map(link => ({
       id: link.id.toString(),
-      name: `${link.journal.name} ↔ ${link.partner.name}`,
-      type: 'journalPartnerLink' as const,
+      name: `${link.journalPartnerLink.journal.name} ↔ ${link.journalPartnerLink.partner.name} ↔ ${link.good.label}`,
+      type: 'link' as const,
       approvalStatus: link.approvalStatus,
       creationJournalLevel: link.creationLevel,
       currentPendingLevel: link.currentPendingLevel,
       createdAt: link.createdAt,
       createdById: 'system', // Links don't have createdById
+      canApprove: link.currentPendingLevel === userApprovalLevel,
       approvalHistory: link.approvalMetadata,
     })));
   }
 
   // Sort by creation date (most recent first)
   results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  serviceLogger.debug("approvalService.getInProcessItems - FINAL RESULTS", { 
+    totalResults: results.length,
+    resultTypes: results.map(r => ({ id: r.id, type: r.type, name: r.name }))
+  });
 
   return {
     data: results,
@@ -302,6 +397,17 @@ async function approveEntity(options: ApproveEntityOptions) {
           },
         });
         break;
+      case 'link':
+        entity = await tx.journalPartnerGoodLink.findUnique({
+          where: { id: BigInt(entityId) },
+          select: {
+            currentPendingLevel: true,
+            creationLevel: true,
+            approvalStatus: true,
+            approvalMetadata: true,
+          },
+        });
+        break;
       default:
         throw new Error(`Unsupported entity type: ${entityType}`);
     }
@@ -336,7 +442,9 @@ async function approveEntity(options: ApproveEntityOptions) {
     const updatedApprovalTimestamps = [...(entity.approvalTimestamps || []), new Date()];
 
     // Determine if this is the final approval
-    const isLastLevel = entity.currentPendingLevel >= entity.creationJournalLevel;
+    // For links, use creationLevel instead of creationJournalLevel
+    const creationLevel = entity.creationJournalLevel ?? entity.creationLevel;
+    const isLastLevel = entity.currentPendingLevel >= creationLevel;
 
     if (isLastLevel) {
       // Final approval - mark as APPROVED
@@ -375,6 +483,21 @@ async function approveEntity(options: ApproveEntityOptions) {
         updatedEntity = await tx.document.update({
           where: { id: BigInt(entityId) },
           data: updateData,
+        });
+        break;
+      case 'link':
+        // For links, use approvalMetadata instead of approvalHistory
+        const linkUpdateData = {
+          ...updateData,
+          approvalMetadata: updateData.approvalHistory,
+        };
+        delete linkUpdateData.approvalHistory;
+        delete linkUpdateData.approvedByUserIds;
+        delete linkUpdateData.approvalTimestamps;
+        
+        updatedEntity = await tx.journalPartnerGoodLink.update({
+          where: { id: BigInt(entityId) },
+          data: linkUpdateData,
         });
         break;
     }

@@ -45,7 +45,16 @@ export interface LevelData {
 
 export const useMultiLevelSelection = (
   hierarchyData: AccountNodeData[],
-  topLevelId: string
+  topLevelId: string,
+  updateJournalSelections?: (
+    newSelections: {
+      topLevelId?: string;
+      level2Ids?: string[];
+      level3Ids?: string[];
+      levelSelections?: string[][];
+    },
+    visibleChildrenMap: Record<string, boolean>
+  ) => void
 ) => {
   const { levelSelections } = useAppStore(
     (state) => state.selections.journal
@@ -270,11 +279,16 @@ export const useMultiLevelSelection = (
         levelSelections: updatedLevelSelections,
         level2Ids: updatedLevelSelections[0] || [],
         level3Ids: updatedLevelSelections[1] || [],
-        selectedJournalId: null, // Will be calculated by the selection hook
+        // selectedJournalId will be calculated by the selection hook's updateJournalSelections
         effectiveJournalIds: Array.from(allEffectiveIds),
       };
       
-      setSelection("journal", updateData);
+      // Use the proper terminal ID calculation function if available
+      if (updateJournalSelections) {
+        updateJournalSelections(updateData, {}); // Pass empty visibleChildrenMap for now
+      } else {
+        setSelection("journal", updateData);
+      }
       return;
     }
     
@@ -369,12 +383,17 @@ export const useMultiLevelSelection = (
       // Also update legacy format for backward compatibility
       level2Ids: updatedLevelSelections[0] || [],
       level3Ids: updatedLevelSelections[1] || [],
-      selectedJournalId: null, // Will be calculated by the selection hook
+      // selectedJournalId will be calculated by the selection hook's updateJournalSelections
       effectiveJournalIds: Array.from(allEffectiveIds),
     };
     
-    setSelection("journal", updateData);
-  }, [levelSelections, calculateNextCycleState, setSelection, hierarchyData]);
+    // Use the proper terminal ID calculation function if available
+    if (updateJournalSelections) {
+      updateJournalSelections(updateData, {}); // Pass empty visibleChildrenMap for now
+    } else {
+      setSelection("journal", updateData);
+    }
+  }, [levelSelections, calculateNextCycleState, setSelection, hierarchyData, updateJournalSelections]);
 
   // Handle expanding to show more levels (no longer needed - automatic)
   const expandToLevel = useCallback((targetLevel: number) => {

@@ -22,7 +22,7 @@ import type { DocumentCreationMode, DocumentItem } from "@/lib/types/ui";
 import { useChainedQuery } from "@/hooks/useChainedQuery";
 import { getFirstId } from "@/lib/helpers";
 
-export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
+export const useDocumentManager = (selectedGoodData?: GoodClient[], journalManager?: any) => {
   const queryClient = useQueryClient();
 
   const { sliderOrder, visibility } = useAppStore((state) => state.ui);
@@ -100,13 +100,22 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
   }, [sliderOrder, visibility]);
 
   const handleStartCreation = useCallback(() => {
+    console.log('🔍 handleStartCreation called', {
+      isJournalFirst,
+      journalManagerSelectedJournalId: journalManager?.selectedJournalId,
+      selections: selections.journal,
+      journalManager: journalManager
+    });
+    
     if (!isJournalFirst) {
       alert(
         "Document creation is only allowed when the Journal slider is first."
       );
       return;
     }
-    const journalContext = selections.journal.selectedJournalId;
+    
+    // Use the journal manager's selectedJournalId - this is the authoritative source for terminal selections
+    const journalContext = journalManager?.selectedJournalId;
 
     if (!journalContext) {
       alert("Please select a single, terminal journal to create a document.");
@@ -189,6 +198,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
     selections,
     startDocumentCreation,
     selectedGoodData,
+    journalManager,
   ]);
 
   const handleCancelCreation = useCallback(() => {
@@ -374,7 +384,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
   // Document creation for single-item mode and single documents
   const handleSubmit = useCallback(
     async (headerData: { refDoc: string; date: Date; type: any; [key: string]: any }) => {
-      const journalId = selections.journal.selectedJournalId;
+      const journalId = journalManager?.selectedJournalId;
       
       if (!journalId) {
         alert("Critical Error: Journal ID is missing for document creation.");
@@ -403,12 +413,13 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
       }
     },
     [
-      selections.journal.selectedJournalId,
+      journalManager?.selectedJournalId,
       selections.partner,
       items,
       createSingleDocument,
       handleCancelCreation,
       setFinalizeModalOpen,
+      journalManager,
     ]
   );
   
@@ -416,7 +427,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
   const processNextDocument = useCallback(
     async (confirmedHeaderData: any) => {
       const { currentPartnerIndex, partnerIds, totalPartners } = multiDocumentState;
-      const journalId = selections.journal.selectedJournalId!;
+      const journalId = journalManager?.selectedJournalId!;
       const partnerId = partnerIds[currentPartnerIndex];
       
       try {
@@ -440,7 +451,7 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[]) => {
         // Continue with next document or allow user to retry
       }
     },
-    [multiDocumentState, selections.journal.selectedJournalId, createSingleDocument, handleCancelCreation, setFinalizeModalOpen, updateMultiDocumentState, resetMultiDocumentState]
+    [multiDocumentState, journalManager?.selectedJournalId, createSingleDocument, handleCancelCreation, setFinalizeModalOpen, updateMultiDocumentState, resetMultiDocumentState, journalManager]
   );
   
   // Cancel multiple document creation

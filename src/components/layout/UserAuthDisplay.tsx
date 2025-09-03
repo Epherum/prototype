@@ -5,6 +5,7 @@ import Link from "next/link";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
 import styles from "./UserAuthDisplay.module.css";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ThemeSelector } from "@/components/shared/ThemeSelector";
@@ -60,6 +61,8 @@ export default function UserAuthDisplay({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
 
   // Function to get logo source based on theme
   const getLogoSource = () => {
@@ -87,6 +90,15 @@ export default function UserAuthDisplay({
         return 'hue-rotate(80deg) saturate(0.9)'; // Shift blue to green
       default:
         return 'none';
+    }
+  };
+
+  // Function to handle logo click - toggle between main page and departments page
+  const handleLogoClick = () => {
+    if (pathname === '/departments') {
+      router.push('/');
+    } else {
+      router.push('/departments');
     }
   };
 
@@ -164,7 +176,7 @@ export default function UserAuthDisplay({
                     variants={itemRevealUpVariants}
                     className={styles.logoContainer}
                   >
-                    <Link href="/departments">
+                    <button onClick={handleLogoClick} className={styles.logoButton}>
                       <Image
                         src={getLogoSource()}
                         alt="Insen Logo"
@@ -175,7 +187,7 @@ export default function UserAuthDisplay({
                           filter: getLogoFilter()
                         }}
                       />
-                    </Link>
+                    </button>
                   </motion.div>
 
                   {/* Username dropdown in the middle */}

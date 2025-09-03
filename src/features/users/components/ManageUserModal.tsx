@@ -16,6 +16,15 @@ import { ROOT_JOURNAL_ID } from "@/lib/constants";
 import type { AccountNodeData } from "@/lib/types/ui";
 import { roleKeys } from "@/lib/queryKeys";
 
+interface ValidationErrors {
+  name?: string[];
+  email?: string[];
+  password?: string[];
+  roleAssignments?: string[];
+  restrictedTopLevelJournalId?: string[];
+  _errors?: string[];
+}
+
 interface ManageUserModalProps {
   isOpen: boolean; // Though always true when rendered, useful for AnimatePresence
   onClose: () => void;
@@ -131,6 +140,21 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
     ? `Edit User: ${formState.name || ""}`
     : "Create New User";
 
+  // Extract validation errors from submissionError
+  const validationErrors: ValidationErrors = useMemo(() => {
+    if (!submissionError || submissionError.status !== 400) return {};
+    
+    try {
+      const errorData = JSON.parse(submissionError.message);
+      if (errorData.errors) {
+        return errorData.errors;
+      }
+    } catch {
+      // If parsing fails, fall back to showing generic error
+    }
+    return {};
+  }, [submissionError]);
+
   const handleActualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -203,7 +227,13 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                       required
                       disabled={isSubmitting}
                       autoComplete="name"
+                      className={validationErrors.name ? styles.inputError : ''}
                     />
+                    {validationErrors.name && (
+                      <div className={styles.fieldError}>
+                        {validationErrors.name.join(', ')}
+                      </div>
+                    )}
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="email">Email Address *</label>
@@ -216,7 +246,13 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                       required
                       disabled={isSubmitting}
                       autoComplete="email"
+                      className={validationErrors.email ? styles.inputError : ''}
                     />
+                    {validationErrors.email && (
+                      <div className={styles.fieldError}>
+                        {validationErrors.email.join(', ')}
+                      </div>
+                    )}
                   </div>
                   <div className={styles.formGroup}>
                     <label htmlFor="password">
@@ -233,6 +269,7 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                         required={!isEditMode}
                         disabled={isSubmitting}
                         autoComplete="new-password"
+                        className={validationErrors.password ? styles.inputError : ''}
                       />
                       <button
                         type="button"
@@ -246,6 +283,11 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                         {showPassword ? <IoEyeOff /> : <IoEye />}
                       </button>
                     </div>
+                    {validationErrors.password && (
+                      <div className={styles.fieldError}>
+                        {validationErrors.password.join(', ')}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -264,6 +306,11 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                       </button>
                     </div>
                     <div className={styles.rolesContainer}>
+                      {validationErrors.roleAssignments && (
+                        <div className={styles.fieldError}>
+                          {validationErrors.roleAssignments.join(', ')}
+                        </div>
+                      )}
                       {assignableRoles?.map((role) => (
                         <div
                           key={role.id}
@@ -348,9 +395,15 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
                 </div>
               </div>
 
-              {submissionError && (
+              {submissionError && !Object.keys(validationErrors).length && (
                 <p className={styles.errorMessage}>
                   {submissionError.message || "An unexpected error occurred."}
+                </p>
+              )}
+
+              {validationErrors._errors && (
+                <p className={styles.errorMessage}>
+                  {validationErrors._errors.join(', ')}
                 </p>
               )}
 

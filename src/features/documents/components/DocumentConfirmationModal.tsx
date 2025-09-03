@@ -75,7 +75,14 @@ export const DocumentConfirmationModal = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onValidate({ refDoc: refDoc || null, date: new Date(date), type });
+    
+    // Validate that refDoc is not empty
+    if (!refDoc || refDoc.trim() === "") {
+      alert("Document reference is required. Please enter a reference.");
+      return;
+    }
+    
+    onValidate({ refDoc: refDoc.trim(), date: new Date(date), type });
   };
 
   const totalAmount = (goods || [])
@@ -215,7 +222,7 @@ export const DocumentConfirmationModal = ({
 
               <div className={styles.formSection}>
                 <div className={styles.formGroup}>
-                  <label htmlFor="refDoc">Reference (Optional)</label>
+                  <label htmlFor="refDoc">Document Reference *</label>
                   <input
                     id="refDoc"
                     type="text"
@@ -223,6 +230,7 @@ export const DocumentConfirmationModal = ({
                     onChange={(e) => setRefDoc(e.target.value)}
                     placeholder="e.g., INV-2025-001"
                     className={styles.formInput}
+                    required
                   />
                 </div>
                 <div className={styles.formGroupGrid}>

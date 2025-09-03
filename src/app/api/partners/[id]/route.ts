@@ -28,10 +28,11 @@ type RouteContext = { params: { id: string } };
 export const GET = withAuthorization(
   async function GET(_request: NextRequest, { params }: RouteContext) {
     try {
-      const partnerId = parseBigInt(params.id, "partner ID");
+      const resolvedParams = await params;
+      const partnerId = parseBigInt(resolvedParams.id, "partner ID");
       if (partnerId === null) {
         return NextResponse.json(
-          { message: `Invalid partner ID format: '${params.id}'.` },
+          { message: `Invalid partner ID format: '${resolvedParams.id}'.` },
           { status: 400 }
         );
       }
@@ -80,7 +81,7 @@ export const PUT = withAuthorization(
       const partnerId = parseBigInt(params.id, "partner ID");
       if (partnerId === null) {
         return NextResponse.json(
-          { message: `Invalid partner ID format: '${params.id}'.` },
+          { message: `Invalid partner ID format: '${resolvedParams.id}'.` },
           { status: 400 }
         );
       }
@@ -149,7 +150,7 @@ export const DELETE = withAuthorization(
       const partnerId = parseBigInt(params.id, "partner ID");
       if (partnerId === null) {
         return NextResponse.json(
-          { message: `Invalid partner ID format: '${params.id}'.` },
+          { message: `Invalid partner ID format: '${resolvedParams.id}'.` },
           { status: 400 }
         );
       }

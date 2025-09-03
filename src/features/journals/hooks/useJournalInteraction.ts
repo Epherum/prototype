@@ -477,10 +477,15 @@ export const useJournalInteraction = ({
 
   const handleL2SingleClickToggle = useCallback(
     (l2ItemId: string) => {
+      console.log('🔍 handleL2SingleClickToggle called with:', l2ItemId, {
+        isSelected: level3Ids.includes(l2ItemId),
+        currentLevel3Ids: level3Ids
+      });
       const isSelected = level3Ids.includes(l2ItemId);
       const newL3s = isSelected
         ? level3Ids.filter((id) => id !== l2ItemId)
         : [...level3Ids, l2ItemId];
+      console.log('🔍 New L3 selections:', newL3s);
       const parentL1 = findParentOfNode(l2ItemId, hierarchyData);
       if (parentL1) {
         const parentChildrenIds = new Set(
@@ -506,10 +511,12 @@ export const useJournalInteraction = ({
   );
   const handleL2Interaction = useCallback(
     (l2ItemId: string) => {
+      console.log('🔍 handleL2Interaction called with:', l2ItemId);
       if (l2ClickInteractionRef.current.timeout)
         clearTimeout(l2ClickInteractionRef.current.timeout);
       if (l2ClickInteractionRef.current.id === l2ItemId) {
         const parent = findParentOfNode(l2ItemId, hierarchyData);
+        console.log('🔍 Double-click detected, parent found:', parent?.id);
         if (parent) {
           delete savedSelectionsRef.current[parent.id];
           handleSelectTopLevelJournal(parent.id, l2ItemId);

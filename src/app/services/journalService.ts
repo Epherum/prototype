@@ -79,6 +79,34 @@ async function getJournalAncestorPath(journalId: string): Promise<string[]> {
 }
 
 /**
+ * ✨ NEW
+ * Gets the journal level (depth in hierarchy) for a given journal ID.
+ * Root journals have level 0, their children have level 1, etc.
+ */
+async function getJournalLevel(journalId: string): Promise<number> {
+  serviceLogger.debug(
+    `journalService.getJournalLevel: Input - journalId: '${journalId}'`
+  );
+
+  const result = await prisma.$queryRaw<Array<{ id: string; level: number }>>`
+    WITH RECURSIVE "JournalAncestors" AS (
+      SELECT "id", "parent_id", 0 AS level FROM "journals" WHERE "id" = ${journalId}
+      UNION ALL
+      SELECT j."id", j."parent_id", ja.level + 1 FROM "journals" j
+      INNER JOIN "JournalAncestors" ja ON j."id" = ja."parent_id"
+    )
+    SELECT "id", level FROM "JournalAncestors" ORDER BY level ASC LIMIT 1;
+  `;
+
+  const level = result.length > 0 ? result[0].level : 0;
+  serviceLogger.debug(
+    `journalService.getJournalLevel: Output - level: ${level}`
+  );
+
+  return level;
+}
+
+/**
  * ✅ EXISTING & SPECIFIED
  * Fetches the complete hierarchy of journals starting from a given root.
  */
@@ -382,6 +410,7 @@ export const journalService = {
   // Functions specified in the new documentation
   getDescendantJournalIds,
   getJournalAncestorPath,
+  getJournalLevel,
   getJournalSubHierarchy,
   getJournalsForPartners,
   getJournalsForGoods,

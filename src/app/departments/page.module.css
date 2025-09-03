@@ -10,27 +10,8 @@
 .pageHeader {
   display: flex;
   align-items: center;
-  gap: calc(var(--spacing-unit) * 2);
+  justify-content: center;
   margin-bottom: calc(var(--spacing-unit) * 4);
-}
-
-.backButton {
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--border-radius-md);
-  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 2);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: calc(var(--spacing-unit) * 0.5);
-}
-
-.backButton:hover {
-  background: var(--bg-secondary-hover);
-  border-color: var(--border-interactive);
 }
 
 .title {

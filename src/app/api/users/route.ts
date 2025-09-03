@@ -22,7 +22,10 @@ const postHandler = async (
     if (!validation.success) {
       return NextResponse.json(
         {
-          message: "Invalid user creation data",
+          message: JSON.stringify({
+            message: "Invalid user creation data",
+            errors: validation.error.format(),
+          }),
           errors: validation.error.format(),
         },
         { status: 400 }

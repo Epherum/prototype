@@ -247,6 +247,29 @@
   border: 1px solid var(--danger-color);
 }
 
+/* --- Field-specific Error Styling --- */
+.fieldError {
+  color: var(--danger-color);
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: calc(var(--spacing-unit) * 0.5);
+  padding: calc(var(--spacing-unit) * 0.75);
+  background-color: var(--danger-color-light-bg);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--danger-color-light);
+}
+
+/* --- Input Error State --- */
+.inputError {
+  border-color: var(--danger-color) !important;
+  box-shadow: 0 0 0 3px var(--danger-color-light) !important;
+}
+
+.inputError:focus {
+  border-color: var(--danger-color) !important;
+  box-shadow: 0 0 0 3px var(--danger-color-light) !important;
+}
+
 /* --- Journal Selection Styling --- */
 .journalSelect {
   flex-grow: 1;

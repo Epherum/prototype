@@ -91,6 +91,20 @@ export const useChainedQuery = <T extends SliderType>(
   const queryOpts = useMemo(() => {
     const visibleOrder = sliderOrder.filter((id) => visibility[id]);
     const myIndex = visibleOrder.indexOf(sliderType);
+    const documentIndex = visibleOrder.indexOf(SLIDER_TYPES.DOCUMENT);
+    
+    // DEBUG: Log creation mode context for Partner/Goods sliders
+    if ((sliderType === SLIDER_TYPES.PARTNER || sliderType === SLIDER_TYPES.GOODS) && isCreating) {
+      console.log(`🔍 [useChainedQuery] Creation mode context for ${sliderType}:`, {
+        isCreating,
+        visibleOrder,
+        myIndex,
+        documentIndex,
+        hasDocumentDependency: documentIndex !== -1 && documentIndex < myIndex,
+        effectiveDocumentId,
+        selectedDocumentId
+      });
+    }
 
     if (myIndex === -1) {
       return queryOptions({
@@ -112,7 +126,6 @@ export const useChainedQuery = <T extends SliderType>(
     const journalIndex = visibleOrder.indexOf(SLIDER_TYPES.JOURNAL);
     const partnerIndex = visibleOrder.indexOf(SLIDER_TYPES.PARTNER);
     const goodsIndex = visibleOrder.indexOf(SLIDER_TYPES.GOODS);
-    const documentIndex = visibleOrder.indexOf(SLIDER_TYPES.DOCUMENT);
 
     // ✅ OPTIMIZATION: Check if any preceding slider is empty (except for document dependencies)
     const checkPrecedingSliderEmpty = (precedingIndex: number, precedingType: SliderType): boolean => {
@@ -140,12 +153,19 @@ export const useChainedQuery = <T extends SliderType>(
     const hasDocumentDependency = documentIndex !== -1 && documentIndex < myIndex;
     
     // If document comes before this slider and is empty, disable (except for journal which can work without document)
-    if (hasDocumentDependency && !effectiveDocumentId && sliderType !== SLIDER_TYPES.JOURNAL) {
+    // BUT: During document creation mode, allow Partner/Goods sliders to populate with available options
+    if (hasDocumentDependency && !effectiveDocumentId && sliderType !== SLIDER_TYPES.JOURNAL && !isCreating) {
+      console.log(`🚫 [useChainedQuery] Disabling ${sliderType} due to empty document dependency (standard mode)`);
       return queryOptions({
         queryKey: [sliderType, "disabled_empty_document"],
         queryFn: async () => ({ data: [], totalCount: 0 }),
         enabled: false,
       });
+    }
+    
+    // DEBUG: Log when we bypass document dependency during creation
+    if (hasDocumentDependency && !effectiveDocumentId && isCreating && sliderType !== SLIDER_TYPES.JOURNAL) {
+      console.log(`✅ [useChainedQuery] Bypassing document dependency for ${sliderType} during creation mode`);
     }
     
     // ✅ OPTIMIZATION: For sequential dependencies (non-document), check if previous slider is empty
@@ -324,13 +344,13 @@ export const useChainedQuery = <T extends SliderType>(
         
         // Only include journal filtering if we have journal selections AND journal comes before partner
         if (hasJournalSelections && isJournalBeforePartner) {
-          // Handle multiple active filter modes
-          const activeFilters = journalSelection.rootFilter;
+          // Handle multiple active filter modes - EXCLUDE 'pending' (only for ApprovalCenter)
+          const activeFilters = journalSelection.rootFilter.filter(filter => filter !== 'pending');
           
           // Use the properly calculated effectiveJournalIds which supports unlimited levels
           params.selectedJournalIds = effectiveJournalIds;
           
-          // Pass all active filter modes for multi-select support
+          // Pass all active filter modes for multi-select support (excluding pending)
           if (activeFilters.length > 0) {
             // Use activeFilterModes for new multi-select API, keep filterMode for backward compatibility
             params.activeFilterModes = activeFilters as ('affected' | 'unaffected' | 'inProcess')[];
@@ -345,6 +365,17 @@ export const useChainedQuery = <T extends SliderType>(
          
         }
         
+        // DEBUG: Log when Partner query is enabled during creation mode
+        if (isCreating) {
+          console.log(`📊 [useChainedQuery] PARTNER query enabled during creation:`, {
+            params,
+            hasJournalSelections,
+            isJournalBeforePartner,
+            effectiveJournalIds,
+            visibleOrder
+          });
+        }
+        
         return queryOptions({
           queryKey: partnerKeys.list(params),
           queryFn: () => partnerService.fetchPartners(params),
@@ -353,8 +384,8 @@ export const useChainedQuery = <T extends SliderType>(
             // If no journal before partner, always enabled
             if (!isJournalBeforePartner) return true;
             
-            // If journal before partner, need both selections and filters
-            const hasRequiredJournalData = hasJournalSelections && journalSelection.rootFilter.length > 0;
+            // If journal before partner, need both selections and filters (excluding 'pending')
+            const hasRequiredJournalData = hasJournalSelections && journalSelection.rootFilter.filter(f => f !== 'pending').length > 0;
             
             // Additional check: if we have document dependency, we might still be enabled even without journal
             if (hasDocumentDependency && effectiveDocumentId) return true;
@@ -445,13 +476,13 @@ export const useChainedQuery = <T extends SliderType>(
         
         // Only include journal filtering if we have journal selections AND journal comes before goods
         if (hasJournalSelectionsForGoods && isJournalBeforeGoods) {
-          // Handle multiple active filter modes
-          const activeFilters = journalSelection.rootFilter;
+          // Handle multiple active filter modes - EXCLUDE 'pending' (only for ApprovalCenter)
+          const activeFilters = journalSelection.rootFilter.filter(filter => filter !== 'pending');
           
           // Use the properly calculated effectiveJournalIds which supports unlimited levels
           goodsParams.selectedJournalIds = effectiveJournalIds;
           
-          // Pass all active filter modes for multi-select support
+          // Pass all active filter modes for multi-select support (excluding pending)
           if (activeFilters.length > 0) {
             // Use activeFilterModes for new multi-select API, keep filterMode for backward compatibility
             goodsParams.activeFilterModes = activeFilters as ('affected' | 'unaffected' | 'inProcess')[];
@@ -459,6 +490,17 @@ export const useChainedQuery = <T extends SliderType>(
             goodsParams.filterMode = activeFilters[0] as any;
           }
           goodsParams.permissionRootId = journalSelection.topLevelId;
+        }
+        
+        // DEBUG: Log when Goods query is enabled during creation mode
+        if (isCreating) {
+          console.log(`📊 [useChainedQuery] GOODS query enabled during creation:`, {
+            goodsParams,
+            hasJournalSelectionsForGoods,
+            isJournalBeforeGoods,
+            effectiveJournalIds,
+            visibleOrder
+          });
         }
         
         return queryOptions({
@@ -469,8 +511,8 @@ export const useChainedQuery = <T extends SliderType>(
             // If no journal before goods, always enabled
             if (!isJournalBeforeGoods) return true;
             
-            // If journal before goods, need both selections and filters
-            const hasRequiredJournalData = hasJournalSelectionsForGoods && journalSelection.rootFilter.length > 0;
+            // If journal before goods, need both selections and filters (excluding 'pending')
+            const hasRequiredJournalData = hasJournalSelectionsForGoods && journalSelection.rootFilter.filter(f => f !== 'pending').length > 0;
             
             // Additional check: if we have document dependency, we might still be enabled even without journal
             if (hasDocumentDependency && effectiveDocumentId) return true;
@@ -550,7 +592,7 @@ export const useChainedQuery = <T extends SliderType>(
     isCreating,
     effectiveJournalIds,
     journalSelection,
-    JSON.stringify(journalSelection.rootFilter), // Ensure array content changes trigger re-render
+    JSON.stringify(journalSelection.rootFilter.filter(f => f !== 'pending')), // Exclude 'pending' from dependencies
     journalSelection.topLevelId,
     journalSelection.level2Ids.length, // Track array length changes
     journalSelection.level3Ids.length,

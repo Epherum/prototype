@@ -1,7 +1,7 @@
 // src/app/services/partnerService.ts
 
 import prisma from "@/app/utils/prisma";
-import { Partner, Prisma, EntityState } from "@prisma/client";
+import { Partner, Prisma, EntityState, ApprovalStatus } from "@prisma/client";
 import { journalService } from "./journalService";
 import {
   GetAllItemsOptions,
@@ -28,6 +28,10 @@ const partnerService = {
     const ancestorPath = await journalService.getJournalAncestorPath(journalId);
     serviceLogger.debug("partnerService.createPartner: Ancestor path", { ancestorPath });
     
+    // Get the journal level for the creation journal
+    const creationJournalLevel = await journalService.getJournalLevel(journalId);
+    serviceLogger.debug("partnerService.createPartner: Creation journal level", { creationJournalLevel });
+    
     // Create the partner first
     const newPartner = await prisma.partner.create({
       data: {
@@ -35,14 +39,19 @@ const partnerService = {
         createdById: createdById,
         entityState: EntityState.ACTIVE,
         statusId: partnerData.statusId || "pending-default",
+        creationJournalLevel: creationJournalLevel,
       },
     });
     
     // Create journal-partner links for the entire hierarchy path
+    // Note: JournalPartnerLinks are automatically approved (no approval workflow needed)
     const journalPartnerLinks = ancestorPath.map(journalId => ({
       journalId,
       partnerId: newPartner.id,
       partnershipType: "STANDARD_TRANSACTION", // Default partnership type
+      creationLevel: creationJournalLevel,
+      approvalStatus: "APPROVED", // Auto-approve journal-partner links
+      currentPendingLevel: creationJournalLevel, // Set to creation level (fully approved)
     }));
     
     await prisma.journalPartnerLink.createMany({
@@ -85,9 +94,11 @@ const partnerService = {
       ...externalWhere,
     };
     // Use activeFilterModes if provided, otherwise fall back to single filterMode
-    const filtersToApply = activeFilterModes?.length > 0 
+    // IMPORTANT: Filter out 'pending' - it's only for ApprovalCenter, not main sliders
+    const rawFilters = activeFilterModes?.length > 0 
       ? activeFilterModes 
       : filterMode ? [filterMode] : [];
+    const filtersToApply = rawFilters.filter(filter => filter !== 'pending');
 
     if (filtersToApply.length > 0) {
       if (selectedJournalIds.length === 0) {
@@ -112,72 +123,24 @@ const partnerService = {
         journalIdsString
       });
       
-      // For multi-filter mode, we need to track which filter each entity matches
+      // For multi-filter mode, we need intersection logic (AND) not union (OR)
       if (filtersToApply.length > 1) {
-        // Execute queries for each filter separately to track matches
-        const allPartners = new Map<bigint, { partner: any, matchedFilters: string[] }>();
-        
-        for (const filterMode of filtersToApply) {
-          const filterClauses = await this.buildMultiFilterClauses(
-            [filterMode], // Single filter at a time
-            journalIdsString,
-            permissionRootId
-          );
-          
-          if (filterClauses.length === 0) continue;
-          
-          const filterWhere: Prisma.PartnerWhereInput = {
-            entityState: EntityState.ACTIVE,
-            ...externalWhere,
-            AND: [filterClauses[0]],
-          };
-          
-          // Apply journal restrictions if needed
-          if (restrictedJournalId) {
-            const descendantIds = await journalService.getDescendantJournalIds(
-              restrictedJournalId
-            );
-            filterWhere.journalPartnerLinks = {
-              some: { journalId: { in: [...descendantIds, restrictedJournalId] } },
-            };
-          }
-          
-          const partnersForFilter = await prisma.partner.findMany({
-            where: filterWhere,
-            include: {
-              journalPartnerLinks: {
-                include: {
-                  journal: true,
-                },
-              },
-            },
-          });
-          
-          // Track which filter each partner matches
-          partnersForFilter.forEach(partner => {
-            if (allPartners.has(partner.id)) {
-              allPartners.get(partner.id)!.matchedFilters.push(filterMode);
-            } else {
-              allPartners.set(partner.id, { 
-                partner, 
-                matchedFilters: [filterMode] 
-              });
-            }
-          });
-        }
-        
-        // Convert map to array and add filter match information
-        const data = Array.from(allPartners.values()).map(({ partner, matchedFilters }) => ({
-          ...partner,
-          matchedFilters
-        }));
-        
-        serviceLogger.debug(
-          `partnerService.getAllPartners: Multi-filter output: ${data.length} partners with filter matches`,
-          { totalPartners: data.length }
+        // Build all filter clauses and combine them with AND logic
+        const allFilterClauses = await this.buildMultiFilterClauses(
+          filtersToApply,
+          journalIdsString,
+          permissionRootId
         );
         
-        return { data, totalCount: data.length };
+        if (allFilterClauses.length === 0) {
+          serviceLogger.warn(
+            "partnerService.getAllPartners: No valid filter clauses generated for multi-filter. Returning empty."
+          );
+          return { data: [], totalCount: 0 };
+        }
+        
+        // Combine all filter clauses with AND logic
+        prismaWhere.AND = allFilterClauses;
       } else {
         // Single filter mode - use existing logic
         const filterClauses = await this.buildMultiFilterClauses(
@@ -259,6 +222,7 @@ const partnerService = {
       INNER JOIN "journal_partner_links" AS jpl ON jpgl."journal_partner_link_id" = jpl."id"
       WHERE
         jpgl."good_id" IN (${Prisma.join(uniqueGoodIds)})
+        AND jpgl."approval_status" = 'APPROVED'
         ${journalFilterClause}
       GROUP BY
         jpl."partner_id"
@@ -364,7 +328,7 @@ const partnerService = {
         case "affected":
           clauses.push({
             AND: [
-              { status: { name: "Approved" } },
+              { approvalStatus: "APPROVED" },
               {
                 journalPartnerLinks: {
                   some: { journalId: { in: selectedJournalIds } },
@@ -410,7 +374,7 @@ const partnerService = {
           
           clauses.push({
             AND: [
-              { status: { name: "Approved" } },
+              { approvalStatus: "APPROVED" },
               {
                 journalPartnerLinks: {
                   some: { journalId: { in: uniqueParentPaths } },
@@ -433,6 +397,13 @@ const partnerService = {
             ],
           });
           break;
+          
+        case "pending":
+          // Skip 'pending' filter - it's only for ApprovalCenter, not main sliders
+          serviceLogger.warn(
+            "partnerService.buildMultiFilterClauses: 'pending' filter should not be processed by main sliders. Skipping."
+          );
+          continue;
       }
     }
     

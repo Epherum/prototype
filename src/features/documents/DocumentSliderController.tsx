@@ -1,12 +1,12 @@
 // src/features/documents/DocumentSliderController.tsx
 "use client";
 
-import React, { forwardRef, useMemo, useState } from "react";
+import React, { forwardRef, useMemo, useState, useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/appStore";
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import DocumentConfirmationModal from "./components/DocumentConfirmationModal";
-import SingleItemQuantityModal from "./components/SingleItemQuantityModal";
+import { useSingleItemQuantityModal } from "./components/SingleItemQuantityModal";
 import DocumentDetailsModal from "./components/DocumentDetailsModal";
 import { ManageDocumentModal } from "./components/ManageDocumentModal";
 import { SLIDER_TYPES } from "@/lib/constants";
@@ -55,6 +55,9 @@ export const DocumentSliderController = forwardRef<
     const queryClient = useQueryClient();
     const toast = useToast();
 
+    // New modal system
+    const { openQuantityModal } = useSingleItemQuantityModal();
+
     const [isDocMenuOpen, setDocMenuOpen] = useState(false);
     const [docMenuAnchorEl, setDocMenuAnchorEl] = useState<HTMLElement | null>(
       null
@@ -100,6 +103,21 @@ export const DocumentSliderController = forwardRef<
         toast.error("Failed to update document", error.message);
       },
     });
+
+    // Effect to handle transition from old modal system to new modal system
+    useEffect(() => {
+      if (manager.quantityModalState.isOpen && manager.quantityModalState.good) {
+        // Open the new modal
+        openQuantityModal(manager.quantityModalState.good, (item) => {
+          // Close the old modal state first
+          manager.handleCancelCreation();
+          // Then handle the submission
+          manager.handleSingleItemSubmit(item);
+        });
+        // Close the old modal state to prevent re-triggering
+        setTimeout(() => manager.handleCancelCreation(), 0);
+      }
+    }, [manager.quantityModalState.isOpen, manager.quantityModalState.good, openQuantityModal]);
 
     const handleOpenDocMenu = (event: React.MouseEvent<HTMLElement>) => {
       setDocMenuAnchorEl(event.currentTarget);
@@ -294,13 +312,6 @@ export const DocumentSliderController = forwardRef<
           isCreating={manager.isCreating}
           creationMode={manager.mode}
         />
-        <SingleItemQuantityModal
-          isOpen={manager.quantityModalState.isOpen}
-          onClose={() => manager.handleCancelCreation()}
-          onSubmit={manager.handleSingleItemSubmit}
-          good={manager.quantityModalState.good}
-        />
-
 
         {/* ✅ REFACTORED: Handle both single and multiple document creation modals */}
         <AnimatePresence>

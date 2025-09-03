@@ -1,6 +1,6 @@
 //src/app/services/goodsService.ts
 import prisma from "@/app/utils/prisma";
-import { GoodsAndService, Prisma, EntityState } from "@prisma/client";
+import { GoodsAndService, Prisma, EntityState, ApprovalStatus } from "@prisma/client";
 import { journalService } from "./journalService";
 import {
   GetAllItemsOptions,
@@ -39,19 +39,28 @@ const goodsService = {
     const ancestorPath = await journalService.getJournalAncestorPath(journalId);
     serviceLogger.debug("goodsService.createGood: Ancestor path", { ancestorPath });
 
+    // Get the journal level for the creation journal
+    const creationJournalLevel = await journalService.getJournalLevel(journalId);
+    serviceLogger.debug("goodsService.createGood: Creation journal level", { creationJournalLevel });
+
     // Create the good first
     const newGood = await prisma.goodsAndService.create({
       data: {
         ...restOfData,
         status: { connect: { id: restOfData.statusId || "pending-default" } }, // Connect to status
         createdBy: { connect: { id: createdById } },
+        creationJournalLevel: creationJournalLevel,
       },
     });
     
     // Create journal-good links for the entire hierarchy path
+    // Note: JournalGoodLinks are automatically approved (no approval workflow needed)
     const journalGoodLinks = ancestorPath.map(journalId => ({
       journalId,
       goodId: newGood.id,
+      creationLevel: creationJournalLevel,
+      approvalStatus: "APPROVED", // Auto-approve journal-good links
+      currentPendingLevel: creationJournalLevel, // Set to creation level (fully approved)
     }));
     
     await prisma.journalGoodLink.createMany({
@@ -105,9 +114,11 @@ const goodsService = {
     };
 
     // Use activeFilterModes if provided, otherwise fall back to single filterMode
-    const filtersToApply = activeFilterModes?.length > 0 
+    // IMPORTANT: Filter out 'pending' - it's only for ApprovalCenter, not main sliders
+    const rawFilters = activeFilterModes?.length > 0 
       ? activeFilterModes 
       : filterMode ? [filterMode] : [];
+    const filtersToApply = rawFilters.filter(filter => filter !== 'pending');
 
     if (filtersToApply.length > 0) {
       if (selectedJournalIds.length === 0) {
@@ -117,72 +128,24 @@ const goodsService = {
         return { data: [], totalCount: 0 };
       }
 
-      // For multi-filter mode, we need to track which filter each entity matches
+      // For multi-filter mode, we need intersection logic (AND) not union (OR)
       if (filtersToApply.length > 1) {
-        // Execute queries for each filter separately to track matches
-        const allGoods = new Map<bigint, { good: any, matchedFilters: string[] }>();
-        
-        for (const filterMode of filtersToApply) {
-          const filterClauses = await this.buildMultiFilterClauses(
-            [filterMode], // Single filter at a time
-            selectedJournalIds,
-            permissionRootId
-          );
-          
-          if (filterClauses.length === 0) continue;
-          
-          const filterWhere: Prisma.GoodsAndServiceWhereInput = {
-            entityState: EntityState.ACTIVE,
-            ...externalWhere,
-            AND: [filterClauses[0]],
-          };
-          
-          // Apply journal restrictions if needed
-          if (restrictedJournalId) {
-            const descendantIds = await journalService.getDescendantJournalIds(
-              restrictedJournalId
-            );
-            filterWhere.journalGoodLinks = {
-              some: { journalId: { in: [...descendantIds, restrictedJournalId] } },
-            };
-          }
-          
-          const goodsForFilter = await prisma.goodsAndService.findMany({
-            where: filterWhere,
-            include: {
-              journalGoodLinks: {
-                include: {
-                  journal: true,
-                },
-              },
-            },
-          });
-          
-          // Track which filter each good matches
-          goodsForFilter.forEach(good => {
-            if (allGoods.has(good.id)) {
-              allGoods.get(good.id)!.matchedFilters.push(filterMode);
-            } else {
-              allGoods.set(good.id, { 
-                good, 
-                matchedFilters: [filterMode] 
-              });
-            }
-          });
-        }
-        
-        // Convert map to array and add filter match information
-        const data = Array.from(allGoods.values()).map(({ good, matchedFilters }) => ({
-          ...good,
-          matchedFilters
-        }));
-        
-        serviceLogger.debug(
-          `goodsService.getAllGoods: Multi-filter output: ${data.length} goods with filter matches`,
-          { totalGoods: data.length }
+        // Build all filter clauses and combine them with AND logic
+        const allFilterClauses = await this.buildMultiFilterClauses(
+          filtersToApply,
+          selectedJournalIds,
+          permissionRootId
         );
         
-        return { data, totalCount: data.length };
+        if (allFilterClauses.length === 0) {
+          serviceLogger.warn(
+            "goodsService.getAllGoods: No valid filter clauses generated for multi-filter. Returning empty."
+          );
+          return { data: [], totalCount: 0 };
+        }
+        
+        // Combine all filter clauses with AND logic
+        prismaWhere.AND = allFilterClauses;
       } else {
         // Single filter mode - use existing logic
         const filterClauses = await this.buildMultiFilterClauses(
@@ -293,6 +256,7 @@ const goodsService = {
       by: ["goodId"],
       where: {
         journalPartnerLinkId: { in: relevantLinkIds },
+        approvalStatus: "APPROVED", // Only approved links
       },
       _count: {
         journalPartnerLinkId: true,
@@ -374,9 +338,11 @@ const goodsService = {
     const linkIds = journalPartnerLinks.map(link => link.id);
 
     // Find goods that have three-way links with these journal-partner links
+    // IMPORTANT: Only approved links should show in main sliders
     const journalPartnerGoodLinks = await prisma.journalPartnerGoodLink.findMany({
       where: {
         journalPartnerLinkId: { in: linkIds },
+        approvalStatus: "APPROVED", // Only approved links
       },
       select: { goodId: true },
       distinct: ['goodId'],
@@ -524,7 +490,7 @@ const goodsService = {
         case "affected":
           clauses.push({
             AND: [
-              { status: { name: "Approved" } },
+              { approvalStatus: "APPROVED" },
               {
                 journalGoodLinks: {
                   some: { journalId: { in: allRelevantJournalIds } },
@@ -570,7 +536,7 @@ const goodsService = {
           
           clauses.push({
             AND: [
-              { status: { name: "Approved" } },
+              { approvalStatus: "APPROVED" },
               {
                 journalGoodLinks: {
                   some: { journalId: { in: uniqueGoodsParentPaths } },
@@ -593,6 +559,13 @@ const goodsService = {
             ],
           });
           break;
+          
+        case "pending":
+          // Skip 'pending' filter - it's only for ApprovalCenter, not main sliders
+          serviceLogger.warn(
+            "goodsService.buildMultiFilterClauses: 'pending' filter should not be processed by main sliders. Skipping."
+          );
+          continue;
       }
     }
     

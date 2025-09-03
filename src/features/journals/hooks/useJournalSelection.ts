@@ -257,6 +257,13 @@ export const useJournalSelection = (
         effectiveIds,
         hierarchyData
       );
+      
+      console.log('🔍 updateJournalSelections - terminal ID calculation:', {
+        effectiveIds,
+        terminalId,
+        levelSelections: finalLevelSelections,
+        hierarchyDataLength: hierarchyData?.length || 0
+      });
 
       // Always update both new and legacy format
       const updateData = {
@@ -296,8 +303,17 @@ export const useJournalSelection = (
   // ✅ FIX: The final `selectedJournalId` is now correctly derived from the stored
   // hierarchical value or the flat mode ID.
   const selectedJournalId = useMemo((): string | null => {
-    return isHierarchyMode ? selectedHierarchyId : flatId;
-  }, [isHierarchyMode, selectedHierarchyId, flatId]);
+    const result = isHierarchyMode ? selectedHierarchyId : flatId;
+    console.log('🔍 useJournalSelection - selectedJournalId calculation:', {
+      isHierarchyMode,
+      selectedHierarchyId,
+      flatId,
+      result,
+      levelSelections,
+      effectiveJournalIds
+    });
+    return result;
+  }, [isHierarchyMode, selectedHierarchyId, flatId, levelSelections, effectiveJournalIds]);
 
   return {
     topLevelId,

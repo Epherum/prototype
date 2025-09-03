@@ -52,7 +52,7 @@ export const SliderLayoutManager = forwardRef<
     const journalManager = useJournalManager();
     const partnerManager = usePartnerManager();
     const goodManager = useGoodManager();
-    const docManager = useDocumentManager(goodManager.goodsForSlider);
+    const docManager = useDocumentManager(goodManager.goodsForSlider, journalManager);
     const jpqlLinking = useJournalPartnerGoodLinking();
 
     const {
@@ -74,10 +74,15 @@ export const SliderLayoutManager = forwardRef<
     // ✅ FIX: Corrected the logic to use the new authoritative state.
     // The `isTerminal` flag has been removed. The single source of truth for a
     // valid, single selection is now whether `selectedJournalId` has a value.
-    const isCreationEnabled = useMemo(
-      () => journalManager.selectedJournalId !== null,
-      [journalManager.selectedJournalId]
-    );
+    const isCreationEnabled = useMemo(() => {
+      const enabled = journalManager.selectedJournalId !== null;
+      console.log('🔍 SliderLayoutManager - isCreationEnabled calculation:', {
+        selectedJournalId: journalManager.selectedJournalId,
+        enabled,
+        journalManagerKeys: Object.keys(journalManager)
+      });
+      return enabled;
+    }, [journalManager.selectedJournalId]);
 
     return (
       <LayoutGroup id="main-sliders-layout-group">

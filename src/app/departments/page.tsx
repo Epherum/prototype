@@ -2,7 +2,6 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import styles from "./page.module.css";
 import Header from "@/components/layout/Header";
 
@@ -46,15 +45,9 @@ const itemVariants = {
 };
 
 export default function DepartmentsPage() {
-  const router = useRouter();
-
   const handleDepartmentClick = (department: { id: number; name: string }) => {
     console.log(`Department ${department.id}: ${department.name} clicked`);
     // Add functionality here as needed
-  };
-
-  const handleBackClick = () => {
-    router.back();
   };
 
   return (
@@ -67,9 +60,6 @@ export default function DepartmentsPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
-        <button onClick={handleBackClick} className={styles.backButton}>
-          ← Back
-        </button>
         <h1 className={styles.title}>Departments</h1>
       </motion.div>
 

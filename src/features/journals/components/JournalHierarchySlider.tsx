@@ -87,6 +87,16 @@ interface JournalHierarchySliderProps {
   topLevelId: string;
   // Double-click navigation handler
   onNavigateToLevel?: (nodeId: string) => void;
+  // Terminal ID calculation function
+  updateJournalSelections?: (
+    newSelections: {
+      topLevelId?: string;
+      level2Ids?: string[];
+      level3Ids?: string[];
+      levelSelections?: string[][];
+    },
+    visibleChildrenMap: Record<string, boolean>
+  ) => void;
 }
 
 const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
@@ -105,6 +115,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
   onToggleFilter,
   topLevelId,
   onNavigateToLevel,
+  updateJournalSelections,
 }) => {
   // Use the new multi-level selection hook
   const {
@@ -113,7 +124,7 @@ const JournalHierarchySlider: React.FC<JournalHierarchySliderProps> = ({
     handleLevelSelection,
     hasChildrenAtLevel,
     getNodeColor,
-  } = useMultiLevelSelection(hierarchyData, topLevelId);
+  } = useMultiLevelSelection(hierarchyData, topLevelId, updateJournalSelections);
 
   // Create color map for top-level nodes (Level 0)
   const colorMap = useMemo(() => {

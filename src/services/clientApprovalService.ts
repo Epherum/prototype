@@ -15,7 +15,7 @@ export interface ApproveEntityParams {
 
 export interface InProcessItem {
   id: string;
-  type: 'partner' | 'good' | 'document' | 'journalPartnerLink' | 'journalGoodLink' | 'journalPartnerGoodLink';
+  type: 'partner' | 'good' | 'document' | 'link';
   name: string;
   approvalStatus: string;
   creationJournalLevel: number;
@@ -23,6 +23,11 @@ export interface InProcessItem {
   createdAt: string;
   createdById: string;
   canApprove: boolean;
+  // Additional fields for better display
+  journalName?: string;
+  partnerName?: string;
+  goodName?: string;
+  refDoc?: string;
 }
 
 export interface InProcessResponse {

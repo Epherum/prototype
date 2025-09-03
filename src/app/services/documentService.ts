@@ -11,6 +11,7 @@ import { z } from "zod";
 import { journalService } from "./journalService";
 import { jsonBigIntReplacer } from "../utils/jsonBigInt";
 import { serviceLogger } from "@/lib/logger";
+import approvalService from "./approvalService";
 
 // ===================================
 // Type Definitions
@@ -83,6 +84,9 @@ const documentService = {
       JSON.stringify({ ...data, createdById, journalId }, jsonBigIntReplacer)
     );
 
+    // Get the creation journal level for the approval system
+    const creationJournalLevel = await approvalService.getJournalLevel(journalId);
+
     let totalHT = 0;
     let totalTax = 0;
 
@@ -117,20 +121,25 @@ const documentService = {
     });
     const totalTTC = totalHT + totalTax;
 
+    const { partnerId, ...restData } = data;
+    
     const newDocument = await prisma.document.create({
       data: {
-        ...data, // refDoc, type, date, partnerId, description, etc.
-        // ✨ NEW: Denormalized field for efficient filtering
-        journalId,
+        ...restData, // refDoc, type, date, description, etc. (excluding partnerId)
+        // Relations
+        journal: { connect: { id: journalId } },
+        partner: { connect: { id: partnerId } },
+        createdBy: { connect: { id: createdById } },
+        status: { connect: { id: "pending-default" } },
         // Calculated totals
         totalHT,
         totalTax,
         totalTTC,
         balance: totalTTC,
+        // Approval system fields
+        creationJournalLevel,
         // Audit and state
-        createdById,
         entityState: EntityState.ACTIVE,
-        status: { connect: { id: "pending-default" } },
         // Nested line creation
         lines: {
           create: linesToCreate,
@@ -164,7 +173,10 @@ const documentService = {
       filterByGoodIds,
     } = options;
 
-    let where: Prisma.DocumentWhereInput = { entityState: "ACTIVE" };
+    let where: Prisma.DocumentWhereInput = { 
+      entityState: "ACTIVE",
+      approvalStatus: "APPROVED" // Main document slider only shows approved documents
+    };
     const andConditions: Prisma.DocumentWhereInput[] = [];
 
     // 1. Apply user security context (Hierarchical Journal Permissions)
@@ -235,7 +247,7 @@ const documentService = {
   async getDocumentById(id: bigint): Promise<Document | null> {
     serviceLogger.debug("documentService.getDocumentById: Input", { id });
     return await prisma.document.findUnique({
-      where: { id, entityState: "ACTIVE" },
+      where: { id, entityState: "ACTIVE", approvalStatus: "APPROVED" },
       // ✨ NEW: The include clause is expanded for the "Gateway Lookup" use case.
       include: {
         partner: true,
