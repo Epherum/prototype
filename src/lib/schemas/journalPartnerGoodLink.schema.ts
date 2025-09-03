@@ -7,15 +7,23 @@ export const createJournalPartnerGoodLinkSchema = z.object({
   journalId: z.string().min(1, "Journal ID is required"),
   partnerId: z.union([z.string(), z.bigint()]).transform((val) => {
     if (typeof val === 'bigint') {
-      return val.toString();
+      return val;
     }
-    return val;
+    try {
+      return BigInt(val);
+    } catch {
+      throw new Error(`Invalid partner ID: ${val}`);
+    }
   }),
   goodId: z.union([z.string(), z.bigint()]).transform((val) => {
     if (typeof val === 'bigint') {
-      return val.toString();
+      return val;
     }
-    return val;
+    try {
+      return BigInt(val);
+    } catch {
+      throw new Error(`Invalid good ID: ${val}`);
+    }
   }),
   partnershipType: z.string().optional().nullable(),
   descriptiveText: z.string().optional().nullable(),
@@ -51,5 +59,16 @@ export const deleteLinksQuerySchema = z.object({
 export type CreateJournalPartnerGoodLinkPayload = z.infer<
   typeof createJournalPartnerGoodLinkSchema
 >;
+
+// Pre-transformation input type for components (accepts strings before schema transformation)
+export type CreateJournalPartnerGoodLinkInput = {
+  journalId: string;
+  partnerId: string;
+  goodId: string;
+  partnershipType?: string | null;
+  descriptiveText?: string | null;
+  contextualTaxCodeId?: number | null;
+};
+
 export type GetLinksQuery = z.infer<typeof getLinksQuerySchema>;
 export type DeleteLinksQuery = z.infer<typeof deleteLinksQuerySchema>;

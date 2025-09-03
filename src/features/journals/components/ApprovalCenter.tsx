@@ -12,7 +12,6 @@ import styles from "./ApprovalCenter.module.css";
 import { useAppStore } from "@/store/appStore";
 import clientApprovalService, { type InProcessItem } from "@/services/clientApprovalService";
 import { partnerKeys, goodKeys } from "@/lib/queryKeys";
-import EntityDetailsModal from "@/features/shared/modal/EntityDetailsModal";
 
 export interface ApprovalCenterProps {
   isOpen: boolean;
@@ -413,12 +412,6 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
           )}
         </AnimatePresence>
       </div>
-      
-      <EntityDetailsModal
-        entity={selectedEntity}
-        isOpen={isModalOpen}
-        onClose={closeEntityModal}
-      />
     </motion.div>
   );
 };

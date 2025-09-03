@@ -142,7 +142,7 @@ export const ManageUserModal: React.FC<ManageUserModalProps> = ({
 
   // Extract validation errors from submissionError
   const validationErrors: ValidationErrors = useMemo(() => {
-    if (!submissionError || submissionError.status !== 400) return {};
+    if (!submissionError || !('status' in submissionError) || (submissionError as any).status !== 400) return {};
     
     try {
       const errorData = JSON.parse(submissionError.message);

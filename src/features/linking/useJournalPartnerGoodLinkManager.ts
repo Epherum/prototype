@@ -195,8 +195,8 @@ export function useJournalPartnerGoodLinkManager({
     // Transform LinkData to CreateJournalPartnerGoodLinkPayload
     const payloads = linksData.map(link => ({
       journalId: String(link.journalId),
-      partnerId: String(link.partnerId),
-      goodId: String(link.goodId),
+      partnerId: link.partnerId,
+      goodId: link.goodId,
       partnershipType: "STANDARD_TRANSACTION" as const,
       descriptiveText: link.descriptiveText,
     }));

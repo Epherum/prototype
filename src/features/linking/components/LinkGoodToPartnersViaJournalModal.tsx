@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import type { GoodClient, PartnerClient } from "@/lib/types/models.client";
 import type { AccountNodeData } from "@/lib/types/ui";
-import type { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
+import type { CreateJournalPartnerGoodLinkInput } from "@/lib/schemas/journalPartnerGoodLink.schema";
 import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 import listStyles from "./LinkGoodToPartnersViaJournalModal.module.css"; // A new CSS module for the list items
@@ -12,7 +12,7 @@ import { IoClose } from "react-icons/io5";
 interface LinkGoodToPartnersViaJournalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmitLinks: (linksData: CreateJournalPartnerGoodLinkPayload[]) => void;
+  onSubmitLinks: (linksData: CreateJournalPartnerGoodLinkInput[]) => void;
   goodToLink: GoodClient | null;
   targetJournal: AccountNodeData | null;
   availablePartners: PartnerClient[]; // Pre-fetched list of partners linked to targetJournal
@@ -59,7 +59,7 @@ export default function LinkGoodToPartnersViaJournalModal({
       return;
     }
 
-    const linksToCreate: CreateJournalPartnerGoodLinkPayload[] = Array.from(
+    const linksToCreate: CreateJournalPartnerGoodLinkInput[] = Array.from(
       selectedPartnerIds
     ).map((partnerId) => ({
       journalId: targetJournal.id,

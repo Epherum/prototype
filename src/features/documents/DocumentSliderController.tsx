@@ -6,7 +6,7 @@ import { AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/store/appStore";
 import DynamicSlider from "@/features/shared/components/DynamicSlider";
 import DocumentConfirmationModal from "./components/DocumentConfirmationModal";
-import { useSingleItemQuantityModal } from "./components/SingleItemQuantityModal";
+import SingleItemQuantityModal from "./components/SingleItemQuantityModal";
 import DocumentDetailsModal from "./components/DocumentDetailsModal";
 import { ManageDocumentModal } from "./components/ManageDocumentModal";
 import { SLIDER_TYPES } from "@/lib/constants";
@@ -55,8 +55,9 @@ export const DocumentSliderController = forwardRef<
     const queryClient = useQueryClient();
     const toast = useToast();
 
-    // New modal system
-    const { openQuantityModal } = useSingleItemQuantityModal();
+    // Quantity modal state
+    const [isQuantityModalOpen, setIsQuantityModalOpen] = useState(false);
+    const [selectedGoodForQuantity, setSelectedGoodForQuantity] = useState<any>(null);
 
     const [isDocMenuOpen, setDocMenuOpen] = useState(false);
     const [docMenuAnchorEl, setDocMenuAnchorEl] = useState<HTMLElement | null>(
@@ -104,20 +105,26 @@ export const DocumentSliderController = forwardRef<
       },
     });
 
-    // Effect to handle transition from old modal system to new modal system
+    // Effect to handle quantity modal state changes
     useEffect(() => {
       if (manager.quantityModalState.isOpen && manager.quantityModalState.good) {
-        // Open the new modal
-        openQuantityModal(manager.quantityModalState.good, (item) => {
-          // Close the old modal state first
-          manager.handleCancelCreation();
-          // Then handle the submission
-          manager.handleSingleItemSubmit(item);
-        });
+        setSelectedGoodForQuantity(manager.quantityModalState.good);
+        setIsQuantityModalOpen(true);
         // Close the old modal state to prevent re-triggering
-        setTimeout(() => manager.handleCancelCreation(), 0);
+        manager.handleCancelCreation();
       }
-    }, [manager.quantityModalState.isOpen, manager.quantityModalState.good, openQuantityModal]);
+    }, [manager.quantityModalState.isOpen, manager.quantityModalState.good, manager]);
+
+    const handleQuantityModalSubmit = (item: { good: any; quantity: number; price: number }) => {
+      manager.handleSingleItemSubmit(item);
+      setIsQuantityModalOpen(false);
+      setSelectedGoodForQuantity(null);
+    };
+
+    const handleQuantityModalClose = () => {
+      setIsQuantityModalOpen(false);
+      setSelectedGoodForQuantity(null);
+    };
 
     const handleOpenDocMenu = (event: React.MouseEvent<HTMLElement>) => {
       setDocMenuAnchorEl(event.currentTarget);
@@ -380,6 +387,13 @@ export const DocumentSliderController = forwardRef<
           isLoading={isLoadingDetails}
           isSaving={updateMutation.isPending}
           isViewOnly={false}
+        />
+
+        <SingleItemQuantityModal
+          isOpen={isQuantityModalOpen}
+          onClose={handleQuantityModalClose}
+          onSubmit={handleQuantityModalSubmit}
+          good={selectedGoodForQuantity}
         />
       </div>
     );

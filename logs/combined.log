@@ -326,3 +326,9 @@
   message: 'API POST /api/journal-partner-links Error',
   timestamp: '2025-08-22 03:50:15'
 }
+{
+  service: 'api',
+  message: 'No specific query params found, fetching root journals.',
+  level: 'info',
+  timestamp: '2025-09-03 21:11:42'
+}

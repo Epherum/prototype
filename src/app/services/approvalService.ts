@@ -155,14 +155,14 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
   if (entityTypes.length === 0 || entityTypes.includes('partner')) {
     const partnerWhere: Prisma.PartnerWhereInput = {
       approvalStatus: ApprovalStatus.PENDING,
-      ...(showOnlyUserLevel && { currentPendingLevel: userApprovalLevel }),
-      ...(journalScope.length > 0 && {
+      ...(showOnlyUserLevel ? { currentPendingLevel: userApprovalLevel } : {}),
+      ...(journalScope.length > 0 ? {
         journalPartnerLinks: {
           some: {
             journalId: { in: journalScope }
           }
         }
-      })
+      } : {})
     };
 
     serviceLogger.debug("approvalService.getInProcessItems - partner query", { 
@@ -208,7 +208,7 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
   if (entityTypes.length === 0 || entityTypes.includes('good')) {
     const goodWhere: Prisma.GoodsAndServiceWhereInput = {
       approvalStatus: ApprovalStatus.PENDING,
-      ...(showOnlyUserLevel && { currentPendingLevel: userApprovalLevel }),
+      ...(showOnlyUserLevel ? { currentPendingLevel: userApprovalLevel } : {}),
       ...(journalScope.length > 0 && {
         journalGoodLinks: {
           some: {
@@ -247,7 +247,7 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
   if (entityTypes.length === 0 || entityTypes.includes('document')) {
     const documentWhere: Prisma.DocumentWhereInput = {
       approvalStatus: ApprovalStatus.PENDING,
-      ...(showOnlyUserLevel && { currentPendingLevel: userApprovalLevel }),
+      ...(showOnlyUserLevel ? { currentPendingLevel: userApprovalLevel } : {}),
       ...(journalScope.length > 0 && {
         journalId: { in: journalScope }
       })
@@ -290,7 +290,7 @@ async function getInProcessItems(options: GetInProcessItemsOptions) {
     const jpgLinks = await prisma.journalPartnerGoodLink.findMany({
       where: {
         approvalStatus: ApprovalStatus.PENDING,
-        ...(showOnlyUserLevel && { currentPendingLevel: userApprovalLevel }),
+        ...(showOnlyUserLevel ? { currentPendingLevel: userApprovalLevel } : {}),
         ...(journalScope.length > 0 && {
           journalPartnerLink: {
             journalId: { in: journalScope }

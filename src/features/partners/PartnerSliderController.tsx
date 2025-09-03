@@ -22,7 +22,7 @@ import { SLIDER_TYPES } from "@/lib/constants";
 
 // ✅ ADDED: New, specific type imports.
 import { PartnerClient } from "@/lib/types/models.client";
-import { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
+import { CreateJournalPartnerGoodLinkInput } from "@/lib/schemas/journalPartnerGoodLink.schema";
 import { AccountNodeData } from "@/lib/types/ui"; // Assuming AccountNodeData is a UI-specific type now.
 
 export interface PartnerSliderControllerProps {
@@ -129,7 +129,7 @@ export const PartnerSliderController: React.FC<
     if (!canCreateGPGLink) return;
 
     // ✅ CHANGED: Constructing the payload from the Zod-inferred type.
-    const linkData: CreateJournalPartnerGoodLinkPayload = {
+    const linkData: CreateJournalPartnerGoodLinkInput = {
       journalId: gpgContextJournalId!,
       partnerId: partnerManager.selectedPartnerId!,
       goodId: selectedGoodId!,

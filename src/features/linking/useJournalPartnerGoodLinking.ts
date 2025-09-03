@@ -30,7 +30,7 @@ import {
   JournalPartnerGoodLinkClient,
 } from "@/lib/types/models.client";
 import { AccountNodeData } from "@/lib/types/ui";
-import { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
+import { CreateJournalPartnerGoodLinkInput, createJournalPartnerGoodLinkSchema } from "@/lib/schemas/journalPartnerGoodLink.schema";
 import { PaginatedPartnersResponse } from "@/services/clientPartnerService"; // Import the paginated type
 
 // No props needed. The hook is self-contained.
@@ -114,9 +114,13 @@ export const useJournalPartnerGoodLinking = () => {
   const createJPGLMutation = useMutation<
     JournalPartnerGoodLinkClient,
     Error,
-    CreateJournalPartnerGoodLinkPayload
+    CreateJournalPartnerGoodLinkInput
   >({
-    mutationFn: createJournalPartnerGoodLink,
+    mutationFn: (inputData) => {
+      // Transform input to payload using the schema
+      const transformedData = createJournalPartnerGoodLinkSchema.parse(inputData);
+      return createJournalPartnerGoodLink(transformedData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: goodKeys.all });
       queryClient.invalidateQueries({ queryKey: partnerKeys.all });
@@ -189,7 +193,7 @@ export const useJournalPartnerGoodLinking = () => {
   }, []);
 
   const submitLinks = useCallback(
-    async (linksData: CreateJournalPartnerGoodLinkPayload[]) => {
+    async (linksData: CreateJournalPartnerGoodLinkInput[]) => {
       if (linksData.length === 0) {
         closeLinkModal();
         return;
@@ -274,7 +278,7 @@ export const useJournalPartnerGoodLinking = () => {
   );
 
   const createSimpleJPGL = useCallback(
-    (linkData: CreateJournalPartnerGoodLinkPayload) => {
+    (linkData: CreateJournalPartnerGoodLinkInput) => {
       if (!linkData.journalId || !linkData.partnerId || !linkData.goodId) {
         alert("Missing required information to create the link.");
         return;

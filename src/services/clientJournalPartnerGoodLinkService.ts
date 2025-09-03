@@ -1,7 +1,7 @@
 //src/services/clientJournalPartnerGoodLinkService.ts
 import { JournalPartnerGoodLink as PrismaJPGL } from "@prisma/client";
 import { JournalPartnerGoodLinkClient } from "@/lib/types/models.client";
-import { CreateJournalPartnerGoodLinkPayload } from "@/lib/schemas/journalPartnerGoodLink.schema";
+import { CreateJournalPartnerGoodLinkPayload, CreateJournalPartnerGoodLinkInput } from "@/lib/schemas/journalPartnerGoodLink.schema";
 
 const API_BASE_URL = "/api/journal-partner-good-links";
 
@@ -91,7 +91,7 @@ export async function deleteJournalPartnerGoodLinkById(
  * @returns Array of newly created links.
  */
 export async function createBulkJournalPartnerGoodLinks(
-  linksData: CreateJournalPartnerGoodLinkPayload[]
+  linksData: CreateJournalPartnerGoodLinkInput[]
 ): Promise<JournalPartnerGoodLinkClient[]> {
   // Ensure all IDs are strings before sending to API
   const sanitizedLinks = linksData.map(link => ({

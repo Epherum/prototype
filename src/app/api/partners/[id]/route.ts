@@ -27,8 +27,8 @@ type RouteContext = { params: { id: string } };
  */
 export const GET = withAuthorization(
   async function GET(_request: NextRequest, { params }: RouteContext) {
+    const resolvedParams = await params;
     try {
-      const resolvedParams = await params;
       const partnerId = parseBigInt(resolvedParams.id, "partner ID");
       if (partnerId === null) {
         return NextResponse.json(
@@ -39,7 +39,7 @@ export const GET = withAuthorization(
       const partner = await partnerService.getPartnerById(partnerId);
       if (!partner) {
         return NextResponse.json(
-          { message: `Partner with ID '${params.id}' not found.` },
+          { message: `Partner with ID '${resolvedParams.id}' not found.` },
           { status: 404 }
         );
       }
@@ -50,7 +50,7 @@ export const GET = withAuthorization(
       });
     } catch (error) {
       const e = error as Error;
-      apiLogger.error(`API GET /api/partners/${params.id} Error:`, e);
+      apiLogger.error(`API GET /api/partners/${resolvedParams.id} Error:`, e);
       return NextResponse.json(
         { message: "An internal error occurred.", error: e.message },
         { status: 500 }
@@ -77,8 +77,9 @@ export const GET = withAuthorization(
  */
 export const PUT = withAuthorization(
   async function PUT(request: NextRequest, { params }: RouteContext) {
+    const resolvedParams = await params;
     try {
-      const partnerId = parseBigInt(params.id, "partner ID");
+      const partnerId = parseBigInt(resolvedParams.id, "partner ID");
       if (partnerId === null) {
         return NextResponse.json(
           { message: `Invalid partner ID format: '${resolvedParams.id}'.` },
@@ -114,10 +115,10 @@ export const PUT = withAuthorization(
       });
     } catch (error) {
       const e = error as Error & { code?: string };
-      apiLogger.error(`API PUT /api/partners/${params.id} Error:`, e);
+      apiLogger.error(`API PUT /api/partners/${resolvedParams.id} Error:`, e);
       if (e.code === "P2025") {
         return NextResponse.json(
-          { message: `Partner with ID '${params.id}' not found for update.` },
+          { message: `Partner with ID '${resolvedParams.id}' not found for update.` },
           { status: 404 }
         );
       }
@@ -146,8 +147,9 @@ export const PUT = withAuthorization(
  */
 export const DELETE = withAuthorization(
   async function DELETE(_request: NextRequest, { params }: RouteContext) {
+    const resolvedParams = await params;
     try {
-      const partnerId = parseBigInt(params.id, "partner ID");
+      const partnerId = parseBigInt(resolvedParams.id, "partner ID");
       if (partnerId === null) {
         return NextResponse.json(
           { message: `Invalid partner ID format: '${resolvedParams.id}'.` },
@@ -156,15 +158,15 @@ export const DELETE = withAuthorization(
       }
       await partnerService.deletePartner(partnerId);
       return NextResponse.json(
-        { message: `Partner with ID '${params.id}' successfully deleted.` },
+        { message: `Partner with ID '${resolvedParams.id}' successfully deleted.` },
         { status: 200 }
       );
     } catch (error) {
       const e = error as Error & { code?: string };
-      apiLogger.error(`API DELETE /api/partners/${params.id} Error:`, e);
+      apiLogger.error(`API DELETE /api/partners/${resolvedParams.id} Error:`, e);
       if (e.code === "P2025") {
         return NextResponse.json(
-          { message: `Partner with ID '${params.id}' not found for deletion.` },
+          { message: `Partner with ID '${resolvedParams.id}' not found for deletion.` },
           { status: 404 }
         );
       }

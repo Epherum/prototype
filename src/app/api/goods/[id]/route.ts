@@ -26,8 +26,8 @@ type RouteContext = { params: { id: string } };
  */
 export const GET = withAuthorization(
   async function GET(_request: NextRequest, { params }: RouteContext) {
+    const resolvedParams = await params;
     try {
-      const resolvedParams = await params;
       const goodId = parseBigInt(resolvedParams.id, "good ID");
       if (goodId === null) {
         return NextResponse.json(
@@ -78,8 +78,8 @@ export const GET = withAuthorization(
  */
 export const PUT = withAuthorization(
   async function PUT(request: NextRequest, { params }: RouteContext) {
+    const resolvedParams = await params;
     try {
-      const resolvedParams = await params;
       const goodId = parseBigInt(resolvedParams.id, "good ID");
       if (goodId === null) {
         return NextResponse.json(
@@ -146,8 +146,8 @@ export const PUT = withAuthorization(
  */
 export const DELETE = withAuthorization(
   async function DELETE(_request: NextRequest, { params }: RouteContext) {
+    const resolvedParams = await params;
     try {
-      const resolvedParams = await params;
       const goodId = parseBigInt(resolvedParams.id, "good ID");
       if (goodId === null) {
         return NextResponse.json(

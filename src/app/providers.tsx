@@ -9,7 +9,6 @@ import { ThemeInitializer } from "@/components/layout/ThemeInitializer";
 import { SessionValidator } from "@/components/auth/SessionValidator";
 import { ToastProvider } from "@/contexts/ToastContext";
 import { ToastContainer } from "@/components/notifications/ToastContainer";
-import { ModalProvider } from "@/features/shared/modal";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
@@ -18,13 +17,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <ModalProvider>
-            <ThemeInitializer />
-            <SessionValidator />
-            {children}
-            <ToastContainer />
-            <ReactQueryDevtools initialIsOpen={false} />
-          </ModalProvider>
+          <ThemeInitializer />
+          <SessionValidator />
+          {children}
+          <ToastContainer />
+          <ReactQueryDevtools initialIsOpen={false} />
         </ToastProvider>
       </QueryClientProvider>
     </SessionProvider>

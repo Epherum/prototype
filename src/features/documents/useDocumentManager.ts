@@ -208,13 +208,13 @@ export const useDocumentManager = (selectedGoodData?: GoodClient[], journalManag
   }, [cancelDocumentCreation, setFinalizeModalOpen]);
 
   const handleSingleItemSubmit = useCallback(
-    ({ good, quantity }: { good: GoodClient; quantity: number }) => {
+    ({ good, quantity, price }: { good: GoodClient; quantity: number; price: number }) => {
       // ✅ TYPE: Good -> GoodClient
       const newItem: DocumentItem = {
         goodId: good.id,
         goodLabel: good.label || good.label || "Unknown Good",
         quantity: quantity,
-        unitPrice: 0,
+        unitPrice: price,
         // ✅ NEW: Pass the required link ID
         journalPartnerGoodLinkId: (good as any).jpqLinkId,
       };
