@@ -3,12 +3,13 @@
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { FiCheck, FiClock, FiUser, FiFileText, FiBox, FiFolderPlus, FiTarget, FiHome, FiLoader, FiEye, FiLink } from "react-icons/fi";
+import { FiCheck, FiClock, FiUser, FiFileText, FiBox, FiFolderPlus, FiTarget, FiHome, FiLoader, FiEye, FiLink, FiX } from "react-icons/fi";
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { FreeMode } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/free-mode';
 import styles from "./ApprovalCenter.module.css";
+import baseStyles from "@/features/shared/components/ModalBase.module.css";
 import { useAppStore } from "@/store/appStore";
 import clientApprovalService, { type InProcessItem } from "@/services/clientApprovalService";
 import { partnerKeys, goodKeys } from "@/lib/queryKeys";
@@ -412,6 +413,103 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
           )}
         </AnimatePresence>
       </div>
+
+      {/* Entity Details Modal */}
+      <AnimatePresence>
+        {isModalOpen && selectedEntity && (
+          <motion.div
+            className={baseStyles.modalOverlay}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeEntityModal}
+          >
+            <motion.div
+              className={baseStyles.modalContent}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className={baseStyles.modalCloseButton}
+                onClick={closeEntityModal}
+                aria-label="Close modal"
+              >
+                <FiX />
+              </button>
+
+              <h2 className={baseStyles.modalTitle}>
+                {selectedEntity.type.toUpperCase()} Details
+              </h2>
+
+              <div className={baseStyles.modalBody}>
+                <div className={styles.entityDetailGrid}>
+                  <div className={styles.entityDetailItem}>
+                    <label>Name:</label>
+                    <span>{selectedEntity.name}</span>
+                  </div>
+                  
+                  <div className={styles.entityDetailItem}>
+                    <label>Type:</label>
+                    <span>{selectedEntity.type.toUpperCase()}</span>
+                  </div>
+                  
+                  <div className={styles.entityDetailItem}>
+                    <label>Status:</label>
+                    <span>{getStatusBadge(selectedEntity)}</span>
+                  </div>
+                  
+                  <div className={styles.entityDetailItem}>
+                    <label>Created:</label>
+                    <span>{new Date(selectedEntity.createdAt).toLocaleString()}</span>
+                  </div>
+                  
+                  <div className={styles.entityDetailItem}>
+                    <label>Creation Level:</label>
+                    <span>Level {selectedEntity.creationJournalLevel}</span>
+                  </div>
+                  
+                  <div className={styles.entityDetailItem}>
+                    <label>Current Pending Level:</label>
+                    <span>Level {selectedEntity.currentPendingLevel}</span>
+                  </div>
+                  
+                  <div className={styles.entityDetailItem}>
+                    <label>Can Approve:</label>
+                    <span className={selectedEntity.canApprove ? styles.canApproveYes : styles.canApproveNo}>
+                      {selectedEntity.canApprove ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  
+                  
+                </div>
+              </div>
+
+              <div className={baseStyles.modalActions}>
+                {selectedEntity.canApprove && (
+                  <button
+                    className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonPrimary}`}
+                    onClick={() => {
+                      handleApprove(selectedEntity.type, selectedEntity.id);
+                      closeEntityModal();
+                    }}
+                  >
+                    <FiCheck />
+                    Approve
+                  </button>
+                )}
+                <button
+                  className={`${baseStyles.modalActionButton} ${baseStyles.modalButtonSecondary}`}
+                  onClick={closeEntityModal}
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };

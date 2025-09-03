@@ -551,3 +551,104 @@
     transform: rotate(90deg);
   }
 }
+
+/* Entity Detail Modal Styles */
+.entityDetailGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: calc(var(--spacing-unit) * 2);
+}
+
+.entityDetailItem {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: calc(var(--spacing-unit) * 1.5);
+  align-items: start;
+  padding: calc(var(--spacing-unit) * 1.5);
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.entityDetailItem label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.entityDetailItem span {
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.canApproveYes {
+  color: var(--success-color, #10b981);
+  font-weight: 600;
+}
+
+.canApproveNo {
+  color: var(--danger-color, #ef4444);
+  font-weight: 600;
+}
+
+.additionalInfoGrid {
+  display: grid;
+  gap: calc(var(--spacing-unit) * 1);
+  margin-top: calc(var(--spacing-unit) * 1);
+}
+
+.additionalInfoItem {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 1);
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1.5);
+  background: var(--bg-card);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.infoKey {
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  min-width: 100px;
+}
+
+.infoValue {
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  word-break: break-word;
+}
+
+/* Mobile responsive adjustments for modal */
+@media (max-width: 768px) {
+  .entityDetailItem {
+    grid-template-columns: 1fr;
+    gap: calc(var(--spacing-unit) * 0.75);
+  }
+  
+  .entityDetailItem label {
+    font-size: 0.8rem;
+  }
+  
+  .entityDetailItem span {
+    font-size: 0.85rem;
+  }
+  
+  .additionalInfoItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--spacing-unit) * 0.5);
+  }
+  
+  .infoKey {
+    min-width: auto;
+    font-size: 0.8rem;
+  }
+  
+  .infoValue {
+    font-size: 0.8rem;
+  }
+}

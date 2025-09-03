@@ -87,8 +87,8 @@ export default function LoginPage() {
     <div className={styles.loginContainer}>
       <div className={styles.logoContainer}>
         <Image
-          src="/insen_login_logo.png"
-          alt="Insen - Intelligent System Engineering"
+          src="/company_login_logo.png"
+          alt="Company Logo"
           width={400}
           height={120}
           className={styles.loginLogo}

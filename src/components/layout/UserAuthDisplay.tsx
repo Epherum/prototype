@@ -67,7 +67,7 @@ export default function UserAuthDisplay({
   // Function to get logo source based on theme
   const getLogoSource = () => {
     const isDark = currentTheme?.includes('dark') || false;
-    return isDark ? "/insen_logo_dark.png" : "/insen_logo.png";
+    return isDark ? "/company_logo_dark.png" : "/company_logo.png";
   };
 
   // Function to get logo filter based on theme accent color
@@ -179,7 +179,7 @@ export default function UserAuthDisplay({
                     <button onClick={handleLogoClick} className={styles.logoButton}>
                       <Image
                         src={getLogoSource()}
-                        alt="Insen Logo"
+                        alt="Company Logo"
                         width={36}
                         height={36}
                         className={styles.logo}
@@ -329,7 +329,7 @@ export default function UserAuthDisplay({
                   >
                     <Image
                       src={getLogoSource()}
-                      alt="Insen Logo"
+                      alt="Company Logo"
                       width={36}
                       height={36}
                       className={styles.logo}
