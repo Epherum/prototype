@@ -90,6 +90,19 @@ export default function DepartmentsPage() {
           </motion.button>
         ))}
       </motion.div>
+
+      <motion.div
+        className={styles.imageContainer}
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <img 
+          src="/departments2.png" 
+          alt="Departments Overview" 
+          className={styles.departmentImage}
+        />
+      </motion.div>
     </div>
   );
 }

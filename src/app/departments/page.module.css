@@ -74,11 +74,33 @@
   line-height: 1.3;
 }
 
+.imageContainer {
+  margin-top: calc(var(--spacing-unit) * 6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+}
+
+.departmentImage {
+  /* This is the key change: We are now leading with height */
+  height: 90vh;
+
+  /* We let the browser decide the width to maintain the aspect ratio */
+  width: 120%;
+
+  /* This is a safeguard to prevent it from ever exceeding the viewport width */
+
+  /* The rest of the properties can stay the same */
+  object-fit: contain;
+  object-position: center;
+  border-radius: var(--border-radius-lg);
+  box-shadow: 0 8px 32px var(--shadow-color);
+}
+
 /* Mobile responsive adjustments */
 @media (max-width: 768px) {
-  .container {
-    padding: calc(var(--spacing-unit) * 1.5);
-  }
   
   .pageHeader {
     margin-bottom: calc(var(--spacing-unit) * 2);
@@ -106,6 +128,15 @@
   .departmentName {
     font-size: 0.9rem;
     line-height: 1.2;
+  }
+  
+  .imageContainer {
+    margin-top: calc(var(--spacing-unit) * 3);
+  }
+  
+  .departmentImage {
+    width: 120%;
+    border-radius: var(--border-radius-md);
   }
 }
 
@@ -142,6 +173,16 @@
     font-size: 0.85rem;
     line-height: 1.1;
   }
+  
+  .imageContainer {
+    margin-top: calc(var(--spacing-unit) * 2);
+  }
+  
+  .departmentImage {
+    width: 100%;
+    max-width: 100%;
+    border-radius: var(--border-radius-md);
+  }
 }
 
 /* Extra small screens - more compact layout */
@@ -166,5 +207,16 @@
   
   .departmentName {
     font-size: 0.8rem;
+  }
+  
+  .imageContainer {
+    margin-top: calc(var(--spacing-unit) * 1.5);
+  }
+  
+  .departmentImage {
+    width: 100%;
+    max-width: 100%;
+    height: 75vh;
+    border-radius: var(--border-radius);
   }
 }
