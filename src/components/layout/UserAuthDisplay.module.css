@@ -288,3 +288,13 @@
 .dropdownItem + .dropdownItem {
   border-top: 1px solid var(--border-subtle);
 }
+
+/* Minimized styles */
+.logoMinimized {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.userNameMinimized {
+  font-size: 0.8em !important;
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1) !important;
+}

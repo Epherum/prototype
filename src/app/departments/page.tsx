@@ -3,7 +3,6 @@
 import React from "react";
 import { motion } from "framer-motion";
 import styles from "./page.module.css";
-import Header from "@/components/layout/Header";
 
 const departments = [
   { id: 1, name: "Top Management" },
@@ -52,7 +51,6 @@ export default function DepartmentsPage() {
 
   return (
     <div className={styles.container}>
-      <Header />
       
       <motion.div
         className={styles.pageHeader}

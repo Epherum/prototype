@@ -1,4 +1,39 @@
 .header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   width: 100%;
-  margin-bottom: calc(var(--spacing-unit) * 2);
+  background: var(--bg-card);
+  opacity: 0.95;
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-subtle);
+  z-index: 1000;
+  padding: calc(var(--spacing-unit) * 1.5);
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.headerMinimized {
+  padding: calc(var(--spacing-unit) * 0.75);
+  opacity: 0.98;
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: 0 2px 20px var(--shadow-color);
+}
+
+.headerContent {
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.headerContentMinimized {
+  /* Remove scaling and margin adjustments to prevent slider controls from shrinking */
+}
+
+@media (max-width: 768px) {
+  .header {
+    padding: calc(var(--spacing-unit) * 1.25);
+  }
+  
+  .headerMinimized {
+    padding: calc(var(--spacing-unit) * 0.5);
+  }
 }

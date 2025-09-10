@@ -14,7 +14,6 @@ import {
 } from "@/features/users/UsersController";
 import { SliderLayoutManager } from "@/components/layout/SliderLayoutManager";
 import StickyHeaderControls from "@/components/layout/StickyHeaderControls";
-import Header from "@/components/layout/Header";
 import { useJournalPartnerGoodLinking } from "@/features/linking/useJournalPartnerGoodLinking";
 import { useJournalManager } from "@/features/journals/useJournalManager";
 import { useDocumentManager } from "@/features/documents/useDocumentManager";
@@ -104,19 +103,13 @@ export default function Home() {
       <UsersController ref={usersControllerRef} />
 
 
-      <motion.div variants={itemVariants} style={{ marginTop: 'calc(var(--spacing-unit) * 3)' }}>
-        <Header
-          onOpenCreateUserModal={() => usersControllerRef.current?.open()}
-        >
-          <StickyHeaderControls
-            visibility={visibility}
-            onToggleVisibility={useAppStore.getState().toggleSliderVisibility}
-            allSliderIds={INITIAL_ORDER}
-            visibleSliderOrder={visibleSliderOrder}
-            sliderConfigs={sliderConfigs}
-          />
-        </Header>
-      </motion.div>
+      <StickyHeaderControls
+        visibility={visibility}
+        onToggleVisibility={useAppStore.getState().toggleSliderVisibility}
+        allSliderIds={INITIAL_ORDER}
+        visibleSliderOrder={visibleSliderOrder}
+        sliderConfigs={sliderConfigs}
+      />
 
       <motion.div variants={itemVariants}>
         <SliderLayoutManager

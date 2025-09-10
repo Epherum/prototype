@@ -1,5 +1,7 @@
 import { tiemposText, tiemposHeadline } from "@/lib/fonts";
 import Providers from "./providers"; // Adjust path
+import { ViewTransitions } from "next-view-transitions";
+import Header from "@/components/layout/Header";
 
 import "@/styles/globals.css";
 import "swiper/css";
@@ -19,7 +21,12 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${tiemposText.variable} ${tiemposHeadline.variable}`}>
       <body>
-        <Providers>{children}</Providers>
+        <Providers>
+          <Header />
+          <ViewTransitions>
+            {children}
+          </ViewTransitions>
+        </Providers>
       </body>
     </html>
   );

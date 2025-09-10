@@ -18,7 +18,8 @@
       "Bash(npx prisma db execute:*)",
       "Bash(npx prisma studio:*)",
       "WebFetch(domain:localhost)",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(taskkill:*)"
     ],
     "defaultMode": "acceptEdits",
     "additionalDirectories": [

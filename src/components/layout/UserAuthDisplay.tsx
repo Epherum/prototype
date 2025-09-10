@@ -45,10 +45,12 @@ const fadeVariants: Variants = {
 
 interface UserAuthDisplayProps {
   onOpenCreateUserModal: () => void;
+  isMinimized?: boolean;
 }
 
 export default function UserAuthDisplay({
   onOpenCreateUserModal,
+  isMinimized = false,
 }: UserAuthDisplayProps) {
   const { data: session, status } = useSession();
   const { can: canManageUsers } = usePermissions({
@@ -180,9 +182,9 @@ export default function UserAuthDisplay({
                       <Image
                         src={getLogoSource()}
                         alt="Company Logo"
-                        width={36}
-                        height={36}
-                        className={styles.logo}
+                        width={isMinimized ? 28 : 36}
+                        height={isMinimized ? 28 : 36}
+                        className={`${styles.logo} ${isMinimized ? styles.logoMinimized : ''}`}
                         style={{
                           filter: getLogoFilter()
                         }}
@@ -198,7 +200,7 @@ export default function UserAuthDisplay({
                   >
                     <button
                       onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
-                      className={`${styles.userDropdownTrigger} ${styles.userName}`}
+                      className={`${styles.userDropdownTrigger} ${styles.userName} ${isMinimized ? styles.userNameMinimized : ''}`}
                       aria-expanded={isUserDropdownOpen}
                       aria-haspopup="true"
                     >
@@ -330,9 +332,9 @@ export default function UserAuthDisplay({
                     <Image
                       src={getLogoSource()}
                       alt="Company Logo"
-                      width={36}
-                      height={36}
-                      className={styles.logo}
+                      width={isMinimized ? 28 : 36}
+                      height={isMinimized ? 28 : 36}
+                      className={`${styles.logo} ${isMinimized ? styles.logoMinimized : ''}`}
                       style={{
                         filter: getLogoFilter()
                       }}

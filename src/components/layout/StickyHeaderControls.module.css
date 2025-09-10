@@ -1,11 +1,11 @@
 /* src/components/layout/StickyHeaderControls.module.css */
 .stickyHeaderContainer {
   position: sticky;
-  top: 0;
-  z-index: 100;
+  top: var(--header-height, 60px); /* Position directly below the fixed header */
+  z-index: 999; /* Below the header's z-index of 1000 */
   background-color: var(--bg-main);
   padding: calc(var(--spacing-unit) * 1.5) calc(var(--spacing-unit) * 2);
-  margin: 0 calc(-1 * var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+  margin: 0 calc(-1 * var(--spacing-unit) * 2) calc(var(--spacing-unit) * 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
@@ -21,6 +21,7 @@
 /* Mobile-specific adjustments */
 @media (max-width: 768px) {
   .stickyHeaderContainer {
+    top: var(--header-height-mobile, 50px); /* Mobile header height adjustment */
     margin-left: calc(-1 * var(--spacing-unit) * 1.5);
     margin-right: calc(-1 * var(--spacing-unit) * 1.5);
     padding-left: calc(var(--spacing-unit) * 1.5);
