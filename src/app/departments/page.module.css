@@ -2,7 +2,7 @@
 
 .container {
   min-height: 100vh;
-  padding: calc(var(--header-height, 84px) + calc(var(--spacing-unit) * 2)) calc(var(--spacing-unit) * 4) calc(var(--spacing-unit) * 4);
+  padding: calc(var(--header-height, 84px) + calc(var(--spacing-unit) * 1)) calc(var(--spacing-unit) * 4) calc(var(--spacing-unit) * 4);
   background: var(--bg-main);
   color: var(--text-primary);
   view-transition-name: page-content;
@@ -143,7 +143,7 @@
 
 @media (max-width: 480px) {
   .container {
-    padding: calc(var(--header-height-mobile, 70px) + calc(var(--spacing-unit) * 2)) calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1);
+    padding: calc(var(--header-height-mobile, 70px) + calc(var(--spacing-unit) * 1)) calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1);
   }
   
   .pageHeader {
@@ -189,7 +189,7 @@
 /* Extra small screens - more compact layout */
 @media (max-width: 360px) {
   .container {
-    padding: calc(var(--header-height-mobile, 70px) + calc(var(--spacing-unit) * 1)) calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 0.8);
+    padding: calc(var(--header-height-mobile, 70px) + calc(var(--spacing-unit) * 0.5)) calc(var(--spacing-unit) * 0.8) calc(var(--spacing-unit) * 0.8);
   }
   
   .departmentGrid {

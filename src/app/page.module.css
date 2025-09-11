@@ -3,7 +3,7 @@
   position: relative;
   max-width: 600px;
   margin: 0 auto;
-  padding: 0 calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
+  padding: calc(var(--header-height, 84px) + calc(var(--spacing-unit) * 1)) calc(var(--spacing-unit) * 2) calc(var(--spacing-unit) * 3);
   min-height: 100vh;
   /* Use max-width and margin auto to prevent overflow while preserving sticky positioning */
   box-sizing: border-box;
@@ -15,7 +15,7 @@
   .pageContainer {
     padding-left: calc(var(--spacing-unit) * 1.5);
     padding-right: calc(var(--spacing-unit) * 1.5);
-    padding-top: 0;
+    padding-top: calc(var(--header-height-mobile, 70px) + calc(var(--spacing-unit) * 1));
     max-width: 100%;
   }
 }

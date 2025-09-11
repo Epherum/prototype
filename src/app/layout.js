@@ -20,14 +20,16 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={`${tiemposText.variable} ${tiemposHeadline.variable}`}>
-      <body>
-        <Providers>
-          <Header />
-          <ViewTransitions>
-            {children}
-          </ViewTransitions>
-        </Providers>
-      </body>
+      <ViewTransitions>
+        <body>
+          <Providers>
+            <Header />
+            <main style={{ viewTransitionName: 'page-content' }}>
+              {children}
+            </main>
+          </Providers>
+        </body>
+      </ViewTransitions>
     </html>
   );
 }

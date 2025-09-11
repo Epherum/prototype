@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signOut } from "next-auth/react";
-import Link from "next/link";
+import TransitionLink from "@/components/TransitionLink";
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import Image from "next/image";
@@ -349,9 +349,9 @@ export default function UserAuthDisplay({
                     variants={itemRevealUpVariants}
                     className={styles.buttonGroup}
                   >
-                    <Link href="/login" className={styles.authButton}>
+                    <TransitionLink href="/login" className={styles.authButton} onClick={() => {}}>
                       Login
-                    </Link>
+                    </TransitionLink>
                   </motion.div>
                 </>
               )}

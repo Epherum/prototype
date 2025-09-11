@@ -51,6 +51,7 @@ export default function Header({
   return (
     <div
       className={`${styles.header} ${isScrolled && !isAtTop ? styles.headerMinimized : ''}`}
+      style={{ viewTransitionName: 'main-header' }}
     >
       <UserAuthDisplay
         onOpenCreateUserModal={onOpenCreateUserModal || (() => {})}
