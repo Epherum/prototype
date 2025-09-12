@@ -136,7 +136,7 @@ export const createDocumentCreationActions = (set: any, get: any): DocumentCreat
   toggleEntityForDocument: (type, id) => {
     set((state: any) => {
       const { documentCreationState } = state.ui;
-      let newItems = [...documentCreationState.items];
+      const newItems = [...documentCreationState.items];
       let newSelectedPartnerIds = [...documentCreationState.selectedPartnerIds];
       let newSelectedGoodIds = [...documentCreationState.selectedGoodIds];
       

@@ -3,6 +3,7 @@
 .container {
   min-height: 100vh;
   padding: calc(var(--header-height, 84px) + calc(var(--spacing-unit) * 1)) calc(var(--spacing-unit) * 4) calc(var(--spacing-unit) * 4);
+  margin-top: 2rem;
   background: var(--bg-main);
   color: var(--text-primary);
   view-transition-name: page-content;

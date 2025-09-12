@@ -7,7 +7,6 @@ import journalPartnerLinkService, {
 } from "@/app/services/journalPartnerLinkService";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { withAuthorization } from "@/lib/auth/withAuthorization";
-import { Prisma } from "@prisma/client";
 import {
   getLinksQuerySchema,
   deleteLinksQuerySchema,

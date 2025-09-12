@@ -89,7 +89,7 @@ const partnerService = {
       selectedJournalIds = [],
       where: externalWhere,
     } = options;
-    let prismaWhere: Prisma.PartnerWhereInput = {
+    const prismaWhere: Prisma.PartnerWhereInput = {
       entityState: EntityState.ACTIVE,
       ...externalWhere,
     };

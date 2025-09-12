@@ -25,10 +25,10 @@ const putHandler = async (
     // CORRECT: Call the 'update' method on the service object
     const updated = await roleService.update(params.id, validation.data);
     return NextResponse.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     apiLogger.error(`API PUT /api/roles/${params.id} Error:`, error);
     // CORRECT: Use specific Prisma error code for robust 'not found' check
-    if (error.code === "P2025") {
+    if ((error as { code?: string }).code === "P2025") {
       return NextResponse.json(
         { message: `Role with ID '${params.id}' not found.` },
         { status: 404 }
@@ -50,10 +50,10 @@ const deleteHandler = async (
     // CORRECT: Call the 'delete' method on the service object
     await roleService.delete(params.id);
     return new NextResponse(null, { status: 204 }); // 204 No Content is correct
-  } catch (error: any) {
+  } catch (error: unknown) {
     apiLogger.error(`API DELETE /api/roles/${params.id} Error:`, error);
     // CORRECT: Use specific Prisma error code
-    if (error.code === "P2025") {
+    if ((error as { code?: string }).code === "P2025") {
       return NextResponse.json(
         { message: `Role with ID '${params.id}' not found.` },
         { status: 404 }

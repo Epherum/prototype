@@ -276,7 +276,7 @@ export default function UserAuthDisplay({
                   >
                     <button
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      className={styles.dropdownTrigger}
+                      className={`${styles.dropdownTrigger} ${isMinimized ? styles.dropdownTriggerMinimized : ''}`}
                       aria-expanded={isDropdownOpen}
                       aria-haspopup="true"
                       aria-label="Theme options"

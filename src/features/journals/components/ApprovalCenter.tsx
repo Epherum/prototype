@@ -62,8 +62,23 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
     }
   }, [useSelectedJournals, selectedJournals, effectiveRestrictedJournalId]);
 
-  // Fetch pending items for approval 
-  // Fixed: now uses empty journalIds to let approval service handle restrictedJournalId
+  // Fetch all pending items for badge counts (unfiltered by entity type)
+  const { data: allPendingItems } = useQuery({
+    queryKey: clientApprovalService.approvalKeys.inProcessFiltered({ 
+      entityTypes: [], // No entity filter to get all types
+      journalIds: effectiveJournalIds,
+    }),
+    queryFn: () => {
+      return clientApprovalService.getInProcessItems({
+        entityTypes: [], // No entity filter to get all types
+        journalIds: effectiveJournalIds,
+      });
+    },
+    enabled: isOpen,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Fetch pending items for approval (filtered by selected entity types)
   const { data: pendingItems, isLoading: queryIsLoading, error } = useQuery({
     queryKey: clientApprovalService.approvalKeys.inProcessFiltered({ 
       entityTypes: activeEntityFilters, 
@@ -102,6 +117,7 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
 
   // Debug log
   console.log("🔍 ApprovalCenter DEBUG: Query result", {
+    allPendingItems,
     pendingItems,
     queryIsLoading,
     isMinLoadingComplete,
@@ -224,27 +240,37 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
           </button>
         </div>
         
-        {/* Journal Scope Toggle */}
+        {/* Journal Scope Toggle - Sliding Switch */}
         <div className={styles.journalScopeToggle}>
-          <motion.button
-            className={`${styles.scopeToggleButton} ${useSelectedJournals ? styles.scopeToggleActive : ''}`}
-            onClick={() => setUseSelectedJournals(!useSelectedJournals)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            title={useSelectedJournals ? "Using selected journals" : "Using root/restricted level"}
-          >
-            {useSelectedJournals ? (
-              <>
-                <FiTarget className={styles.toggleIcon} />
-                Selected Journals
-              </>
-            ) : (
-              <>
-                <FiHome className={styles.toggleIcon} />
-                Root Level
-              </>
-            )}
-          </motion.button>
+          <div className={styles.slidingToggleContainer}>
+            <motion.div 
+              className={styles.slidingToggleTrack}
+              onClick={() => setUseSelectedJournals(!useSelectedJournals)}
+              whileTap={{ scale: 0.98 }}
+            >
+              <motion.div
+                className={styles.slidingToggleIndicator}
+                animate={{
+                  x: useSelectedJournals ? "100%" : "0%"
+                }}
+                transition={{
+                  type: "tween",
+                  ease: [0.25, 0.1, 0.25, 1],
+                  duration: 0.3
+                }}
+              />
+              <div className={styles.slidingToggleLabels}>
+                <div className={`${styles.toggleLabel} ${!useSelectedJournals ? styles.toggleLabelActive : ''}`}>
+                  <FiHome className={styles.toggleIcon} />
+                  <span>Root Level</span>
+                </div>
+                <div className={`${styles.toggleLabel} ${useSelectedJournals ? styles.toggleLabelActive : ''}`}>
+                  <FiTarget className={styles.toggleIcon} />
+                  <span>Selected</span>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
         
         <div className={styles.entityFilterRow}>
@@ -266,9 +292,9 @@ const ApprovalCenter: React.FC<ApprovalCenterProps> = ({
                 >
                   {filter.icon}
                   {filter.label}
-                  {pendingItems?.data.filter((item: InProcessItem) => item.type === filter.type).length > 0 && (
+                  {allPendingItems?.data.filter((item: InProcessItem) => item.type === filter.type).length > 0 && (
                     <span className={styles.filterBadge}>
-                      {pendingItems.data.filter((item: InProcessItem) => item.type === filter.type).length}
+                      {allPendingItems.data.filter((item: InProcessItem) => item.type === filter.type).length}
                     </span>
                   )}
                 </motion.button>

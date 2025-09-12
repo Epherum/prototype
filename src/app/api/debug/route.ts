@@ -4,7 +4,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions, ExtendedSession } from "@/lib/auth/authOptions";
 import prisma from "@/app/utils/prisma";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log("=== DEBUG ENDPOINT START ===");
     

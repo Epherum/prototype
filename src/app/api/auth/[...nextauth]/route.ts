@@ -1,6 +1,5 @@
 // src/app/api/auth/[...nextauth]/route.ts
 import NextAuth, {
-  NextAuthOptions,
   User as NextAuthUser,
   Session,
 } from "next-auth";
@@ -25,15 +24,6 @@ interface ExtendedSession extends Session {
   accessToken?: string;
 }
 
-// REFACTORED: JWT has a top-level restriction
-interface ExtendedJWT extends JWT {
-  id: string;
-  roles: Role[];
-  restrictedTopLevelJournalId: string | null;
-  name?: string | null;
-  email?: string | null;
-  picture?: string | null;
-}
 
 /**
  * Handles all NextAuth.js authentication requests (e.g., sign-in, sign-out, session).

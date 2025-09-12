@@ -40,6 +40,10 @@ export default function Header({
       
       document.documentElement.style.setProperty('--header-height', isMinimized ? `${minimizedHeight}px` : `${normalHeight}px`);
       document.documentElement.style.setProperty('--header-height-mobile', isMinimized ? `${minimizedMobileHeight}px` : `${normalMobileHeight}px`);
+      
+      // Update buffer sizes for sticky header controls
+      document.documentElement.style.setProperty('--header-buffer', isMinimized ? '20px' : '5px');
+      document.documentElement.style.setProperty('--header-buffer-mobile', isMinimized ? '20px' : '5px');
     };
 
     window.addEventListener('scroll', handleScroll);

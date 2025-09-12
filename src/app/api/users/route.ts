@@ -69,22 +69,22 @@ const postHandler = async (
     );
 
     return NextResponse.json(newUser, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     apiLogger.error(
       `API /users POST (Admin: ${adminUser.id}) Error:`,
-      error.message
+      (error as Error).message
     );
 
     // ✅ CORRECT: Handle specific error codes
-    if (error.code === "P2002" && error.meta?.target?.includes("email")) {
+    if ((error as { code?: string; meta?: { target?: string[] } }).code === "P2002" && (error as { code?: string; meta?: { target?: string[] } }).meta?.target?.includes("email")) {
       return NextResponse.json(
         { message: "A user with this email already exists." },
         { status: 409 } // 409 Conflict is appropriate for duplicates
       );
     }
     // Handle specific error from the service for non-existent journal
-    if (error.message.includes("Journal with ID")) {
-      return NextResponse.json({ message: error.message }, { status: 400 }); // 400 Bad Request
+    if ((error as Error).message.includes("Journal with ID")) {
+      return NextResponse.json({ message: (error as Error).message }, { status: 400 }); // 400 Bad Request
     }
 
     return NextResponse.json(

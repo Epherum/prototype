@@ -108,7 +108,7 @@ const goodsService = {
       where: externalWhere,
     } = options;
 
-    let prismaWhere: Prisma.GoodsAndServiceWhereInput = {
+    const prismaWhere: Prisma.GoodsAndServiceWhereInput = {
       entityState: EntityState.ACTIVE,
       ...externalWhere,
     };

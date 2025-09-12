@@ -40,8 +40,8 @@ function LoginContent() {
       } else {
         setError("An unknown error occurred. Please try again.");
       }
-    } catch (err: any) {
-      setError(err.message || "Failed to sign in.");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to sign in.");
     } finally {
       setIsLoading(false);
     }

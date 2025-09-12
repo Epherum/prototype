@@ -173,7 +173,7 @@ const documentService = {
       filterByGoodIds,
     } = options;
 
-    let where: Prisma.DocumentWhereInput = { 
+    const where: Prisma.DocumentWhereInput = { 
       entityState: "ACTIVE",
       approvalStatus: "APPROVED" // Main document slider only shows approved documents
     };

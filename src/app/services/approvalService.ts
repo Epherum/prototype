@@ -2,6 +2,17 @@
 
 import { ApprovalStatus, Prisma } from "@prisma/client";
 import prisma from "@/app/utils/prisma";
+
+interface ApprovalHistoryEntry {
+  level: number;
+  approvedBy: string;
+  approvedAt: string;
+  comments?: string | null;
+  userIp?: string;
+}
+
+type ApprovalHistory = ApprovalHistoryEntry[];
+
 import { serviceLogger } from "@/lib/logger";
 import { ROOT_JOURNAL_ID } from "@/lib/constants";
 import { journalService } from "./journalService";
@@ -16,7 +27,7 @@ export interface InProcessItem {
   createdAt: Date;
   createdById: string;
   canApprove: boolean;
-  approvalHistory?: any;
+  approvalHistory?: ApprovalHistory;
 }
 
 export interface GetInProcessItemsOptions {
@@ -353,8 +364,8 @@ async function approveEntity(options: ApproveEntityOptions) {
 
   // Start a transaction to ensure consistency
   return await prisma.$transaction(async (tx) => {
-    let entity: any;
-    let updateData: any;
+    let entity: Record<string, unknown>;
+    let updateData: Record<string, unknown>;
 
     // Get the current entity state
     switch (entityType) {
@@ -428,7 +439,7 @@ async function approveEntity(options: ApproveEntityOptions) {
     }
 
     // Update approval history
-    const currentHistory = entity.approvalHistory || [];
+    const currentHistory = (entity.approvalHistory as ApprovalHistory) || [];
     const newHistoryEntry = {
       level: userApprovalLevel,
       approvedBy: userId,
@@ -438,13 +449,13 @@ async function approveEntity(options: ApproveEntityOptions) {
     };
 
     const updatedHistory = [...currentHistory, newHistoryEntry];
-    const updatedApprovedByUserIds = [...(entity.approvedByUserIds || []), userId];
-    const updatedApprovalTimestamps = [...(entity.approvalTimestamps || []), new Date()];
+    const updatedApprovedByUserIds = [...((entity.approvedByUserIds as string[]) || []), userId];
+    const updatedApprovalTimestamps = [...((entity.approvalTimestamps as Date[]) || []), new Date()];
 
     // Determine if this is the final approval
     // For links, use creationLevel instead of creationJournalLevel
     const creationLevel = entity.creationJournalLevel ?? entity.creationLevel;
-    const isLastLevel = entity.currentPendingLevel >= creationLevel;
+    const isLastLevel = (entity.currentPendingLevel as number) >= (creationLevel as number);
 
     if (isLastLevel) {
       // Final approval - mark as APPROVED
@@ -465,7 +476,7 @@ async function approveEntity(options: ApproveEntityOptions) {
     }
 
     // Apply the update
-    let updatedEntity: any;
+    let updatedEntity: Record<string, unknown>;
     switch (entityType) {
       case 'partner':
         updatedEntity = await tx.partner.update({
@@ -487,7 +498,7 @@ async function approveEntity(options: ApproveEntityOptions) {
         break;
       case 'link':
         // For links, use approvalMetadata instead of approvalHistory
-        const linkUpdateData = {
+        const linkUpdateData: Record<string, unknown> = {
           ...updateData,
           approvalMetadata: updateData.approvalHistory,
         };

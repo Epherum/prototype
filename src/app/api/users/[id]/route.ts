@@ -103,30 +103,30 @@ const putHandler = async (
     const updatedUser = await userService.update(userIdToUpdate, updateData);
 
     return NextResponse.json(updatedUser);
-  } catch (error: any) {
+  } catch (error: unknown) {
     apiLogger.error(
       `API /users/${userIdToUpdate} PUT (Admin: ${adminUser.id}) Error:`,
-      error.message
+      (error as Error).message
     );
 
     // ✅ CORRECT: Catch specific Prisma error codes
-    if (error.code === "P2025") {
+    if ((error as { code?: string }).code === "P2025") {
       // Record not found
       return NextResponse.json(
         { message: `User with ID '${userIdToUpdate}' not found.` },
         { status: 404 }
       );
     }
-    if (error.code === "P2002" && error.meta?.target?.includes("email")) {
+    if ((error as { code?: string; meta?: { target?: string[] } }).code === "P2002" && (error as { code?: string; meta?: { target?: string[] } }).meta?.target?.includes("email")) {
       // Unique constraint violation
       return NextResponse.json(
         { message: "A user with this email already exists." },
         { status: 409 }
       );
     }
-    if (error.message.includes("Journal with ID")) {
+    if ((error as Error).message.includes("Journal with ID")) {
       // Error from service about non-existent journal
-      return NextResponse.json({ message: error.message }, { status: 400 });
+      return NextResponse.json({ message: (error as Error).message }, { status: 400 });
     }
 
     return NextResponse.json(

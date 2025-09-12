@@ -2,7 +2,7 @@
 .authContainer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  position: relative;
   gap: calc(var(--spacing-unit) * 1.5);
 
   /* Restore the "card" look */
@@ -20,6 +20,8 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .logoButton {
@@ -33,10 +35,17 @@
   border-radius: 50%;
   transition: background-color 0.2s ease;
   outline: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .logoButton:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg-card), 0 0 0 4px var(--accent-warm);
+  outline: none;
+  box-shadow: none;
 }
 
 .logoButton:hover {
@@ -97,7 +106,6 @@
   display: flex;
   align-items: center;
   gap: calc(var(--spacing-unit) * 0.5);
-  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
   font-size: 0.9em;
   font-weight: 600;
   cursor: pointer;
@@ -109,6 +117,7 @@
   transition: all 0.2s ease;
   white-space: nowrap;
   outline: none;
+  margin-top: 0.4rem;
 }
 
 .userDropdownTrigger:focus-visible {
@@ -178,6 +187,23 @@
   display: flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+.dropdownContainer:has(.userDropdownTrigger) {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Position the options dropdown container to the right */
+.dropdownContainer:has(.dropdownTrigger) {
+  margin-left: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .dropdownTrigger {
@@ -297,4 +323,15 @@
 .userNameMinimized {
   font-size: 0.8em !important;
   padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1) !important;
+}
+
+.dropdownTriggerMinimized {
+  width: 32px !important;
+  height: 32px !important;
+  padding: calc(var(--spacing-unit) * 0.5) !important;
+}
+
+.dropdownTriggerMinimized .settingsIcon {
+  width: 14px !important;
+  height: 14px !important;
 }
