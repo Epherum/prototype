@@ -52,6 +52,10 @@
   background-color: var(--accent-warm-light);
 }
 
+.logoButton:active {
+  background-color: transparent;
+}
+
 .logo {
   display: block;
   opacity: 0.8;

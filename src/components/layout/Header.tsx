@@ -30,20 +30,22 @@ export default function Header({
       setIsScrolled(isScrolledState);
       setIsAtTop(isAtTopState);
       
-      // Update CSS variables for dynamic header height - add actual header height
+      // Keep header height fixed to prevent layout shift - use transform for minimization
       const isMinimized = isScrolledState && !isAtTopState;
-      // Calculate actual header heights including padding
-      const normalHeight = 60 + (8 * 1.5 * 2); // 60px + padding calc(var(--spacing-unit) * 1.5) * 2
-      const minimizedHeight = 36 + (8 * 0.75 * 2); // 36px + padding calc(var(--spacing-unit) * 0.75) * 2
-      const normalMobileHeight = 50 + (8 * 1.25 * 2); // 50px + mobile padding
-      const minimizedMobileHeight = 30 + (8 * 0.5 * 2); // 30px + minimized mobile padding
+      // Set fixed header heights (use the normal size as the fixed size)
+      const fixedHeight = 60 + (8 * 1.5 * 2); // 60px + padding calc(var(--spacing-unit) * 1.5) * 2
+      const fixedMobileHeight = 50 + (8 * 1.25 * 2); // 50px + mobile padding
       
-      document.documentElement.style.setProperty('--header-height', isMinimized ? `${minimizedHeight}px` : `${normalHeight}px`);
-      document.documentElement.style.setProperty('--header-height-mobile', isMinimized ? `${minimizedMobileHeight}px` : `${normalMobileHeight}px`);
+      // Set fixed header heights to prevent content jumping
+      document.documentElement.style.setProperty('--header-height', `${fixedHeight}px`);
+      document.documentElement.style.setProperty('--header-height-mobile', `${fixedMobileHeight}px`);
       
-      // Update buffer sizes for sticky header controls
-      document.documentElement.style.setProperty('--header-buffer', isMinimized ? '20px' : '5px');
-      document.documentElement.style.setProperty('--header-buffer-mobile', isMinimized ? '20px' : '5px');
+      // Dynamic gap adjustment based on navbar state
+      document.documentElement.style.setProperty('--header-buffer', '0px');
+      document.documentElement.style.setProperty('--header-buffer-mobile', '0px');
+      // Set minimized offset: 0px when normal, -15px when minimized
+      document.documentElement.style.setProperty('--header-minimized-offset', isMinimized ? '-15px' : '0px');
+      document.documentElement.style.setProperty('--header-minimized-offset-mobile', isMinimized ? '-15px' : '0px');
     };
 
     window.addEventListener('scroll', handleScroll);

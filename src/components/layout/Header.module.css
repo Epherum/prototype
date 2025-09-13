@@ -9,7 +9,7 @@
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-subtle);
   z-index: 1000;
-  padding: calc(var(--spacing-unit) * 1);
+  padding: calc(var(--spacing-unit) * 1.5);
   transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -30,10 +30,10 @@
 
 @media (max-width: 768px) {
   .header {
-    padding: calc(var(--spacing-unit) * 0.5);
+    padding: calc(var(--spacing-unit) * 1.25);
   }
   
   .headerMinimized {
-    padding: calc(var(--spacing-unit) * -0.5);
+    padding: calc(var(--spacing-unit) * 0.2);
   }
 }
