@@ -6,10 +6,10 @@ import styles from "./page.module.css";
 
 const departments = [
   { id: 1, name: "Top Management" },
-  { id: 2, name: "Matrix Operationnelle" },
+  { id: 2, name: "Maitrise Operationnelle" },
   { id: 3, name: "Juridique" },
   { id: 4, name: "Logistique" },
-  { id: 5, name: "R&D" },
+  { id: 5, name: "RID" },
   { id: 6, name: "GRH" },
   { id: 7, name: "Comptabilité" },
   { id: 8, name: "Finance" },
