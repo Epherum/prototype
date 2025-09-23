@@ -122,6 +122,8 @@ model User {
   deletedPartners         Partner[]       @relation("PartnerDeletedBy")
   createdGoodsAndServices GoodsAndService[] @relation("GoodsCreatedBy")
   deletedGoodsAndServices GoodsAndService[] @relation("GoodsDeletedBy")
+  createdLoops            JournalLoop[]   @relation("LoopCreatedBy")
+  deletedLoops            JournalLoop[]   @relation("LoopDeletedBy")
 
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
@@ -198,7 +200,11 @@ model Journal {
   
   // Back-relation for user-level restrictions
   userRestrictions User[] @relation("UserRestrictedJournal")
-  documents   Document[]          @relation("DocumentJournal")   
+  documents   Document[]          @relation("DocumentJournal")
+
+  // Loop relations
+  loopFromConnections JournalLoopConnection[] @relation("LoopFromJournal")
+  loopToConnections   JournalLoopConnection[] @relation("LoopToJournal")   
 
   createdAt          DateTime  @default(now()) @map("created_at")
   updatedAt          DateTime  @updatedAt @map("updated_at")
@@ -543,4 +549,63 @@ model DocumentLine {
   updatedAt               DateTime  @updatedAt @map("updated_at")
 
   @@map("document_lines")
+}
+
+// --- Journal Loops Feature ---
+
+enum LoopStatus {
+  ACTIVE
+  INACTIVE
+  DRAFT
+}
+
+model JournalLoop {
+  id                  String        @id @default(cuid())
+  name                String        @db.VarChar(255)
+  description         String?       @db.Text
+  status              LoopStatus    @default(DRAFT)
+
+  // Audit Fields
+  entityState         EntityState   @default(ACTIVE) @map("entity_state")
+  createdById         String        @map("created_by_id")
+  createdByIp         String?       @map("created_by_ip") @db.VarChar(45)
+  deletedById         String?       @map("deleted_by_id")
+  deletedByIp         String?       @map("deleted_by_ip") @db.VarChar(45)
+  deletedAt           DateTime?     @map("deleted_at")
+
+  // Relations
+  createdBy           User          @relation("LoopCreatedBy", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  deletedBy           User?         @relation("LoopDeletedBy", fields: [deletedById], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // Loop connections
+  journalConnections  JournalLoopConnection[]
+
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@map("journal_loops")
+  @@index([name])
+  @@index([status])
+}
+
+model JournalLoopConnection {
+  id                  String        @id @default(cuid())
+  loopId              String        @map("loop_id")
+  fromJournalId       String        @map("from_journal_id") @db.VarChar(100)
+  toJournalId         String        @map("to_journal_id") @db.VarChar(100)
+  sequence            Int           // Order in the loop (0-based)
+
+  // Relations
+  loop                JournalLoop   @relation(fields: [loopId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  fromJournal         Journal       @relation("LoopFromJournal", fields: [fromJournalId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  toJournal           Journal       @relation("LoopToJournal", fields: [toJournalId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  @@map("journal_loop_connections")
+  @@unique([loopId, sequence])
+  @@unique([loopId, fromJournalId, toJournalId])
+  @@index([fromJournalId])
+  @@index([toJournalId])
 }

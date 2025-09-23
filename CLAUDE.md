@@ -63,6 +63,8 @@ Sophisticated query management system that:
 - **GoodsAndService**: Products/services with tax codes, units of measure, and barcode support
 - **Document**: Invoices, quotes, purchase orders, credit notes with line items
 - **DocumentLine**: Individual line items linking documents to journal-partner-good relationships
+- **JournalLoop**: Named loops of journals that form closed accounting circuits (NEW FEATURE)
+- **JournalLoopConnection**: Individual connections between journals within a loop
 
 **Advanced Linking System:**
 - `JournalPartnerLink` - Associates partners with journals (with partnership types like CONSIGNMENT, EXCLUSIVE_SUPPLIER)
@@ -99,6 +101,58 @@ approvalHistory JSONB
 2. Visibility: Users see ALL pending entities for oversight
 3. Authority: Users can only approve items at their approval level
 4. Sequential approval: Root → L1 → L2 → ... → Creation Level
+
+### Journal Loops System (NEW FEATURE - BACKEND COMPLETE)
+
+**Core Architecture:**
+The Journal Loops feature allows creation of named loops representing closed accounting circuits where journal-to-journal transactions flow in circular patterns.
+
+**Key Components:**
+- **JournalLoop Model**: Stores loop metadata (name, description, status, audit trail)
+- **JournalLoopConnection Model**: Defines sequential connections between journals in a loop
+- **Loop Validation**: Ensures minimum 3 journals, closed circuit, and journal existence
+- **Status Management**: ACTIVE, INACTIVE, DRAFT statuses for loop lifecycle management
+
+**Database Schema (COMPLETED):**
+```sql
+JournalLoop {
+  id, name, description, status (LoopStatus)
+  createdAt, updatedAt, deletedAt
+  createdById, deletedById
+  entityState (ACTIVE/MODIFIED/DELETED)
+}
+
+JournalLoopConnection {
+  id, loopId, fromJournalId, toJournalId, sequence
+  createdAt, updatedAt
+}
+```
+
+**API Endpoints (COMPLETED):**
+- `GET /api/loops` - List all loops with filtering (status, search)
+- `POST /api/loops` - Create new loops with validation
+- `GET /api/loops/[id]` - Get specific loop with connections
+- `PUT /api/loops/[id]` - Update loop properties and path
+- `DELETE /api/loops/[id]` - Soft delete loops
+
+**Service Layer (COMPLETED):**
+- `loopService.ts` - Server-side business logic with comprehensive validation
+- Loop validation ensures 3+ journals, closed circuit, no duplicates
+- Transaction-based operations for data integrity
+- Support for finding loops by journal participation
+
+**Frontend Specification:**
+Detailed UI/UX specification available in `docs/journal-loops-frontend-specification.md`
+- Loop Management Dashboard with card-based interface
+- Interactive Loop Builder with drag-and-drop journal arrangement
+- Visual loop representation with flow indicators
+- Integration with existing journal slider interface
+
+**Next Steps for Frontend Implementation:**
+1. Create loop management components following specification
+2. Implement interactive loop builder with visualization
+3. Add loop participation indicators to journal interface
+4. Integrate with existing slider system for loop-aware filtering
 
 ### Journal Filtering System
 
@@ -143,14 +197,21 @@ All major entities include:
 
 **Core Structure:**
 - `src/app/api/` - Next.js API routes with comprehensive error handling
-- `src/app/services/` - Server-side business logic services (journalService, approvalService, etc.)
+- `src/app/services/` - Server-side business logic services (journalService, approvalService, loopService, etc.)
 - `src/services/` - Client-side service wrappers with React Query integration
 - `src/features/` - Feature-specific UI components organized by domain
 - `src/features/shared/` - Reusable UI components
 - `src/store/` - Modular Zustand state management
-- `src/lib/schemas/` - Zod validation schemas
+- `src/lib/schemas/` - Zod validation schemas (including loop.schema.ts)
 - `src/lib/auth/` - Authentication configuration and utilities
 - `docs/` - Comprehensive architecture and API documentation
+
+**Loops Feature Files (COMPLETED BACKEND):**
+- `src/app/api/loops/route.ts` - Main loops API endpoints (GET, POST)
+- `src/app/api/loops/[id]/route.ts` - Individual loop endpoints (GET, PUT, DELETE)
+- `src/app/services/loopService.ts` - Server-side loop business logic
+- `src/lib/schemas/loop.schema.ts` - Zod validation schemas for loops
+- `docs/journal-loops-frontend-specification.md` - Detailed frontend UI/UX specification
 
 ### Service Layer Pattern
 

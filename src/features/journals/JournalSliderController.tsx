@@ -9,9 +9,10 @@ import React, {
 } from "react";
 // Import motion components
 import { motion, AnimatePresence } from "framer-motion";
-import { IoOptionsOutline } from "react-icons/io5";
+import { IoOptionsOutline, IoGitNetworkOutline } from "react-icons/io5";
 import { IoChevronDown } from "react-icons/io5";
 import styles from "@/app/page.module.css";
+import { useRouter } from "next/navigation";
 
 // Store & Hooks
 import { useAppStore } from "@/store/appStore";
@@ -64,6 +65,7 @@ export const JournalSliderController = forwardRef<
 >(({ canMoveUp, canMoveDown, onMoveUp, onMoveDown, isMoveDisabled }, ref) => {
   const journalManager = useJournalManager();
   const { isCreating } = useAppStore((state) => state.ui.documentCreationState);
+  const router = useRouter();
 
   // ... (rest of the component up to the return statement is unchanged)
   const [isLinkingModalOpen, setIsLinkingModalOpen] = useState(false);
@@ -72,6 +74,10 @@ export const JournalSliderController = forwardRef<
   >(null);
   const [isGpgContextModalOpen, setIsGpgContextModalOpen] = useState(false);
   const [isTitleExpanded, setIsTitleExpanded] = useState(false);
+
+  const handleNavigateToLoops = () => {
+    router.push('/loops');
+  };
 
   const topLevelContextNode = useMemo(() => {
     if (
@@ -204,6 +210,16 @@ export const JournalSliderController = forwardRef<
             disabled={isCreating}
           >
             <IoOptionsOutline />
+          </button>
+
+          <button
+            onClick={handleNavigateToLoops}
+            className={`${styles.controlButton} ${styles.loopsButton}`}
+            aria-label="Manage Journal Loops"
+            title="Manage Journal Loops - Create and manage closed accounting circuits"
+            disabled={isCreating}
+          >
+            <IoGitNetworkOutline />
           </button>
 
           {/* ✅ 2. START: Update the classNames to use the global `styles` object */}

@@ -188,6 +188,16 @@ export default function UserAuthDisplay({
                         style={{
                           filter: getLogoFilter()
                         }}
+                        onError={(e) => {
+                          console.log('Logo loading error:', e);
+                          // Fallback to the regular logo if dark logo fails
+                          const target = e.target as HTMLImageElement;
+                          if (target.src.includes('company_logo_dark.png')) {
+                            target.src = '/company_logo.png';
+                          }
+                        }}
+                        unoptimized
+                        priority
                       />
                     </button>
                   </motion.div>
@@ -338,6 +348,16 @@ export default function UserAuthDisplay({
                       style={{
                         filter: getLogoFilter()
                       }}
+                      onError={(e) => {
+                        console.log('Logo loading error (unauthenticated):', e);
+                        // Fallback to the regular logo if dark logo fails
+                        const target = e.target as HTMLImageElement;
+                        if (target.src.includes('company_logo_dark.png')) {
+                          target.src = '/company_logo.png';
+                        }
+                      }}
+                      unoptimized
+                      priority
                     />
                   </motion.div>
                   
