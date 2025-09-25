@@ -294,16 +294,6 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
           </motion.g>
         )}
 
-        {/* Loop completion indicator */}
-        <motion.circle
-          cx={svgSize / 2}
-          cy={svgSize / 2}
-          r={compact ? 5 : 8}
-          className={styles.centerDot}
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ delay: 0.8, duration: 0.3 }}
-        />
       </svg>
 
       {/* Legend for non-compact mode */}

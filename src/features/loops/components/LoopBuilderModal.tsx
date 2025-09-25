@@ -55,6 +55,7 @@ const LoopBuilderModal: React.FC<LoopBuilderModalProps> = ({
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedJournalsForSwap, setSelectedJournalsForSwap] = useState<string[]>([]);
 
   const queryClient = useQueryClient();
   const user = useAppStore((state) => state.user);
@@ -168,6 +169,7 @@ const LoopBuilderModal: React.FC<LoopBuilderModalProps> = ({
         ?.map(conn => conn.fromJournalId) || []
     );
     setSearchTerm("");
+    setSelectedJournalsForSwap([]);
     setIsSubmitting(false);
     onClose();
   };
@@ -193,6 +195,30 @@ const LoopBuilderModal: React.FC<LoopBuilderModalProps> = ({
 
   const handleRemoveJournal = (journalId: string) => {
     setSelectedJournalIds(prev => prev.filter(id => id !== journalId));
+  };
+
+  const handleJournalSelectForSwap = (journalId: string) => {
+    setSelectedJournalsForSwap(prev => {
+      if (prev.includes(journalId)) {
+        return prev.filter(id => id !== journalId);
+      } else if (prev.length < 2) {
+        return [...prev, journalId];
+      } else {
+        return [prev[1], journalId]; // Replace first selection
+      }
+    });
+  };
+
+  const handleSwapJournals = (journalId1: string, journalId2: string) => {
+    const index1 = selectedJournalIds.indexOf(journalId1);
+    const index2 = selectedJournalIds.indexOf(journalId2);
+
+    if (index1 >= 0 && index2 >= 0) {
+      const newOrder = [...selectedJournalIds];
+      [newOrder[index1], newOrder[index2]] = [newOrder[index2], newOrder[index1]];
+      setSelectedJournalIds(newOrder);
+      setSelectedJournalsForSwap([]); // Clear selection after swap
+    }
   };
 
   const handleSubmit = async () => {
@@ -497,7 +523,21 @@ const LoopBuilderModal: React.FC<LoopBuilderModalProps> = ({
                       journalMap={journalMap}
                       compact={false}
                       className={styles.previewVisualization}
+                      selectedJournalIds={selectedJournalsForSwap}
+                      onJournalSelect={handleJournalSelectForSwap}
+                      onSwapJournals={handleSwapJournals}
+                      allowSwapping={true}
                     />
+                    {selectedJournalsForSwap.length > 0 && (
+                      <div className={styles.swapHint}>
+                        <span>
+                          {selectedJournalsForSwap.length === 1
+                            ? "Select another journal to swap positions"
+                            : "Click the swap button in the center or select different journals"
+                          }
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>

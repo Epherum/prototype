@@ -154,6 +154,12 @@
   gap: calc(var(--spacing-unit) * 1.25);
 }
 
+.previewSection {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  border-top: 1px solid var(--border-subtle);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+}
+
 @media (max-width: 768px) {
   .connectionRow {
     grid-template-columns: 1fr;
@@ -171,5 +177,10 @@
   .newLoopForm,
   .connectionConfig {
     padding: calc(var(--spacing-unit) * 0.75);
+  }
+
+  .previewSection {
+    margin-top: calc(var(--spacing-unit) * 1);
+    padding-top: calc(var(--spacing-unit) * 1);
   }
 }

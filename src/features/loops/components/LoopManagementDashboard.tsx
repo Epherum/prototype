@@ -486,7 +486,7 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
                                       {journal?.name || `Journal ${journalId}`}
                                     </span>
                                     <span className={styles.journalCode}>
-                                      {journal?.code || journalId}
+                                      {journal?.id || journalId}
                                     </span>
                                     {journal?.isTerminal && (
                                       <span className={styles.terminalBadge}>T</span>

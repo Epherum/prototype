@@ -53,25 +53,20 @@
 
 .terminalNode {
   fill: var(--accent-warm);
-  stroke: #d97706;
-  stroke-width: 2;
 }
 
 .nonTerminalNode {
   fill: #3b82f6;
-  stroke: #000000; /* Black border for non-terminal journals */
-  stroke-width: 3;
 }
 
 .journalNode:hover {
-  stroke-width: 3;
   filter: brightness(1.1);
 }
 
 .journalNumber {
   font-size: 12px;
   font-weight: 600;
-  fill: white;
+  fill: var(--text-primary);
   pointer-events: none;
 }
 
@@ -91,17 +86,13 @@
 
 .connectionLine:hover {
   stroke-width: 3;
-  stroke: #d97706;
+  stroke: var(--accent-warm-hover);
 }
 
 .arrowMarker {
   fill: var(--accent-warm);
 }
 
-.centerDot {
-  fill: var(--accent-warm);
-  opacity: 0.8;
-}
 
 /* Legend */
 .legend {
@@ -133,13 +124,10 @@
 
 .legendNode.terminalNode {
   background-color: var(--accent-warm);
-  border-color: #d97706;
 }
 
 .legendNode.nonTerminalNode {
   background-color: #3b82f6;
-  border-color: #000000; /* Black border for non-terminal in legend too */
-  border-width: 3px;
 }
 
 .legendArrow {
@@ -293,14 +281,10 @@
 @media (prefers-contrast: high) {
   .terminalNode {
     fill: #ff6b00;
-    stroke: #cc4400;
-    stroke-width: 3;
   }
 
   .nonTerminalNode {
     fill: #0066ff;
-    stroke: #0044cc;
-    stroke-width: 3;
   }
 
   .connectionLine {

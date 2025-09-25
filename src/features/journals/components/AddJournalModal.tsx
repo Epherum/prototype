@@ -25,7 +25,6 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
   let codePrefixForDisplay = "";
   let codeSeparator = "";
   let codePatternHint = "";
-  let finalCodeForNewAccount = "";
 
   let currentLevel = 1;
   if (context?.parentCode) {
@@ -48,6 +47,22 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
     currentLevel = 1;
     codePatternHint = `Enter a single digit (1-9)`;
   }
+
+  // Calculate final code for preview purposes (this updates as user types)
+  const calculateFinalCode = () => {
+    const trimmedSuffix = newCodeSuffix.trim();
+    if (!trimmedSuffix) return "";
+
+    if (currentLevel === 1) {
+      return trimmedSuffix;
+    } else if (currentLevel === 2 && !context?.parentCode?.includes("-")) {
+      return codePrefixForDisplay + trimmedSuffix;
+    } else {
+      return codePrefixForDisplay + codeSeparator + trimmedSuffix;
+    }
+  };
+
+  const finalCodeForNewAccount = calculateFinalCode();
 
   // Fetch available journals for loop integration
   const { data: availableJournals = [] } = useQuery({
@@ -90,25 +105,25 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
     const trimmedSuffix = newCodeSuffix.trim();
     const trimmedName = newName.trim();
 
+
     if (!trimmedSuffix || !trimmedName) {
       setError("Code Suffix and Name fields are required.");
       return;
     }
 
+    // Validation only - finalCodeForNewAccount is already calculated above
     if (currentLevel === 1) {
       if (!/^[1-9]$/.test(trimmedSuffix)) {
         setError("Top-level code must be a single digit (1-9).");
         return;
       }
-      finalCodeForNewAccount = trimmedSuffix;
-    } else if (currentLevel === 2 && !context.parentCode.includes("-")) {
+    } else if (currentLevel === 2 && !context?.parentCode?.includes("-")) {
       if (!/^\d{2}$/.test(trimmedSuffix)) {
         setError(
           `Level 2 code suffix (after "${codePrefixForDisplay}") must be exactly two digits. e.g., "01"`
         );
         return;
       }
-      finalCodeForNewAccount = codePrefixForDisplay + trimmedSuffix;
     } else {
       if (!/^\d{1,2}$/.test(trimmedSuffix)) {
         setError(
@@ -116,8 +131,6 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
         );
         return;
       }
-      finalCodeForNewAccount =
-        codePrefixForDisplay + codeSeparator + trimmedSuffix;
     }
 
     const newAccountId = finalCodeForNewAccount;
@@ -238,7 +251,10 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
           <LoopIntegrationSection
             onLoopDataChange={setLoopIntegrationData}
             availableJournals={flatJournals}
+            newJournalId={finalCodeForNewAccount}
+            newJournalName={newName.trim()}
           />
+
 
           {/* Modal actions use baseStyles */}
           <div

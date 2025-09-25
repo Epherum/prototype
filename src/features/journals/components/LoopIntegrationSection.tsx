@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { IoAdd, IoChevronDown, IoChevronUp, IoLinkOutline } from "react-icons/io5";
 import { useQuery } from "@tanstack/react-query";
 import { fetchLoops } from "@/services/clientLoopService";
 import { LoopWithConnections } from "@/lib/schemas/loop.schema";
+import LoopPreview from "@/features/loops/components/LoopPreview";
 import styles from "./LoopIntegrationSection.module.css";
 
 interface LoopIntegrationData {
@@ -19,11 +20,15 @@ interface LoopIntegrationData {
 interface LoopIntegrationSectionProps {
   onLoopDataChange: (data: LoopIntegrationData | null) => void;
   availableJournals: Array<{ id: string; name: string; code: string }>;
+  newJournalId?: string;
+  newJournalName?: string;
 }
 
 export const LoopIntegrationSection: React.FC<LoopIntegrationSectionProps> = ({
   onLoopDataChange,
   availableJournals,
+  newJournalId,
+  newJournalName,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [integrationMode, setIntegrationMode] = useState<"none" | "existing" | "new">("none");
@@ -39,6 +44,29 @@ export const LoopIntegrationSection: React.FC<LoopIntegrationSectionProps> = ({
     queryFn: () => fetchLoops(), // Fetch all loops regardless of status
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Get selected loop for preview
+  const selectedLoop = useMemo(() => {
+    if (integrationMode === "existing" && selectedLoopId) {
+      return loops.find(loop => loop.id === selectedLoopId);
+    }
+    return null;
+  }, [integrationMode, selectedLoopId, loops]);
+
+  // Create journal map for visualization
+  const journalMap = useMemo(() => {
+    return availableJournals.reduce((acc, journal) => {
+      acc[journal.id] = journal;
+      return acc;
+    }, {} as Record<string, any>);
+  }, [availableJournals]);
+
+  // Should show preview
+  const shouldShowPreview = useMemo(() => {
+    return integrationMode !== "none" && newJournalId && newJournalName &&
+           ((integrationMode === "existing" && selectedLoopId) ||
+            (integrationMode === "new" && newLoopName.trim()));
+  }, [integrationMode, newJournalId, newJournalName, selectedLoopId, newLoopName]);
 
   // Update parent when integration data changes
   useEffect(() => {
@@ -251,6 +279,28 @@ export const LoopIntegrationSection: React.FC<LoopIntegrationSectionProps> = ({
                     </select>
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+            {/* Loop Preview */}
+            {shouldShowPreview && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={styles.previewSection}
+              >
+                <LoopPreview
+                  currentLoop={selectedLoop}
+                  newJournalId={newJournalId!}
+                  newJournalName={newJournalName!}
+                  journalMap={journalMap}
+                  forwardToJournalId={forwardToJournalId}
+                  backwardFromJournalId={backwardFromJournalId}
+                  onForwardToChange={setForwardToJournalId}
+                  onBackwardFromChange={setBackwardFromJournalId}
+                  availableJournals={availableJournals}
+                  newLoopName={newLoopName}
+                />
               </motion.div>
             )}
           </motion.div>

@@ -7,7 +7,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: calc(var(--spacing-unit) * 2);
   box-sizing: border-box;
 }
@@ -661,4 +661,15 @@
   .step {
     min-height: 300px;
   }
+}
+
+.swapHint {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  border: 1px solid var(--border-light);
 }
