@@ -2,9 +2,13 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { IoAddCircleOutline } from "react-icons/io5";
+import { useQuery } from "@tanstack/react-query";
 
 import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
+import { LoopIntegrationSection, LoopIntegrationData } from "./LoopIntegrationSection";
+import { fetchJournalHierarchy } from "@/services/clientJournalService";
+import { journalKeys } from "@/lib/queryKeys";
 
 import specificStyles from "./AddJournalModal.module.css"; // Styles unique to AddJournalModal form
 
@@ -15,6 +19,7 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
   const [newCodeSuffix, setNewCodeSuffix] = useState("");
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
+  const [loopIntegrationData, setLoopIntegrationData] = useState<LoopIntegrationData | null>(null);
 
   // ... (rest of your existing logic for codePrefixForDisplay, codeSeparator, etc. remains unchanged)
   let codePrefixForDisplay = "";
@@ -44,11 +49,34 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
     codePatternHint = `Enter a single digit (1-9)`;
   }
 
+  // Fetch available journals for loop integration
+  const { data: availableJournals = [] } = useQuery({
+    queryKey: journalKeys.hierarchy(null),
+    queryFn: () => fetchJournalHierarchy(null),
+    staleTime: 5 * 60 * 1000,
+    enabled: isOpen, // Only fetch when modal is open
+  });
+
+  // Flatten journal hierarchy for dropdown
+  const flatJournals = availableJournals.reduce((acc, journal) => {
+    const flattenJournal = (j: any): Array<{ id: string; name: string; code: string }> => {
+      const result = [{ id: j.id, name: j.name, code: j.code || j.id }];
+      if (j.children) {
+        j.children.forEach((child: any) => {
+          result.push(...flattenJournal(child));
+        });
+      }
+      return result;
+    };
+    return [...acc, ...flattenJournal(journal)];
+  }, [] as Array<{ id: string; name: string; code: string }>);
+
   useEffect(() => {
     if (isOpen) {
       setNewCodeSuffix("");
       setNewName("");
       setError("");
+      setLoopIntegrationData(null); // Reset loop integration data
       setTimeout(() => {
         document.getElementById("newJournalCodeSuffix")?.focus();
       }, 100);
@@ -93,12 +121,15 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
     }
 
     const newAccountId = finalCodeForNewAccount;
-    onSubmit({
+    const journalData = {
       id: newAccountId,
       code: finalCodeForNewAccount,
       name: trimmedName,
       children: [],
-    });
+      loopIntegration: loopIntegrationData, // Include loop integration data
+    };
+
+    onSubmit(journalData);
     onClose();
   };
 
@@ -126,7 +157,7 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
       exit="closed"
       variants={{ open: { opacity: 1 }, closed: { opacity: 0 } }}
       transition={{ duration: 0.2, ease: "easeInOut" }}
-      style={{ zIndex: 2001 }} // zIndex might be better handled in the CSS if consistent
+      style={{ zIndex: 3000 }} // Much higher than JournalModal to appear on top
     >
       <motion.div
         className={baseStyles.modalContent} // Use baseStyles
@@ -202,6 +233,13 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
               aria-describedby={error ? "formErrorText" : undefined}
             />
           </div>
+
+          {/* Loop Integration Section */}
+          <LoopIntegrationSection
+            onLoopDataChange={setLoopIntegrationData}
+            availableJournals={flatJournals}
+          />
+
           {/* Modal actions use baseStyles */}
           <div
             className={baseStyles.modalActions}

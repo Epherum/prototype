@@ -114,7 +114,7 @@ export const GET = withAuthorization(
  * @permission CREATE_JOURNAL - Requires 'CREATE' action on 'JOURNAL' resource.
  */
 export const POST = withAuthorization(
-  async function POST(request: NextRequest) {
+  async function POST(request: NextRequest, context, session: ExtendedSession) {
     try {
       const rawBody = await request.json();
       const validation = createJournalSchema.safeParse(rawBody);
@@ -130,7 +130,8 @@ export const POST = withAuthorization(
       }
 
       const newJournal = await journalService.createJournal(
-        validation.data as CreateJournalData
+        validation.data as CreateJournalData,
+        session.user.id
       );
 
       return NextResponse.json(newJournal, { status: 201 });

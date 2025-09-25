@@ -3,14 +3,26 @@ import { Journal, Prisma } from "@prisma/client";
 import prisma from "@/app/utils/prisma";
 import { jsonBigIntReplacer } from "@/app/utils/jsonBigInt";
 import { serviceLogger } from "@/lib/logger";
+import { loopService } from "./loopService";
 
-// --- Types (Unchanged) ---
+// --- Types ---
+export type LoopIntegrationData = {
+  loopId?: string;
+  newLoop?: {
+    name: string;
+    description?: string;
+  };
+  forwardToJournalId?: string;
+  backwardFromJournalId?: string;
+};
+
 export type CreateJournalData = {
   id: string;
   name: string;
   parentId?: string | null;
   isTerminal?: boolean;
   additionalDetails?: any;
+  loopIntegration?: LoopIntegrationData | null;
 };
 
 export type UpdateJournalData = {
@@ -308,8 +320,10 @@ async function getAllJournals(options?: { where?: any }): Promise<Journal[]> {
   return allJournals;
 }
 
-async function createJournal(data: CreateJournalData): Promise<Journal> {
+async function createJournal(data: CreateJournalData, userId?: string): Promise<Journal> {
   serviceLogger.debug(`journalService.createJournal: Input`, data);
+
+  // Validate parent journal if provided
   if (data.parentId) {
     const parent = await prisma.journal.findUnique({
       where: { id: data.parentId },
@@ -317,9 +331,76 @@ async function createJournal(data: CreateJournalData): Promise<Journal> {
     if (!parent)
       throw new Error(`Parent journal with ID ${data.parentId} not found.`);
   }
-  const newJournal = await prisma.journal.create({ data });
-  serviceLogger.debug(`journalService.createJournal: Output`, newJournal);
-  return newJournal;
+
+  // Create journal and handle loop integration in a transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // Create the journal (exclude loopIntegration from the data passed to Prisma)
+    const { loopIntegration, ...journalData } = data;
+    const newJournal = await tx.journal.create({ data: journalData });
+
+    // Handle loop integration if provided
+    if (loopIntegration && userId) {
+      try {
+        if (loopIntegration.newLoop) {
+          // Create a new loop and add the journal to it
+          const loopJournalIds = [newJournal.id];
+
+          // Add forward/backward connections if specified
+          if (loopIntegration.forwardToJournalId) {
+            loopJournalIds.push(loopIntegration.forwardToJournalId);
+          }
+          if (loopIntegration.backwardFromJournalId &&
+              loopIntegration.backwardFromJournalId !== loopIntegration.forwardToJournalId) {
+            loopJournalIds.unshift(loopIntegration.backwardFromJournalId);
+          }
+
+          // Ensure we have at least 3 journals for a valid loop
+          if (loopJournalIds.length >= 3) {
+            await loopService.createLoop({
+              name: loopIntegration.newLoop.name,
+              description: loopIntegration.newLoop.description,
+              journalIds: loopJournalIds
+            }, userId);
+          }
+        } else if (loopIntegration.loopId) {
+          // Add the journal to an existing loop
+          const existingLoop = await loopService.getLoopById(loopIntegration.loopId);
+          if (existingLoop) {
+            // Get current journal order and add the new journal
+            const currentJournalIds = existingLoop.journalConnections
+              .sort((a, b) => a.sequence - b.sequence)
+              .map(conn => conn.fromJournalId);
+
+            // Insert the new journal based on connection preferences
+            let insertIndex = currentJournalIds.length; // Default to end
+
+            if (loopIntegration.backwardFromJournalId) {
+              const fromIndex = currentJournalIds.indexOf(loopIntegration.backwardFromJournalId);
+              if (fromIndex >= 0) {
+                insertIndex = fromIndex + 1;
+              }
+            }
+
+            currentJournalIds.splice(insertIndex, 0, newJournal.id);
+
+            // Update the loop with the new journal order
+            await loopService.updateLoop(loopIntegration.loopId, {
+              journalIds: currentJournalIds
+            }, userId);
+          }
+        }
+      } catch (loopError) {
+        serviceLogger.error('Failed to handle loop integration during journal creation:', loopError);
+        // We don't want to fail journal creation if loop integration fails
+        // The journal should still be created successfully
+      }
+    }
+
+    return newJournal;
+  });
+
+  serviceLogger.debug(`journalService.createJournal: Output`, result);
+  return result;
 }
 
 async function updateJournal(

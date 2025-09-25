@@ -350,6 +350,17 @@ export const JournalSliderController = forwardRef<
         }
         isLoading={journalManager.isJournalDataLoading}
         onTriggerAddChild={(parentId, parentCode) => {
+          // Close the journal modal first
+          if (journalManager.isJournalNavModalOpen) {
+            journalManager.closeJournalNavModal();
+          }
+          if (isLinkingModalOpen) {
+            setIsLinkingModalOpen(false);
+          }
+          if (isGpgContextModalOpen) {
+            setIsGpgContextModalOpen(false);
+          }
+
           const pNode = findNodeById(journalManager.hierarchyData, parentId);
           journalManager.openAddJournalModal({
             level: pNode ? "child" : "top",
@@ -358,7 +369,21 @@ export const JournalSliderController = forwardRef<
             parentName: pNode?.name,
           });
         }}
-        onDeleteAccount={journalManager.deleteJournal}
+        onDeleteAccount={(accountId) => {
+          // Close the journal modal first
+          if (journalManager.isJournalNavModalOpen) {
+            journalManager.closeJournalNavModal();
+          }
+          if (isLinkingModalOpen) {
+            setIsLinkingModalOpen(false);
+          }
+          if (isGpgContextModalOpen) {
+            setIsGpgContextModalOpen(false);
+          }
+
+          // Execute the delete operation
+          journalManager.deleteJournal(accountId);
+        }}
       />
     </>
   );

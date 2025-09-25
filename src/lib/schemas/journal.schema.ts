@@ -7,6 +7,15 @@ export const createJournalSchema = z.object({
   parentId: z.string().optional().nullable(),
   isTerminal: z.boolean().optional(),
   additionalDetails: z.any().optional(),
+  loopIntegration: z.object({
+    loopId: z.string().optional(),
+    newLoop: z.object({
+      name: z.string().min(1, "Loop name is required"),
+      description: z.string().optional(),
+    }).optional(),
+    forwardToJournalId: z.string().optional(),
+    backwardFromJournalId: z.string().optional(),
+  }).optional().nullable(),
 });
 
 export const getJournalsQuerySchema = z.object({

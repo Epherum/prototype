@@ -17,6 +17,10 @@ interface LoopVisualizationProps {
   compact?: boolean;
   className?: string;
   onJournalClick?: (journalId: string) => void;
+  selectedJournalIds?: string[];
+  onJournalSelect?: (journalId: string) => void;
+  onSwapJournals?: (journalId1: string, journalId2: string) => void;
+  allowSwapping?: boolean;
 }
 
 const LoopVisualization: React.FC<LoopVisualizationProps> = ({
@@ -25,6 +29,10 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
   compact = true,
   className,
   onJournalClick,
+  selectedJournalIds = [],
+  onJournalSelect,
+  onSwapJournals,
+  allowSwapping = false,
 }) => {
   // Calculate node positions in a circle
   const { nodes, connections } = useMemo(() => {
@@ -72,6 +80,38 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
   }, [loop.journalConnections, journalMap, compact]);
 
   const svgSize = compact ? 200 : 300;
+
+  // Calculate swap button position and visibility
+  const { swapButtonVisible, swapButtonPosition } = useMemo(() => {
+    if (!allowSwapping || selectedJournalIds.length !== 2) {
+      return { swapButtonVisible: false, swapButtonPosition: { x: 0, y: 0 } };
+    }
+
+    // Calculate center position
+    const centerX = svgSize / 2;
+    const centerY = svgSize / 2;
+
+    return {
+      swapButtonVisible: true,
+      swapButtonPosition: { x: centerX, y: centerY }
+    };
+  }, [allowSwapping, selectedJournalIds.length, svgSize]);
+
+  const handleNodeClick = (journalId: string, event?: React.MouseEvent) => {
+    if (allowSwapping && onJournalSelect) {
+      // Handle selection for swapping
+      onJournalSelect(journalId);
+    } else if (onJournalClick) {
+      // Handle single click
+      onJournalClick(journalId);
+    }
+  };
+
+  const handleSwapClick = () => {
+    if (selectedJournalIds.length === 2 && onSwapJournals) {
+      onSwapJournals(selectedJournalIds[0], selectedJournalIds[1]);
+    }
+  };
 
   // Animation variants
   const nodeVariants = {
@@ -167,58 +207,92 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
         })}
 
         {/* Journal nodes */}
-        {nodes.map((node, index) => (
-          <g key={node.id}>
-            <motion.circle
-              cx={node.position.x}
-              cy={node.position.y}
-              r={compact ? 20 : 25}
-              className={`${styles.journalNode} ${
-                node.isTerminal ? styles.terminalNode : styles.nonTerminalNode
-              }`}
-              variants={nodeVariants}
-              initial="hidden"
-              animate="visible"
-              whileHover="hover"
-              custom={index}
-              onClick={() => onJournalClick?.(node.id)}
-              style={{ cursor: onJournalClick ? 'pointer' : 'default' }}
-            />
+        {nodes.map((node, index) => {
+          const isSelected = selectedJournalIds.includes(node.id);
 
-            {/* Journal number/sequence */}
-            <motion.text
-              x={node.position.x}
-              y={node.position.y}
-              className={styles.journalNumber}
-              textAnchor="middle"
-              dominantBaseline="middle"
-              variants={nodeVariants}
-              initial="hidden"
-              animate="visible"
-              custom={index}
-              onClick={() => onJournalClick?.(node.id)}
-              style={{ cursor: onJournalClick ? 'pointer' : 'default' }}
-            >
-              {index + 1}
-            </motion.text>
+          return (
+            <g key={node.id}>
+              <motion.circle
+                cx={node.position.x}
+                cy={node.position.y}
+                r={compact ? 20 : 25}
+                className={`${styles.journalNode} ${
+                  node.isTerminal ? styles.terminalNode : styles.nonTerminalNode
+                } ${isSelected ? styles.selectedNode : ''}`}
+                variants={nodeVariants}
+                initial="hidden"
+                animate="visible"
+                whileHover="hover"
+                custom={index}
+                onClick={() => handleNodeClick(node.id)}
+                style={{
+                  cursor: (onJournalClick || (allowSwapping && onJournalSelect)) ? 'pointer' : 'default',
+                }}
+              />
 
-            {/* Journal name (only in non-compact mode) */}
-            {!compact && (
+              {/* Journal number/sequence */}
               <motion.text
                 x={node.position.x}
-                y={node.position.y + 40}
-                className={styles.journalLabel}
+                y={node.position.y}
+                className={styles.journalNumber}
                 textAnchor="middle"
+                dominantBaseline="middle"
                 variants={nodeVariants}
                 initial="hidden"
                 animate="visible"
                 custom={index}
+                onClick={() => handleNodeClick(node.id)}
+                style={{ cursor: (onJournalClick || (allowSwapping && onJournalSelect)) ? 'pointer' : 'default' }}
               >
-                {node.name.length > 12 ? `${node.name.substring(0, 12)}...` : node.name}
+                {index + 1}
               </motion.text>
-            )}
-          </g>
-        ))}
+
+              {/* Journal name (only in non-compact mode) */}
+              {!compact && (
+                <motion.text
+                  x={node.position.x}
+                  y={node.position.y + 40}
+                  className={styles.journalLabel}
+                  textAnchor="middle"
+                  variants={nodeVariants}
+                  initial="hidden"
+                  animate="visible"
+                  custom={index}
+                >
+                  {node.name.length > 12 ? `${node.name.substring(0, 12)}...` : node.name}
+                </motion.text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Swap Button */}
+        {swapButtonVisible && (
+          <motion.g
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {/* Swap button background */}
+            <motion.circle
+              cx={swapButtonPosition.x}
+              cy={swapButtonPosition.y}
+              r={compact ? 15 : 20}
+              className={styles.swapButton}
+              onClick={handleSwapClick}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            />
+            {/* Swap icon */}
+            <motion.path
+              d={`M ${swapButtonPosition.x - 8} ${swapButtonPosition.y - 4} L ${swapButtonPosition.x + 8} ${swapButtonPosition.y - 4} M ${swapButtonPosition.x - 8} ${swapButtonPosition.y + 4} L ${swapButtonPosition.x + 8} ${swapButtonPosition.y + 4} M ${swapButtonPosition.x + 4} ${swapButtonPosition.y - 8} L ${swapButtonPosition.x + 8} ${swapButtonPosition.y - 4} L ${swapButtonPosition.x + 4} ${swapButtonPosition.y} M ${swapButtonPosition.x - 4} ${swapButtonPosition.y} L ${swapButtonPosition.x - 8} ${swapButtonPosition.y + 4} L ${swapButtonPosition.x - 4} ${swapButtonPosition.y + 8}`}
+              className={styles.swapIcon}
+              strokeWidth="2"
+              fill="none"
+            />
+          </motion.g>
+        )}
 
         {/* Loop completion indicator */}
         <motion.circle
@@ -254,22 +328,29 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
       {compact && (
         <div className={styles.journalList}>
           <h4 className={styles.listTitle}>Journals in Loop:</h4>
-          {nodes.map((node, index) => (
-            <div key={node.id} className={styles.journalListItem}>
-              <span className={styles.journalSequence}>{index + 1}.</span>
-              <span
-                className={styles.journalName}
-                onClick={() => onJournalClick?.(node.id)}
-                style={{ cursor: onJournalClick ? 'pointer' : 'default' }}
-                title={node.name}
+          {nodes.map((node, index) => {
+            const isSelected = selectedJournalIds.includes(node.id);
+
+            return (
+              <div
+                key={node.id}
+                className={`${styles.journalListItem} ${isSelected ? styles.selectedListItem : ''}`}
               >
-                {node.name}
-              </span>
-              {node.isTerminal && (
-                <span className={styles.terminalBadge}>T</span>
-              )}
-            </div>
-          ))}
+                <span className={styles.journalSequence}>{index + 1}.</span>
+                <span
+                  className={styles.journalName}
+                  onClick={() => handleNodeClick(node.id)}
+                  style={{ cursor: (onJournalClick || (allowSwapping && onJournalSelect)) ? 'pointer' : 'default' }}
+                  title={node.name}
+                >
+                  {node.name}
+                </span>
+                {node.isTerminal && (
+                  <span className={styles.terminalBadge}>T</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

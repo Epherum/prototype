@@ -1,0 +1,175 @@
+.loopIntegrationSection {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-md);
+  background-color: var(--bg-secondary-subtle);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 1);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-radius: var(--border-radius-md);
+}
+
+.sectionHeader:hover {
+  background-color: var(--bg-secondary-hover);
+}
+
+.sectionIcon {
+  font-size: 1.1em;
+  color: var(--accent-warm);
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  flex: 1;
+  font-weight: 500;
+  font-size: 0.95em;
+  color: var(--text-primary);
+}
+
+.expandedContent {
+  overflow: hidden;
+  padding: 0 calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1);
+}
+
+.modeSelection {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  padding: calc(var(--spacing-unit) * 1);
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.radioLabel {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  font-size: 0.9em;
+  padding: calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius-sm);
+  transition: background-color 0.2s ease;
+}
+
+.radioLabel:hover {
+  background-color: var(--bg-secondary-subtle);
+}
+
+.radioLabel input[type="radio"] {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.formGroup {
+  margin-bottom: calc(var(--spacing-unit) * 1.25);
+}
+
+.formGroup label {
+  display: block;
+  font-weight: 500;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.75);
+  font-size: 0.9em;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent-warm);
+  box-shadow: 0 0 0 2px var(--accent-warm-subtle);
+}
+
+.select {
+  cursor: pointer;
+}
+
+.select:disabled {
+  background-color: var(--bg-secondary-subtle);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 60px;
+  font-family: inherit;
+}
+
+.newLoopForm {
+  padding: calc(var(--spacing-unit) * 1);
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-subtle);
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+}
+
+.connectionConfig {
+  padding: calc(var(--spacing-unit) * 1);
+  background-color: var(--bg-secondary-subtle);
+  border-radius: var(--border-radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
+.connectionTitle {
+  margin: 0 0 calc(var(--spacing-unit) * 0.5);
+  font-size: 1em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.connectionHint {
+  margin: 0 0 calc(var(--spacing-unit) * 1.25);
+  font-size: 0.85em;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.connectionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--spacing-unit) * 1.25);
+}
+
+@media (max-width: 768px) {
+  .connectionRow {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionHeader {
+    padding: calc(var(--spacing-unit) * 0.75);
+  }
+
+  .expandedContent {
+    padding: 0 calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.75);
+  }
+
+  .modeSelection,
+  .newLoopForm,
+  .connectionConfig {
+    padding: calc(var(--spacing-unit) * 0.75);
+  }
+}

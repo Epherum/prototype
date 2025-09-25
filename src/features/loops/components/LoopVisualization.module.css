@@ -59,8 +59,8 @@
 
 .nonTerminalNode {
   fill: #3b82f6;
-  stroke: #1d4ed8;
-  stroke-width: 2;
+  stroke: #000000; /* Black border for non-terminal journals */
+  stroke-width: 3;
 }
 
 .journalNode:hover {
@@ -138,7 +138,8 @@
 
 .legendNode.nonTerminalNode {
   background-color: #3b82f6;
-  border-color: #1d4ed8;
+  border-color: #000000; /* Black border for non-terminal in legend too */
+  border-width: 3px;
 }
 
 .legendArrow {
@@ -310,4 +311,70 @@
   .journalListItem {
     border-width: 2px;
   }
+}
+
+/* Node Selection States */
+.selectedNode {
+  stroke: #ff6b35 !important;
+  stroke-width: 4 !important;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.6));
+}
+
+.selectedListItem {
+  border-color: #ff6b35 !important;
+  background-color: rgba(255, 107, 53, 0.1) !important;
+  border-width: 2px !important;
+}
+
+/* Swap Button */
+.swapButton {
+  fill: #ff6b35;
+  stroke: #ffffff;
+  stroke-width: 2;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.swapButton:hover {
+  fill: #e55a2b;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+.swapIcon {
+  stroke: #ffffff;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+/* Enhanced node selection visual feedback */
+.journalNode {
+  transform-origin: center;
+  transition: all 0.2s ease;
+}
+
+.journalNode.selectedNode {
+  animation: pulseSelection 2s infinite;
+}
+
+@keyframes pulseSelection {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+/* Improved accessibility and interaction feedback */
+.journalNode:focus-visible {
+  outline: 3px solid var(--accent-warm);
+  outline-offset: 3px;
+}
+
+.swapButton:focus-visible {
+  outline: 3px solid var(--accent-warm);
+  outline-offset: 2px;
 }

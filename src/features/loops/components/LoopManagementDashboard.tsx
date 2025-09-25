@@ -47,6 +47,10 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
   const [sortBy, setSortBy] = useState<"name" | "createdAt" | "updatedAt">("updatedAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
+  // State for managing loop card interactions
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+  const [selectedJournalsPerLoop, setSelectedJournalsPerLoop] = useState<Record<string, string[]>>({});
+
   const queryClient = useQueryClient();
   const user = useAppStore((state) => state.user);
   const router = useRouter();
@@ -75,9 +79,9 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
   // Create journal lookup map
   const journalMap = useMemo(() => {
     return allJournals.reduce((acc, journal) => {
-      acc[journal.id] = journal.name;
+      acc[journal.id] = journal;
       return acc;
-    }, {} as Record<string, string>);
+    }, {} as Record<string, any>);
   }, [allJournals]);
 
   // Delete loop mutation
@@ -149,6 +153,91 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
 
   const handleGoBack = () => {
     router.push('/');
+  };
+
+  // Card expansion handlers
+  const toggleCardExpanded = (loopId: string) => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(loopId)) {
+        newSet.delete(loopId);
+      } else {
+        newSet.add(loopId);
+      }
+      return newSet;
+    });
+  };
+
+  // Journal selection handlers
+  const handleJournalSelect = (loopId: string, journalId: string) => {
+    setSelectedJournalsPerLoop(prev => {
+      const currentSelection = prev[loopId] || [];
+      let newSelection: string[];
+
+      // For swapping functionality, we always want multi-select behavior up to 2 selections
+      if (currentSelection.includes(journalId)) {
+        // If already selected, deselect it
+        newSelection = currentSelection.filter(id => id !== journalId);
+      } else {
+        // If not selected, add it to selection
+        newSelection = [...currentSelection, journalId];
+      }
+
+      // Limit to 2 selections for swapping
+      if (newSelection.length > 2) {
+        newSelection = [newSelection[newSelection.length - 2], newSelection[newSelection.length - 1]];
+      }
+
+      return {
+        ...prev,
+        [loopId]: newSelection,
+      };
+    });
+
+    // Auto-expand card when journals are selected
+    if (!expandedCards.has(loopId)) {
+      setExpandedCards(prev => new Set([...prev, loopId]));
+    }
+  };
+
+  const handleSwapJournals = async (loopId: string, journalId1: string, journalId2: string) => {
+    const loop = loops.find(l => l.id === loopId);
+    if (!loop) return;
+
+    // Get current journal order from loop connections
+    const sortedConnections = [...loop.journalConnections].sort((a, b) => a.sequence - b.sequence);
+    const currentJournalIds = sortedConnections.map(conn => conn.fromJournalId);
+
+    // Find positions of the two journals to swap
+    const pos1 = currentJournalIds.indexOf(journalId1);
+    const pos2 = currentJournalIds.indexOf(journalId2);
+
+    if (pos1 === -1 || pos2 === -1) {
+      console.error('Journals not found in loop');
+      return;
+    }
+
+    // Create new journal order with swapped positions
+    const newJournalIds = [...currentJournalIds];
+    newJournalIds[pos1] = journalId2;
+    newJournalIds[pos2] = journalId1;
+
+    try {
+      // Update the loop with new journal order
+      await updateLoopMutation.mutateAsync({
+        id: loopId,
+        updates: { journalIds: newJournalIds }
+      });
+
+      // Clear selections after successful swap
+      setSelectedJournalsPerLoop(prev => ({
+        ...prev,
+        [loopId]: [],
+      }));
+    } catch (error) {
+      console.error('Failed to swap journals:', error);
+      // Could add a toast notification here for better UX
+    }
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -342,6 +431,14 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
                       journalMap={journalMap}
                       compact={true}
                       className={styles.cardVisualization}
+                      selectedJournalIds={selectedJournalsPerLoop[loop.id] || []}
+                      onJournalSelect={(journalId) =>
+                        handleJournalSelect(loop.id, journalId)
+                      }
+                      onSwapJournals={(journalId1, journalId2) =>
+                        handleSwapJournals(loop.id, journalId1, journalId2)
+                      }
+                      allowSwapping={true}
                     />
                   </div>
 
@@ -352,6 +449,75 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
                   )}
                 </div>
 
+                {/* Expandable Details Section */}
+                <AnimatePresence>
+                  {expandedCards.has(loop.id) && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
+                      className={styles.cardExpandedDetails}
+                    >
+                      <div className={styles.expandedContent}>
+                        <h4 className={styles.expandedTitle}>Journal Details</h4>
+                        <div className={styles.journalDetailsList}>
+                          {loop.journalConnections
+                            .sort((a, b) => a.sequence - b.sequence)
+                            .map((connection, index) => {
+                              const journalId = connection.fromJournalId;
+                              const isSelected = (selectedJournalsPerLoop[loop.id] || []).includes(journalId);
+                              const journal = allJournals.find(j => j.id === journalId);
+
+                              return (
+                                <motion.div
+                                  key={connection.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: index * 0.05 }}
+                                  className={`${styles.journalDetailItem} ${isSelected ? styles.selectedDetailItem : ''}`}
+                                  onClick={() => {
+                                    handleJournalSelect(loop.id, journalId);
+                                  }}
+                                >
+                                  <div className={styles.journalDetailHeader}>
+                                    <span className={styles.journalSequence}>{index + 1}.</span>
+                                    <span className={styles.journalName}>
+                                      {journal?.name || `Journal ${journalId}`}
+                                    </span>
+                                    <span className={styles.journalCode}>
+                                      {journal?.code || journalId}
+                                    </span>
+                                    {journal?.isTerminal && (
+                                      <span className={styles.terminalBadge}>T</span>
+                                    )}
+                                  </div>
+                                  <div className={styles.journalConnections}>
+                                    <span className={styles.connectionLabel}>
+                                      Connects to: {connection.toJournal?.name || connection.toJournalId}
+                                    </span>
+                                  </div>
+                                </motion.div>
+                              );
+                            })}
+                        </div>
+
+                        {/* Selection Help Text */}
+                        {(selectedJournalsPerLoop[loop.id] || []).length > 0 && (
+                          <div className={styles.selectionHelp}>
+                            <p>
+                              {(selectedJournalsPerLoop[loop.id] || []).length === 1
+                                ? "Select another journal to swap positions"
+                                : `${(selectedJournalsPerLoop[loop.id] || []).length} journals selected - click swap button to reorder`
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <div className={styles.cardFooter}>
                   <div className={styles.cardMeta}>
                     <span className={styles.metaItem}>
@@ -361,6 +527,14 @@ const LoopManagementDashboard: React.FC<LoopManagementDashboardProps> = ({
                       Updated {new Date(loop.updatedAt).toLocaleDateString()}
                     </span>
                   </div>
+                  <button
+                    onClick={() => toggleCardExpanded(loop.id)}
+                    className={styles.expandButton}
+                    title={expandedCards.has(loop.id) ? "Collapse details" : "Expand details"}
+                  >
+                    <IoDocumentOutline />
+                    {expandedCards.has(loop.id) ? "Less" : "More"}
+                  </button>
                 </div>
               </motion.div>
             ))
