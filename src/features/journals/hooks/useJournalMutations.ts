@@ -14,6 +14,7 @@ import { useToast } from "@/contexts/ToastContext";
 import type { CreateJournalData } from "@/app/services/journalService";
 import type { JournalClient } from "@/lib/types/models.client";
 import type { LoopIntegrationData } from "../components/LoopIntegrationSection";
+import type { EnhancedLoopIntegrationData } from "../components/EnhancedLoopIntegrationSection";
 
 interface MutationProps {
   restrictedJournalId: string | null;

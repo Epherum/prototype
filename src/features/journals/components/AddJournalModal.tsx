@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import baseStyles from "@/features/shared/components/ModalBase.module.css"; // Assuming shared base styles
 import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
-import { LoopIntegrationSection, LoopIntegrationData } from "./LoopIntegrationSection";
+import { EnhancedLoopIntegrationSection, EnhancedLoopIntegrationData } from "./EnhancedLoopIntegrationSection";
 import { fetchJournalHierarchy } from "@/services/clientJournalService";
 import { journalKeys } from "@/lib/queryKeys";
 
@@ -19,7 +19,7 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
   const [newCodeSuffix, setNewCodeSuffix] = useState("");
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
-  const [loopIntegrationData, setLoopIntegrationData] = useState<LoopIntegrationData | null>(null);
+  const [loopIntegrationData, setLoopIntegrationData] = useState<EnhancedLoopIntegrationData | null>(null);
 
   // ... (rest of your existing logic for codePrefixForDisplay, codeSeparator, etc. remains unchanged)
   let codePrefixForDisplay = "";
@@ -247,8 +247,8 @@ function AddJournalModal({ isOpen, onClose, onSubmit, context }) {
             />
           </div>
 
-          {/* Loop Integration Section */}
-          <LoopIntegrationSection
+          {/* Enhanced Loop Integration Section */}
+          <EnhancedLoopIntegrationSection
             onLoopDataChange={setLoopIntegrationData}
             availableJournals={flatJournals}
             newJournalId={finalCodeForNewAccount}

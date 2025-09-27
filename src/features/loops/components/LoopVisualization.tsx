@@ -36,7 +36,12 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
 }) => {
   // Calculate node positions in a circle
   const { nodes, connections } = useMemo(() => {
+    console.log('🎨 LoopVisualization: Processing loop:', loop.name);
+    console.log('🎨 LoopVisualization: Raw connections:', loop.journalConnections?.map(c => `${c.fromJournalId}→${c.toJournalId}`));
+
     const sortedConnections = [...loop.journalConnections].sort((a, b) => a.sequence - b.sequence);
+    console.log('🎨 LoopVisualization: Sorted connections:', sortedConnections.map(c => `${c.fromJournalId}→${c.toJournalId}`));
+
     const journalCount = sortedConnections.length;
 
     if (journalCount === 0) {
@@ -63,10 +68,17 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
       };
     });
 
-    // Create connection lines
+    console.log('🎨 LoopVisualization: Created nodes:', nodes.map(n => `${n.id}(${n.name})`));
+
+    // Create connection lines using actual connection data
     const connectionLines = sortedConnections.map((conn, index) => {
-      const fromNode = nodes[index];
-      const toNode = nodes[(index + 1) % nodes.length]; // Next node, wrapping to start
+      const fromNode = nodes.find(node => node.id === conn.fromJournalId);
+      const toNode = nodes.find(node => node.id === conn.toJournalId);
+
+      if (!fromNode || !toNode) {
+        console.error('🚨 LoopVisualization: Missing node for connection', conn);
+        return null;
+      }
 
       return {
         id: `${conn.fromJournalId}-${conn.toJournalId}`,
@@ -74,7 +86,9 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
         to: toNode,
         sequence: conn.sequence,
       };
-    });
+    }).filter(Boolean); // Remove any null connections
+
+    console.log('🎨 LoopVisualization: Created connections:', connectionLines.map(c => `${c.from.id}→${c.to.id}`));
 
     return { nodes, connections: connectionLines };
   }, [loop.journalConnections, journalMap, compact]);
@@ -208,7 +222,7 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
 
         {/* Journal nodes */}
         {nodes.map((node, index) => {
-          const isSelected = selectedJournalIds.includes(node.id);
+          const isSelected = node.id && selectedJournalIds.includes(node.id);
 
           return (
             <g key={node.id}>
@@ -230,7 +244,7 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
                 }}
               />
 
-              {/* Journal number/sequence */}
+              {/* Journal number/code */}
               <motion.text
                 x={node.position.x}
                 y={node.position.y}
@@ -244,7 +258,7 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
                 onClick={() => handleNodeClick(node.id)}
                 style={{ cursor: (onJournalClick || (allowSwapping && onJournalSelect)) ? 'pointer' : 'default' }}
               >
-                {index + 1}
+                {journalMap[node.id]?.code || node.id}
               </motion.text>
 
               {/* Journal name (only in non-compact mode) */}
@@ -319,7 +333,7 @@ const LoopVisualization: React.FC<LoopVisualizationProps> = ({
         <div className={styles.journalList}>
           <h4 className={styles.listTitle}>Journals in Loop:</h4>
           {nodes.map((node, index) => {
-            const isSelected = selectedJournalIds.includes(node.id);
+            const isSelected = node.id && selectedJournalIds.includes(node.id);
 
             return (
               <div

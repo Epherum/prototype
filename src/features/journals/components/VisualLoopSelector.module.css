@@ -1,0 +1,502 @@
+/* Visual Loop Selector Styles */
+
+.selector {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 2);
+  padding: calc(var(--spacing-unit) * 2);
+  background-color: var(--bg-card);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-subtle);
+}
+
+.instructions {
+  text-align: center;
+}
+
+.instructions h4 {
+  margin: 0 0 calc(var(--spacing-unit) * 0.5) 0;
+  color: var(--text-primary);
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.instructions p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9em;
+  line-height: 1.4;
+}
+
+.visualizationContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 1.5);
+}
+
+.svg {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  flex-shrink: 0;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* SVG Elements */
+.journalNode {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  transform-origin: center;
+}
+
+.terminalNode {
+  fill: #ff8a5b; /* Brighter orange for terminal journals */
+}
+
+.nonTerminalNode {
+  fill: #5ba3ff; /* Brighter blue for non-terminal journals */
+}
+
+.journalNode:hover {
+  filter: brightness(1.1);
+}
+
+.selectedNode {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.6));
+}
+
+.afterNode {
+  stroke: #10b981;
+  fill: #10b981 !important;
+}
+
+.beforeNode {
+  stroke: #f59e0b;
+  fill: #f59e0b !important;
+}
+
+.journalNumber {
+  font-size: 11px;
+  font-weight: 600;
+  fill: white;
+  pointer-events: none;
+}
+
+.selectionLabel {
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--text-primary);
+  pointer-events: none;
+}
+
+.connectionLine {
+  stroke: var(--accent-warm);
+  stroke-width: 2;
+  fill: none;
+  transition: all 0.2s ease;
+}
+
+.selectedConnection {
+  stroke: #10b981;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 4px rgba(16, 185, 129, 0.4));
+}
+
+.arrowMarker {
+  fill: var(--accent-warm);
+}
+
+/* Insertion Preview */
+.insertionPreview {
+  fill: var(--accent-warm);
+  stroke: white;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 12px rgba(255, 107, 53, 0.8));
+}
+
+.insertionText {
+  font-size: 10px;
+  font-weight: 700;
+  fill: white;
+  pointer-events: none;
+}
+
+/* Status Messages */
+.statusContainer {
+  width: 100%;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.statusMessage {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1.5);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.4;
+}
+
+.validStatus {
+  background-color: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #059669;
+}
+
+.invalidStatus {
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #d97706;
+}
+
+.statusMessage:not(.validStatus):not(.invalidStatus) {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.statusIcon {
+  font-size: 1.2em;
+  flex-shrink: 0;
+}
+
+/* Journal Reference List */
+.journalReference {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: calc(var(--spacing-unit) * 1.5);
+}
+
+.journalReference h5 {
+  margin: 0 0 calc(var(--spacing-unit) * 1) 0;
+  color: var(--text-primary);
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.referenceList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.referenceItem {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.referenceItem:hover {
+  border-color: var(--accent-warm-light);
+  background-color: var(--accent-slider);
+}
+
+.selectedReference {
+  border-color: var(--accent-warm) !important;
+  background-color: rgba(255, 107, 53, 0.1) !important;
+  border-width: 2px !important;
+}
+
+.referenceSequence {
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 20px;
+  text-align: right;
+}
+
+.referenceName {
+  flex: 1;
+  font-size: 0.85em;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.referenceLabel {
+  background-color: var(--accent-warm);
+  color: white;
+  padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.7em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .selector {
+    padding: calc(var(--spacing-unit) * 1.5);
+  }
+
+  .visualizationContainer {
+    gap: calc(var(--spacing-unit) * 1);
+  }
+
+  .svg {
+    width: 100%;
+    max-width: 250px;
+    height: auto;
+  }
+
+  .statusMessage {
+    padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1);
+    font-size: 0.85em;
+  }
+
+  .referenceList {
+    max-height: 150px;
+  }
+
+  .referenceItem {
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.75);
+  }
+}
+
+@media (max-width: 480px) {
+  .selector {
+    padding: calc(var(--spacing-unit) * 1);
+  }
+
+  .instructions p {
+    font-size: 0.85em;
+  }
+
+  .statusMessage {
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.5);
+    text-align: center;
+  }
+
+  .referenceName {
+    font-size: 0.8em;
+  }
+}
+
+/* Animation Enhancements */
+.journalNode {
+  transform-origin: center;
+}
+
+.journalNode.selectedNode {
+  animation: pulseSelection 2s infinite;
+}
+
+@keyframes pulseSelection {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.insertionPreview {
+  transform-origin: center;
+}
+
+/* Focus and Accessibility */
+.journalNode:focus,
+.referenceItem:focus {
+  outline: 2px solid var(--accent-warm);
+  outline-offset: 2px;
+}
+
+/* Action Buttons */
+.selectionActions,
+.previewActions {
+  margin-top: calc(var(--spacing-unit) * 1);
+  display: flex;
+  justify-content: center;
+}
+
+.clearSelectionButton {
+  background-color: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 1);
+  border-radius: var(--border-radius-sm);
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.clearSelectionButton:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--accent-warm-light);
+  color: var(--text-primary);
+}
+
+.clearSelectionButton:active {
+  transform: translateY(1px);
+}
+
+/* Enhanced Animations */
+.referenceList {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.5);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.referenceItem {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  transform: translateX(0);
+}
+
+.referenceItem:hover {
+  border-color: var(--accent-warm-light);
+  background-color: var(--accent-slider);
+  transform: translateX(2px);
+}
+
+.selectedReference {
+  border-color: var(--accent-warm) !important;
+  background-color: rgba(255, 107, 53, 0.1) !important;
+  border-width: 2px !important;
+  transform: translateX(4px) !important;
+}
+
+/* Smooth transitions for status messages */
+.statusContainer {
+  width: 100%;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.statusMessage {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 1.5);
+  border-radius: var(--border-radius-md);
+  font-size: 0.9em;
+  text-align: center;
+  max-width: 500px;
+  line-height: 1.4;
+  position: absolute;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Enhanced selection indicators */
+.selectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--accent-warm);
+  pointer-events: none;
+  text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
+}
+
+/* Overlay nodes for chain preview */
+.overlayNode {
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.3));
+  transition: all 0.2s ease;
+  transform-origin: center;
+}
+
+.overlayTerminalNode {
+  fill: #ff8a5b; /* Lighter/brighter orange for terminal journals */
+}
+
+.overlayNonTerminalNode {
+  fill: #5ba3ff; /* Lighter/brighter blue for non-terminal journals */
+}
+
+.overlaySelectedNode {
+  stroke: var(--accent-warm);
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px rgba(255, 107, 53, 0.6));
+}
+
+.overlayNodeText {
+  font-size: 10px;
+  font-weight: 700;
+  fill: white;
+  pointer-events: none;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.overlayDim {
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  .terminalNode {
+    fill: #ff6b00;
+  }
+
+  .nonTerminalNode {
+    fill: #0066ff;
+  }
+
+  .afterNode {
+    stroke: #00cc66;
+    fill: #00cc66 !important;
+  }
+
+  .beforeNode {
+    stroke: #ffaa00;
+    fill: #ffaa00 !important;
+  }
+
+  .connectionLine {
+    stroke: #ff6b00;
+    stroke-width: 3;
+  }
+
+  .selectedConnection {
+    stroke: #00cc66;
+    stroke-width: 5;
+  }
+
+  .referenceItem {
+    border-width: 2px;
+  }
+
+  .clearSelectionButton {
+    border-width: 2px;
+  }
+}

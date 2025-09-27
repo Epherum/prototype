@@ -16,13 +16,22 @@ export type LoopIntegrationData = {
   backwardFromJournalId?: string;
 };
 
+export type EnhancedLoopIntegrationData = {
+  beforeJournalId?: string;
+  afterJournalId?: string;
+  selectedLoopId?: string;
+  createNewLoop?: boolean;
+  insertAfterJournalId?: string;
+  insertBeforeJournalId?: string;
+};
+
 export type CreateJournalData = {
   id: string;
   name: string;
   parentId?: string | null;
   isTerminal?: boolean;
   additionalDetails?: any;
-  loopIntegration?: LoopIntegrationData | null;
+  loopIntegration?: LoopIntegrationData | EnhancedLoopIntegrationData | null;
 };
 
 export type UpdateJournalData = {
@@ -341,52 +350,107 @@ async function createJournal(data: CreateJournalData, userId?: string): Promise<
     // Handle loop integration if provided
     if (loopIntegration && userId) {
       try {
-        if (loopIntegration.newLoop) {
-          // Create a new loop and add the journal to it
-          const loopJournalIds = [newJournal.id];
+        // Check if this is enhanced loop integration data
+        const isEnhanced = 'beforeJournalId' in loopIntegration || 'afterJournalId' in loopIntegration;
 
-          // Add forward/backward connections if specified
-          if (loopIntegration.forwardToJournalId) {
-            loopJournalIds.push(loopIntegration.forwardToJournalId);
-          }
-          if (loopIntegration.backwardFromJournalId &&
-              loopIntegration.backwardFromJournalId !== loopIntegration.forwardToJournalId) {
-            loopJournalIds.unshift(loopIntegration.backwardFromJournalId);
-          }
+        if (isEnhanced) {
+          const enhancedData = loopIntegration as EnhancedLoopIntegrationData;
 
-          // Ensure we have at least 3 journals for a valid loop
-          if (loopJournalIds.length >= 3) {
+          if (enhancedData.createNewLoop && enhancedData.beforeJournalId && enhancedData.afterJournalId) {
+            // Create a new loop: beforeJournal -> newJournal -> afterJournal -> beforeJournal
+            const loopJournalIds = [enhancedData.beforeJournalId, newJournal.id, enhancedData.afterJournalId];
+
             await loopService.createLoop({
-              name: loopIntegration.newLoop.name,
-              description: loopIntegration.newLoop.description,
+              name: `Loop with ${newJournal.id}`,
+              description: `Auto-created loop containing ${newJournal.id}`,
               journalIds: loopJournalIds
             }, userId);
-          }
-        } else if (loopIntegration.loopId) {
-          // Add the journal to an existing loop
-          const existingLoop = await loopService.getLoopById(loopIntegration.loopId);
-          if (existingLoop) {
-            // Get current journal order and add the new journal
-            const currentJournalIds = existingLoop.journalConnections
-              .sort((a, b) => a.sequence - b.sequence)
-              .map(conn => conn.fromJournalId);
+          } else if (enhancedData.selectedLoopId) {
+            // Add to existing loop using enhanced insertion logic
+            if (enhancedData.beforeJournalId && enhancedData.afterJournalId) {
+              // Use the new insertChain method for automatic insertion
+              await loopService.insertChain(
+                enhancedData.selectedLoopId,
+                enhancedData.beforeJournalId,
+                enhancedData.afterJournalId,
+                [newJournal.id],
+                userId
+              );
+            } else if (enhancedData.insertAfterJournalId && enhancedData.insertBeforeJournalId) {
+              // Use the new insertChain method for manual insertion
+              await loopService.insertChain(
+                enhancedData.selectedLoopId,
+                enhancedData.insertAfterJournalId,
+                enhancedData.insertBeforeJournalId,
+                [newJournal.id],
+                userId
+              );
+            } else {
+              // Fallback: add to the end of the loop
+              const existingLoop = await loopService.getLoopById(enhancedData.selectedLoopId);
+              if (existingLoop) {
+                const currentJournalIds = existingLoop.journalConnections
+                  .sort((a, b) => a.sequence - b.sequence)
+                  .map(conn => conn.fromJournalId);
+                currentJournalIds.push(newJournal.id);
 
-            // Insert the new journal based on connection preferences
-            let insertIndex = currentJournalIds.length; // Default to end
-
-            if (loopIntegration.backwardFromJournalId) {
-              const fromIndex = currentJournalIds.indexOf(loopIntegration.backwardFromJournalId);
-              if (fromIndex >= 0) {
-                insertIndex = fromIndex + 1;
+                await loopService.updateLoop(enhancedData.selectedLoopId, {
+                  journalIds: currentJournalIds
+                }, userId);
               }
             }
+          }
+        } else {
+          // Legacy loop integration logic
+          const legacyData = loopIntegration as LoopIntegrationData;
 
-            currentJournalIds.splice(insertIndex, 0, newJournal.id);
+          if (legacyData.newLoop) {
+            // Create a new loop and add the journal to it
+            const loopJournalIds = [newJournal.id];
 
-            // Update the loop with the new journal order
-            await loopService.updateLoop(loopIntegration.loopId, {
-              journalIds: currentJournalIds
-            }, userId);
+            // Add forward/backward connections if specified
+            if (legacyData.forwardToJournalId) {
+              loopJournalIds.push(legacyData.forwardToJournalId);
+            }
+            if (legacyData.backwardFromJournalId &&
+                legacyData.backwardFromJournalId !== legacyData.forwardToJournalId) {
+              loopJournalIds.unshift(legacyData.backwardFromJournalId);
+            }
+
+            // Ensure we have at least 3 journals for a valid loop
+            if (loopJournalIds.length >= 3) {
+              await loopService.createLoop({
+                name: legacyData.newLoop.name,
+                description: legacyData.newLoop.description,
+                journalIds: loopJournalIds
+              }, userId);
+            }
+          } else if (legacyData.loopId) {
+            // Add the journal to an existing loop
+            const existingLoop = await loopService.getLoopById(legacyData.loopId);
+            if (existingLoop) {
+              // Get current journal order and add the new journal
+              const currentJournalIds = existingLoop.journalConnections
+                .sort((a, b) => a.sequence - b.sequence)
+                .map(conn => conn.fromJournalId);
+
+              // Insert the new journal based on connection preferences
+              let insertIndex = currentJournalIds.length; // Default to end
+
+              if (legacyData.backwardFromJournalId) {
+                const fromIndex = currentJournalIds.indexOf(legacyData.backwardFromJournalId);
+                if (fromIndex >= 0) {
+                  insertIndex = fromIndex + 1;
+                }
+              }
+
+              currentJournalIds.splice(insertIndex, 0, newJournal.id);
+
+              // Update the loop with the new journal order
+              await loopService.updateLoop(legacyData.loopId, {
+                journalIds: currentJournalIds
+              }, userId);
+            }
           }
         }
       } catch (loopError) {

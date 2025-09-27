@@ -346,6 +346,196 @@ async function getLoopsForJournal(journalId: string): Promise<LoopWithConnection
   return loops;
 }
 
+/**
+ * Detects if a connection exists between two journals in any active loop.
+ * Returns information about loops containing the connection.
+ */
+async function detectConnection(beforeJournalId: string, afterJournalId: string): Promise<{
+  connectionExists: boolean;
+  loops: Array<{
+    id: string;
+    name: string;
+    path: Array<{ id: string; name: string }>;
+  }>;
+}> {
+  serviceLogger.debug(`loopService.detectConnection: Input - beforeJournalId: ${beforeJournalId}, afterJournalId: ${afterJournalId}`);
+
+  // Find loops that contain a direct connection from beforeJournalId to afterJournalId
+  const loopsWithConnection = await prisma.journalLoop.findMany({
+    where: {
+      entityState: 'ACTIVE',
+      status: { in: ['ACTIVE', 'DRAFT'] }, // Include both ACTIVE and DRAFT status loops
+      journalConnections: {
+        some: {
+          fromJournalId: beforeJournalId,
+          toJournalId: afterJournalId,
+        },
+      },
+    },
+    include: {
+      journalConnections: {
+        include: {
+          fromJournal: {
+            select: { id: true, name: true },
+          },
+          toJournal: {
+            select: { id: true, name: true },
+          },
+        },
+        orderBy: { sequence: 'asc' },
+      },
+    },
+  });
+
+  const result = {
+    connectionExists: loopsWithConnection.length > 0,
+    loops: loopsWithConnection.map(loop => ({
+      id: loop.id,
+      name: loop.name,
+      path: loop.journalConnections.map(conn => conn.fromJournal),
+    })),
+  };
+
+  serviceLogger.debug(`loopService.detectConnection: Output - connectionExists: ${result.connectionExists}, loops count: ${result.loops.length}`);
+  return result;
+}
+
+/**
+ * Inserts a chain of journals into an existing loop between two specified journals.
+ * Replaces the existing connection between insertAfterJournalId and insertBeforeJournalId
+ * with a chain of connections through the provided journal chain.
+ */
+async function insertChain(
+  loopId: string,
+  insertAfterJournalId: string,
+  insertBeforeJournalId: string,
+  journalChain: string[],
+  userId: string
+): Promise<LoopWithConnections | null> {
+  serviceLogger.debug(`loopService.insertChain: Input - loopId: ${loopId}, insertAfter: ${insertAfterJournalId}, insertBefore: ${insertBeforeJournalId}, chain: [${journalChain.join(', ')}]`);
+
+  // Check if loop exists
+  const existingLoop = await prisma.journalLoop.findFirst({
+    where: { id: loopId, entityState: 'ACTIVE' },
+    include: {
+      journalConnections: {
+        include: {
+          fromJournal: { select: { id: true, name: true } },
+          toJournal: { select: { id: true, name: true } },
+        },
+        orderBy: { sequence: 'asc' },
+      },
+    },
+  });
+
+  if (!existingLoop) {
+    return null;
+  }
+
+  // Validate that insertAfter -> insertBefore connection exists
+  const targetConnection = existingLoop.journalConnections.find(
+    conn => conn.fromJournalId === insertAfterJournalId && conn.toJournalId === insertBeforeJournalId
+  );
+
+  if (!targetConnection) {
+    throw new Error(`Invalid insertion: No connection found from ${insertAfterJournalId} to ${insertBeforeJournalId} in loop ${loopId}`);
+  }
+
+  // Validate that all journals in the chain exist
+  const existingJournals = await prisma.journal.findMany({
+    where: { id: { in: journalChain } },
+    select: { id: true },
+  });
+
+  const existingIds = existingJournals.map(j => j.id);
+  const missingIds = journalChain.filter(id => !existingIds.includes(id));
+
+  if (missingIds.length > 0) {
+    throw new Error(`Invalid insertion: Journals not found: ${missingIds.join(', ')}`);
+  }
+
+  // Check if any journal in the chain already exists in the loop
+  const existingLoopJournalIds = new Set();
+  existingLoop.journalConnections.forEach(conn => {
+    existingLoopJournalIds.add(conn.fromJournalId);
+    existingLoopJournalIds.add(conn.toJournalId);
+  });
+
+  const duplicateJournals = journalChain.filter(id => existingLoopJournalIds.has(id));
+  if (duplicateJournals.length > 0) {
+    throw new Error(`Invalid insertion: Journals already exist in loop: ${duplicateJournals.join(', ')}`);
+  }
+
+  // Perform the insertion in a transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // Remove the existing direct connection
+    await tx.journalLoopConnection.delete({
+      where: { id: targetConnection.id },
+    });
+
+    // Build the new chain connections
+    const newConnections: Prisma.JournalLoopConnectionCreateManyInput[] = [];
+    let currentSequence = targetConnection.sequence;
+
+    // Create connections for the chain
+    for (let i = 0; i < journalChain.length; i++) {
+      const fromJournalId = i === 0 ? insertAfterJournalId : journalChain[i - 1];
+      const toJournalId = journalChain[i];
+
+      newConnections.push({
+        loopId,
+        fromJournalId,
+        toJournalId,
+        sequence: currentSequence,
+      });
+      currentSequence += 0.1; // Use decimal increments to insert between existing sequences
+    }
+
+    // Add final connection from last chain journal to insertBeforeJournalId
+    newConnections.push({
+      loopId,
+      fromJournalId: journalChain[journalChain.length - 1],
+      toJournalId: insertBeforeJournalId,
+      sequence: currentSequence,
+    });
+
+    // Insert the new connections
+    await tx.journalLoopConnection.createMany({
+      data: newConnections,
+    });
+
+    // Update all sequence numbers to be integers again
+    const allConnections = await tx.journalLoopConnection.findMany({
+      where: { loopId },
+      orderBy: { sequence: 'asc' },
+    });
+
+    for (let i = 0; i < allConnections.length; i++) {
+      await tx.journalLoopConnection.update({
+        where: { id: allConnections[i].id },
+        data: { sequence: i },
+      });
+    }
+
+    // Return the updated loop with connections
+    return await tx.journalLoop.findUniqueOrThrow({
+      where: { id: loopId },
+      include: {
+        journalConnections: {
+          include: {
+            fromJournal: { select: { id: true, name: true } },
+            toJournal: { select: { id: true, name: true } },
+          },
+          orderBy: { sequence: 'asc' },
+        },
+      },
+    });
+  });
+
+  serviceLogger.debug(`loopService.insertChain: Output - chain inserted successfully in loop ${result.id}`);
+  return result;
+}
+
 // Export the service
 export const loopService = {
   getLoops,
@@ -355,4 +545,6 @@ export const loopService = {
   deleteLoop,
   getLoopsForJournal,
   validateLoop,
+  detectConnection,
+  insertChain,
 };
